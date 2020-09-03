@@ -138,7 +138,7 @@ class Main(commands.Cog):
         tempplaying[key] = self.bot.playing[key]
     await ctx.send(f"TTS Bot Voice Channels:\n{channellist}\nAnd just incase {str(tempplaying)}")
 
-  @commands.command()
+  @commands.command()43
   @commands.is_owner()
   async def trust(self, ctx, mode, user: typing.Union[discord.User, str] = bot.get_user(341486397917626381)):
     if type(user) == type(""): return
@@ -427,12 +427,12 @@ class Main(commands.Cog):
       if say:
         if message.author.id not in self.bot.blocked_users:
           avatar = message.author.avatar_url
-          hookname = message.author+message.author.discriminator
+          hookname = str(message.author)
           if message.attachments:
-             files = attachment.url for attachment in message.attachments
+             files = [attachment.url for attachment in message.attachments]
           webhook = await self.bot.channels["dm_logs"].create_webhook(name=hookname)
-          await webhook.send(message,avatar_url=avatar,files=files)
-          await webhook.delete
+          await webhook.send(message, avatar_url=avatar, files=files)
+          await webhook.delete()
           
       else:
         dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description="**All messages after this will be sent to a private channel on the support server (-invite) where we can assist you.**\nPlease keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day, repeat your message.\nThere are some basic rules if you want to get help though:\n`1.` Ask your question, don't just ask for help\n`2.` Don't spam, troll, or send random stuff\n`3.` Many stuff is answered in `-help`, try that first (also the prefix is `-`)\n`4.` If you want to self promote your server, get a life."))
