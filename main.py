@@ -73,9 +73,8 @@ def emojiAnimatedToWord(text):
 BOT_PREFIX = "-"
 bot = commands.Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 bot.load_extension("cogs.common")
-bot.remove_command("help")
-bot.remove_command("end")
-bot.remove_command("suggest")
+for overwriten_command in ("help", "end", "suggest", "botstats"):
+  bot.remove_command(overwriten_command)
 #//////////////////////////////////////////////////////
 class Main(commands.Cog):
   def __init__(self, bot):
@@ -561,24 +560,22 @@ class Main(commands.Cog):
     await ctx.send(embed=embed)
 
   @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
-  @commands.command()
-  async def info(self, ctx):
-    await ctx.channel.trigger_typing()
-    
-    channellist = list()
-    for guild1 in self.bot.guilds:
-      try:
-        channellist.append(str(guild1.voice_client.channel))
-      except:
-        pass
+  @commands.command(aliases=["botstats", "stats"])
+  async def info(self, ctx):    
+    channels = int()
+    for guild in self.bot.guilds:
+      try:  if guild.voice_client:  channels += 1
+      except: pass        
 
     embed=discord.Embed(title="TTS Bot Info", url="https://discord.gg/zWPWwQC", color=0x3498db)
     embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/513423712582762502/760ae3b79b2ca0fcd91dc9d89c6984c5.png")
     embed.add_field(name="**Info**", value=cleandoc(f"""
-      TTS Bot: Developed by Gnome!#6669
-      Currently in {str(len(channellist))} voice channels!
+      {self.bot.user.name}: Now open source!
+      Currently in {str(channels)} voice channels!
+      Currently in {self.bot.user.name} in {len(self.bot.guilds)} servers
+      {self.bot.user.name} can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people"
       Support Server: https://discord.gg/zWPWwQC
-      Prefix: `-`
+      Repository: https://github.com/Gnome-py/Discord-TTS-Bot
       """), inline=False)
     await ctx.send(embed=embed)
 
@@ -667,8 +664,8 @@ class Settings(commands.Cog):
     self._last_member = None 
 
   @commands.guild_only()
-  @commands.command()
   @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+  @commands.command()
   async def settings(self, ctx, help = None):
     if help == "help":
       message = cleandoc("""
