@@ -269,7 +269,7 @@ class Main(commands.Cog):
   async def on_message(self, message):
     if message.embeds and message.channel.id == 749971061843558440 and str(message.author) == "GitHub#0000":
       print("Message is from a github webhook")
-      if message.embeds[0].title.endswith(" new commit"):
+      if " new commit" in message.embeds[0].title:
         print("Message is a commit")
         update_for_main = message.embeds[0].title.startswith("[Discord-TTS-Bot:master]") and self.bot.user.id == 513423712582762502
         update_for_dev = message.embeds[0].title.startswith("[Discord-TTS-Bot:dev]") and self.bot.user.id == 698218518335848538
