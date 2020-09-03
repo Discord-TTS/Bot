@@ -145,7 +145,7 @@ class Main(commands.Cog):
     
     if mode == "add":
       self.bot.trusted = self.bot.trusted.append(str(user.id))
-      config["Main"]["trusted_ids"] = self.bot.trusted
+      config["Main"]["trusted_ids"] = str(self.bot.trusted)
       with open("config.ini", "w") as configfile:
         config.write(configfile)
 
@@ -381,7 +381,12 @@ class Main(commands.Cog):
 
                   path = f"servers/{message.guild.id}"
                   saveto = f"{path}/{str(message.id)}.mp3"
-                  gTTS.gTTS(text = saythis, lang = lang, slow = False).save(saveto)
+
+                  try:  gTTS.gTTS(text = saythis, lang = lang, slow = False).save(saveto)
+                  except AssertionError:  
+                    try:  os.remove(saveto)
+                    except FileNotFoundError: pass
+                    return
 
                   # Discard if over 30 seconds
                   if int(MP3(saveto).info.length) >= 30:
