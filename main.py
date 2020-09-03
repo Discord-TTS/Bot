@@ -785,8 +785,6 @@ class Settings(commands.Cog):
     
     if lang in langs:
       self.bot.setlangs[str(ctx.author.id)] = lang.lower()
-      with open("setlangs.json", "w") as f:
-        json.dump(self.bot.setlangs, f)
       await ctx.send(f"Changed your voice to: {self.bot.setlangs[str(ctx.author.id)]}")
     else:
       await ctx.send("Invalid voice, do -voices")
@@ -800,12 +798,12 @@ class Settings(commands.Cog):
       try:  return await self.voice(ctx, lang)
       except: pass  
       
-    try:      
-      msg = await ctx.send(f"-My currently supported language codes are: \n{listtostring1(langs)}\nAnd you are using: {self.bot.setlangs[str(ctx.author.id)]}")
-    except:
-      lang = self.bot.setlangs[str(ctx.author.id)] = "en-us"
-      msg = await ctx.send(f"-My currently supported language codes are: \n{listtostring1(langs)}\nAnd you are using: {self.bot.setlangs[str(ctx.author.id)]}")
-    await msg.edit(content=msg.content[1:])
+
+    if str(ctx.author.id) in self.bot.setlangs: 
+      lang = self.bot.setlangs[str(ctx.author.id)]
+    else: lang = "en-us"
+      
+    await ctx.send(f"My currently supported language codes are: \n{listtostring1(langs)}\nAnd you are using: {lang}")
 #//////////////////////////////////////////////////////
 
 bot.add_cog(Main(bot))
