@@ -162,7 +162,7 @@ class Main(commands.Cog):
   @commands.check(is_trusted)
   async def block(self, ctx, user: discord.User, notify: bool = False):
     if user.id in self.bot.blocked_users:
-      return await ctx.send("They are already blocked!")
+      return await ctx.send(f"{str(user)} | {user.id} is already blocked!")
 
     self.bot.blocked_users.append(user.id)
 
@@ -174,7 +174,7 @@ class Main(commands.Cog):
   @commands.check(is_trusted)
   async def unblock(self, ctx, user: discord.User, notify: bool = False):
     if user.id not in self.bot.blocked_users:
-      return await ctx.send("They aren't blocked!")
+      return await ctx.send(f"{str(user)} | {user.id} isn't blocked!")
 
     self.bot.blocked_users.remove(user.id)
     
