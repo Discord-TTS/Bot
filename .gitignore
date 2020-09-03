@@ -1,0 +1,8 @@
+*.json
+*.txt
+*.save
+*.mp3
+__pycache__
+config.ini
+backup.py
+servers
