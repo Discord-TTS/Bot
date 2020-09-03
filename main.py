@@ -138,7 +138,7 @@ class Main(commands.Cog):
         tempplaying[key] = self.bot.playing[key]
     await ctx.send(f"TTS Bot Voice Channels:\n{channellist}\nAnd just incase {str(tempplaying)}")
 
-  @commands.command()43
+  @commands.command()
   @commands.is_owner()
   async def trust(self, ctx, mode, user: typing.Union[discord.User, str] = bot.get_user(341486397917626381)):
     if type(user) == type(""): return
