@@ -564,8 +564,11 @@ class Main(commands.Cog):
   async def info(self, ctx):    
     channels = int()
     for guild in self.bot.guilds:
-      try:  if guild.voice_client:  channels += 1
-      except: pass        
+      try:
+        if guild.voice_client:
+          channels += 1
+      except:
+        pass        
 
     embed=discord.Embed(title="TTS Bot Info", url="https://discord.gg/zWPWwQC", color=0x3498db)
     embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/513423712582762502/760ae3b79b2ca0fcd91dc9d89c6984c5.png")
