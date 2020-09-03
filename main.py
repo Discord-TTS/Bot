@@ -429,7 +429,8 @@ class Main(commands.Cog):
         if message.author.id not in self.bot.blocked_users:
           webhook = await self.bot.channels["dm_logs"].create_webhook(name=str(message.author))
           
-          if message.attachments: files = [attachment.url for attachment in message.attachments]
+          if message.attachments: 
+            files = [await attachment.to_file() for attachment in message.attachments]
           else: files = None
             
           await webhook.send(message.content, avatar_url=message.author.avatar_url, files=files)
