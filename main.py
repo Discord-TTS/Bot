@@ -390,13 +390,11 @@ class Main(commands.Cog):
 
                   # Discard if over 30 seconds
                   if int(MP3(saveto).info.length) >= 30:
-                    os.remove(saveto)
-                    return
+                    return os.remove(saveto)
                   
                   # Queue, please don't touch this, it works somehow
                   while self.bot.playing[message.guild.id] != 0:
-                    if self.bot.playing[message.guild.id] == 2:
-                      return
+                    if self.bot.playing[message.guild.id] == 2: return
                     await asyncio.sleep(0.5)
                   
                   self.bot.playing[message.guild.id] = 1
@@ -404,14 +402,12 @@ class Main(commands.Cog):
                   # Select file and play
                   while True:
                     firstmp3 = natsort.natsorted(os.listdir(path),reverse=False)[0]
-                    if firstmp3.endswith(".mp3"):
-                      break
-                    else:
-                      os.remove(f"{path}/{firstmp3}")
+                    if firstmp3.endswith(".mp3"): break
+                    else: os.remove(f"{path}/{firstmp3}")
                   
                   vc = message.guild.voice_client
                   if vc is not None: 
-                    vc.play(discord.FFmpegPCMAudio(f"{path}/{firstmp3}"))
+                    vc.play(discord.FFmpegPCMAudio(f"{path}/{firstmp3}", before_options="-hide_banner -loglevel panic"))
                     
                     while vc.is_playing():
                         await asyncio.sleep(0.5)
