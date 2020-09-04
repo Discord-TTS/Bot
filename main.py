@@ -143,7 +143,7 @@ class Main(commands.Cog):
     if isinstance(user, str): return
     
     if mode == "add":
-      self.bot.trusted = self.bot.trusted.append(str(user.id))
+      self.bot.trusted.append(str(user.id))
       config["Main"]["trusted_ids"] = str(self.bot.trusted)
       with open("config.ini", "w") as configfile:
         config.write(configfile)
