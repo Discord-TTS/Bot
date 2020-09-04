@@ -140,20 +140,24 @@ class Main(commands.Cog):
   @commands.command()
   @commands.is_owner()
   async def trust(self, ctx, mode, user: typing.Union[discord.User, str] = bot.get_user(341486397917626381)):
-    if type(user) == type(""): return
+    if isinstance(user, str): return
     
     if mode == "add":
       self.bot.trusted = self.bot.trusted.append(str(user.id))
       config["Main"]["trusted_ids"] = str(self.bot.trusted)
       with open("config.ini", "w") as configfile:
         config.write(configfile)
+      
+      await ctx.send(f"Added {str(user)} | {user.id} to the trusted members")
 
     elif mode == "del":
       if str(user.id) in self.bot.trusted:
         self.bot.trusted.remove(str(user.id))
         with open("config.ini", "w") as configfile:
           config.write(configfile)
-    
+
+        await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
+
     elif mode == "list":
       await ctx.send("\n".join(self.bot.trusted))
 
@@ -406,7 +410,7 @@ class Main(commands.Cog):
                   
                   vc = message.guild.voice_client
                   if vc is not None: 
-                    vc.play(discord.FFmpegPCMAudio(f"{path}/{firstmp3}", before_options="-hide_banner -loglevel panic"))
+                    vc.play(discord.FFmpegPCMAudio(f"{path}/{firstmp3}"))
                     
                     while vc.is_playing():
                         await asyncio.sleep(0.5)
