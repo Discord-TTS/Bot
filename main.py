@@ -562,8 +562,12 @@ class Main(commands.Cog):
         embed=discord.Embed(title="TTS Bot Info", url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/513423712582762502/760ae3b79b2ca0fcd91dc9d89c6984c5.png")
         
-        # Cleandoc wasn't playing nice
-        main_section = f"Currently in:\n  {str(channels)} voice channels\n  {len(self.bot.guilds)} servers\nand be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people"
+        main_section = cleandoc(f"""
+          Currently in:
+            :small_orange_diamond: {str(channels)} voice channels
+            :small_orange_diamond: {len(self.bot.guilds)} servers
+          and be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people
+        """)
         
         footer = cleandoc("""
             Support Server: https://discord.gg/zWPWwQC
