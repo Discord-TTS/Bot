@@ -547,6 +547,7 @@ class Main(commands.Cog):
           """
         message1 = f"""
           `-help`: Shows this message
+          `-botstats`: Shows various different stats 
           `-donate`: Help improve TTS Bot's development and hosting through Patreon
           `-suggest *suggestion*`: Suggests a new feature! (could also DM TTS Bot)
           `-invite`: Sends the instructions to invite TTS Bot!"""
@@ -569,14 +570,22 @@ class Main(commands.Cog):
 
         embed=discord.Embed(title="TTS Bot Info", url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/513423712582762502/760ae3b79b2ca0fcd91dc9d89c6984c5.png")
-        embed.add_field(name="**Info**", value=cleandoc(f"""
-          {self.bot.user.name}: Now open source!
-          Currently in {str(channels)} voice channels!
-          Currently in {self.bot.user.name} in {len(self.bot.guilds)} servers
-          {self.bot.user.name} can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people"
-          Support Server: https://discord.gg/zWPWwQC
-          Repository: https://github.com/Gnome-py/Discord-TTS-Bot
-          """), inline=False)
+        
+        main_section = cleandoc(f"""
+          Currently:
+            In {str(channels)} voice channels
+            In {len(self.bot.guilds)} servers
+            Can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people
+        """)
+        
+        footer = cleandoc("""
+            Support Server: https://discord.gg/zWPWwQC
+            Repository: https://github.com/Gnome-py/Discord-TTS-Bot
+        """)
+        
+        embed.add_field(name=f"**{self.bot.user.name}: Now open source!**", value=main_section, inline=False)
+        embed.set_footer(text=footer)
+
         await ctx.send(embed=embed)
 
     @commands.guild_only()
