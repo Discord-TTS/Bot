@@ -401,7 +401,7 @@ class Main(commands.Cog):
 
                             vc = message.guild.voice_client
                             if vc is not None:
-                                vc.play(discord.FFmpegPCMAudio(f"{path}/{firstmp3}"))
+                                vc.play(discord.FFmpegPCMAudio(f"{path}/{firstmp3}", options='-loglevel "quiet"'))
 
                                 while vc.is_playing():
                                     await asyncio.sleep(0.5)
