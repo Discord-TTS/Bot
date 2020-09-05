@@ -5,7 +5,7 @@ import re
 import shutil
 import time
 import traceback
-import typing
+from typing import Union
 from configparser import ConfigParser
 from inspect import cleandoc
 from subprocess import call
@@ -139,7 +139,7 @@ class Main(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
-    async def trust(self, ctx, mode, user: typing.Union[discord.User, str] = bot.get_user(341486397917626381)):
+    async def trust(self, ctx, mode, user: Union[discord.User, str] = bot.get_user(341486397917626381)):
         if isinstance(user, str): return
 
         if mode == "add":
@@ -515,10 +515,6 @@ class Main(commands.Cog):
         await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
         await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
 
-    @commands.Cog.listener()
-    async def on_member_join(self, member):
-        if member is not None and member.guild.owner == member and guild.owner in self.bot.supportserver.members:
-            await self.bot.supportserver.get_member(member.id).add_roles(self.bot.supportserver.get_role(703307566654160969))
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
@@ -539,7 +535,6 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["commands"])
     async def help(self, ctx):
-        await ctx.channel.trigger_typing()
         message = f"""
           `-setup #textchannel`: Setup the bot to read messages from that channel
 
