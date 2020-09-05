@@ -139,10 +139,14 @@ class Main(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
-    async def trust(self, ctx, mode, user: Union[discord.User, str] = bot.get_user(341486397917626381)):
-        if isinstance(user, str): return
+    async def trust(self, ctx, mode, user: Union[discord.User, str] = ""):
+        if mode == "list":
+            await ctx.send("\n".join(self.bot.trusted))
 
-        if mode == "add":
+        elif isinstance(user, str):
+            return
+        
+        elif mode == "add":
             self.bot.trusted.append(str(user.id))
             config["Main"]["trusted_ids"] = str(self.bot.trusted)
             with open("config.ini", "w") as configfile:
@@ -153,13 +157,11 @@ class Main(commands.Cog):
         elif mode == "del":
             if str(user.id) in self.bot.trusted:
                 self.bot.trusted.remove(str(user.id))
+                config["Main"]["trusted_ids"] = str(self.bot.trusted)
                 with open("config.ini", "w") as configfile:
                     config.write(configfile)
 
                 await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
-
-        elif mode == "list":
-            await ctx.send("\n".join(self.bot.trusted))
 
     @commands.command()
     @commands.check(is_trusted)
@@ -184,17 +186,6 @@ class Main(commands.Cog):
         await ctx.send(f"Unblocked {str(user)} | {str(user.id)}")
         if notify:
             await user.send("You have been unblocked from support DMs.")
-
-    @commands.command()
-    @commands.check(is_trusted)
-    async def delete_dms(self, ctx, user: discord.User):
-        await user.send("Deleting DMs!")
-
-        async for message in user.history(oldest_first=True):
-            if message.author.id == self.bot.user.id:
-                await message.delete()
-
-        await ctx.send("Done!")
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.Cog.listener()
     async def on_ready(self):
@@ -547,6 +538,7 @@ class Main(commands.Cog):
           """
         message1 = f"""
           `-help`: Shows this message
+          `-botstats`: Shows various different stats 
           `-donate`: Help improve TTS Bot's development and hosting through Patreon
           `-suggest *suggestion*`: Suggests a new feature! (could also DM TTS Bot)
           `-invite`: Sends the instructions to invite TTS Bot!"""
@@ -569,14 +561,22 @@ class Main(commands.Cog):
 
         embed=discord.Embed(title="TTS Bot Info", url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/513423712582762502/760ae3b79b2ca0fcd91dc9d89c6984c5.png")
-        embed.add_field(name="**Info**", value=cleandoc(f"""
-          {self.bot.user.name}: Now open source!
-          Currently in {str(channels)} voice channels!
-          Currently in {self.bot.user.name} in {len(self.bot.guilds)} servers
-          {self.bot.user.name} can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people"
-          Support Server: https://discord.gg/zWPWwQC
-          Repository: https://github.com/Gnome-py/Discord-TTS-Bot
-          """), inline=False)
+        
+        main_section = cleandoc(f"""
+          Currently in:
+            :small_blue_diamond: {str(channels)} voice channels
+            :small_orange_diamond: {len(self.bot.guilds)} servers
+          and can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people!
+        """)
+        
+        footer = cleandoc("""
+            Support Server: https://discord.gg/zWPWwQC
+            Repository: https://github.com/Gnome-py/Discord-TTS-Bot
+        """)
+        
+        embed.add_field(name=f"**{self.bot.user.name}: Now open source!**", value=main_section, inline=False)
+        embed.set_footer(text=footer)
+
         await ctx.send(embed=embed)
 
     @commands.guild_only()
@@ -730,7 +730,7 @@ class Settings(commands.Cog):
         }
 
         if key in needs_admin_to_edit:
-            if not ctx.author.guild_permissions.administrator and ctx.author.id != 341486397917626381:
+            if not ctx.author.guild_permissions.administrator and not await bot.is_owner(ctx.author.id):
                 return await ctx.send(f"Error: You need administrator permission to edit {key}!")
 
             if key == "xsaid":
