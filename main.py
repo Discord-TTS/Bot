@@ -564,9 +564,9 @@ class Main(commands.Cog):
         
         main_section = cleandoc(f"""
           Currently in:
-            :small_orange_diamond: {str(channels)} voice channels
+            :small_blue_diamond: {str(channels)} voice channels
             :small_orange_diamond: {len(self.bot.guilds)} servers
-          and be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people
+          and can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people!
         """)
         
         footer = cleandoc("""
