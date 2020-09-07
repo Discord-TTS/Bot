@@ -730,7 +730,7 @@ class Settings(commands.Cog):
         }
 
         if key in needs_admin_to_edit:
-            if not ctx.author.guild_permissions.administrator and not await bot.is_owner(ctx.author.id):
+            if not ctx.author.guild_permissions.administrator and not await self.bot.is_owner(ctx.author):
                 return await ctx.send(f"Error: You need administrator permission to edit {key}!")
 
             if key == "xsaid":
