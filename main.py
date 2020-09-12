@@ -44,7 +44,7 @@ def listtostring1(s):
         str1 = f'{str1}"{ele}", '
     return str1
 def emojitoword(text):
-    emojiRegex = re.compile('<:.+:\d+\d+>')
+    emojiRegex = re.compile(r'<:.+:\d+\d+>')
     words = text.split(' ')
     output = []
 
@@ -57,7 +57,7 @@ def emojitoword(text):
 
     return ' '.join([str(x) for x in output])
 def emojiAnimatedToWord(text):
-    emojiAniRegex = re.compile('<a\:.+:\d+>')
+    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
     words = text.split(' ')
     output = []
     for x in words:
@@ -73,7 +73,7 @@ def emojiAnimatedToWord(text):
 BOT_PREFIX = "-"
 bot = commands.Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 bot.load_extension("cogs.common")
-for overwriten_command in ("help", "end", "suggest", "botstats"):
+for overwriten_command in ("help", "end", "botstats"):
     bot.remove_command(overwriten_command)
 #//////////////////////////////////////////////////////
 class Main(commands.Cog):
@@ -298,7 +298,10 @@ class Main(commands.Cog):
             if message.author.discriminator == "0000":
                 return
 
-            autojoin = self.bot.settings[str(message.guild.id)]["auto_join"]
+            # Get autojoin setting, return if settings aren't loaded (fully or at all)
+            try:    autojoin = self.bot.settings[str(message.guild.id)]["auto_join"]
+            except KeyError:    return  
+
             # if author is a bot and bot ignore is on
             if self.bot.settings[str(message.guild.id)]["bot_ignore"] and message.author.bot:
                 return
@@ -313,10 +316,10 @@ class Main(commands.Cog):
             # If message is **not** empty **or** there is an attachment
             if int(len(saythis)) != 0 or message.attachments:
 
-                    # Ignore messages starting with - that are probably commands (also advertised as a feature when it is wrong lol)
+                # Ignore messages starting with - that are probably commands (also advertised as a feature when it is wrong lol)
                 if saythis.startswith("-") is False or saythis.startswith("-tts"):
 
-                        # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
+                    # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
                     if autojoin or saythis.startswith("-tts ") or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
                         # Check if a setup channel
@@ -340,17 +343,18 @@ class Main(commands.Cog):
                               " irl": "in real life",
                               "gtg": " got to go ",
                               "iirc": "if I recall correctly",
+                              "™️": " tm",
                               "-tts": "",
                             }
                             for toreplace, replacewith in acronyms.items():
                                 saythis = saythis.replace(toreplace, replacewith)
 
                             # Spoiler filter
-                            saythis = re.sub("\|\|.*?\|\|", ". spoiler avoided.", saythis)
+                            saythis = re.sub(r"\|\|.*?\|\|", ". spoiler avoided.", saythis)
 
                             # Url filter
                             saythisbefore = saythis
-                            saythis = re.sub("(https?:\/\/)(\s)*(www\.)?(\s)*((\w|\s)+\.)*([\w\-\s]+\/)*([\w\-]+)((\?)?[\w\s]*=\s*[\w\%&]*)*", "", str(saythis))
+                            saythis = re.sub(r"(https?:\/\/)(\s)*(www\.)?(\s)*((\w|\s)+\.)*([\w\-\s]+\/)*([\w\-]+)((\?)?[\w\s]*=\s*[\w\%&]*)*", "", str(saythis))
                             if saythisbefore != saythis:
                                 saythis = saythis + ". This message contained a link"
 
@@ -401,7 +405,7 @@ class Main(commands.Cog):
 
                             vc = message.guild.voice_client
                             if vc is not None:
-                                vc.play(discord.FFmpegPCMAudio(f"{path}/{firstmp3}"))
+                                vc.play(discord.FFmpegPCMAudio(f"{path}/{firstmp3}", options='-loglevel "quiet"'))
 
                                 while vc.is_playing():
                                     await asyncio.sleep(0.5)
@@ -431,7 +435,18 @@ class Main(commands.Cog):
                     await webhook.delete()
 
             else:
-                dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description="**All messages after this will be sent to a private channel on the support server (-invite) where we can assist you.**\nPlease keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day, repeat your message.\nThere are some basic rules if you want to get help though:\n`1.` Ask your question, don't just ask for help\n`2.` Don't spam, troll, or send random stuff\n`3.` Many stuff is answered in `-help`, try that first (also the prefix is `-`)\n`4.` If you want to self promote your server, get a life."))
+                embed_message = cleandoc("""
+                    **All messages after this will be sent to a private channel on the support server (-invite) where we can assist you.**
+                    Please keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day, repeat your message.
+                    There are some basic rules if you want to get help though:
+                    `1.` Ask your question, don't just ask for help
+                    `2.` Don't spam, troll, or send random stuff (including server invites)
+                    `3.` Many stuff is answered in `-help`, try that first (also the prefix is `-`)
+                """)   
+
+                embed = discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description=embed_message)
+                dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=embed)
+
                 await self.bot.channels["logs"].send(f"{str(message.author)} just got the 'Welcome to Support DMs' message")
                 await dm_message.pin()
 
@@ -512,12 +527,6 @@ class Main(commands.Cog):
         self.bot.settings.pop(str(guild.id), None)
         await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)} (owned by {str(guild.owner)}). I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    @commands.command()
-    async def suggest(self, ctx, *, suggestion):
-        if ctx.author.id not in self.bot.blocked_users:
-            await self.bot.channels["suggestions"].send(f"{str(ctx.author)} in {ctx.guild.name} suggested: {suggestion}")
-        await ctx.send("Suggestion noted")
-
     @commands.command()
     async def uptime(self, ctx):
         ping = str((time.monotonic() - before) / 60).split(".")[0]
