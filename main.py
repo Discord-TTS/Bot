@@ -298,7 +298,10 @@ class Main(commands.Cog):
             if message.author.discriminator == "0000":
                 return
 
-            autojoin = self.bot.settings[str(message.guild.id)]["auto_join"]
+            # Get autojoin setting, return if settings aren't loaded (fully or at all)
+            try:    autojoin = self.bot.settings[str(message.guild.id)]["auto_join"]
+            except KeyError:    return  
+
             # if author is a bot and bot ignore is on
             if self.bot.settings[str(message.guild.id)]["bot_ignore"] and message.author.bot:
                 return
@@ -340,6 +343,7 @@ class Main(commands.Cog):
                               " irl": "in real life",
                               "gtg": " got to go ",
                               "iirc": "if I recall correctly",
+                              "™️": " tm",
                               "-tts": "",
                             }
                             for toreplace, replacewith in acronyms.items():
