@@ -515,7 +515,12 @@ class Main(commands.Cog):
     @commands.command()
     async def suggest(self, ctx, *, suggestion):
         if ctx.author.id not in self.bot.blocked_users:
-            await self.bot.channels["suggestions"].send(f"{str(ctx.author)} in {ctx.guild.name} suggested: {suggestion}")
+            webhook = await self.bot.channels["suggestions"].create_webhook(name=str(ctx.message.author))
+            if ctx.message.attachments:
+                files = [await attachment.to_file() for attachment in ctx.message.attachments]
+            else:
+                files = None
+            await webhook.send(suggestion, avatar_url=ctx.message.author.avatar_url, files=files)
         await ctx.send("Suggestion noted")
 
     @commands.command()
