@@ -44,7 +44,7 @@ def listtostring1(s):
         str1 = f'{str1}"{ele}", '
     return str1
 def emojitoword(text):
-    emojiRegex = re.compile('<:.+:\d+\d+>')
+    emojiRegex = re.compile(r'<:.+:\d+\d+>')
     words = text.split(' ')
     output = []
 
@@ -57,7 +57,7 @@ def emojitoword(text):
 
     return ' '.join([str(x) for x in output])
 def emojiAnimatedToWord(text):
-    emojiAniRegex = re.compile('<a\:.+:\d+>')
+    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
     words = text.split(' ')
     output = []
     for x in words:
@@ -346,11 +346,11 @@ class Main(commands.Cog):
                                 saythis = saythis.replace(toreplace, replacewith)
 
                             # Spoiler filter
-                            saythis = re.sub("\|\|.*?\|\|", ". spoiler avoided.", saythis)
+                            saythis = re.sub(r"\|\|.*?\|\|", ". spoiler avoided.", saythis)
 
                             # Url filter
                             saythisbefore = saythis
-                            saythis = re.sub("(https?:\/\/)(\s)*(www\.)?(\s)*((\w|\s)+\.)*([\w\-\s]+\/)*([\w\-]+)((\?)?[\w\s]*=\s*[\w\%&]*)*", "", str(saythis))
+                            saythis = re.sub(r"(https?:\/\/)(\s)*(www\.)?(\s)*((\w|\s)+\.)*([\w\-\s]+\/)*([\w\-]+)((\?)?[\w\s]*=\s*[\w\%&]*)*", "", str(saythis))
                             if saythisbefore != saythis:
                                 saythis = saythis + ". This message contained a link"
 
