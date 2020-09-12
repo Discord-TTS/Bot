@@ -300,7 +300,7 @@ class Main(commands.Cog):
 
             # Get autojoin setting, return if settings aren't loaded (fully or at all)
             try:    autojoin = self.bot.settings[str(message.guild.id)]["auto_join"]
-            except KeyError:    return  
+            except (KeyError, AttributeError):    return  
 
             # if author is a bot and bot ignore is on
             if self.bot.settings[str(message.guild.id)]["bot_ignore"] and message.author.bot:
