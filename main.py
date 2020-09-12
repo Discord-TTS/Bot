@@ -73,7 +73,7 @@ def emojiAnimatedToWord(text):
 BOT_PREFIX = "-"
 bot = commands.Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 bot.load_extension("cogs.common")
-for overwriten_command in ("help", "end", "suggest", "botstats"):
+for overwriten_command in ("help", "end", "botstats"):
     bot.remove_command(overwriten_command)
 #//////////////////////////////////////////////////////
 class Main(commands.Cog):
@@ -527,17 +527,6 @@ class Main(commands.Cog):
         self.bot.settings.pop(str(guild.id), None)
         await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)} (owned by {str(guild.owner)}). I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    @commands.command()
-    async def suggest(self, ctx, *, suggestion):
-        if ctx.author.id not in self.bot.blocked_users:
-            webhook = await self.bot.channels["suggestions"].create_webhook(name=str(ctx.message.author))
-            if ctx.message.attachments:
-                files = [await attachment.to_file() for attachment in ctx.message.attachments]
-            else:
-                files = None
-            await webhook.send(suggestion, avatar_url=ctx.message.author.avatar_url, files=files)
-        await ctx.send("Suggestion noted")
-
     @commands.command()
     async def uptime(self, ctx):
         ping = str((time.monotonic() - before) / 60).split(".")[0]
