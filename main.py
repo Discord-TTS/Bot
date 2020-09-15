@@ -189,7 +189,6 @@ class Main(commands.Cog):
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.Cog.listener()
     async def on_ready(self):
-        ready = False
         self.bot.playing = dict()
         self.bot.settings = dict()
         self.bot.setlangs = dict()
@@ -212,8 +211,6 @@ class Main(commands.Cog):
 
         print(f"Starting as {self.bot.user.name}!")
         starting_message = await self.bot.channels["logs"].send(f"Starting {self.bot.user.mention}")
-
-        servers = os.listdir("servers")
 
         if not os.path.exists("blocked_users.json"):
             with open("blocked_users.json", "x") as f:
@@ -254,7 +251,6 @@ class Main(commands.Cog):
             with open("settings.json", "w") as f:
                 json.dump(self.bot.settings, f)
 
-        ready = True
         ping = str(time.monotonic() - before).split(".")[0]
         self.avoid_file_crashes.start()
         await starting_message.edit(content=f"Started and ready! Took `{ping} seconds`")
@@ -730,8 +726,6 @@ class Settings(commands.Cog):
           "1": True,
           "false": False,
           "true": True,
-          False: False,
-          True: True,
         }
         to_enabled = {
           True: "Enabled",
