@@ -35,11 +35,12 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
             
         raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
-def listtostring1(s):
-    str1 = ""
-    for ele in s:
-        str1 = f'{str1}"{ele}", '
-    return str1
+def remove_chars(remove_from, *chars):
+    input_string = str(remove_from)
+    for char in chars:  input_string = input_string.replace(char, "")
+    
+    return input_string
+
 def emojitoword(text):
     emojiRegex = re.compile(r'<:.+:\d+\d+>')
     words = text.split(' ')
@@ -48,11 +49,12 @@ def emojitoword(text):
     for x in words:
 
         if emojiRegex.match(x):
-            output.append(f"emoji {x.split(':')[1].replace('<','')}")
+            output.append(f"emoji {remove_chars(x.split(':')[1]), '<'}")
         else:
             output.append(x)
 
     return ' '.join([str(x) for x in output])
+
 def emojiAnimatedToWord(text):
     emojiAniRegex = re.compile(r'<a\:.+:\d+>')
     words = text.split(' ')
@@ -190,7 +192,7 @@ class Main(commands.Cog):
         self.bot.settings = dict()
         self.bot.setlangs = dict()
         self.bot.channels = dict()
-        self.bot.trusted = config["Main"]["trusted_ids"].replace("[", "").replace("]", "").replace("'", "").split(", ")
+        self.bot.trusted = remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
         self.bot.supportserver = self.bot.get_guild(int(config["Main"]["main_server"]))
         config_channel = config["Channels"]
 
@@ -361,7 +363,7 @@ class Main(commands.Cog):
                                 else:
                                     saythis = f"{message.author.display_name} said: {saythis}"
 
-                            if saythis.replace(" ", "").replace("?", "").replace(".", ".") == "":
+                            if remove_chars(saythis, " ", "?", ".") == "":
                                 return
 
                             # Read language file
@@ -463,7 +465,8 @@ class Main(commands.Cog):
             if "send_messages" in str(error.missing_perms):
                 return await ctx.author.send("Sorry I could not complete this command as I don't have send messages permissions.")
             else:
-                return await ctx.send(f'I am missing the permissions: {str(error.missing_perms).replace("[", "").replace("]", "")}')
+                return await ctx.send(f'I am missing the permissions: {remove_chars(error.missing_perms, "[", "]")}')
+
         elif isinstance(error, commands.NoPrivateMessage):
             return await ctx.author.send("**Error:** This command cannot be used in private messages.")
 
@@ -799,7 +802,7 @@ class Settings(commands.Cog):
             lang = self.bot.setlangs[str(ctx.author.id)]
         else: lang = "en-us"
 
-        await ctx.send(f"My currently supported language codes are: \n{listtostring1(langs)}\nAnd you are using: {lang}")
+        await ctx.send(f"My currently supported language codes are: \n{remove_chars(langs, "[", "]")}\nAnd you are using: {lang}")
 #//////////////////////////////////////////////////////
 
 bot.add_cog(Main(bot))
