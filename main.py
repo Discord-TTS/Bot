@@ -35,10 +35,7 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
             
         raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
-def remove_chars(remove_from, *chars):
-    if isinstance(remove_from, dict):
-        input_string = remove_from.keys()
-    
+def remove_chars(remove_from, *chars):    
     input_string = str(remove_from)
     for char in chars:  input_string = input_string.replace(char, "")
     
@@ -805,7 +802,7 @@ class Settings(commands.Cog):
             lang = self.bot.setlangs[str(ctx.author.id)]
         else: lang = "en-us"
 
-        langs_string = remove_chars(langs, "[", "]")
+        langs_string = remove_chars(list(langs.keys()), "[", "]")
         await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {lang}")
 #//////////////////////////////////////////////////////
 
