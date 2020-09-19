@@ -578,7 +578,7 @@ class Main(commands.Cog):
             Repository: https://github.com/Gnome-py/Discord-TTS-Bot
         """)
 
-        embed=discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section url="https://discord.gg/zWPWwQC", color=0x3498db)
+        embed=discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section, url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.set_footer(text=footer)
         embed.set_thumbnail(url=str(self.bot.user.avatar_url))
 
