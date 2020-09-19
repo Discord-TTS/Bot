@@ -5,10 +5,10 @@ import re
 import shutil
 import time
 import traceback
-from typing import Union
 from configparser import ConfigParser
 from inspect import cleandoc
 from subprocess import call
+from typing import Union
 
 import discord
 import gtts as gTTS
@@ -30,15 +30,15 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
         return True
 
     for opus_lib in opus_libs:
-        try:    return opus.load_opus(opus_lib) 
+        try:    return opus.load_opus(opus_lib)
         except OSError: pass
-            
+
         raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
-def remove_chars(remove_from, *chars):    
+def remove_chars(remove_from, *chars):
     input_string = str(remove_from)
     for char in chars:  input_string = input_string.replace(char, "")
-    
+
     return input_string
 
 def emojitoword(text):
@@ -144,7 +144,7 @@ class Main(commands.Cog):
 
         elif isinstance(user, str):
             return
-        
+
         elif mode == "add":
             self.bot.trusted.append(str(user.id))
             config["Main"]["trusted_ids"] = str(self.bot.trusted)
@@ -295,7 +295,7 @@ class Main(commands.Cog):
 
             # Get autojoin setting, return if settings aren't loaded (fully or at all)
             try:    autojoin = self.bot.settings[str(message.guild.id)]["auto_join"]
-            except (KeyError, AttributeError):    return  
+            except (KeyError, AttributeError):    return
 
             # if author is a bot and bot ignore is on
             if self.bot.settings[str(message.guild.id)]["bot_ignore"] and message.author.bot:
@@ -437,7 +437,7 @@ class Main(commands.Cog):
                     `1.` Ask your question, don't just ask for help
                     `2.` Don't spam, troll, or send random stuff (including server invites)
                     `3.` Many stuff is answered in `-help`, try that first (also the prefix is `-`)
-                """)   
+                """)
 
                 embed = discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description=embed_message)
                 dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=embed)
@@ -543,7 +543,7 @@ class Main(commands.Cog):
           """
         message1 = f"""
           `-help`: Shows this message
-          `-botstats`: Shows various different stats 
+          `-botstats`: Shows various different stats
           `-donate`: Help improve TTS Bot's development and hosting through Patreon
           `-suggest *suggestion*`: Suggests a new feature! (could also DM TTS Bot)
           `-invite`: Sends the instructions to invite TTS Bot!"""
@@ -564,23 +564,21 @@ class Main(commands.Cog):
             except:
                 pass
 
-        embed=discord.Embed(title="TTS Bot Info", url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/513423712582762502/760ae3b79b2ca0fcd91dc9d89c6984c5.png")
-        
         main_section = cleandoc(f"""
           Currently in:
             :small_blue_diamond: {str(channels)} voice channels
             :small_orange_diamond: {len(self.bot.guilds)} servers
           and can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people!
         """)
-        
+
         footer = cleandoc("""
             Support Server: https://discord.gg/zWPWwQC
             Repository: https://github.com/Gnome-py/Discord-TTS-Bot
         """)
-        
-        embed.add_field(name=f"**{self.bot.user.name}: Now open source!**", value=main_section, inline=False)
+
+        embed=discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.set_footer(text=footer)
+        embed.set_thumbnail(url=str(self.bot.user.avatar_url))
 
         await ctx.send(embed=embed)
 
