@@ -82,8 +82,8 @@ class Main(commands.Cog):
     def cog_unload(self):
         self.avoid_file_crashes.cancel()
 
-    def is_trusted(ctx):
-        if str(ctx.author.id) in bot.trusted: return True
+    def is_trusted(self, ctx):
+        if str(ctx.author.id) in self.bot.trusted: return True
         else: raise commands.errors.NotOwner
 
 #//////////////////////////////////////////////////////
@@ -420,6 +420,8 @@ class Main(commands.Cog):
 
             if say:
                 if message.author.id not in self.bot.blocked_users:
+                    if "https://discord.gg/" in message.content:
+                        return await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
                     webhook = await self.bot.channels["dm_logs"].create_webhook(name=str(message.author))
 
                     if message.attachments:
