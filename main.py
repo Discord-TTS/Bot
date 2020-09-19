@@ -36,6 +36,9 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
         raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
 def remove_chars(remove_from, *chars):
+    if isinstance(remove_from, dict):
+        input_string = remove_from.keys()
+    
     input_string = str(remove_from)
     for char in chars:  input_string = input_string.replace(char, "")
     
