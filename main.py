@@ -805,7 +805,8 @@ class Settings(commands.Cog):
             lang = self.bot.setlangs[str(ctx.author.id)]
         else: lang = "en-us"
 
-        await ctx.send(f"My currently supported language codes are: \n{remove_chars(langs, "[", "]")}\nAnd you are using: {lang}")
+        langs_string = remove_chars(langs, "[", "]")
+        await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {lang}")
 #//////////////////////////////////////////////////////
 
 bot.add_cog(Main(bot))
