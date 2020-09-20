@@ -77,7 +77,7 @@ async def get_setting(guild, setting):
     # Check for everything loaded
     while settings_loaded is False:
         await asyncio.sleep(1)
-        
+
     if guild in bot.settings and setting in bot.settings[guild]:
         returned_setting = bot.settings[guild][setting]
     else:
@@ -93,13 +93,17 @@ async def set_setting(guild, setting, value):
         await asyncio.sleep(1)
 
     if guild in bot.settings:
-        if value == default_settings[setting]:
+        if value == default_settings[setting] and setting in bot.settings[guild]:
             del bot.settings[guild][setting]
+            return
+        
         if bot.settings[guild] == dict():
             del bot.settings[guild]
+            return
     else:
         bot.settings[guild] = dict()
-        bot.settings[guild][setting] = value
+    
+    bot.settings[guild][setting] = value
 
     return
 
@@ -199,7 +203,7 @@ class Main(commands.Cog):
     @commands.command()
     @commands.check(is_trusted)
     async def cleanup(self, ctx):
-        guild_id_list = [guild.id for guild in self.bot.guilds]
+        guild_id_list = [str(guild.id) for guild in self.bot.guilds]
 
         for guild_id in self.bot.settings.copy():
             if guild_id not in guild_id_list:
@@ -212,8 +216,6 @@ class Main(commands.Cog):
 
             if self.bot.settings[guild_id] == dict():
                 del self.bot.settings[guild_id]
-        
-        self.bot.settings = self.bot.settings
 
         for folder in os.listdir("servers"):
             if folder not in guild_id_list:
