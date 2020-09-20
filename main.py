@@ -44,6 +44,7 @@ def listtostring1(s):
         str1 = f'{str1}"{ele}", '
     return str1
 def emojitoword(text):
+    
     emojiAniRegex = re.compile(r'<a\:.+:\d+>')
     emojiRegex = re.compile(r'<:.+:\d+\d+>')
     words = text.split(' ')
