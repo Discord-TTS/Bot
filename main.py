@@ -211,7 +211,7 @@ class Main(commands.Cog):
                 continue
 
             for key, value in self.bot.settings[guild_id].copy().items():
-                if value == default_settings[key]:
+                if key not in default_settings or value == default_settings[key]:
                     del self.bot.settings[guild_id][key]
 
             if self.bot.settings[guild_id] == dict():
