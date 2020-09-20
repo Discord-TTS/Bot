@@ -5,6 +5,13 @@ import os
 import discord
 from discord.ext import commands
 
+bot = commands.Bot(command_prefix="-")
+config = configparser.ConfigParser()
+
+token = input("Input a bot token: ")
+main_server = int(input("What is the ID of the main server for your bot? (Suggestions, errors and DMs will be sent here): "))
+trusted_ids = input("Input a list of trusted user IDs (allowing for moderation commands such as -(un)block, -dm, -refreshroles, -lookupinfo, and others.): ").split(", ")
+
 try:
   os.mkdir("servers")
 
@@ -18,15 +25,8 @@ try:
     json.dump(dict(), setlangs)
     json.dump(dict(), settings)
 except:
-  print("Failed making one of the files! If you are resetting to default, delete the servers folder,  all .txt, .json, and the .ini file before running this again!")
+  print("Failed making one of the files! If you are resetting to default, delete the servers folder, all .txt, .json, and the .ini file before running this again!")
   raise SystemExit
-
-bot = commands.Bot(command_prefix="-")
-config = configparser.ConfigParser()
-
-token = input("Input a bot token: ")
-main_server = int(input("What is the ID of the main server for your bot? (Suggestions, errors and DMs will be sent here): "))
-trusted_ids = input("Input a list of trusted user IDs (allowing for moderation commands such as -(un)block, -dm, -refreshroles, -lookupinfo, and others.): ").split(", ")
 
 config["Main"] = {
   "token": token,
