@@ -21,10 +21,13 @@ config = ConfigParser()
 config.read("config.ini")
 t = config["Main"]["Token"]
 
-#//////////////////////////////////////////////////////
+# Define random variables
 before = time.monotonic()
+settings_loaded = False
+default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True}
 OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
 
+# Define useful functions
 def load_opus_lib(opus_libs=OPUS_LIBS):
     if opus.is_loaded():
         return True
@@ -68,7 +71,39 @@ def emojiAnimatedToWord(text):
 
     return ' '.join([str(x) for x in output])
 
-#//////////////////////////////////////////////////////
+async def get_setting(guild, setting):
+    guild = str(guild.id)
+    
+    # Check for everything loaded
+    while settings_loaded is False:
+        await asyncio.sleep(1)
+        
+    if guild in bot.settings and setting in bot.settings[guild]:
+        returned_setting = bot.settings[guild][setting]
+    else:
+        returned_setting = default_settings[setting]
+
+    return returned_setting
+
+async def set_setting(guild, setting, value):
+    guild = str(guild.id)
+    
+    # Check for everything loaded
+    while settings_loaded is False:
+        await asyncio.sleep(1)
+
+    if guild in bot.settings:
+        if value == default_settings[setting]:
+            del bot.settings[guild][setting]
+        if bot.settings[guild] == dict():
+            del bot.settings[guild]
+    else:
+        bot.settings[guild] = dict()
+        bot.settings[guild][setting] = value
+
+    return
+
+# Define bot and remove overwritten commands
 BOT_PREFIX = "-"
 bot = commands.Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 bot.load_extension("cogs.common")
@@ -82,11 +117,10 @@ class Main(commands.Cog):
     def cog_unload(self):
         self.avoid_file_crashes.cancel()
 
-    def is_trusted(self, ctx):
-        if str(ctx.author.id) in self.bot.trusted: return True
+    def is_trusted(ctx):
+        if str(ctx.author.id) in bot.trusted: return True
         else: raise commands.errors.NotOwner
 
-#//////////////////////////////////////////////////////
     @tasks.loop(seconds=60.0)
     async def avoid_file_crashes(self):
         try:
@@ -161,7 +195,31 @@ class Main(commands.Cog):
                     config.write(configfile)
 
                 await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
+    
+    @commands.command()
+    @commands.check(is_trusted)
+    async def cleanup(self, ctx):
+        guild_id_list = [guild.id for guild in self.bot.guilds]
 
+        for guild_id in self.bot.settings.copy():
+            if guild_id not in guild_id_list:
+                del self.bot.settings[guild_id]
+                continue
+
+            for key, value in self.bot.settings[guild_id].copy().items():
+                if value == default_settings[key]:
+                    del self.bot.settings[guild_id][key]
+
+            if self.bot.settings[guild_id] == dict():
+                del self.bot.settings[guild_id]
+        
+        self.bot.settings = self.bot.settings
+
+        for folder in os.listdir("servers"):
+            if folder not in guild_id_list:
+                shutil.rmtree(f"servers/{folder}", ignore_errors=True)
+
+        await ctx.send("Done!")
     @commands.command()
     @commands.check(is_trusted)
     async def block(self, ctx, user: discord.User, notify: bool = False):
@@ -188,6 +246,7 @@ class Main(commands.Cog):
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.Cog.listener()
     async def on_ready(self):
+        global settings_loaded
         self.bot.playing = dict()
         self.bot.settings = dict()
         self.bot.setlangs = dict()
@@ -200,13 +259,6 @@ class Main(commands.Cog):
             channel_id = int(config_channel[channel_name])
             channel_object = self.bot.supportserver.get_channel(channel_id)
             self.bot.channels[channel_name] = channel_object
-
-        possible_settings = {
-          "channel": 0,
-          "xsaid": True,
-          "auto_join": False,
-          "bot_ignore": True
-        }
 
         print(f"Starting as {self.bot.user.name}!")
         starting_message = await self.bot.channels["logs"].send(f"Starting {self.bot.user.mention}")
@@ -223,32 +275,17 @@ class Main(commands.Cog):
             activity = f3.read()
             activitytype = f4.read()
             status = f5.read()
-
+        
+        settings_loaded = True
+        
         activitytype1 = getattr(discord.ActivityType, activitytype)
         status1 = getattr(discord.Status, status)
         await self.bot.change_presence(status=status1, activity=discord.Activity(name=activity, type=activitytype1))
 
         for guild in self.bot.guilds:
             self.bot.playing[guild.id] = 0
-            str_guildid = str(guild.id)
-            changed = False
-
-            if str_guildid not in self.bot.settings:
-                changed = True
-                self.bot.settings[str_guildid] = possible_settings
-            else:
-                for setting, default_value in possible_settings.items():
-                    if setting not in self.bot.settings[str_guildid]:
-                        changed = True
-                        self.bot.settings[str_guildid][setting] = default_value
-
-            directory = f"servers/{str_guildid}"
-            shutil.rmtree(directory, ignore_errors=True)
-            os.mkdir(directory)
-
-        if changed:
-            with open("settings.json", "w") as f:
-                json.dump(self.bot.settings, f)
+            if os.path.exists(f"servers/{str(guild.id)}") is False:
+                os.mkdir(f"servers/{str(guild.id)}")
 
         ping = str(time.monotonic() - before).split(".")[0]
         self.avoid_file_crashes.start()
@@ -293,12 +330,11 @@ class Main(commands.Cog):
             if message.author.discriminator == "0000":
                 return
 
-            # Get autojoin setting, return if settings aren't loaded (fully or at all)
-            try:    autojoin = self.bot.settings[str(message.guild.id)]["auto_join"]
-            except (KeyError, AttributeError):    return
+            # Get autojoin setting
+            autojoin = await get_setting(message.guild, "auto_join")
 
             # if author is a bot and bot ignore is on
-            if self.bot.settings[str(message.guild.id)]["bot_ignore"] and message.author.bot:
+            if await get_setting(message.guild, "bot_ignore") and message.author.bot:
                 return
 
             # if author is not a bot, and is not in a voice channel, and doesn't start with -tts
@@ -318,7 +354,7 @@ class Main(commands.Cog):
                     if autojoin or saythis.startswith("-tts ") or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
                         # Check if a setup channel
-                        if message.channel.id == self.bot.settings[str(message.guild.id)]["channel"]:
+                        if message.channel.id == await get_setting(message.guild, "channel"):
 
                             #Auto Join
                             if message.guild.voice_client is None and autojoin:
@@ -354,7 +390,7 @@ class Main(commands.Cog):
                                 saythis = saythis + ". This message contained a link"
 
                             # Toggleable X said and attachment detection
-                            if self.bot.settings[str(message.guild.id)]["xsaid"]:
+                            if await get_setting(message.guild, "xsaid"):
                                 if message.attachments:
                                     if len(message.clean_content.lower()) == 0:
                                         saythis = f"{message.author.display_name} sent an image."
@@ -509,13 +545,6 @@ class Main(commands.Cog):
 
             await self.bot.channels["servers"].send(embed=embed)
 
-        self.bot.settings[str(guild.id)] = {
-          "channel": 0,
-          "xsaid": True,
-          "auto_join": False,
-          "bot_ignore": True
-        }
-
         await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
         await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
 
@@ -589,7 +618,7 @@ class Main(commands.Cog):
     @commands.bot_has_guild_permissions(speak=True, connect=True, use_voice_activation=True)
     @commands.command()
     async def join(self, ctx):
-        if ctx.channel.id != self.bot.settings[str(ctx.guild.id)]["channel"]:
+        if ctx.channel.id != await get_setting(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
         if ctx.author.voice is None:
@@ -619,7 +648,7 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):
-        if ctx.channel.id != self.bot.settings[str(ctx.guild.id)]["channel"]:
+        if ctx.channel.id != await get_setting(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
         elif ctx.author.voice is None:
@@ -647,7 +676,7 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def channel(self, ctx):
-        channel = self.bot.settings[str(ctx.guild.id)]["channel"]
+        channel = await get_setting(ctx.guild, "channel")
 
         if channel == ctx.channel.id:
             await ctx.send("You are in the right channel already!")
@@ -680,10 +709,10 @@ class Settings(commands.Cog):
             embed.add_field(name="Available properties:", value=message, inline=False)
 
         else:
-            channel = ctx.guild.get_channel(self.bot.settings[str(ctx.guild.id)]["channel"])
-            say = self.bot.settings[str(ctx.guild.id)]["xsaid"]
-            join = self.bot.settings[str(ctx.guild.id)]["auto_join"]
-            bot_ignore = self.bot.settings[str(ctx.guild.id)]["bot_ignore"]
+            channel = ctx.guild.get_channel(await get_setting(ctx.guild, "channel"))
+            say = await get_setting(ctx.guild, "xsaid")
+            join = await get_setting(ctx.guild, "auto_join")
+            bot_ignore = await get_setting(ctx.guild, "bot_ignore")
 
             if channel is None: channel = "has not been setup yet"
             else: channel = channel.name
@@ -714,8 +743,8 @@ class Settings(commands.Cog):
             return await ctx.send("**Error:** This command cannot be used in DMs!")
 
         key = key.lower()
-        needs_admin_to_edit = ("xsaid", "auto_join", "autojoin", "botignore", "bot_ignore", "ignore_bots", "ignorebots")
-        no_admin_needed = ("channel", "language")
+        needs_admin_to_edit = ("xsaid", "auto_join", "autojoin", "botignore", "bot_ignore", "ignore_bots", "ignorebots", "channel" )
+        no_admin_needed = ("language")
 
         to_bool = {
           0: False,
@@ -739,7 +768,7 @@ class Settings(commands.Cog):
                     value = to_bool[value.lower()]
                 except:
                     return await ctx.send("Error: Invalid value")
-                self.bot.settings[str(ctx.guild.id)]["xsaid"] = value
+                await set_setting(ctx.guild, "xsaid", value)
                 return await ctx.send(f"xsaid is now: {to_enabled[value]}")
 
             elif key in ("auto_join", "autojoin"):
@@ -747,7 +776,7 @@ class Settings(commands.Cog):
                     value = to_bool[value.lower()]
                 except:
                     return await ctx.send("Error: Invalid value")
-                self.bot.settings[str(ctx.guild.id)]["auto_join"] = value
+                await set_setting(ctx.guild, "auto_join", value)
                 return await ctx.send(f"Auto Join is now: {to_enabled[value]}")
 
             elif key in ("botignore", "bot_ignore", "ignore_bots", "ignorebots"):
@@ -755,16 +784,15 @@ class Settings(commands.Cog):
                     value = to_bool[value.lower()]
                 except:
                     return await ctx.send("Error: Invalid value")
-                self.bot.settings[str(ctx.guild.id)]["bot_ignore"] = value
+                await set_setting(ctx.guild, "bot_ignore", value)
                 return await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
-        elif key in no_admin_needed:
-            if key == "channel":
+            elif key == "channel":
                 value = await commands.TextChannelConverter().convert(ctx, value)
                 await self.setup(ctx, value)
 
-            else:
-                await self.voice(ctx, value)
+        elif key in no_admin_needed:
+            await self.voice(ctx, value)
 
         else:
             await ctx.send("Error: Invalid property, do `-settings` to get a list!")
@@ -774,7 +802,7 @@ class Settings(commands.Cog):
     @commands.has_permissions(administrator=True)
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
-        self.bot.settings[str(ctx.guild.id)]["channel"] = channel.id
+        await set_setting(ctx.guild, "channel", channel.id)
         await ctx.send(f"Setup complete, {channel.mention} will now accept -join and -leave!")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
