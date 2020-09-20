@@ -54,7 +54,7 @@ def emojitoword(text):
         if emojiAniRegex.match(x):
             output.append(f"animated emoji {x.split(':')[1]}")
         elif emojiRegex.match(x):
-            output.append(f"emoji {x.split(':')[1].replace('<','')}")
+            output.append(f"emoji {x.split(':')[1]}")
         else:
             output.append(x)
 
