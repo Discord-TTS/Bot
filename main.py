@@ -44,26 +44,17 @@ def listtostring1(s):
         str1 = f'{str1}"{ele}", '
     return str1
 def emojitoword(text):
+    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
     emojiRegex = re.compile(r'<:.+:\d+\d+>')
     words = text.split(' ')
     output = []
 
     for x in words:
 
-        if emojiRegex.match(x):
-            output.append(f"emoji {x.split(':')[1].replace('<','')}")
-        else:
-            output.append(x)
-
-    return ' '.join([str(x) for x in output])
-def emojiAnimatedToWord(text):
-    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
-    words = text.split(' ')
-    output = []
-    for x in words:
-
         if emojiAniRegex.match(x):
             output.append(f"animated emoji {x.split(':')[1]}")
+        elif emojiRegex.match(x):
+            output.append(f"emoji {x.split(':')[1].replace('<','')}")
         else:
             output.append(x)
 
@@ -334,7 +325,6 @@ class Main(commands.Cog):
                                 await channel.connect()
 
                             # Emoji filter
-                            saythis = emojiAnimatedToWord(saythis)
                             saythis = emojitoword(saythis)
 
                             # Acronyms and removing -tts
