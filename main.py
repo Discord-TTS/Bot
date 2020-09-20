@@ -73,7 +73,7 @@ def emojiAnimatedToWord(text):
 
 async def get_setting(guild, setting):
     guild = str(guild.id)
-    
+
     # Check for everything loaded
     while settings_loaded is False:
         await asyncio.sleep(1)
@@ -87,7 +87,7 @@ async def get_setting(guild, setting):
 
 async def set_setting(guild, setting, value):
     guild = str(guild.id)
-    
+
     # Check for everything loaded
     while settings_loaded is False:
         await asyncio.sleep(1)
@@ -96,13 +96,13 @@ async def set_setting(guild, setting, value):
         if value == default_settings[setting] and setting in bot.settings[guild]:
             del bot.settings[guild][setting]
             return
-        
+
         if bot.settings[guild] == dict():
             del bot.settings[guild]
             return
     else:
         bot.settings[guild] = dict()
-    
+
     bot.settings[guild][setting] = value
 
     return
@@ -199,7 +199,7 @@ class Main(commands.Cog):
                     config.write(configfile)
 
                 await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
-    
+
     @commands.command()
     @commands.check(is_trusted)
     async def cleanup(self, ctx):
@@ -277,9 +277,9 @@ class Main(commands.Cog):
             activity = f3.read()
             activitytype = f4.read()
             status = f5.read()
-        
+
         settings_loaded = True
-        
+
         activitytype1 = getattr(discord.ActivityType, activitytype)
         status1 = getattr(discord.Status, status)
         await self.bot.change_presence(status=status1, activity=discord.Activity(name=activity, type=activitytype1))
@@ -328,20 +328,20 @@ class Main(commands.Cog):
         elif message.guild is not None:
             saythis = message.clean_content.lower()
 
-            # return if webhook (webhooks are discord.User even though they are in a guild)
-            if message.author.discriminator == "0000":
-                return
-
-            # Get autojoin setting
+            # Get settings
             autojoin = await get_setting(message.guild, "auto_join")
+            bot_ignore = await get_setting(message.guild, "bot_ignore")
+           
+            starts_with_tts = saythis.startswith("-tts")
 
             # if author is a bot and bot ignore is on
-            if await get_setting(message.guild, "bot_ignore") and message.author.bot:
+            if bot_ignore and message.author.bot:
                 return
 
             # if author is not a bot, and is not in a voice channel, and doesn't start with -tts
-            if not message.author.bot and message.author.voice is None and saythis.startswith("-tts") is False:
+            if not message.author.bot and message.author.voice is None and starts_with_tts is False:
                 return
+
             # if bot **not** in voice channel and autojoin **is off**, return
             if message.guild.voice_client is None and autojoin is False:
                 return
@@ -350,10 +350,10 @@ class Main(commands.Cog):
             if int(len(saythis)) != 0 or message.attachments:
 
                 # Ignore messages starting with - that are probably commands (also advertised as a feature when it is wrong lol)
-                if saythis.startswith("-") is False or saythis.startswith("-tts"):
+                if saythis.startswith("-") is False or starts_with_tts:
 
                     # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
-                    if autojoin or saythis.startswith("-tts ") or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
+                    if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
                         # Check if a setup channel
                         if message.channel.id == await get_setting(message.guild, "channel"):
