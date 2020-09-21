@@ -45,27 +45,18 @@ def remove_chars(remove_from, *chars):
     return input_string
 
 def emojitoword(text):
+    
+    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
     emojiRegex = re.compile(r'<:.+:\d+\d+>')
     words = text.split(' ')
     output = []
 
     for x in words:
 
-        if emojiRegex.match(x):
-            output.append(f"emoji {remove_chars(x.split(':')[1]), '<'}")
-        else:
-            output.append(x)
-
-    return ' '.join([str(x) for x in output])
-
-def emojiAnimatedToWord(text):
-    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
-    words = text.split(' ')
-    output = []
-    for x in words:
-
         if emojiAniRegex.match(x):
             output.append(f"animated emoji {x.split(':')[1]}")
+        elif emojiRegex.match(x):
+            output.append(f"emoji {x.split(':')[1]}")
         else:
             output.append(x)
 
@@ -367,7 +358,6 @@ class Main(commands.Cog):
                                 await channel.connect()
 
                             # Emoji filter
-                            saythis = emojiAnimatedToWord(saythis)
                             saythis = emojitoword(saythis)
 
                             # Acronyms and removing -tts
