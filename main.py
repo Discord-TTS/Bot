@@ -5,10 +5,10 @@ import re
 import shutil
 import time
 import traceback
-from typing import Union
 from configparser import ConfigParser
 from inspect import cleandoc
 from subprocess import call
+from typing import Union
 
 import discord
 import gtts as gTTS
@@ -21,55 +21,84 @@ config = ConfigParser()
 config.read("config.ini")
 t = config["Main"]["Token"]
 
-#//////////////////////////////////////////////////////
+# Define random variables
 before = time.monotonic()
-OPUS_LIBS = ['libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib']
+settings_loaded = False
+default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True}
+OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
 
+# Define useful functions
 def load_opus_lib(opus_libs=OPUS_LIBS):
     if opus.is_loaded():
         return True
 
     for opus_lib in opus_libs:
-        try:
-            opus.load_opus(opus_lib)
-            return
-        except OSError:
-            pass
+        try:    return opus.load_opus(opus_lib)
+        except OSError: pass
 
-        raise RuntimeError('Could not load an opus lib. Tried %s' % (', '.join(opus_libs)))
+        raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
-def listtostring1(s):
-    str1 = ""
-    for ele in s:
-        str1 = f'{str1}"{ele}", '
-    return str1
+def remove_chars(remove_from, *chars):
+    input_string = str(remove_from)
+    for char in chars:  input_string = input_string.replace(char, "")
+
+    return input_string
+
 def emojitoword(text):
+    
+    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
     emojiRegex = re.compile(r'<:.+:\d+\d+>')
     words = text.split(' ')
     output = []
 
     for x in words:
 
-        if emojiRegex.match(x):
-            output.append(f"emoji {x.split(':')[1].replace('<','')}")
-        else:
-            output.append(x)
-
-    return ' '.join([str(x) for x in output])
-def emojiAnimatedToWord(text):
-    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
-    words = text.split(' ')
-    output = []
-    for x in words:
-
         if emojiAniRegex.match(x):
             output.append(f"animated emoji {x.split(':')[1]}")
+        elif emojiRegex.match(x):
+            output.append(f"emoji {x.split(':')[1]}")
         else:
             output.append(x)
 
     return ' '.join([str(x) for x in output])
 
-#//////////////////////////////////////////////////////
+async def get_setting(guild, setting):
+    guild = str(guild.id)
+
+    # Check for everything loaded
+    while settings_loaded is False:
+        await asyncio.sleep(1)
+
+    if guild in bot.settings and setting in bot.settings[guild]:
+        returned_setting = bot.settings[guild][setting]
+    else:
+        returned_setting = default_settings[setting]
+
+    return returned_setting
+
+async def set_setting(guild, setting, value):
+    guild = str(guild.id)
+
+    # Check for everything loaded
+    while settings_loaded is False:
+        await asyncio.sleep(1)
+
+    if guild in bot.settings:
+        if value == default_settings[setting] and setting in bot.settings[guild]:
+            del bot.settings[guild][setting]
+            return
+
+        if bot.settings[guild] == dict():
+            del bot.settings[guild]
+            return
+    else:
+        bot.settings[guild] = dict()
+
+    bot.settings[guild][setting] = value
+
+    return
+
+# Define bot and remove overwritten commands
 BOT_PREFIX = "-"
 bot = commands.Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 bot.load_extension("cogs.common")
@@ -87,7 +116,6 @@ class Main(commands.Cog):
         if str(ctx.author.id) in bot.trusted: return True
         else: raise commands.errors.NotOwner
 
-#//////////////////////////////////////////////////////
     @tasks.loop(seconds=60.0)
     async def avoid_file_crashes(self):
         try:
@@ -145,7 +173,7 @@ class Main(commands.Cog):
 
         elif isinstance(user, str):
             return
-        
+
         elif mode == "add":
             self.bot.trusted.append(str(user.id))
             config["Main"]["trusted_ids"] = str(self.bot.trusted)
@@ -163,6 +191,28 @@ class Main(commands.Cog):
 
                 await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
 
+    @commands.command()
+    @commands.check(is_trusted)
+    async def cleanup(self, ctx):
+        guild_id_list = [str(guild.id) for guild in self.bot.guilds]
+
+        for guild_id in self.bot.settings.copy():
+            if guild_id not in guild_id_list:
+                del self.bot.settings[guild_id]
+                continue
+
+            for key, value in self.bot.settings[guild_id].copy().items():
+                if key not in default_settings or value == default_settings[key]:
+                    del self.bot.settings[guild_id][key]
+
+            if self.bot.settings[guild_id] == dict():
+                del self.bot.settings[guild_id]
+
+        for folder in os.listdir("servers"):
+            if folder not in guild_id_list:
+                shutil.rmtree(f"servers/{folder}", ignore_errors=True)
+
+        await ctx.send("Done!")
     @commands.command()
     @commands.check(is_trusted)
     async def block(self, ctx, user: discord.User, notify: bool = False):
@@ -189,12 +239,12 @@ class Main(commands.Cog):
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.Cog.listener()
     async def on_ready(self):
-        ready = False
+        global settings_loaded
         self.bot.playing = dict()
         self.bot.settings = dict()
         self.bot.setlangs = dict()
         self.bot.channels = dict()
-        self.bot.trusted = config["Main"]["trusted_ids"].replace("[", "").replace("]", "").replace("'", "").split(", ")
+        self.bot.trusted = remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
         self.bot.supportserver = self.bot.get_guild(int(config["Main"]["main_server"]))
         config_channel = config["Channels"]
 
@@ -203,17 +253,8 @@ class Main(commands.Cog):
             channel_object = self.bot.supportserver.get_channel(channel_id)
             self.bot.channels[channel_name] = channel_object
 
-        possible_settings = {
-          "channel": 0,
-          "xsaid": True,
-          "auto_join": False,
-          "bot_ignore": True
-        }
-
         print(f"Starting as {self.bot.user.name}!")
         starting_message = await self.bot.channels["logs"].send(f"Starting {self.bot.user.mention}")
-
-        servers = os.listdir("servers")
 
         if not os.path.exists("blocked_users.json"):
             with open("blocked_users.json", "x") as f:
@@ -228,33 +269,17 @@ class Main(commands.Cog):
             activitytype = f4.read()
             status = f5.read()
 
+        settings_loaded = True
+
         activitytype1 = getattr(discord.ActivityType, activitytype)
         status1 = getattr(discord.Status, status)
         await self.bot.change_presence(status=status1, activity=discord.Activity(name=activity, type=activitytype1))
 
         for guild in self.bot.guilds:
             self.bot.playing[guild.id] = 0
-            str_guildid = str(guild.id)
-            changed = False
+            if os.path.exists(f"servers/{str(guild.id)}") is False:
+                os.mkdir(f"servers/{str(guild.id)}")
 
-            if str_guildid not in self.bot.settings:
-                changed = True
-                self.bot.settings[str_guildid] = possible_settings
-            else:
-                for setting, default_value in possible_settings.items():
-                    if setting not in self.bot.settings[str_guildid]:
-                        changed = True
-                        self.bot.settings[str_guildid][setting] = default_value
-
-            directory = f"servers/{str_guildid}"
-            shutil.rmtree(directory, ignore_errors=True)
-            os.mkdir(directory)
-
-        if changed:
-            with open("settings.json", "w") as f:
-                json.dump(self.bot.settings, f)
-
-        ready = True
         ping = str(time.monotonic() - before).split(".")[0]
         self.avoid_file_crashes.start()
         await starting_message.edit(content=f"Started and ready! Took `{ping} seconds`")
@@ -294,21 +319,20 @@ class Main(commands.Cog):
         elif message.guild is not None:
             saythis = message.clean_content.lower()
 
-            # return if webhook (webhooks are discord.User even though they are in a guild)
-            if message.author.discriminator == "0000":
-                return
-
-            # Get autojoin setting, return if settings aren't loaded (fully or at all)
-            try:    autojoin = self.bot.settings[str(message.guild.id)]["auto_join"]
-            except KeyError:    return  
+            # Get settings
+            autojoin = await get_setting(message.guild, "auto_join")
+            bot_ignore = await get_setting(message.guild, "bot_ignore")
+           
+            starts_with_tts = saythis.startswith("-tts")
 
             # if author is a bot and bot ignore is on
-            if self.bot.settings[str(message.guild.id)]["bot_ignore"] and message.author.bot:
+            if bot_ignore and message.author.bot:
                 return
 
             # if author is not a bot, and is not in a voice channel, and doesn't start with -tts
-            if not message.author.bot and message.author.voice is None and saythis.startswith("-tts") is False:
+            if not message.author.bot and message.author.voice is None and starts_with_tts is False:
                 return
+
             # if bot **not** in voice channel and autojoin **is off**, return
             if message.guild.voice_client is None and autojoin is False:
                 return
@@ -317,13 +341,13 @@ class Main(commands.Cog):
             if int(len(saythis)) != 0 or message.attachments:
 
                 # Ignore messages starting with - that are probably commands (also advertised as a feature when it is wrong lol)
-                if saythis.startswith("-") is False or saythis.startswith("-tts"):
+                if saythis.startswith("-") is False or starts_with_tts:
 
                     # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
-                    if autojoin or saythis.startswith("-tts ") or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
+                    if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
                         # Check if a setup channel
-                        if message.channel.id == self.bot.settings[str(message.guild.id)]["channel"]:
+                        if message.channel.id == await get_setting(message.guild, "channel"):
 
                             #Auto Join
                             if message.guild.voice_client is None and autojoin:
@@ -334,7 +358,6 @@ class Main(commands.Cog):
                                 await channel.connect()
 
                             # Emoji filter
-                            saythis = emojiAnimatedToWord(saythis)
                             saythis = emojitoword(saythis)
 
                             # Acronyms and removing -tts
@@ -359,7 +382,7 @@ class Main(commands.Cog):
                                 saythis = saythis + ". This message contained a link"
 
                             # Toggleable X said and attachment detection
-                            if self.bot.settings[str(message.guild.id)]["xsaid"]:
+                            if await get_setting(message.guild, "xsaid"):
                                 if message.attachments:
                                     if len(message.clean_content.lower()) == 0:
                                         saythis = f"{message.author.display_name} sent an image."
@@ -368,7 +391,7 @@ class Main(commands.Cog):
                                 else:
                                     saythis = f"{message.author.display_name} said: {saythis}"
 
-                            if saythis.replace(" ", "").replace("?", "").replace(".", ".") == "":
+                            if remove_chars(saythis, " ", "?", ".") == "":
                                 return
 
                             # Read language file
@@ -425,6 +448,8 @@ class Main(commands.Cog):
 
             if say:
                 if message.author.id not in self.bot.blocked_users:
+                    if "https://discord.gg/" in message.content:
+                        return await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
                     webhook = await self.bot.channels["dm_logs"].create_webhook(name=str(message.author))
 
                     if message.attachments:
@@ -442,7 +467,7 @@ class Main(commands.Cog):
                     `1.` Ask your question, don't just ask for help
                     `2.` Don't spam, troll, or send random stuff (including server invites)
                     `3.` Many stuff is answered in `-help`, try that first (also the prefix is `-`)
-                """)   
+                """)
 
                 embed = discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description=embed_message)
                 dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=embed)
@@ -470,7 +495,8 @@ class Main(commands.Cog):
             if "send_messages" in str(error.missing_perms):
                 return await ctx.author.send("Sorry I could not complete this command as I don't have send messages permissions.")
             else:
-                return await ctx.send(f'I am missing the permissions: {str(error.missing_perms).replace("[", "").replace("]", "")}')
+                return await ctx.send(f'I am missing the permissions: {remove_chars(error.missing_perms, "[", "]")}')
+
         elif isinstance(error, commands.NoPrivateMessage):
             return await ctx.author.send("**Error:** This command cannot be used in private messages.")
 
@@ -511,13 +537,6 @@ class Main(commands.Cog):
 
             await self.bot.channels["servers"].send(embed=embed)
 
-        self.bot.settings[str(guild.id)] = {
-          "channel": 0,
-          "xsaid": True,
-          "auto_join": False,
-          "bot_ignore": True
-        }
-
         await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
         await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
 
@@ -547,7 +566,7 @@ class Main(commands.Cog):
           """
         message1 = f"""
           `-help`: Shows this message
-          `-botstats`: Shows various different stats 
+          `-botstats`: Shows various different stats
           `-donate`: Help improve TTS Bot's development and hosting through Patreon
           `-suggest *suggestion*`: Suggests a new feature! (could also DM TTS Bot)
           `-invite`: Sends the instructions to invite TTS Bot!"""
@@ -568,23 +587,21 @@ class Main(commands.Cog):
             except:
                 pass
 
-        embed=discord.Embed(title="TTS Bot Info", url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/513423712582762502/760ae3b79b2ca0fcd91dc9d89c6984c5.png")
-        
         main_section = cleandoc(f"""
           Currently in:
             :small_blue_diamond: {str(channels)} voice channels
             :small_orange_diamond: {len(self.bot.guilds)} servers
           and can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people!
         """)
-        
+
         footer = cleandoc("""
             Support Server: https://discord.gg/zWPWwQC
             Repository: https://github.com/Gnome-py/Discord-TTS-Bot
         """)
-        
-        embed.add_field(name=f"**{self.bot.user.name}: Now open source!**", value=main_section, inline=False)
+
+        embed=discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section, url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.set_footer(text=footer)
+        embed.set_thumbnail(url=str(self.bot.user.avatar_url))
 
         await ctx.send(embed=embed)
 
@@ -593,7 +610,7 @@ class Main(commands.Cog):
     @commands.bot_has_guild_permissions(speak=True, connect=True, use_voice_activation=True)
     @commands.command()
     async def join(self, ctx):
-        if ctx.channel.id != self.bot.settings[str(ctx.guild.id)]["channel"]:
+        if ctx.channel.id != await get_setting(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
         if ctx.author.voice is None:
@@ -623,7 +640,7 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):
-        if ctx.channel.id != self.bot.settings[str(ctx.guild.id)]["channel"]:
+        if ctx.channel.id != await get_setting(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
         elif ctx.author.voice is None:
@@ -651,7 +668,7 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def channel(self, ctx):
-        channel = self.bot.settings[str(ctx.guild.id)]["channel"]
+        channel = await get_setting(ctx.guild, "channel")
 
         if channel == ctx.channel.id:
             await ctx.send("You are in the right channel already!")
@@ -669,8 +686,6 @@ class Main(commands.Cog):
 class Settings(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.index = 0
-        self._last_member = None
 
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
@@ -686,10 +701,10 @@ class Settings(commands.Cog):
             embed.add_field(name="Available properties:", value=message, inline=False)
 
         else:
-            channel = ctx.guild.get_channel(self.bot.settings[str(ctx.guild.id)]["channel"])
-            say = self.bot.settings[str(ctx.guild.id)]["xsaid"]
-            join = self.bot.settings[str(ctx.guild.id)]["auto_join"]
-            bot_ignore = self.bot.settings[str(ctx.guild.id)]["bot_ignore"]
+            channel = ctx.guild.get_channel(await get_setting(ctx.guild, "channel"))
+            say = await get_setting(ctx.guild, "xsaid")
+            join = await get_setting(ctx.guild, "auto_join")
+            bot_ignore = await get_setting(ctx.guild, "bot_ignore")
 
             if channel is None: channel = "has not been setup yet"
             else: channel = channel.name
@@ -720,8 +735,8 @@ class Settings(commands.Cog):
             return await ctx.send("**Error:** This command cannot be used in DMs!")
 
         key = key.lower()
-        needs_admin_to_edit = ("xsaid", "auto_join", "autojoin", "botignore", "bot_ignore", "ignore_bots", "ignorebots")
-        no_admin_needed = ("channel", "language")
+        needs_admin_to_edit = ("xsaid", "auto_join", "autojoin", "botignore", "bot_ignore", "ignore_bots", "ignorebots", "channel" )
+        no_admin_needed = ("language")
 
         to_bool = {
           0: False,
@@ -730,8 +745,6 @@ class Settings(commands.Cog):
           "1": True,
           "false": False,
           "true": True,
-          False: False,
-          True: True,
         }
         to_enabled = {
           True: "Enabled",
@@ -747,7 +760,7 @@ class Settings(commands.Cog):
                     value = to_bool[value.lower()]
                 except:
                     return await ctx.send("Error: Invalid value")
-                self.bot.settings[str(ctx.guild.id)]["xsaid"] = value
+                await set_setting(ctx.guild, "xsaid", value)
                 return await ctx.send(f"xsaid is now: {to_enabled[value]}")
 
             elif key in ("auto_join", "autojoin"):
@@ -755,7 +768,7 @@ class Settings(commands.Cog):
                     value = to_bool[value.lower()]
                 except:
                     return await ctx.send("Error: Invalid value")
-                self.bot.settings[str(ctx.guild.id)]["auto_join"] = value
+                await set_setting(ctx.guild, "auto_join", value)
                 return await ctx.send(f"Auto Join is now: {to_enabled[value]}")
 
             elif key in ("botignore", "bot_ignore", "ignore_bots", "ignorebots"):
@@ -763,16 +776,15 @@ class Settings(commands.Cog):
                     value = to_bool[value.lower()]
                 except:
                     return await ctx.send("Error: Invalid value")
-                self.bot.settings[str(ctx.guild.id)]["bot_ignore"] = value
+                await set_setting(ctx.guild, "bot_ignore", value)
                 return await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
-        elif key in no_admin_needed:
-            if key == "channel":
+            elif key == "channel":
                 value = await commands.TextChannelConverter().convert(ctx, value)
                 await self.setup(ctx, value)
 
-            else:
-                await self.voice(ctx, value)
+        elif key in no_admin_needed:
+            await self.voice(ctx, value)
 
         else:
             await ctx.send("Error: Invalid property, do `-settings` to get a list!")
@@ -782,7 +794,7 @@ class Settings(commands.Cog):
     @commands.has_permissions(administrator=True)
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
-        self.bot.settings[str(ctx.guild.id)]["channel"] = channel.id
+        await set_setting(ctx.guild, "channel", channel.id)
         await ctx.send(f"Setup complete, {channel.mention} will now accept -join and -leave!")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
@@ -810,7 +822,8 @@ class Settings(commands.Cog):
             lang = self.bot.setlangs[str(ctx.author.id)]
         else: lang = "en-us"
 
-        await ctx.send(f"My currently supported language codes are: \n{listtostring1(langs)}\nAnd you are using: {lang}")
+        langs_string = remove_chars(list(langs.keys()), "[", "]")
+        await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {lang}")
 #//////////////////////////////////////////////////////
 
 bot.add_cog(Main(bot))
