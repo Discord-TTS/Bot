@@ -506,8 +506,7 @@ class Main(commands.Cog):
 
         for oh_no_oh_fuck in ["concurrent.futures._base.TimeoutError", "asyncio.exceptions.TimeoutError"]:
             if oh_no_oh_fuck in temp:
-                await self.bot .send(f"**Timeout Error!** caused by {str(ctx.author)}: Message = '{ctx.message.content}' Guild = {ctx.guild.name} | {ctx.guild.id}")
-                return await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
+                await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
 
         if "discord.errors.Forbidden" in temp:
             await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` in {str(ctx.guild)} caused by {str(ctx.message.content)} sent by {str(ctx.author)}")
