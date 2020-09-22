@@ -238,6 +238,9 @@ class Main(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         global settings_loaded
+        if settings_loaded:
+            await self.bot.close()
+                          
         self.bot.playing = dict()
         self.bot.settings = dict()
         self.bot.setlangs = dict()
