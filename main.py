@@ -24,6 +24,7 @@ t = config["Main"]["Token"]
 # Define random variables
 before = time.monotonic()
 settings_loaded = False
+to_enabled = {True: "Enabled", False: "Disabled"}
 default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True}
 OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
 
@@ -45,7 +46,6 @@ def remove_chars(remove_from, *chars):
     return input_string
 
 def emojitoword(text):
-    
     emojiAniRegex = re.compile(r'<a\:.+:\d+>')
     emojiRegex = re.compile(r'<:.+:\d+\d+>')
     words = text.split(' ')
@@ -95,8 +95,6 @@ async def set_setting(guild, setting, value):
         bot.settings[guild] = dict()
 
     bot.settings[guild][setting] = value
-
-    return
 
 # Define bot and remove overwritten commands
 BOT_PREFIX = "-"
@@ -322,7 +320,7 @@ class Main(commands.Cog):
             # Get settings
             autojoin = await get_setting(message.guild, "auto_join")
             bot_ignore = await get_setting(message.guild, "bot_ignore")
-           
+
             starts_with_tts = saythis.startswith("-tts")
 
             # if author is a bot and bot ignore is on
@@ -727,66 +725,39 @@ class Settings(commands.Cog):
         embed.set_footer(text="Change these settings with -set property value!")
         await ctx.send(embed=embed)
 
+    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.guild_only()
-    @commands.command()
-    async def set(self, ctx, key, value):
-        if not ctx.guild or ctx.author.discriminator == "0000":
-            return await ctx.send("**Error:** This command cannot be used in DMs!")
+    @commands.group()
+    async def set(self, ctx):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Error: Invalid property, do `-settings help` to get a list!")
 
-        key = key.lower()
-        needs_admin_to_edit = ("xsaid", "auto_join", "autojoin", "botignore", "bot_ignore", "ignore_bots", "ignorebots", "channel" )
-        no_admin_needed = ("language")
+    @commands.has_permissions(administrator=True)
+    @set.command()
+    async def xsaid(self, ctx, value: bool):
+        await set_setting(ctx.guild, "xsaid", value)
+        await ctx.send(f"xsaid is now: {to_enabled[value]}")
 
-        to_bool = {
-          0: False,
-          1: True,
-          "0": False,
-          "1": True,
-          "false": False,
-          "true": True,
-        }
-        to_enabled = {
-          True: "Enabled",
-          False: "Disabled"
-        }
+    @commands.has_permissions(administrator=True)
+    @set.command(aliases=["auto_join"])
+    async def autojoin(self, ctx, value: bool):
+        await set_setting(ctx.guild, "auto_join", value)
+        await ctx.send(f"Auto Join is now: {to_enabled[value]}")
 
-        if key in needs_admin_to_edit:
-            if not ctx.author.guild_permissions.administrator and not await self.bot.is_owner(ctx.author):
-                return await ctx.send(f"Error: You need administrator permission to edit {key}!")
+    @commands.has_permissions(administrator=True)
+    @set.command(aliases=["bot_ignore", "ignore_bots", "ignorebots"])
+    async def botignore(self, ctx, value: bool):
+        await set_setting(ctx.guild, "bot_ignore", value)
+        await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
-            if key == "xsaid":
-                try:
-                    value = to_bool[value.lower()]
-                except:
-                    return await ctx.send("Error: Invalid value")
-                await set_setting(ctx.guild, "xsaid", value)
-                return await ctx.send(f"xsaid is now: {to_enabled[value]}")
+    @commands.has_permissions(administrator=True)
+    @set.command()
+    async def channel(self, ctx, channel: discord.TextChannel):
+        await self.setup(ctx, channel)
 
-            elif key in ("auto_join", "autojoin"):
-                try:
-                    value = to_bool[value.lower()]
-                except:
-                    return await ctx.send("Error: Invalid value")
-                await set_setting(ctx.guild, "auto_join", value)
-                return await ctx.send(f"Auto Join is now: {to_enabled[value]}")
-
-            elif key in ("botignore", "bot_ignore", "ignore_bots", "ignorebots"):
-                try:
-                    value = to_bool[value.lower()]
-                except:
-                    return await ctx.send("Error: Invalid value")
-                await set_setting(ctx.guild, "bot_ignore", value)
-                return await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
-
-            elif key == "channel":
-                value = await commands.TextChannelConverter().convert(ctx, value)
-                await self.setup(ctx, value)
-
-        elif key in no_admin_needed:
-            await self.voice(ctx, value)
-
-        else:
-            await ctx.send("Error: Invalid property, do `-settings` to get a list!")
+    @set.command()
+    async def voice(self, ctx, voice):
+        await self.voice(ctx, value)
 
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
