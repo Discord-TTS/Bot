@@ -8,13 +8,13 @@ import traceback
 from configparser import ConfigParser
 from inspect import cleandoc
 from subprocess import call
-from typing import Union
+from typing import Union, Optional
 
 import discord
 import gtts as gTTS
-import natsort
 from discord.ext import commands, tasks
 from mutagen.mp3 import MP3
+from natsort import natsorted
 
 #//////////////////////////////////////////////////////
 config = ConfigParser()
@@ -25,8 +25,8 @@ t = config["Main"]["Token"]
 before = time.monotonic()
 settings_loaded = False
 to_enabled = {True: "Enabled", False: "Disabled"}
-default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True}
 OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
+default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "nicknames": dict()}
 
 # Define useful functions
 def load_opus_lib(opus_libs=OPUS_LIBS):
@@ -95,6 +95,33 @@ async def set_setting(guild, setting, value):
         bot.settings[guild] = dict()
 
     bot.settings[guild][setting] = value
+
+async def get_nickname(guild, user):
+    nicknames = await get_setting(guild, "nicknames")
+
+    guild_id = str(guild.id)
+    user_id = str(user.id)
+
+    if user_id in nicknames:
+        nickname = nicknames[user_id]
+    else:
+        nickname = user.display_name
+
+    return nickname
+
+async def set_nickname(guild, user, nickname):
+    nicknames = await get_setting(guild, "nicknames")
+
+    user_id = str(user.id)
+
+    if nickname != "" and nickname != user.display_name:
+        nicknames[user_id] = nickname
+    elif user_id in nicknames:
+        del nicknames[user_id]
+    else:
+        return
+
+    await set_setting(guild, "nicknames", nicknames)
 
 # Define bot and remove overwritten commands
 BOT_PREFIX = "-"
@@ -240,7 +267,7 @@ class Main(commands.Cog):
         global settings_loaded
         if settings_loaded:
             await self.bot.close()
-                          
+
         self.bot.playing = dict()
         self.bot.settings = dict()
         self.bot.setlangs = dict()
@@ -384,15 +411,17 @@ class Main(commands.Cog):
 
                             # Toggleable X said and attachment detection
                             if await get_setting(message.guild, "xsaid"):
+                                said_name = await get_nickname(message.guild, message.author)
+
                                 if message.attachments:
                                     if len(message.clean_content.lower()) == 0:
-                                        saythis = f"{message.author.display_name} sent an image."
+                                        saythis = f"{said_name} sent an image."
                                     else:
-                                        saythis = f"{message.author.display_name} sent an image and said {saythis}"
+                                        saythis = f"{said_name} sent an image and said {saythis}"
                                 else:
-                                    saythis = f"{message.author.display_name} said: {saythis}"
+                                    saythis = f"{said_name} said: {saythis}"
 
-                            if remove_chars(saythis, " ", "?", ".") == "":
+                            if remove_chars(saythis, " ", "?", ".", ")", "'", '"') == "":
                                 return
 
                             # Read language file
@@ -423,7 +452,11 @@ class Main(commands.Cog):
 
                             # Select file and play
                             while True:
-                                firstmp3 = natsort.natsorted(os.listdir(path),reverse=False)[0]
+                                try:    firstmp3 = natsorted(os.listdir(path),reverse=False)[0]
+                                except:
+                                    self.bot.playing[message.guild.id] = 0
+                                    return
+
                                 if firstmp3.endswith(".mp3"): break
                                 else: os.remove(f"{path}/{firstmp3}")
 
@@ -467,7 +500,7 @@ class Main(commands.Cog):
                     There are some basic rules if you want to get help though:
                     `1.` Ask your question, don't just ask for help
                     `2.` Don't spam, troll, or send random stuff (including server invites)
-                    `3.` Many stuff is answered in `-help`, try that first (also the prefix is `-`)
+                    `3.` Many questions are answered in `-help`, try that first (also the prefix is `-`)
                 """)
 
                 embed = discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description=embed_message)
@@ -482,11 +515,13 @@ class Main(commands.Cog):
             return
 
         error = getattr(error, 'original', error)
+        for typed_wrong in ("BadArgument", "MissingRequiredArgument", "UnexpectedQuoteError", "ExpectedClosingQuoteError"):
+            if isinstance(error, getattr(commands, typed_wrong)):
+                return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
+
         if isinstance(error, commands.CommandNotFound) or isinstance(error, commands.NotOwner):
             return
 
-        elif isinstance(error, commands.BadArgument) or isinstance(error, commands.MissingRequiredArgument) or isinstance(error, commands.UnexpectedQuoteError) or isinstance(error, commands.ExpectedClosingQuoteError):
-            return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
         elif isinstance(error, commands.MissingPermissions):
             if not ctx.guild or ctx.author.discriminator == "0000":
                 return await ctx.send("**Error:** This command cannot be used in DMs!")
@@ -696,7 +731,10 @@ class Settings(commands.Cog):
               -set channel `#channel`: Sets the text channel to read from
               -set xsaid `true/false`: Enable/disable "person said" before every message
               -set autojoin `true/false`: Auto joins a voice channel when a text is sent
-              -set ignorebots `true/false`: Do not read other bot messages""")
+              -set ignorebots `true/false`: Do not read other bot messages
+              -set nickname `@person` `new name`: Sets your (or someone else if admin) name for xsaid.
+
+              -set voice `language-code`: Changes your voice to a `-voices` code, equivalent to `-voice`""")
             embed=discord.Embed(title="Settings > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
             embed.add_field(name="Available properties:", value=message, inline=False)
 
@@ -705,12 +743,16 @@ class Settings(commands.Cog):
             say = await get_setting(ctx.guild, "xsaid")
             join = await get_setting(ctx.guild, "auto_join")
             bot_ignore = await get_setting(ctx.guild, "bot_ignore")
+            nickname = await get_nickname(ctx.guild, ctx.author)
+
 
             if channel is None: channel = "has not been setup yet"
             else: channel = channel.name
 
             if str(ctx.author.id) in self.bot.setlangs: lang = self.bot.setlangs[str(ctx.author.id)]
             else: lang = "en-us"
+
+            if nickname == ctx.author.display_name: nickname = "has not be set yet"
 
             # Show settings embed
             message1 = cleandoc(f"""
@@ -719,7 +761,9 @@ class Settings(commands.Cog):
               :small_orange_diamond: Auto Join: `{join}`
               :small_orange_diamond: Ignore Bots: `{bot_ignore}`""")
 
-            message2 = f":small_blue_diamond:Language: `{lang}`"
+            message2 = cleandoc(f"""
+              :small_blue_diamond:Language: `{lang}`
+              :small_blue_diamond:Nickname: `{nickname}`""")
 
             embed=discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
             embed.add_field(name="**Server Wide**", value=message1, inline=False)
@@ -752,6 +796,22 @@ class Settings(commands.Cog):
     async def botignore(self, ctx, value: bool):
         await set_setting(ctx.guild, "bot_ignore", value)
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
+
+    @set.command(aliases=["nick_name", "nickname", "name"])
+    async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname):
+        if user:
+            if not ctx.channel.permissions_for(ctx.author).administrator:
+                return await ctx.send("Error: You need admin to set other people's nicknames!")
+            your = str(user)
+        else:
+            user = ctx.author
+            your = "your"
+
+        if "<" in nickname and ">" in nickname:
+            return await ctx.send("Hey! You can't have mentions/emotes in your nickname!")
+
+        await set_nickname(ctx.guild, user, nickname)
+        await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {your} nickname to {nickname}"))
 
     @commands.has_permissions(administrator=True)
     @set.command()
