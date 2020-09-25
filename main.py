@@ -813,10 +813,12 @@ class Settings(commands.Cog):
             your = "your"
 
         if "<" in nickname and ">" in nickname:
-            return await ctx.send("Hey! You can't have mentions/emotes in your nickname!")
-
-        await set_nickname(ctx.guild, user, nickname)
-        await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {your} nickname to {nickname}"))
+            await ctx.send("Hey! You can't have mentions/emotes in your nickname!")
+        elif not re.match(r'^(\w|\s)+$', nickname):
+            await ctx.send("Hey! Please keep your nickname to only letters, numbers, and spaces!")
+        else:
+            await set_nickname(ctx.guild, user, nickname)
+            await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {your} nickname to {nickname}"))
 
     @commands.has_permissions(administrator=True)
     @set.command()
