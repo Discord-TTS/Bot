@@ -22,8 +22,9 @@ config.read("config.ini")
 t = config["Main"]["Token"]
 
 # Define random variables
-before = time.monotonic()
+files = None
 settings_loaded = False
+before = time.monotonic()
 to_enabled = {True: "Enabled", False: "Disabled"}
 OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
 default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "nicknames": dict()}
@@ -482,16 +483,19 @@ class Main(commands.Cog):
 
             if say:
                 if message.author.id not in self.bot.blocked_users:
-                    if "https://discord.gg/" in message.content:
+                    if "https://discord.gg/" in message.content.lower():
                         return await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
-                    webhook = await self.bot.channels["dm_logs"].create_webhook(name=str(message.author))
 
                     if message.attachments:
                         files = [await attachment.to_file() for attachment in message.attachments]
-                    else: files = None
 
-                    await webhook.send(message.content, avatar_url=message.author.avatar_url, files=files)
-                    await webhook.delete()
+                    webhooks = await self.bot.channels["dm_logs"].webhooks()
+                    if len(webhooks) == 0:
+                        webhook = await ctx.channel.create_webhook(name="TTS-DM-LOGS")
+                    else:
+                        webhook = webhooks[0]
+
+                    await webhook.send(message.content, username=str(message.author), avatar_url=message.author.avatar_url, files=files)
 
             else:
                 embed_message = cleandoc("""
