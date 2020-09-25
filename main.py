@@ -492,7 +492,7 @@ class Main(commands.Cog):
 
                     webhooks = await self.bot.channels["dm_logs"].webhooks()
                     if len(webhooks) == 0:
-                        webhook = await ctx.channel.create_webhook(name="TTS-DM-LOGS")
+                        webhook = await self.bot.channels["dm_logs"].create_webhook(name="TTS-DM-LOGS")
                     else:
                         webhook = webhooks[0]
 
