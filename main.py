@@ -823,9 +823,9 @@ class Settings(commands.Cog):
     async def channel(self, ctx, channel: discord.TextChannel):
         await self.setup(ctx, channel)
 
-    @set.command()
-    async def voice(self, ctx, voice):
-        await self.voice(ctx, value)
+    @set.command(aliases=("voice", "lang"))
+    async def language(self, ctx, voicecode):
+        await self.voice(ctx, voicecode)
 
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
