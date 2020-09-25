@@ -22,7 +22,6 @@ config.read("config.ini")
 t = config["Main"]["Token"]
 
 # Define random variables
-files = None
 settings_loaded = False
 before = time.monotonic()
 to_enabled = {True: "Enabled", False: "Disabled"}
@@ -488,6 +487,8 @@ class Main(commands.Cog):
 
                     if message.attachments:
                         files = [await attachment.to_file() for attachment in message.attachments]
+                    else:
+                        files = None
 
                     webhooks = await self.bot.channels["dm_logs"].webhooks()
                     if len(webhooks) == 0:
