@@ -170,8 +170,7 @@ class Main(commands.Cog):
                 await self.bot.channels["errors"].send(temp)
 
     @avoid_file_crashes.before_loop
-    async def before_printer(self):
-        print('waiting...')
+    async def before_file_saving_loop(self):
         await self.bot.wait_until_ready()
 
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -804,14 +803,19 @@ class Settings(commands.Cog):
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
-    async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname):
+    async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname = False):
+        your = "your"
+
         if user:
-            if not ctx.channel.permissions_for(ctx.author).administrator:
-                return await ctx.send("Error: You need admin to set other people's nicknames!")
-            your = str(user)
-        else:
-            user = ctx.author
-            your = "your"
+            if nickname:
+                if ctx.channel.permissions_for(ctx.author).administrator:
+                    your = str(user)
+                else:
+                    return await ctx.send("Error: You need admin to set other people's nicknames!")
+            else:
+                nickname = ctx.author
+        elif not nickname:
+            raise commands.MissingRequiredArgument
 
         if "<" in nickname and ">" in nickname:
             await ctx.send("Hey! You can't have mentions/emotes in your nickname!")
