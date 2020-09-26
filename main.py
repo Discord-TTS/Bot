@@ -244,9 +244,8 @@ class Main(commands.Cog):
             if self.bot.settings[guild_id] == dict():
                 del self.bot.settings[guild_id]
 
-        for folder in os.listdir("servers"):
-            if folder not in guild_id_list:
-                shutil.rmtree(f"servers/{folder}", ignore_errors=True)
+        if os.path.exists("servers"):
+            shutil.rmtree("servers", ignore_errors=True)
 
         await ctx.send("Done!")
     @commands.command()
@@ -279,11 +278,11 @@ class Main(commands.Cog):
         if settings_loaded:
             await self.bot.close()
 
+        self.bot.queue = dict()
         self.bot.playing = dict()
         self.bot.settings = dict()
         self.bot.setlangs = dict()
         self.bot.channels = dict()
-        self.bot.queue = dict()
         self.bot.trusted = remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
         self.bot.supportserver = self.bot.get_guild(int(config["Main"]["main_server"]))
         config_channel = config["Channels"]
@@ -295,10 +294,6 @@ class Main(commands.Cog):
 
         print(f"Starting as {self.bot.user.name}!")
         starting_message = await self.bot.channels["logs"].send(f"Starting {self.bot.user.mention}")
-
-        if not os.path.exists("blocked_users.json"):
-            with open("blocked_users.json", "x") as f:
-                json.dump(list(), f)
 
         # Load some files
         with open("settings.json") as f, open('setlangs.json') as f1, open("blocked_users.json") as f2, open("activity.txt") as f3, open("activitytype.txt") as f4, open("status.txt") as f5:
@@ -709,10 +704,6 @@ class Main(commands.Cog):
         self.bot.playing[ctx.guild.id] = 2
 
         await ctx.send("Left voice channel!")
-
-        directory = f"servers/{str(ctx.guild.id)}"
-        shutil.rmtree(directory, ignore_errors=True)
-        os.mkdir(directory)
 
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
