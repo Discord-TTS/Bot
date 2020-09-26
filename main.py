@@ -813,7 +813,7 @@ class Settings(commands.Cog):
                 else:
                     return await ctx.send("Error: You need admin to set other people's nicknames!")
             else:
-                nickname = ctx.author
+                nickname = str(ctx.author)
         elif not nickname:
             raise commands.MissingRequiredArgument
 
