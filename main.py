@@ -30,6 +30,11 @@ to_enabled = {True: "Enabled", False: "Disabled"}
 OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
 default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "nicknames": dict()}
 
+intents = discord.Intents.none()
+intents.voice_states = True
+intents.messages = True
+intents.guilds = True
+
 # Define useful functions
 def load_opus_lib(opus_libs=OPUS_LIBS):
     if opus.is_loaded():
@@ -46,6 +51,15 @@ def remove_chars(remove_from, *chars):
     for char in chars:  input_string = input_string.replace(char, "")
 
     return input_string
+
+def get_value(dictionary, *nested_values):
+    try:
+        for value in nested_values:
+            dictionary = dictionary[value]
+    except (TypeError, AttributeError, KeyError):
+        return None
+
+    return dictionary
 
 def emojitoword(text):
     emojiAniRegex = re.compile(r'<a\:.+:\d+>')
@@ -74,15 +88,12 @@ def sort_dict(dict_to_sort):
     return newdict
 
 async def get_setting(guild, setting):
-    guild = str(guild.id)
-
     # Check for everything loaded
     while settings_loaded is False:
         await asyncio.sleep(1)
 
-    if guild in bot.settings and setting in bot.settings[guild]:
-        returned_setting = bot.settings[guild][setting]
-    else:
+    returned_setting = get_value(bot.settings, str(guild.id), setting)
+    if returned_setting is None:
         returned_setting = default_settings[setting]
 
     return returned_setting
@@ -108,14 +119,9 @@ async def set_setting(guild, setting, value):
     bot.settings[guild][setting] = value
 
 async def get_nickname(guild, user):
-    nicknames = await get_setting(guild, "nicknames")
+    nickname = get_value(await get_setting(guild, "nicknames"), str(user.id))
 
-    guild_id = str(guild.id)
-    user_id = str(user.id)
-
-    if user_id in nicknames:
-        nickname = nicknames[user_id]
-    else:
+    if nickname is None:
         nickname = user.display_name
 
     return nickname
@@ -136,7 +142,7 @@ async def set_nickname(guild, user, nickname):
 
 # Define bot and remove overwritten commands
 BOT_PREFIX = "-"
-bot = commands.Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
+bot = commands.Bot(command_prefix=BOT_PREFIX, chunk_guilds_at_startup=False, case_insensitive=True, intents=intents)
 bot.load_extension("cogs.common")
 for overwriten_command in ("help", "end", "botstats"):
     bot.remove_command(overwriten_command)
@@ -319,7 +325,7 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.embeds and message.channel.id == 749971061843558440 and str(message.author) == "GitHub#0000":
+        if message.channel.id == 749971061843558440 and message.embeds and str(message.author) == "GitHub#0000":
             print("Message is from a github webhook")
             if " new commit" in message.embeds[0].title:
                 print("Message is a commit")
@@ -389,6 +395,10 @@ class Main(commands.Cog):
 
                                 self.bot.playing[message.guild.id] = 0
                                 await channel.connect()
+
+                            # Sometimes bot.guilds is wrong, because intents
+                            if message.guild.id not in self.bot.queue:
+                                self.bot.queue[message.guild.id] = dict()
 
                             # Emoji filter
                             saythis = emojitoword(saythis)
@@ -525,8 +535,7 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
-        if hasattr(ctx.command, 'on_error'):
-            return
+        if hasattr(ctx.command, 'on_error'):    return
 
         error = getattr(error, 'original', error)
         for typed_wrong in ("BadArgument", "MissingRequiredArgument", "UnexpectedQuoteError", "ExpectedClosingQuoteError"):
@@ -823,7 +832,7 @@ class Settings(commands.Cog):
             await ctx.send("Hey! Please keep your nickname to only letters, numbers, and spaces!")
         else:
             await set_nickname(ctx.guild, user, nickname)
-            await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {your} nickname to {nickname}"))
+            await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {user.name}'s nickname to {nickname}"))
 
     @commands.has_permissions(administrator=True)
     @set.command()
