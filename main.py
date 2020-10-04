@@ -1,12 +1,14 @@
 import asyncio
 import json
-import os
 import re
 import shutil
 import time
+from asyncio.exceptions import TimeoutError as asyncio_TimeoutError
+from concurrent.futures._base import TimeoutError as concurrent_TimeoutError
 from configparser import ConfigParser
 from inspect import cleandoc
 from io import BytesIO
+from os.path import exists
 from subprocess import call
 from traceback import format_exception
 from typing import Optional, Union
@@ -34,6 +36,7 @@ intents = discord.Intents.none()
 intents.voice_states = True
 intents.messages = True
 intents.guilds = True
+intents.members = True
 
 # Define useful functions
 def load_opus_lib(opus_libs=OPUS_LIBS):
@@ -158,6 +161,12 @@ class Main(commands.Cog):
         if str(ctx.author.id) in bot.trusted: return True
         else: raise commands.errors.NotOwner
 
+    async def fill_cache(self):
+        await self.bot.supportserver.chunk(cache=True)
+        for guild in self.bot.guilds:
+            if not guild.chunked:
+                await guild.chunk(cache=True)
+
     @tasks.loop(seconds=60.0)
     async def avoid_file_crashes(self):
         try:
@@ -249,7 +258,7 @@ class Main(commands.Cog):
             if self.bot.settings[guild_id] == dict():
                 del self.bot.settings[guild_id]
 
-        if os.path.exists("servers"):
+        if exists("servers"):
             shutil.rmtree("servers", ignore_errors=True)
 
         await ctx.send("Done!")
@@ -319,9 +328,15 @@ class Main(commands.Cog):
             self.bot.playing[guild.id] = 0
             self.bot.queue[guild.id] = dict()
 
-        ping = str(time.monotonic() - before).split(".")[0]
         self.avoid_file_crashes.start()
+
+        ping = str(time.monotonic() - before).split(".")[0]
         await starting_message.edit(content=f"Started and ready! Took `{ping} seconds`")
+
+        await self.fill_cache()
+
+        ping = str(time.monotonic() - before).split(".")[0]
+        await starting_message.edit(content=f"Started, ready, and cache filled! Took `{ping} seconds`")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -535,41 +550,44 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
-        if hasattr(ctx.command, 'on_error'):    return
-
-        error = getattr(error, 'original', error)
-        for typed_wrong in ("BadArgument", "MissingRequiredArgument", "UnexpectedQuoteError", "ExpectedClosingQuoteError"):
-            if isinstance(error, getattr(commands, typed_wrong)):
-                return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
-
-        if isinstance(error, commands.CommandNotFound) or isinstance(error, commands.NotOwner):
+        if hasattr(ctx.command, 'on_error') or isinstance(error, commands.CommandNotFound) or isinstance(error, commands.NotOwner):
             return
 
-        elif isinstance(error, commands.MissingPermissions):
-            if not ctx.guild or ctx.author.discriminator == "0000":
-                return await ctx.send("**Error:** This command cannot be used in DMs!")
+        elif not ctx.guild.chunked:
+            message = "**Warning:** The server you are in hasn't been fully loaded yet, this could cause issues!"
 
-            return await ctx.send(f"You are missing {error.missing_perms} to run this command.")
+            try:  await ctx.send(message)
+            except:
+                try:    await ctx.author.send(message)
+                except: pass
+
+        error = getattr(error, 'original', error)
+
+        for typed_wrong in (commands.BadArgument, commands.MissingRequiredArgument, commands.UnexpectedQuoteError, commands.ExpectedClosingQuoteError):
+            if isinstance(error, typed_wrong):
+                return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
+
+        for Timeout_Error in (concurrent_TimeoutError, asyncio_TimeoutError):
+            if isinstance(error, Timeout_Error):
+                return await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
+
+        if isinstance(error, commands.NoPrivateMessage):
+            return await ctx.author.send("**Error:** This command cannot be used in private messages!")
+
+        elif isinstance(error, commands.MissingPermissions):
+            return await ctx.send(f"**Error:** You are missing {error.missing_perms} to run this command!")
         elif isinstance(error, commands.BotMissingPermissions):
             if "send_messages" in str(error.missing_perms):
-                return await ctx.author.send("Sorry I could not complete this command as I don't have send messages permissions.")
-            else:
-                return await ctx.send(f'I am missing the permissions: {remove_chars(error.missing_perms, "[", "]")}')
+                return await ctx.author.send("**Error:** I could not complete this command as I don't have send messages permissions!")
 
-        elif isinstance(error, commands.NoPrivateMessage):
-            return await ctx.author.send("**Error:** This command cannot be used in private messages.")
+            return await ctx.send(f'**Error:** I am missing the permissions: {remove_chars(error.missing_perms, "[", "]")}')
+        elif isinstance(error, discord.errors.Forbidden):
+            await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` in {str(ctx.guild)} caused by {str(ctx.message.content)} sent by {str(ctx.author)}")
+            return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `-suggest *what command you just run*`")
 
         first_part = f"{str(ctx.author)} caused an error with the message: {ctx.message.clean_content}"
         second_part = ''.join(format_exception(type(error), error, error.__traceback__))
         temp = f"{first_part}\n```{second_part}```"
-
-        for oh_no_oh_fuck in ["concurrent.futures._base.TimeoutError", "asyncio.exceptions.TimeoutError"]:
-            if oh_no_oh_fuck in temp:
-                await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
-
-        if "discord.errors.Forbidden" in temp:
-            await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` in {str(ctx.guild)} caused by {str(ctx.message.content)} sent by {str(ctx.author)}")
-            return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `-suggest *what command you just run*`")
 
         if len(temp) >= 1900:
             with open("temp.txt", "w") as f:    f.write(temp)
@@ -582,6 +600,11 @@ class Main(commands.Cog):
         owner = guild.owner
         self.bot.queue[guild.id] = dict()
 
+        await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
+
+        while not guild.chunked:   await guild.chunk(cache=True)
+        await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
+
         if owner.id in [member.id for member in self.bot.supportserver.members]:
             role = self.bot.supportserver.get_role(738009431052386304)
             await self.bot.supportserver.get_member(owner.id).add_roles(role)
@@ -591,8 +614,6 @@ class Main(commands.Cog):
 
             await self.bot.channels["servers"].send(embed=embed)
 
-        await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
-        await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
@@ -660,7 +681,6 @@ class Main(commands.Cog):
 
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
-    @commands.bot_has_guild_permissions(speak=True, connect=True, use_voice_activation=True)
     @commands.command()
     async def join(self, ctx):
         if ctx.channel.id != await get_setting(ctx.guild, "channel"):
@@ -675,7 +695,7 @@ class Main(commands.Cog):
         if not permissions.view_channel:
             return await ctx.send("Error: Missing Permission to view your voice channel!")
 
-        if not permissions.speak:
+        if not permissions.speak or not permissions.use_voice_activation:
             return await ctx.send("Error: I do not have permssion to speak!")
 
         if ctx.guild.voice_client is not None and ctx.guild.voice_client == channel:
@@ -812,19 +832,19 @@ class Settings(commands.Cog):
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
-    async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname = False):
-        your = "your"
+    async def nick(self, ctx, user: Optional[discord.User] = False, *, nickname):
 
         if user:
             if nickname:
-                if ctx.channel.permissions_for(ctx.author).administrator:
-                    your = str(user)
-                else:
+                if not ctx.channel.permissions_for(ctx.author).administrator:
                     return await ctx.send("Error: You need admin to set other people's nicknames!")
             else:
                 nickname = ctx.author.display_name
-        elif not nickname:
-            raise commands.MissingRequiredArgument
+        else:
+            user = ctx.author
+
+        if not nickname:
+            raise commands.UserInputError(ctx.message)
 
         if "<" in nickname and ">" in nickname:
             await ctx.send("Hey! You can't have mentions/emotes in your nickname!")
@@ -882,4 +902,5 @@ class Settings(commands.Cog):
 
 bot.add_cog(Main(bot))
 bot.add_cog(Settings(bot))
-bot.run(t)
+try:    bot.run(t)
+except RuntimeError: pass
