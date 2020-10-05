@@ -202,10 +202,16 @@ class Main(commands.Cog):
         await self.bot.close()
 
     @commands.command()
-    @commands.is_owner()
-    async def get_queue(self, ctx):
-        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue))
-        await ctx.author.send(file=discord.File("queue.txt"))
+    @commands.check(is_trusted)
+    async def debug(self, ctx):
+        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
+        await ctx.author.send(
+            cleandoc(f"""
+                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
+                Guild is chunked: {str(ctx.guild.chunked)}
+                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
+            """),
+            file=discord.File("queue.txt"))
 
     @commands.command()
     @commands.is_owner()
@@ -483,7 +489,6 @@ class Main(commands.Cog):
                             # Queue, please don't touch this, it works somehow
                             while self.bot.playing[message.guild.id] != 0:
                                 if self.bot.playing[message.guild.id] == 2: return
-                                print(f"Waiting for {message.guild.name} | {message.guild.id} which is on {self.bot.playing[message.guild.id]}")
                                 await asyncio.sleep(0.5)
 
                             self.bot.playing[message.guild.id] = 1
