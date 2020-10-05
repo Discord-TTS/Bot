@@ -206,7 +206,7 @@ class Main(commands.Cog):
     async def get_queue(self, ctx):
         with open("queue.txt", "w") as f:   f.write(str(self.bot.queue))
         await ctx.author.send(file=discord.File("queue.txt"))
-                          
+
     @commands.command()
     @commands.is_owner()
     async def channellist(self, ctx):
@@ -483,6 +483,7 @@ class Main(commands.Cog):
                             # Queue, please don't touch this, it works somehow
                             while self.bot.playing[message.guild.id] != 0:
                                 if self.bot.playing[message.guild.id] == 2: return
+                                print(f"Waiting for {ctx.guild.name} | {ctx.guild.id} which is on {self.bot.playing[message.guild.id]}")
                                 await asyncio.sleep(0.5)
 
                             self.bot.playing[message.guild.id] = 1
