@@ -204,7 +204,8 @@ class Main(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def get_queue(self, ctx):
-        await ctx.author.send(str(self.bot.queue))
+        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue))
+        await ctx.author.send(file=discord.File("queue.txt"))
                           
     @commands.command()
     @commands.is_owner()
