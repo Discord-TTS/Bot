@@ -1,20 +1,24 @@
 import asyncio
 import json
-import os
 import re
 import shutil
 import time
-import traceback
+from asyncio.exceptions import TimeoutError as asyncio_TimeoutError
+from concurrent.futures._base import TimeoutError as concurrent_TimeoutError
 from configparser import ConfigParser
 from inspect import cleandoc
+from io import BytesIO
+from os.path import exists
 from subprocess import call
-from typing import Union, Optional
+from traceback import format_exception
+from typing import Optional, Union
 
 import discord
 import gtts as gTTS
 from discord.ext import commands, tasks
 from mutagen.mp3 import MP3
-from natsort import natsorted
+
+from patched_FFmpegPCM import FFmpegPCMAudio
 
 #//////////////////////////////////////////////////////
 config = ConfigParser()
@@ -27,6 +31,12 @@ before = time.monotonic()
 to_enabled = {True: "Enabled", False: "Disabled"}
 OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
 default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "nicknames": dict()}
+
+intents = discord.Intents.none()
+intents.voice_states = True
+intents.messages = True
+intents.guilds = True
+intents.members = True
 
 # Define useful functions
 def load_opus_lib(opus_libs=OPUS_LIBS):
@@ -45,6 +55,15 @@ def remove_chars(remove_from, *chars):
 
     return input_string
 
+def get_value(dictionary, *nested_values):
+    try:
+        for value in nested_values:
+            dictionary = dictionary[value]
+    except (TypeError, AttributeError, KeyError):
+        return None
+
+    return dictionary
+
 def emojitoword(text):
     emojiAniRegex = re.compile(r'<a\:.+:\d+>')
     emojiRegex = re.compile(r'<:.+:\d+\d+>')
@@ -62,16 +81,22 @@ def emojitoword(text):
 
     return ' '.join([str(x) for x in output])
 
-async def get_setting(guild, setting):
-    guild = str(guild.id)
+def sort_dict(dict_to_sort):
+    keys = list(dict_to_sort.keys())
+    keys.sort()
+    newdict = {}
+    for x in keys:
+        newdict[x] = dict_to_sort[x]
 
+    return newdict
+
+async def get_setting(guild, setting):
     # Check for everything loaded
     while settings_loaded is False:
         await asyncio.sleep(1)
 
-    if guild in bot.settings and setting in bot.settings[guild]:
-        returned_setting = bot.settings[guild][setting]
-    else:
+    returned_setting = get_value(bot.settings, str(guild.id), setting)
+    if returned_setting is None:
         returned_setting = default_settings[setting]
 
     return returned_setting
@@ -97,14 +122,9 @@ async def set_setting(guild, setting, value):
     bot.settings[guild][setting] = value
 
 async def get_nickname(guild, user):
-    nicknames = await get_setting(guild, "nicknames")
+    nickname = get_value(await get_setting(guild, "nicknames"), str(user.id))
 
-    guild_id = str(guild.id)
-    user_id = str(user.id)
-
-    if user_id in nicknames:
-        nickname = nicknames[user_id]
-    else:
+    if nickname is None:
         nickname = user.display_name
 
     return nickname
@@ -125,7 +145,7 @@ async def set_nickname(guild, user, nickname):
 
 # Define bot and remove overwritten commands
 BOT_PREFIX = "-"
-bot = commands.Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
+bot = commands.Bot(command_prefix=BOT_PREFIX, chunk_guilds_at_startup=False, case_insensitive=True, intents=intents)
 bot.load_extension("cogs.common")
 for overwriten_command in ("help", "end", "botstats"):
     bot.remove_command(overwriten_command)
@@ -140,6 +160,12 @@ class Main(commands.Cog):
     def is_trusted(ctx):
         if str(ctx.author.id) in bot.trusted: return True
         else: raise commands.errors.NotOwner
+
+    async def fill_cache(self):
+        await self.bot.supportserver.chunk(cache=True)
+        for guild in self.bot.guilds:
+            if not guild.chunked:
+                await guild.chunk(cache=True)
 
     @tasks.loop(seconds=60.0)
     async def avoid_file_crashes(self):
@@ -159,8 +185,7 @@ class Main(commands.Cog):
                 await self.bot.channels["errors"].send(temp)
 
     @avoid_file_crashes.before_loop
-    async def before_printer(self):
-        print('waiting...')
+    async def before_file_saving_loop(self):
         await self.bot.wait_until_ready()
 
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -233,9 +258,8 @@ class Main(commands.Cog):
             if self.bot.settings[guild_id] == dict():
                 del self.bot.settings[guild_id]
 
-        for folder in os.listdir("servers"):
-            if folder not in guild_id_list:
-                shutil.rmtree(f"servers/{folder}", ignore_errors=True)
+        if exists("servers"):
+            shutil.rmtree("servers", ignore_errors=True)
 
         await ctx.send("Done!")
     @commands.command()
@@ -268,6 +292,7 @@ class Main(commands.Cog):
         if settings_loaded:
             await self.bot.close()
 
+        self.bot.queue = dict()
         self.bot.playing = dict()
         self.bot.settings = dict()
         self.bot.setlangs = dict()
@@ -283,10 +308,6 @@ class Main(commands.Cog):
 
         print(f"Starting as {self.bot.user.name}!")
         starting_message = await self.bot.channels["logs"].send(f"Starting {self.bot.user.mention}")
-
-        if not os.path.exists("blocked_users.json"):
-            with open("blocked_users.json", "x") as f:
-                json.dump(list(), f)
 
         # Load some files
         with open("settings.json") as f, open('setlangs.json') as f1, open("blocked_users.json") as f2, open("activity.txt") as f3, open("activitytype.txt") as f4, open("status.txt") as f5:
@@ -305,16 +326,21 @@ class Main(commands.Cog):
 
         for guild in self.bot.guilds:
             self.bot.playing[guild.id] = 0
-            if os.path.exists(f"servers/{str(guild.id)}") is False:
-                os.mkdir(f"servers/{str(guild.id)}")
+            self.bot.queue[guild.id] = dict()
+
+        self.avoid_file_crashes.start()
 
         ping = str(time.monotonic() - before).split(".")[0]
-        self.avoid_file_crashes.start()
         await starting_message.edit(content=f"Started and ready! Took `{ping} seconds`")
+
+        await self.fill_cache()
+
+        ping = str(time.monotonic() - before).split(".")[0]
+        await starting_message.edit(content=f"Started, ready, and cache filled! Took `{ping} seconds`")
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.embeds and message.channel.id == 749971061843558440 and str(message.author) == "GitHub#0000":
+        if message.channel.id == 749971061843558440 and message.embeds and str(message.author) == "GitHub#0000":
             print("Message is from a github webhook")
             if " new commit" in message.embeds[0].title:
                 print("Message is a commit")
@@ -369,7 +395,7 @@ class Main(commands.Cog):
             if int(len(saythis)) != 0 or message.attachments:
 
                 # Ignore messages starting with - that are probably commands (also advertised as a feature when it is wrong lol)
-                if saythis.startswith("-") is False or starts_with_tts:
+                if saythis.startswith(BOT_PREFIX) is False or starts_with_tts:
 
                     # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
@@ -385,20 +411,28 @@ class Main(commands.Cog):
                                 self.bot.playing[message.guild.id] = 0
                                 await channel.connect()
 
+                            # Sometimes bot.guilds is wrong, because intents
+                            if message.guild.id not in self.bot.queue:
+                                self.bot.queue[message.guild.id] = dict()
+
                             # Emoji filter
                             saythis = emojitoword(saythis)
 
                             # Acronyms and removing -tts
+                            saythis = f" {saythis} "
                             acronyms = {
-                              " @": " at ",
-                              " irl": "in real life",
+                              "@": " at ",
+                              "irl": "in real life",
                               "gtg": " got to go ",
                               "iirc": "if I recall correctly",
-                              "™️": " tm",
-                              "-tts": "",
+                              "™️": "tm",
+                              "rn": "right now"
                             }
+                            if starts_with_tts: acronyms["-tts"] = ""
+
                             for toreplace, replacewith in acronyms.items():
-                                saythis = saythis.replace(toreplace, replacewith)
+                                saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
+                            saythis = saythis[1:-1]
 
                             # Spoiler filter
                             saythis = re.sub(r"\|\|.*?\|\|", ". spoiler avoided.", saythis)
@@ -430,18 +464,15 @@ class Main(commands.Cog):
                             else:
                                 lang = "en-us"
 
-                            path = f"servers/{message.guild.id}"
-                            saveto = f"{path}/{str(message.id)}.mp3"
-
-                            try:  gTTS.gTTS(text = saythis, lang = lang, slow = False).save(saveto)
-                            except AssertionError:
-                                try:  os.remove(saveto)
-                                except FileNotFoundError: pass
-                                return
+                            temp_store_for_mp3 = BytesIO()
+                            try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
+                            except AssertionError:  return
 
                             # Discard if over 30 seconds
-                            if int(MP3(saveto).info.length) >= 30:
-                                return os.remove(saveto)
+                            temp_store_for_mp3.seek(0)
+                            if not (int(MP3(temp_store_for_mp3).info.length) >= 30):
+                                self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
+                                del temp_store_for_mp3
 
                             # Queue, please don't touch this, it works somehow
                             while self.bot.playing[message.guild.id] != 0:
@@ -450,27 +481,30 @@ class Main(commands.Cog):
 
                             self.bot.playing[message.guild.id] = 1
 
-                            # Select file and play
-                            while True:
-                                try:    firstmp3 = natsorted(os.listdir(path),reverse=False)[0]
-                                except:
-                                    self.bot.playing[message.guild.id] = 0
-                                    return
+                            while self.bot.queue[message.guild.id] != dict():
+                                # Sort Queue
+                                self.bot.queue[message.guild.id] = sort_dict(self.bot.queue[message.guild.id])
 
-                                if firstmp3.endswith(".mp3"): break
-                                else: os.remove(f"{path}/{firstmp3}")
+                                # Select first in queue
+                                message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
+                                selected = self.bot.queue[message.guild.id][message_id_to_read]
+                                selected.seek(0)
 
-                            vc = message.guild.voice_client
-                            if vc is not None:
-                                vc.play(discord.FFmpegPCMAudio(f"{path}/{firstmp3}", options='-loglevel "quiet"'))
+                                # Play selected audio
+                                vc = message.guild.voice_client
+                                if vc is not None:
+                                    vc.play(FFmpegPCMAudio(selected.read(), pipe=True, options='-loglevel "quiet"'))
 
-                                while vc.is_playing():
-                                    await asyncio.sleep(0.5)
+                                    while vc.is_playing():  await asyncio.sleep(0.5)
 
+                                    # Delete said message from queue
+                                    del self.bot.queue[message.guild.id][message_id_to_read]
+                                else:
+                                    # If not in a voice channel anymore, clear the queue
+                                    self.bot.queue[message.guild.id] = dict()
+
+                            # Queue should be empty now, let next on_message though
                             self.bot.playing[message.guild.id] = 0
-
-                            try:  os.remove(f"{path}/{firstmp3}")
-                            except FileNotFoundError: pass
 
         elif message.author.bot is False:
             pins = await message.author.pins()
@@ -516,69 +550,69 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
-        if hasattr(ctx.command, 'on_error'):
+        if hasattr(ctx.command, 'on_error') or isinstance(error, commands.CommandNotFound) or isinstance(error, commands.NotOwner):
             return
+
+        elif not ctx.guild.chunked:
+            message = "**Warning:** The server you are in hasn't been fully loaded yet, this could cause issues!"
+
+            try:  await ctx.send(message)
+            except:
+                try:    await ctx.author.send(message)
+                except: pass
 
         error = getattr(error, 'original', error)
-        for typed_wrong in ("BadArgument", "MissingRequiredArgument", "UnexpectedQuoteError", "ExpectedClosingQuoteError"):
-            if isinstance(error, getattr(commands, typed_wrong)):
+
+        for typed_wrong in (commands.BadArgument, commands.MissingRequiredArgument, commands.UnexpectedQuoteError, commands.ExpectedClosingQuoteError):
+            if isinstance(error, typed_wrong):
                 return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
 
-        if isinstance(error, commands.CommandNotFound) or isinstance(error, commands.NotOwner):
-            return
+        for Timeout_Error in (concurrent_TimeoutError, asyncio_TimeoutError):
+            if isinstance(error, Timeout_Error):
+                return await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
+
+        if isinstance(error, commands.NoPrivateMessage):
+            return await ctx.author.send("**Error:** This command cannot be used in private messages!")
 
         elif isinstance(error, commands.MissingPermissions):
-            if not ctx.guild or ctx.author.discriminator == "0000":
-                return await ctx.send("**Error:** This command cannot be used in DMs!")
-
-            return await ctx.send(f"You are missing {error.missing_perms} to run this command.")
+            return await ctx.send(f"**Error:** You are missing {error.missing_perms} to run this command!")
         elif isinstance(error, commands.BotMissingPermissions):
             if "send_messages" in str(error.missing_perms):
-                return await ctx.author.send("Sorry I could not complete this command as I don't have send messages permissions.")
-            else:
-                return await ctx.send(f'I am missing the permissions: {remove_chars(error.missing_perms, "[", "]")}')
+                return await ctx.author.send("**Error:** I could not complete this command as I don't have send messages permissions!")
 
-        elif isinstance(error, commands.NoPrivateMessage):
-            return await ctx.author.send("**Error:** This command cannot be used in private messages.")
-
-        first_part = f"{str(ctx.author)} caused an error with the message: {ctx.message.clean_content}"
-        second_part = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
-        temp = f"{first_part}\n```{second_part}```"
-
-        for oh_no_oh_fuck in ["concurrent.futures._base.TimeoutError", "asyncio.exceptions.TimeoutError"]:
-            if oh_no_oh_fuck in temp:
-                await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
-
-        if "discord.errors.Forbidden" in temp:
+            return await ctx.send(f'**Error:** I am missing the permissions: {remove_chars(error.missing_perms, "[", "]")}')
+        elif isinstance(error, discord.errors.Forbidden):
             await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` in {str(ctx.guild)} caused by {str(ctx.message.content)} sent by {str(ctx.author)}")
             return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `-suggest *what command you just run*`")
 
+        first_part = f"{str(ctx.author)} caused an error with the message: {ctx.message.clean_content}"
+        second_part = ''.join(format_exception(type(error), error, error.__traceback__))
+        temp = f"{first_part}\n```{second_part}```"
+
         if len(temp) >= 1900:
-            with open("temp.txt", "w") as f:
-                f.write(temp)
+            with open("temp.txt", "w") as f:    f.write(temp)
             await self.bot.channels["errors"].send(file=discord.File("temp.txt"))
         else:
             await self.bot.channels["errors"].send(temp)
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        role = self.bot.supportserver.get_role(738009431052386304)
         owner = guild.owner
-        mypath = f"servers/{str(guild.id)}"
+        self.bot.queue[guild.id] = dict()
 
-        if os.path.exists(mypath) is False:
-            os.mkdir(mypath)
+        await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
+
+        while not guild.chunked:   await guild.chunk(cache=True)
+        await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
 
         if owner.id in [member.id for member in self.bot.supportserver.members]:
+            role = self.bot.supportserver.get_role(738009431052386304)
             await self.bot.supportserver.get_member(owner.id).add_roles(role)
 
             embed = discord.Embed(description=f"*Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild.name}")
             embed.set_author(name=f"{str(owner)} (ID {owner.id})", icon_url=owner.avatar_url)
 
             await self.bot.channels["servers"].send(embed=embed)
-
-        await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
-        await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
 
 
     @commands.Cog.listener()
@@ -647,7 +681,6 @@ class Main(commands.Cog):
 
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
-    @commands.bot_has_guild_permissions(speak=True, connect=True, use_voice_activation=True)
     @commands.command()
     async def join(self, ctx):
         if ctx.channel.id != await get_setting(ctx.guild, "channel"):
@@ -662,7 +695,7 @@ class Main(commands.Cog):
         if not permissions.view_channel:
             return await ctx.send("Error: Missing Permission to view your voice channel!")
 
-        if not permissions.speak:
+        if not permissions.speak or not permissions.use_voice_activation:
             return await ctx.send("Error: I do not have permssion to speak!")
 
         if ctx.guild.voice_client is not None and ctx.guild.voice_client == channel:
@@ -699,10 +732,6 @@ class Main(commands.Cog):
         self.bot.playing[ctx.guild.id] = 2
 
         await ctx.send("Left voice channel!")
-
-        directory = f"servers/{str(ctx.guild.id)}"
-        shutil.rmtree(directory, ignore_errors=True)
-        os.mkdir(directory)
 
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
@@ -803,14 +832,19 @@ class Settings(commands.Cog):
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
-    async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname):
+    async def nick(self, ctx, user: Optional[discord.User] = False, *, nickname):
+
         if user:
-            if not ctx.channel.permissions_for(ctx.author).administrator:
-                return await ctx.send("Error: You need admin to set other people's nicknames!")
-            your = str(user)
+            if nickname:
+                if not ctx.channel.permissions_for(ctx.author).administrator:
+                    return await ctx.send("Error: You need admin to set other people's nicknames!")
+            else:
+                nickname = ctx.author.display_name
         else:
             user = ctx.author
-            your = "your"
+
+        if not nickname:
+            raise commands.UserInputError(ctx.message)
 
         if "<" in nickname and ">" in nickname:
             await ctx.send("Hey! You can't have mentions/emotes in your nickname!")
@@ -818,7 +852,7 @@ class Settings(commands.Cog):
             await ctx.send("Hey! Please keep your nickname to only letters, numbers, and spaces!")
         else:
             await set_nickname(ctx.guild, user, nickname)
-            await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {your} nickname to {nickname}"))
+            await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {user.name}'s nickname to {nickname}"))
 
     @commands.has_permissions(administrator=True)
     @set.command()
@@ -868,4 +902,5 @@ class Settings(commands.Cog):
 
 bot.add_cog(Main(bot))
 bot.add_cog(Settings(bot))
-bot.run(t)
+try:    bot.run(t)
+except RuntimeError: pass

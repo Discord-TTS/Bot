@@ -13,20 +13,18 @@ main_server = int(input("What is the ID of the main server for your bot? (Sugges
 trusted_ids = input("Input a list of trusted user IDs (allowing for moderation commands such as -(un)block, -dm, -refreshroles, -lookupinfo, and others.): ").split(", ")
 
 try:
-  os.mkdir("servers")
+    with open("activity.txt", "x") as activity, open("activitytype.txt", "x") as activitytype, open("status.txt", "x") as status:
+        activitytype.write("watching")
+        activity.write("my owner set me up!")
+        status.write("idle")
 
-  with open("activity.txt", "x") as activity, open("activitytype.txt", "x") as activitytype, open("status.txt", "x") as status:
-    activitytype.write("watching")
-    activity.write("my owner set me up!")
-    status.write("idle")
-
-  with open("blocked_users.json", "x") as blocked_users, open("setlangs.json", "x") as setlangs, open("settings.json", "x") as settings:
-    json.dump(list(), blocked_users)
-    json.dump(dict(), setlangs)
-    json.dump(dict(), settings)
+    with open("blocked_users.json", "x") as blocked_users, open("setlangs.json", "x") as setlangs, open("settings.json", "x") as settings:
+        json.dump(list(), blocked_users)
+        json.dump(dict(), setlangs)
+        json.dump(dict(), settings)
 except:
-  print("Failed making one of the files! If you are resetting to default, delete the servers folder, all .txt, .json, and the .ini file before running this again!")
-  raise SystemExit
+    print("Failed making one of the files! If you are resetting to default, delete the servers folder, all .txt, .json, and the .ini file before running this again!")
+    raise SystemExit
 
 config["Main"] = {
   "token": token,
@@ -38,7 +36,7 @@ config["Main"] = {
 async def on_ready():
     global config
     global logs
-    
+
     guild = bot.get_guild(main_server)
     botcategory = await guild.create_category("TTS Bot")
     overwrites = {guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False)}
@@ -64,8 +62,8 @@ async def on_ready():
 @commands.is_owner()
 async def yes(ctx):
     with open("config.ini", "x") as configfile:
-      config.write(configfile)
-    
+        config.write(configfile)
+
     await logs.send("Finished and written to config.ini, change the names of the channels all you want and now TTS Bot should be startable!")
     await bot.close()
 
