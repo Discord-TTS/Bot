@@ -203,6 +203,11 @@ class Main(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
+    async def get_queue(self, ctx):
+        await ctx.author.send(str(self.bot.queue))
+                          
+    @commands.command()
+    @commands.is_owner()
     async def channellist(self, ctx):
         channellist = str()
         for guild1 in self.bot.guilds:
