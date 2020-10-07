@@ -403,6 +403,10 @@ class Main(commands.Cog):
             if message.guild.voice_client is None and autojoin is False:
                 return
 
+            # Check if a setup channel
+            if message.channel.id != await get_setting(message.guild, "channel"):
+                return
+
             # If message is **not** empty **or** there is an attachment
             if int(len(saythis)) != 0 or message.attachments:
 
@@ -412,111 +416,108 @@ class Main(commands.Cog):
                     # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
-                        # Check if a setup channel
-                        if message.channel.id == await get_setting(message.guild, "channel"):
+                        #Auto Join
+                        if message.guild.voice_client is None and autojoin:
+                            try:  channel = message.author.voice.channel
+                            except AttributeError: return
 
-                            #Auto Join
-                            if message.guild.voice_client is None and autojoin:
-                                try:  channel = message.author.voice.channel
-                                except AttributeError: return
+                            self.bot.playing[message.guild.id] = 0
+                            await channel.connect()
 
-                                self.bot.playing[message.guild.id] = 0
-                                await channel.connect()
+                        # Sometimes bot.guilds is wrong, because intents
+                        if message.guild.id not in self.bot.queue:
+                            self.bot.queue[message.guild.id] = dict()
 
-                            # Sometimes bot.guilds is wrong, because intents
-                            if message.guild.id not in self.bot.queue:
+                        # Emoji filter
+                        saythis = emojitoword(saythis)
+
+                        # Acronyms and removing -tts
+                        saythis = f" {saythis} "
+                        acronyms = {
+                            "@": " at ",
+                            "irl": "in real life",
+                            "gtg": " got to go ",
+                            "iirc": "if I recall correctly",
+                            "™️": "tm",
+                            "rn": "right now"
+                        }
+                        if starts_with_tts: acronyms["-tts"] = ""
+
+                        for toreplace, replacewith in acronyms.items():
+                            saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
+                        saythis = saythis[1:-1]
+
+                        # Spoiler filter
+                        saythis = re.sub(r"\|\|.*?\|\|", ". spoiler avoided.", saythis)
+
+                        # Url filter
+                        saythisbefore = saythis
+                        saythis = re.sub(r"(https?:\/\/)(\s)*(www\.)?(\s)*((\w|\s)+\.)*([\w\-\s]+\/)*([\w\-]+)((\?)?[\w\s]*=\s*[\w\%&]*)*", "", str(saythis))
+                        if saythisbefore != saythis:
+                            saythis = saythis + ". This message contained a link"
+
+                        # Toggleable X said and attachment detection
+                        if await get_setting(message.guild, "xsaid"):
+                            said_name = await get_nickname(message.guild, message.author)
+
+                            if message.attachments:
+                                if len(message.clean_content.lower()) == 0:
+                                    saythis = f"{said_name} sent an image."
+                                else:
+                                    saythis = f"{said_name} sent an image and said {saythis}"
+                            else:
+                                saythis = f"{said_name} said: {saythis}"
+
+                        if remove_chars(saythis, " ", "?", ".", ")", "'", '"') == "":
+                            return
+
+                        # Read language file
+                        if str(message.author.id) in self.bot.setlangs:
+                            lang = self.bot.setlangs[str(message.author.id)]
+                        else:
+                            lang = "en-us"
+
+                        temp_store_for_mp3 = BytesIO()
+                        try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
+                        except AssertionError:  return
+
+                        # Discard if over 30 seconds
+                        temp_store_for_mp3.seek(0)
+                        if not (int(MP3(temp_store_for_mp3).info.length) >= 30):
+                            self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
+                            del temp_store_for_mp3
+
+                        # Queue, please don't touch this, it works somehow
+                        while self.bot.playing[message.guild.id] != 0:
+                            if self.bot.playing[message.guild.id] == 2: return
+                            await asyncio.sleep(0.5)
+
+                        self.bot.playing[message.guild.id] = 1
+
+                        while self.bot.queue[message.guild.id] != dict():
+                            # Sort Queue
+                            self.bot.queue[message.guild.id] = sort_dict(self.bot.queue[message.guild.id])
+
+                            # Select first in queue
+                            message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
+                            selected = self.bot.queue[message.guild.id][message_id_to_read]
+                            selected.seek(0)
+
+                            # Play selected audio
+                            vc = message.guild.voice_client
+                            if vc is not None:
+                                vc.play(FFmpegPCMAudio(selected.read(), pipe=True, options='-loglevel "quiet"'))
+
+                                while vc.is_playing():  await asyncio.sleep(0.5)
+
+                                # Delete said message from queue
+                                del self.bot.queue[message.guild.id][message_id_to_read]
+                            else:
+                                # If not in a voice channel anymore, clear the queue
                                 self.bot.queue[message.guild.id] = dict()
 
-                            # Emoji filter
-                            saythis = emojitoword(saythis)
-
-                            # Acronyms and removing -tts
-                            saythis = f" {saythis} "
-                            acronyms = {
-                              "@": " at ",
-                              "irl": "in real life",
-                              "gtg": " got to go ",
-                              "iirc": "if I recall correctly",
-                              "™️": "tm",
-                              "rn": "right now"
-                            }
-                            if starts_with_tts: acronyms["-tts"] = ""
-
-                            for toreplace, replacewith in acronyms.items():
-                                saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
-                            saythis = saythis[1:-1]
-
-                            # Spoiler filter
-                            saythis = re.sub(r"\|\|.*?\|\|", ". spoiler avoided.", saythis)
-
-                            # Url filter
-                            saythisbefore = saythis
-                            saythis = re.sub(r"(https?:\/\/)(\s)*(www\.)?(\s)*((\w|\s)+\.)*([\w\-\s]+\/)*([\w\-]+)((\?)?[\w\s]*=\s*[\w\%&]*)*", "", str(saythis))
-                            if saythisbefore != saythis:
-                                saythis = saythis + ". This message contained a link"
-
-                            # Toggleable X said and attachment detection
-                            if await get_setting(message.guild, "xsaid"):
-                                said_name = await get_nickname(message.guild, message.author)
-
-                                if message.attachments:
-                                    if len(message.clean_content.lower()) == 0:
-                                        saythis = f"{said_name} sent an image."
-                                    else:
-                                        saythis = f"{said_name} sent an image and said {saythis}"
-                                else:
-                                    saythis = f"{said_name} said: {saythis}"
-
-                            if remove_chars(saythis, " ", "?", ".", ")", "'", '"') == "":
-                                return
-
-                            # Read language file
-                            if str(message.author.id) in self.bot.setlangs:
-                                lang = self.bot.setlangs[str(message.author.id)]
-                            else:
-                                lang = "en-us"
-
-                            temp_store_for_mp3 = BytesIO()
-                            try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
-                            except AssertionError:  return
-
-                            # Discard if over 30 seconds
-                            temp_store_for_mp3.seek(0)
-                            if not (int(MP3(temp_store_for_mp3).info.length) >= 30):
-                                self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
-                                del temp_store_for_mp3
-
-                            # Queue, please don't touch this, it works somehow
-                            while self.bot.playing[message.guild.id] != 0:
-                                if self.bot.playing[message.guild.id] == 2: return
-                                await asyncio.sleep(0.5)
-
-                            self.bot.playing[message.guild.id] = 1
-
-                            while self.bot.queue[message.guild.id] != dict():
-                                # Sort Queue
-                                self.bot.queue[message.guild.id] = sort_dict(self.bot.queue[message.guild.id])
-
-                                # Select first in queue
-                                message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
-                                selected = self.bot.queue[message.guild.id][message_id_to_read]
-                                selected.seek(0)
-
-                                # Play selected audio
-                                vc = message.guild.voice_client
-                                if vc is not None:
-                                    vc.play(FFmpegPCMAudio(selected.read(), pipe=True, options='-loglevel "quiet"'))
-
-                                    while vc.is_playing():  await asyncio.sleep(0.5)
-
-                                    # Delete said message from queue
-                                    del self.bot.queue[message.guild.id][message_id_to_read]
-                                else:
-                                    # If not in a voice channel anymore, clear the queue
-                                    self.bot.queue[message.guild.id] = dict()
-
-                            # Queue should be empty now, let next on_message though
-                            self.bot.playing[message.guild.id] = 0
+                        # Queue should be empty now, let next on_message though
+                        self.bot.playing[message.guild.id] = 0
 
         elif message.author.bot is False:
             pins = await message.author.pins()
