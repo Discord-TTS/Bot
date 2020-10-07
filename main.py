@@ -729,12 +729,12 @@ class Main(commands.Cog):
     @commands.guild_only()
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
-    async def leave(self, ctx, force = "no"):
+    async def leave(self, ctx):
         if ctx.channel.id != await get_setting(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
-        if force != "--force" and get_value(self.bot.playing, ctx.guild.id) == 3:
-            return await ctx.send("Error: Trying to join a voice channel! (Do `-leave --force` to bypass this check)")
+        if get_value(self.bot.playing, ctx.guild.id) == 3:
+            return await ctx.send("Error: Trying to join a voice channel!")
 
         elif ctx.author.voice is None:
             return await ctx.send("Error: You need to be in a voice channel to make me leave!")
