@@ -616,16 +616,20 @@ class Main(commands.Cog):
         await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
 
         while not guild.chunked:   await guild.chunk(cache=True)
-        await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
+
+        try:    await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
+        except:
+            if guild.chunked:   pass
+            else:   await self.bot.channels["logs"].send(f"Weird, `{guild.name} | {guild.id}` wasn't chunked after trying to chunk?")
 
         if owner.id in [member.id for member in self.bot.supportserver.members]:
             role = self.bot.supportserver.get_role(738009431052386304)
             await self.bot.supportserver.get_member(owner.id).add_roles(role)
 
-            embed = discord.Embed(description=f"*Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild.name}")
+            embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild.name}")
             embed.set_author(name=f"{str(owner)} (ID {owner.id})", icon_url=owner.avatar_url)
 
-            await self.bot.channels["servers"].send(embed=embed)
+            await self.bot.channels["logs"].send(embed=embed)
 
 
     @commands.Cog.listener()
