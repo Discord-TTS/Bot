@@ -17,3 +17,33 @@ Text to speech Discord Bot using gTTS and discord.py!
 - Run `python -m pip install -r requirements.txt`
 - Run `python setup.py` and follow the instructions
 - Run `python main.py`, and you should have your own instance of TTS Bot running!
+
+## Variable Explaination:
+
+### `bot.playing[guild_id]`:
+
+- 0 = Not speaking/playing audio  
+1 = Speaking/playing audio  
+2 = Leaving/left voice channel  
+3 = Joining voice channel  
+
+### `bot.queue[guild_id]`:
+- Dictionary of message_id: [BytesIO](https://docs.python.org/3/library/io.html#io.BytesIO) objects of gTTS output
+
+### `bot.settings`:
+- Contents of the settings.json file, stores server specific settings
+
+### `bot.setlangs`:
+- Contents of the setlangs.json file, stores user specific voices
+
+### `bot.blocked_users`:
+- Contents of the blocked_users.json file, stores blocked users
+
+### `bot.trusted`:
+- List of trusted people, stored in the config.ini["Main"]["trusted_ids"]
+
+### `bot.channels`:
+- Stores commonly used channels, dictionary of channel_name: channel_object
+
+### `bot.supportserver`:
+- Cached guild object for the support server, should contain the bot.channels
