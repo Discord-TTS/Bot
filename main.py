@@ -566,7 +566,7 @@ class Main(commands.Cog):
         if hasattr(ctx.command, 'on_error') or isinstance(error, commands.CommandNotFound) or isinstance(error, commands.NotOwner):
             return
 
-        elif not ctx.guild.chunked:
+        if ctx.guild is not None and not ctx.guild.chunked:
             message = "**Warning:** The server you are in hasn't been fully loaded yet, this could cause issues!"
 
             try:  await ctx.send(message)
@@ -641,7 +641,7 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["commands"])
     async def help(self, ctx):
-        message = f"""
+        message = """
           `-setup #textchannel`: Setup the bot to read messages from that channel
 
           `-join`: Joins the voice channel you're in
@@ -651,7 +651,7 @@ class Main(commands.Cog):
           `-settings help`: Displays list of available settings
           `-set property value`: Sets a setting
           """
-        message1 = f"""
+        message1 = """
           `-help`: Shows this message
           `-botstats`: Shows various different stats
           `-donate`: Help improve TTS Bot's development and hosting through Patreon
@@ -660,7 +660,7 @@ class Main(commands.Cog):
 
         embed=discord.Embed(title="TTS Bot Help!", url="https://discord.gg/zWPWwQC", description=cleandoc(message), color=0x3498db)
         embed.add_field(name="Universal Commands", value=cleandoc(message1), inline=False)
-        embed.set_footer(text=f"Do you want to get support for TTS Bot or invite it to your own server? https://discord.gg/zWPWwQC")
+        embed.set_footer(text="Do you want to get support for TTS Bot or invite it to your own server? https://discord.gg/zWPWwQC")
         await ctx.send(embed=embed)
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
@@ -696,6 +696,9 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def join(self, ctx):
+        if get_value(self.bot.playing, ctx.guild.id) == 3:
+            return await ctx.send("Error: Already trying to join your voice channel!")
+
         if ctx.channel.id != await get_setting(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
@@ -717,17 +720,21 @@ class Main(commands.Cog):
         if ctx.guild.voice_client is not None and ctx.guild.voice_client != channel:
             return await ctx.send("Error: I am already in a voice channel!")
 
+        self.bot.playing[ctx.guild.id] = 3
+        await channel.connect()
         self.bot.playing[ctx.guild.id] = 0
 
-        await channel.connect()
         await ctx.send("Joined your voice channel!")
 
     @commands.guild_only()
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
-    async def leave(self, ctx):
+    async def leave(self, ctx, force = "no"):
         if ctx.channel.id != await get_setting(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
+
+        if force != "--force" and get_value(self.bot.playing, ctx.guild.id) == 3:
+            return await ctx.send("Error: Trying to join a voice channel! (Do `-leave --force` to bypass this check)")
 
         elif ctx.author.voice is None:
             return await ctx.send("Error: You need to be in a voice channel to make me leave!")
@@ -761,9 +768,8 @@ class Main(commands.Cog):
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
-    async def tts(self, ctx, totts = None):
-        if totts is None:
-            await ctx.send(f"You don't need to do `-tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `-`!")
+    async def tts(self, ctx, no_input = True):
+        if no_input:    await ctx.send(f"You don't need to do `-tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `-`!")
 
 class Settings(commands.Cog):
     def __init__(self, bot):
