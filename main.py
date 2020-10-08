@@ -146,7 +146,17 @@ async def set_nickname(guild, user, nickname):
 # Define bot and remove overwritten commands
 BOT_PREFIX = "-"
 bot = commands.Bot(command_prefix=BOT_PREFIX, chunk_guilds_at_startup=False, case_insensitive=True, intents=intents)
-bot.load_extension("cogs.common")
+
+if exists("cogs/common_user.py"):
+    bot.load_extension("cogs.common_owner")
+    bot.load_extension("cogs.common_trusted")
+    bot.load_extension("cogs.common_user")
+elif exists("cogs/common.py"):
+    bot.load_extension("cogs.common")
+else:
+    print("Error: Cannot find cogs to load? Did you do 'git clone --recurse-submodules'?")
+    raise SystemExit
+
 for overwriten_command in ("help", "end", "botstats"):
     bot.remove_command(overwriten_command)
 #//////////////////////////////////////////////////////
