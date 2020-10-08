@@ -386,7 +386,9 @@ class Main(commands.Cog):
                     await self.bot.channels['logs'].send("Reloading cog...")
 
                     try:
-                        self.bot.reload_extension("cogs.common")
+                        self.bot.reload_extension("cogs.common_user")
+                        self.bot.reload_extension("cogs.common_owner")
+                        self.bot.reload_extension("cogs.common_trusted")
                     except Exception as e:
                         await self.bot.channels['logs'].send(f'**`ERROR:`** {type(e).__name__} - {e}')
                     else:
