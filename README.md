@@ -30,9 +30,6 @@ Text to speech Discord Bot using gTTS and discord.py!
 ### `bot.queue[guild_id]`:
 - Dictionary of message_id: [BytesIO](https://docs.python.org/3/library/io.html#io.BytesIO) objects of gTTS output
 
-### `bot.settings`:
-- Contents of the settings.json file, stores server specific settings
-
 ### `bot.setlangs`:
 - Contents of the setlangs.json file, stores user specific voices
 
