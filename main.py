@@ -67,7 +67,7 @@ def emojitoword(text):
     return ' '.join([str(x) for x in output])
 
 # Define bot and remove overwritten commands
-BOT_PREFIX = "t-"
+BOT_PREFIX = "-"
 bot = commands.Bot(command_prefix=BOT_PREFIX, chunk_guilds_at_startup=False, case_insensitive=True, intents=intents)
 
 if exists("cogs/common_user.py"):
