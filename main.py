@@ -798,7 +798,7 @@ class Settings(commands.Cog):
             if str(ctx.author.id) in self.bot.setlangs: lang = self.bot.setlangs[str(ctx.author.id)]
             else: lang = "en-us"
 
-            if nickname == ctx.author.display_name: nickname = "has not be set yet"
+            if nickname == ctx.author.display_name: nickname = "has not been set yet"
 
             # Show settings embed
             message1 = cleandoc(f"""
