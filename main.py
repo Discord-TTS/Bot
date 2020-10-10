@@ -141,7 +141,7 @@ class Main(commands.Cog):
             guild_id = str(guild.id)
             if guild_id not in settings.settings:
                 guilds_to_leave.append(guild)
-        
+
         if not sure:
             await ctx.send(f"Are you sure you want me to leave {len(guilds_to_leave)} guilds?")
         else:
@@ -149,7 +149,7 @@ class Main(commands.Cog):
                 try:    await guild.owner.send("Hey! TTS Bot has not been setup on your server so I have left! If you want to reinvite me, join https://discord.gg/zWPWwQC and look in #invites-and-rules.")
                 except: pass
                 await guild.leave()
-            
+
             await self.bot.channels["logs"].send(f"Just left {len(guilds_to_leave)} guilds due to no setup, requested by {ctx.author.name}")
 
     @commands.command()
@@ -498,6 +498,17 @@ class Main(commands.Cog):
                 await dm_message.pin()
 
     @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        guild = member.guild
+        vc = guild.voice_client
+        playing = basic.get_value(self.bot.playing, guild.id)
+
+        if vc and len(vc.channel.members) == 1 and vc.channel.id == before.channel.id and playing in (0, 1):
+            self.bot.playing[guild.id] = 2
+            await vc.disconnect(force=True)
+            self.bot.playing[guild.id] = 0
+
+    @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if hasattr(ctx.command, 'on_error') or isinstance(error, commands.CommandNotFound) or isinstance(error, commands.NotOwner):
             return
@@ -566,7 +577,6 @@ class Main(commands.Cog):
             embed.set_author(name=f"{str(owner)} (ID {owner.id})", icon_url=owner.avatar_url)
 
             await self.bot.channels["logs"].send(embed=embed)
-
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
@@ -670,6 +680,9 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):
+        if basic.get_value(self.bot.playing, ctx.guild.id) == 2:
+            return await ctx.send("Error: Already trying to leave your voice channel!")
+
         if ctx.channel.id != settings.get(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
@@ -685,11 +698,9 @@ class Main(commands.Cog):
         elif ctx.author.voice.channel != ctx.guild.voice_client.channel:
             return await ctx.send("Error: You need to be in the same voice channel as me to make me leave!")
 
-        await ctx.guild.voice_client.disconnect(force=True)
-
-        if self.bot.playing[ctx.guild.id] is None:
-            self.bot.playing[ctx.guild.id] = 0
         self.bot.playing[ctx.guild.id] = 2
+        await ctx.guild.voice_client.disconnect(force=True)
+        self.bot.playing[ctx.guild.id] = 0
 
         await ctx.send("Left voice channel!")
 
