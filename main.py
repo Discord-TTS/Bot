@@ -455,7 +455,7 @@ class Main(commands.Cog):
                 if "https://discord.gg/" in message.content.lower():
                     await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
 
-                elif blocked_users.check(ctx.author):
+                elif blocked_users.check(message.author):
                     files = [await attachment.to_file() for attachment in message.attachments]
                     webhook = await basic.ensure_webhook(self.bot.channels["dm_logs"], name="TTS-DM-LOGS")
 
