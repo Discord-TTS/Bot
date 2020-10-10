@@ -76,7 +76,7 @@ class setlangs_class():
         with open("setlangs.json", "w") as f:    json.dump(setlangs, f)
 
     def cleanup(user_id_list):
-        for user_id in setlangs:
+        for user_id in setlangs.copy():
             if user_id not in user_id_list:
                 del setlangs[user_id]
 
