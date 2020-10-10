@@ -133,18 +133,6 @@ class Main(commands.Cog):
         await self.bot.close()
 
     @commands.command()
-    @commands.check(is_trusted)
-    async def debug(self, ctx):
-        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
-        await ctx.author.send(
-            cleandoc(f"""
-                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
-                Guild is chunked: {str(ctx.guild.chunked)}
-                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
-            """),
-            file=discord.File("queue.txt"))
-
-    @commands.command()
     @commands.is_owner()
     async def channellist(self, ctx):
         channellist = str()
@@ -157,6 +145,26 @@ class Main(commands.Cog):
             if self.bot.playing[key] != 0:
                 tempplaying[key] = self.bot.playing[key]
         await ctx.send(f"TTS Bot Voice Channels:\n{channellist}\nAnd just incase {str(tempplaying)}")
+
+    @commands.command()
+    @commands.check(is_trusted)
+    async def debug(self, ctx):
+        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
+        await ctx.author.send(
+            cleandoc(f"""
+                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
+                Guild is chunked: {str(ctx.guild.chunked)}
+                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
+            """),
+            file=discord.File("queue.txt"))
+
+    @commands.command()
+    @commands.check(is_trusted)
+    async def save_files(self, ctx):
+        settings.save()
+        setlangs.save()
+        blocked_users.save()
+        await ctx.send("Saved all files!")
 
     @commands.command()
     @commands.is_owner()
@@ -447,7 +455,7 @@ class Main(commands.Cog):
                 if "https://discord.gg/" in message.content.lower():
                     await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
 
-                elif blocked_users.check(user):
+                elif blocked_users.check(ctx.author):
                     files = [await attachment.to_file() for attachment in message.attachments]
                     webhook = await basic.ensure_webhook(self.bot.channels["dm_logs"], name="TTS-DM-LOGS")
 

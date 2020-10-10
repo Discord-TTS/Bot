@@ -103,4 +103,4 @@ class blocked_users_class():
         blocked_users.append(user.id)
 
     def remove(user):
-        del blocked_users[user.id]
+        blocked_users.remove(user.id)
