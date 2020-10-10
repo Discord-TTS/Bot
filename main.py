@@ -134,6 +134,26 @@ class Main(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
+    async def leave_unused_guilds(self, ctx, sure: bool = False):
+        guilds_to_leave = []
+
+        for guild in self.bot.guilds:
+            guild_id = str(guild.id)
+            if guild_id not in settings.settings:
+                guilds_to_leave.append(guild)
+        
+        if not sure:
+            await ctx.send(f"Are you sure you want me to leave {len(guilds_to_leave)} guilds?")
+        else:
+            for guild in guilds_to_leave:
+                try:    await guild.owner.send("Hey! TTS Bot has not been setup on your server so I have left! If you want to reinvite me, join https://discord.gg/zWPWwQC and look in #invites-and-rules.")
+                except: pass
+                await guild.leave()
+            
+            await self.bot.channels["logs"].send(f"Just left {len(guilds_to_leave)} guilds due to no setup, requested by {ctx.author.name}")
+
+    @commands.command()
+    @commands.is_owner()
     async def channellist(self, ctx):
         channellist = str()
         for guild1 in self.bot.guilds:
@@ -145,26 +165,6 @@ class Main(commands.Cog):
             if self.bot.playing[key] != 0:
                 tempplaying[key] = self.bot.playing[key]
         await ctx.send(f"TTS Bot Voice Channels:\n{channellist}\nAnd just incase {str(tempplaying)}")
-
-    @commands.command()
-    @commands.check(is_trusted)
-    async def debug(self, ctx):
-        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
-        await ctx.author.send(
-            cleandoc(f"""
-                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
-                Guild is chunked: {str(ctx.guild.chunked)}
-                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
-            """),
-            file=discord.File("queue.txt"))
-
-    @commands.command()
-    @commands.check(is_trusted)
-    async def save_files(self, ctx):
-        settings.save()
-        setlangs.save()
-        blocked_users.save()
-        await ctx.send("Saved all files!")
 
     @commands.command()
     @commands.is_owner()
@@ -191,6 +191,26 @@ class Main(commands.Cog):
                     config.write(configfile)
 
                 await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
+
+    @commands.command()
+    @commands.check(is_trusted)
+    async def debug(self, ctx):
+        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
+        await ctx.author.send(
+            cleandoc(f"""
+                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
+                Guild is chunked: {str(ctx.guild.chunked)}
+                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
+            """),
+            file=discord.File("queue.txt"))
+
+    @commands.command()
+    @commands.check(is_trusted)
+    async def save_files(self, ctx):
+        settings.save()
+        setlangs.save()
+        blocked_users.save()
+        await ctx.send("Saved all files!")
 
     @commands.command()
     @commands.check(is_trusted)
