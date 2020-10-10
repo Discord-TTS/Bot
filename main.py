@@ -19,7 +19,8 @@ from discord.ext import commands, tasks
 from mutagen.mp3 import MP3
 
 from patched_FFmpegPCM import FFmpegPCMAudio
-from utils import settings, basic
+from utils import basic
+from utils.settings import setlangs_class as setlangs, settings_class as settings, blocked_users_class as blocked_users
 
 #//////////////////////////////////////////////////////
 config = ConfigParser()
@@ -102,7 +103,10 @@ class Main(commands.Cog):
 
     @tasks.loop(seconds=60.0)
     async def avoid_file_crashes(self):
-        try:    settings.save()
+        try:
+            settings.save()
+            setlangs.save()
+            blocked_users.save()
         except Exception as e:
             error = getattr(e, 'original', e)
 
@@ -123,10 +127,8 @@ class Main(commands.Cog):
     async def end(self, ctx):
         self.avoid_file_crashes.cancel()
         settings.save()
-
-        with open("setlangs.json", "w") as f1, open("blocked_users.json", "w") as f2:
-            json.dump(self.bot.setlangs, f1)
-            json.dump(self.bot.blocked_users, f2)
+        setlangs.save()
+        blocked_users.save()
 
         await self.bot.close()
 
@@ -186,7 +188,10 @@ class Main(commands.Cog):
     @commands.check(is_trusted)
     async def cleanup(self, ctx):
         guild_id_list = [str(guild.id) for guild in self.bot.guilds]
-        settings.cleanup()
+        user_id_list = [[member.id for member in guild.members] for guild in bot.guilds]
+
+        settings.cleanup(guild_id_list)
+        setlangs.cleanup(user_id_list)
 
         if exists("servers"):
             shutil.rmtree("servers", ignore_errors=True)
@@ -196,10 +201,10 @@ class Main(commands.Cog):
     @commands.command()
     @commands.check(is_trusted)
     async def block(self, ctx, user: discord.User, notify: bool = False):
-        if user.id in self.bot.blocked_users:
+        if blocked_users.check(user):
             return await ctx.send(f"{str(user)} | {user.id} is already blocked!")
 
-        self.bot.blocked_users.append(user.id)
+        blocked_users.add(user)
 
         await ctx.send(f"Blocked {str(user)} | {str(user.id)}")
         if notify:
@@ -208,10 +213,10 @@ class Main(commands.Cog):
     @commands.command()
     @commands.check(is_trusted)
     async def unblock(self, ctx, user: discord.User, notify: bool = False):
-        if user.id not in self.bot.blocked_users:
+        if not blocked_users.check(user):
             return await ctx.send(f"{str(user)} | {user.id} isn't blocked!")
 
-        self.bot.blocked_users.remove(user.id)
+        blocked_users.remove(user)
 
         await ctx.send(f"Unblocked {str(user)} | {str(user.id)}")
         if notify:
@@ -225,7 +230,6 @@ class Main(commands.Cog):
 
         self.bot.queue = dict()
         self.bot.playing = dict()
-        self.bot.setlangs = dict()
         self.bot.channels = dict()
         self.bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
         self.bot.supportserver = self.bot.get_guild(int(config["Main"]["main_server"]))
@@ -240,13 +244,10 @@ class Main(commands.Cog):
         starting_message = await self.bot.channels["logs"].send(f"Starting {self.bot.user.mention}")
 
         # Load some files
-        with open("setlangs.json") as f1, open("blocked_users.json") as f2, open("activity.txt") as f3, open("activitytype.txt") as f4, open("status.txt") as f5:
-            self.bot.setlangs = json.load(f1)
-            self.bot.blocked_users = json.load(f2)
-            activity = f3.read()
-            activitytype = f4.read()
-            status = f5.read()
-
+        with open("activity.txt") as f2, open("activitytype.txt") as f3, open("status.txt") as f4:
+            activity = f2.read()
+            activitytype = f3.read()
+            status = f4.read()
 
         activitytype1 = getattr(discord.ActivityType, activitytype)
         status1 = getattr(discord.Status, status)
@@ -304,8 +305,8 @@ class Main(commands.Cog):
             saythis = message.clean_content.lower()
 
             # Get settings
-            autojoin = await settings.get(message.guild, "auto_join")
-            bot_ignore = await settings.get(message.guild, "bot_ignore")
+            autojoin = settings.get(message.guild, "auto_join")
+            bot_ignore = settings.get(message.guild, "bot_ignore")
 
             starts_with_tts = saythis.startswith("-tts")
 
@@ -322,7 +323,7 @@ class Main(commands.Cog):
                 return
 
             # Check if a setup channel
-            if message.channel.id != await settings.get(message.guild, "channel"):
+            if message.channel.id != settings.get(message.guild, "channel"):
                 return
 
             # If message is **not** empty **or** there is an attachment
@@ -375,8 +376,8 @@ class Main(commands.Cog):
                             saythis = saythis + ". This message contained a link"
 
                         # Toggleable X said and attachment detection
-                        if await settings.get(message.guild, "xsaid"):
-                            said_name = await settings.nickname.get(message.guild, message.author)
+                        if settings.get(message.guild, "xsaid"):
+                            said_name = settings.nickname.get(message.guild, message.author)
 
                             if message.attachments:
                                 if len(message.clean_content.lower()) == 0:
@@ -390,10 +391,7 @@ class Main(commands.Cog):
                             return
 
                         # Read language file
-                        if str(message.author.id) in self.bot.setlangs:
-                            lang = self.bot.setlangs[str(message.author.id)]
-                        else:
-                            lang = "en-us"
+                        lang = setlangs.get(message.author)
 
                         temp_store_for_mp3 = BytesIO()
                         try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
@@ -446,20 +444,12 @@ class Main(commands.Cog):
                     say = True
 
             if say:
-                if message.author.id not in self.bot.blocked_users:
-                    if "https://discord.gg/" in message.content.lower():
-                        return await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
+                if "https://discord.gg/" in message.content.lower():
+                    await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
 
-                    if message.attachments:
-                        files = [await attachment.to_file() for attachment in message.attachments]
-                    else:
-                        files = None
-
-                    webhooks = await self.bot.channels["dm_logs"].webhooks()
-                    if len(webhooks) == 0:
-                        webhook = await self.bot.channels["dm_logs"].create_webhook(name="TTS-DM-LOGS")
-                    else:
-                        webhook = webhooks[0]
+                elif blocked_users.check(user):
+                    files = [await attachment.to_file() for attachment in message.attachments]
+                    webhook = await basic.ensure_webhook(self.bot.channels["dm_logs"], name="TTS-DM-LOGS")
 
                     await webhook.send(message.content, username=str(message.author), avatar_url=message.author.avatar_url, files=files)
 
@@ -621,7 +611,7 @@ class Main(commands.Cog):
         if basic.get_value(self.bot.playing, ctx.guild.id) == 3:
             return await ctx.send("Error: Already trying to join your voice channel!")
 
-        if ctx.channel.id != await settings.get(ctx.guild, "channel"):
+        if ctx.channel.id != settings.get(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
         if ctx.author.voice is None:
@@ -652,7 +642,7 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):
-        if ctx.channel.id != await settings.get(ctx.guild, "channel"):
+        if ctx.channel.id != settings.get(ctx.guild, "channel"):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
         if basic.get_value(self.bot.playing, ctx.guild.id) == 3:
@@ -679,7 +669,7 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def channel(self, ctx):
-        channel = await settings.get(ctx.guild, "channel")
+        channel = settings.get(ctx.guild, "channel")
 
         if channel == ctx.channel.id:
             await ctx.send("You are in the right channel already!")
@@ -714,18 +704,17 @@ class Settings(commands.Cog):
             embed.add_field(name="Available properties:", value=message, inline=False)
 
         else:
-            channel = ctx.guild.get_channel(await settings.get(ctx.guild, "channel"))
-            say = await settings.get(ctx.guild, "xsaid")
-            join = await settings.get(ctx.guild, "auto_join")
-            bot_ignore = await settings.get(ctx.guild, "bot_ignore")
-            nickname = await settings.nickname.get(ctx.guild, ctx.author)
+            channel = ctx.guild.get_channel(settings.get(ctx.guild, "channel"))
+            say = settings.get(ctx.guild, "xsaid")
+            join = settings.get(ctx.guild, "auto_join")
+            bot_ignore = settings.get(ctx.guild, "bot_ignore")
+            nickname = settings.nickname.get(ctx.guild, ctx.author)
 
 
             if channel is None: channel = "has not been setup yet"
             else: channel = channel.name
 
-            if str(ctx.author.id) in self.bot.setlangs: lang = self.bot.setlangs[str(ctx.author.id)]
-            else: lang = "en-us"
+            lang = setlangs.get(ctx.author)
 
             if nickname == ctx.author.display_name: nickname = "has not be set yet"
 
@@ -757,19 +746,19 @@ class Settings(commands.Cog):
     @commands.has_permissions(administrator=True)
     @set.command()
     async def xsaid(self, ctx, value: bool):
-        await settings.set(ctx.guild, "xsaid", value)
+        settings.set(ctx.guild, "xsaid", value)
         await ctx.send(f"xsaid is now: {to_enabled[value]}")
 
     @commands.has_permissions(administrator=True)
     @set.command(aliases=["auto_join"])
     async def autojoin(self, ctx, value: bool):
-        await settings.set(ctx.guild, "auto_join", value)
+        settings.set(ctx.guild, "auto_join", value)
         await ctx.send(f"Auto Join is now: {to_enabled[value]}")
 
     @commands.has_permissions(administrator=True)
     @set.command(aliases=["bot_ignore", "ignore_bots", "ignorebots"])
     async def botignore(self, ctx, value: bool):
-        await settings.set(ctx.guild, "bot_ignore", value)
+        settings.set(ctx.guild, "bot_ignore", value)
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
@@ -792,7 +781,7 @@ class Settings(commands.Cog):
         elif not re.match(r'^(\w|\s)+$', nickname):
             await ctx.send("Hey! Please keep your nickname to only letters, numbers, and spaces!")
         else:
-            await settings.nickname.set(ctx.guild, user, nickname)
+            settings.nickname.set(ctx.guild, user, nickname)
             await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {user.name}'s nickname to {nickname}"))
 
     @commands.has_permissions(administrator=True)
@@ -809,7 +798,7 @@ class Settings(commands.Cog):
     @commands.has_permissions(administrator=True)
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
-        await settings.set(ctx.guild, "channel", channel.id)
+        settings.set(ctx.guild, "channel", channel.id)
         await ctx.send(f"Setup complete, {channel.mention} will now accept -join and -leave!")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
@@ -818,8 +807,8 @@ class Settings(commands.Cog):
         langs = gTTS.lang.tts_langs(tld='co.uk')
 
         if lang in langs:
-            self.bot.setlangs[str(ctx.author.id)] = lang.lower()
-            await ctx.send(f"Changed your voice to: {self.bot.setlangs[str(ctx.author.id)]}")
+            setlangs.set(ctx.author, lang)
+            await ctx.send(f"Changed your voice to: {setlangs.get(ctx.author)}")
         else:
             await ctx.send("Invalid voice, do -voices")
 
@@ -833,9 +822,7 @@ class Settings(commands.Cog):
             except: pass
 
 
-        if str(ctx.author.id) in self.bot.setlangs:
-            lang = self.bot.setlangs[str(ctx.author.id)]
-        else: lang = "en-us"
+        lang = setlangs.get(ctx.author)
 
         langs_string = basic.remove_chars(list(langs.keys()), "[", "]")
         await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {lang}")

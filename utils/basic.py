@@ -1,3 +1,10 @@
+async def ensure_webhook(channel, name="TTS-Webhook"):
+    webhooks = await channel.webhooks()
+    if len(webhooks) == 0:  webhook = await channel.create_webhook(name)
+    else:   webhook = webhooks[0]
+
+    return webhook
+
 def get_value(dictionary, *nested_values, default_value = None):
     try:
         for value in nested_values:
