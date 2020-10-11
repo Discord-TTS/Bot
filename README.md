@@ -24,17 +24,11 @@ Text to speech Discord Bot using gTTS and discord.py!
 
 - 0 = Not speaking/playing audio  
 1 = Speaking/playing audio  
-2 = Leaving/left voice channel  
+2 = Leaving voice channel  
 3 = Joining voice channel  
 
 ### `bot.queue[guild_id]`:
 - Dictionary of message_id: [BytesIO](https://docs.python.org/3/library/io.html#io.BytesIO) objects of gTTS output
-
-### `bot.setlangs`:
-- Contents of the setlangs.json file, stores user specific voices
-
-### `bot.blocked_users`:
-- Contents of the blocked_users.json file, stores blocked users
 
 ### `bot.trusted`:
 - List of trusted people, stored in the config.ini["Main"]["trusted_ids"]

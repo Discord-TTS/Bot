@@ -10,6 +10,7 @@ from inspect import cleandoc
 from io import BytesIO
 from os.path import exists
 from subprocess import call
+from sys import exc_info
 from traceback import format_exception
 from typing import Optional, Union
 
@@ -20,7 +21,9 @@ from mutagen.mp3 import MP3
 
 from patched_FFmpegPCM import FFmpegPCMAudio
 from utils import basic
-from utils.settings import setlangs_class as setlangs, settings_class as settings, blocked_users_class as blocked_users
+from utils.settings import blocked_users_class as blocked_users
+from utils.settings import setlangs_class as setlangs
+from utils.settings import settings_class as settings
 
 #//////////////////////////////////////////////////////
 config = ConfigParser()
@@ -136,10 +139,12 @@ class Main(commands.Cog):
     @commands.is_owner()
     async def leave_unused_guilds(self, ctx, sure: bool = False):
         guilds_to_leave = []
+        with open("settings.json") as f:
+            temp_settings = f.read()
 
         for guild in self.bot.guilds:
             guild_id = str(guild.id)
-            if guild_id not in settings.settings:
+            if guild_id not in temp_settings:
                 guilds_to_leave.append(guild)
 
         if not sure:
@@ -388,11 +393,13 @@ class Main(commands.Cog):
                             "™️": "tm",
                             "rn": "right now"
                         }
-                        if starts_with_tts: acronyms["-tts"] = ""
 
+                        if starts_with_tts: acronyms["-tts"] = ""
                         for toreplace, replacewith in acronyms.items():
                             saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
+
                         saythis = saythis[1:-1]
+                        if saythis == "?":  saythis = "what"
 
                         # Spoiler filter
                         saythis = re.sub(r"\|\|.*?\|\|", ". spoiler avoided.", saythis)
@@ -508,6 +515,25 @@ class Main(commands.Cog):
             await vc.disconnect(force=True)
             self.bot.playing[guild.id] = 0
 
+    @bot.event
+    async def on_error(event, *args, **kwargs):
+        errors = exc_info()
+
+        if event == "on_message":
+            if args[0].author.id == bot.user.id:    return
+
+            message = await args[0].channel.fetch_message(args[0].id)
+            if isinstance(errors[1], discord.errors.Forbidden):
+                try:    return await message.author.send("Unknown Permission Error, please give TTS Bot the required permissions!")
+                except discord.errors.Forbidden:    return
+
+            part1 = f"""{message.author} caused an error with the message: {message.content}"""
+
+        try:    error_message = f"{part1}\n```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
+        except: error_message = f"```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
+
+        await bot.channels["errors"].send(cleandoc(error_message))
+
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if hasattr(ctx.command, 'on_error') or isinstance(error, commands.CommandNotFound) or isinstance(error, commands.NotOwner):
@@ -542,7 +568,7 @@ class Main(commands.Cog):
 
             return await ctx.send(f'**Error:** I am missing the permissions: {basic.remove_chars(error.missing_perms, "[", "]")}')
         elif isinstance(error, discord.errors.Forbidden):
-            await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` in {str(ctx.guild)} caused by {str(ctx.message.content)} sent by {str(ctx.author)}")
+            await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {str(ctx.message.content)} sent by {str(ctx.author)}")
             return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `-suggest *what command you just run*`")
 
         first_part = f"{str(ctx.author)} caused an error with the message: {ctx.message.clean_content}"
