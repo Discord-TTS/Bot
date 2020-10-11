@@ -12,6 +12,7 @@ Text to speech Discord Bot using gTTS and discord.py!
 ### Hard (Self Host):
 - Make sure you have python 3.5 or above installed (tested with 3.8, should work with 3.5)
 - Make a bot account with [the Discord Developer Portal](https://discord.com/developers/applications/) and note down the token
+- Toggle the `Server Members Intent` toggle in the portal
 - Make sure you have a Discord server ready to be setup as a hub for TTS Bot
 - Run `git clone --recurse-submodules https://github.com/Gnome-py/Discord-TTS-Bot.git`
 - Run `python -m pip install -r requirements.txt`
