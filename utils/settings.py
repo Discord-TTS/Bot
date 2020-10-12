@@ -9,9 +9,6 @@ with open("blocked_users.json") as f:    blocked_users = json.load(f)
 default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "nicknames": dict()}
 
 class settings_class():
-    def __init__():
-        with open("settings.json") as f:    settings = json.load(f)
-
     def save():
         with open("settings.json", "w") as f:    json.dump(settings, f)
 

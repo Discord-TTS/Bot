@@ -586,10 +586,9 @@ class Main(commands.Cog):
         owner = guild.owner
         self.bot.queue[guild.id] = dict()
 
-        await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
-
         while not guild.chunked:   await guild.chunk(cache=True)
 
+        await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
         try:    await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
         except:
             if guild.chunked:   pass
@@ -827,7 +826,7 @@ class Settings(commands.Cog):
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
-    async def nick(self, ctx, user: Optional[discord.User] = False, *, nickname):
+    async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname):
 
         if user:
             if nickname:
