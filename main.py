@@ -369,7 +369,7 @@ class Main(commands.Cog):
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
                         #Auto Join
-                        if message.guild.voice_client is None and autojoin:
+                        if message.guild.voice_client is None and autojoin and self.bot.playing[message.guild.id] in (0, 1):
                             try:  channel = message.author.voice.channel
                             except AttributeError: return
 
@@ -462,7 +462,9 @@ class Main(commands.Cog):
                                 while vc.is_playing():  await asyncio.sleep(0.5)
 
                                 # Delete said message from queue
-                                del self.bot.queue[message.guild.id][message_id_to_read]
+                                if message_id_to_read in self.bot.queue[message.guild.id]:
+                                    del self.bot.queue[message.guild.id][message_id_to_read]
+
                             else:
                                 # If not in a voice channel anymore, clear the queue
                                 self.bot.queue[message.guild.id] = dict()
@@ -472,13 +474,8 @@ class Main(commands.Cog):
 
         elif message.author.bot is False:
             pins = await message.author.pins()
-            say = False
 
-            for pinned_message in pins:
-                if pinned_message.embeds and pinned_message.embeds[0].title == f"Welcome to {self.bot.user.name} Support DMs!":
-                    say = True
-
-            if say:
+            if [True for pinned_message in pins if pinned_message.embeds and pinned_message.embeds[0].title == f"Welcome to {self.bot.user.name} Support DMs!"]:
                 if "https://discord.gg/" in message.content.lower():
                     await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
 
@@ -510,7 +507,14 @@ class Main(commands.Cog):
         vc = guild.voice_client
         playing = basic.get_value(self.bot.playing, guild.id)
 
-        if vc and len(vc.channel.members) == 1 and vc.channel.id == before.channel.id and playing in (0, 1):
+        if member.id == self.bot.user.id:   return # someone other than bot left vc
+        elif not (before.channel and not after.channel):   return # user left voice channel
+        elif not vc:   return # bot in a voice channel
+
+        elif len(vc.channel.members) != 1:    return # bot is only one left
+        elif playing not in (0, 1):   return # bot not already joining/leaving a voice channel
+
+        else:
             self.bot.playing[guild.id] = 2
             await vc.disconnect(force=True)
             self.bot.playing[guild.id] = 0
@@ -594,14 +598,16 @@ class Main(commands.Cog):
             if guild.chunked:   pass
             else:   await self.bot.channels["logs"].send(f"Weird, `{guild.name} | {guild.id}` wasn't chunked after trying to chunk?")
 
-        if owner.id in [member.id for member in self.bot.supportserver.members]:
-            role = self.bot.supportserver.get_role(738009431052386304)
-            await self.bot.supportserver.get_member(owner.id).add_roles(role)
+        try:
+            if owner.id in [member.id for member in self.bot.supportserver.members if not isinstance(member, None)]:
+                role = self.bot.supportserver.get_role(738009431052386304)
+                await self.bot.supportserver.get_member(owner.id).add_roles(role)
 
-            embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild.name}")
-            embed.set_author(name=f"{str(owner)} (ID {owner.id})", icon_url=owner.avatar_url)
+                embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild.name}")
+                embed.set_author(name=f"{str(owner)} (ID {owner.id})", icon_url=owner.avatar_url)
 
-            await self.bot.channels["logs"].send(embed=embed)
+                await self.bot.channels["logs"].send(embed=embed)
+        except AttributeError:  pass
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
