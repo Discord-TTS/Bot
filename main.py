@@ -33,6 +33,7 @@ t = config["Main"]["Token"]
 # Define random variables
 settings_loaded = False
 before = time.monotonic()
+tts_langs = gTTS.lang.tts_langs(tld='co.uk')
 to_enabled = {True: "Enabled", False: "Disabled"}
 OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
 
@@ -614,12 +615,13 @@ class Main(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
         settings.remove(guild)
+        self.bot.queue.pop(guild.id, None)
+        self.bot.playing.pop(guild.id, None)
         await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)} (owned by {str(guild.owner)}). I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.command()
     async def uptime(self, ctx):
-        ping = str((time.monotonic() - before) / 60).split(".")[0]
-        await ctx.send(f"{self.bot.user.mention} has been up for {ping} minutes")
+        await ctx.send(f"{self.bot.user.mention} has been up for {int(monotonic() // 60)} minutes")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["commands"])
@@ -875,29 +877,24 @@ class Settings(commands.Cog):
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
-    async def voice(self, ctx, lang : str):
-        langs = gTTS.lang.tts_langs(tld='co.uk')
-
-        if lang in langs:
+    async def voice(self, ctx, lang: str):
+        if lang in tts_langs:
             setlangs.set(ctx.author, lang)
-            await ctx.send(f"Changed your voice to: {setlangs.get(ctx.author)}")
+            await ctx.send(f"Changed your voice to: {tts_langs[setlangs.get(ctx.author)]}")
         else:
             await ctx.send("Invalid voice, do -voices")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
     async def voices(self, ctx, lang: str = None):
-        langs = gTTS.lang.tts_langs(tld='co.uk')
-
-        if lang in langs:
+        if lang in tts_langs:
             try:  return await self.voice(ctx, lang)
-            except: pass
-
+            except: return
 
         lang = setlangs.get(ctx.author)
+        langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
 
-        langs_string = basic.remove_chars(list(langs.keys()), "[", "]")
-        await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {lang}")
+        await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {tts_langs[lang]} | {lang}")
 #//////////////////////////////////////////////////////
 
 bot.add_cog(Main(bot))
