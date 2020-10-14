@@ -221,7 +221,9 @@ class Main(commands.Cog):
     @commands.check(is_trusted)
     async def cleanup(self, ctx):
         guild_id_list = [str(guild.id) for guild in self.bot.guilds]
-        user_id_list = [[member.id for member in guild.members] for guild in bot.guilds]
+
+        user_id_list = list()
+        [[user_id_list.append(str(member.id)) for member in guild.members] for guild in bot.guilds]
 
         settings.cleanup(guild_id_list)
         setlangs.cleanup(user_id_list)
