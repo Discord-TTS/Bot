@@ -31,6 +31,7 @@ config.read("config.ini")
 t = config["Main"]["Token"]
 
 # Define random variables
+NoneType = type(None)
 settings_loaded = False
 before = time.monotonic()
 tts_langs = gTTS.lang.tts_langs(tld='co.uk')
@@ -606,7 +607,12 @@ class Main(commands.Cog):
         owner = guild.owner
         self.bot.queue[guild.id] = dict()
 
-        while not guild.chunked:   await guild.chunk(cache=True)
+        while not guild.chunked:
+            while self.bot.chunking: pass
+
+            self.bot.chunking = True
+            await guild.chunk(cache=True)
+            self.bot.chunking = False
 
         await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
         try:    await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
@@ -615,7 +621,7 @@ class Main(commands.Cog):
             else:   await self.bot.channels["logs"].send(f"Weird, `{guild.name} | {guild.id}` wasn't chunked after trying to chunk?")
 
         try:
-            if owner.id in [member.id for member in self.bot.supportserver.members if not isinstance(member, None)]:
+            if owner.id in [member.id for member in self.bot.supportserver.members if not isinstance(member, NoneType)]:
                 role = self.bot.supportserver.get_role(738009431052386304)
                 await self.bot.supportserver.get_member(owner.id).add_roles(role)
 
@@ -770,11 +776,12 @@ class Main(commands.Cog):
         else:
             await ctx.send("The channel hasn't been setup, do `-setup #textchannel`")
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @require_chunk()
+    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
-    async def tts(self, ctx, *, no_input = True):
-        if no_input:    await ctx.send(f"You don't need to do `-tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `-`!")
+    async def tts(self, ctx):
+        if ctx.message != f"{BOT_PREFIX}tts":
+            await ctx.send(f"You don't need to do `-tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `-`!")
 
 class Settings(commands.Cog):
     def __init__(self, bot):
