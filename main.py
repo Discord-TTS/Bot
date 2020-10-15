@@ -33,6 +33,7 @@ t = config["Main"]["Token"]
 # Define random variables
 settings_loaded = False
 before = time.monotonic()
+tts_langs = gTTS.lang.tts_langs(tld='co.uk')
 to_enabled = {True: "Enabled", False: "Disabled"}
 OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
 
@@ -221,7 +222,9 @@ class Main(commands.Cog):
     @commands.check(is_trusted)
     async def cleanup(self, ctx):
         guild_id_list = [str(guild.id) for guild in self.bot.guilds]
-        user_id_list = [[member.id for member in guild.members] for guild in bot.guilds]
+
+        user_id_list = list()
+        [[user_id_list.append(str(member.id)) for member in guild.members] for guild in bot.guilds]
 
         settings.cleanup(guild_id_list)
         setlangs.cleanup(user_id_list)
@@ -369,7 +372,7 @@ class Main(commands.Cog):
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
                         #Auto Join
-                        if message.guild.voice_client is None and autojoin:
+                        if message.guild.voice_client is None and autojoin and self.bot.playing[message.guild.id] in (0, 1):
                             try:  channel = message.author.voice.channel
                             except AttributeError: return
 
@@ -462,7 +465,9 @@ class Main(commands.Cog):
                                 while vc.is_playing():  await asyncio.sleep(0.5)
 
                                 # Delete said message from queue
-                                del self.bot.queue[message.guild.id][message_id_to_read]
+                                if message_id_to_read in self.bot.queue[message.guild.id]:
+                                    del self.bot.queue[message.guild.id][message_id_to_read]
+
                             else:
                                 # If not in a voice channel anymore, clear the queue
                                 self.bot.queue[message.guild.id] = dict()
@@ -472,13 +477,8 @@ class Main(commands.Cog):
 
         elif message.author.bot is False:
             pins = await message.author.pins()
-            say = False
 
-            for pinned_message in pins:
-                if pinned_message.embeds and pinned_message.embeds[0].title == f"Welcome to {self.bot.user.name} Support DMs!":
-                    say = True
-
-            if say:
+            if [True for pinned_message in pins if pinned_message.embeds and pinned_message.embeds[0].title == f"Welcome to {self.bot.user.name} Support DMs!"]:
                 if "https://discord.gg/" in message.content.lower():
                     await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
 
@@ -510,7 +510,14 @@ class Main(commands.Cog):
         vc = guild.voice_client
         playing = basic.get_value(self.bot.playing, guild.id)
 
-        if vc and len(vc.channel.members) == 1 and vc.channel.id == before.channel.id and playing in (0, 1):
+        if member.id == self.bot.user.id:   return # someone other than bot left vc
+        elif not (before.channel and not after.channel):   return # user left voice channel
+        elif not vc:   return # bot in a voice channel
+
+        elif len(vc.channel.members) != 1:    return # bot is only one left
+        elif playing not in (0, 1):   return # bot not already joining/leaving a voice channel
+
+        else:
             self.bot.playing[guild.id] = 2
             await vc.disconnect(force=True)
             self.bot.playing[guild.id] = 0
@@ -594,24 +601,27 @@ class Main(commands.Cog):
             if guild.chunked:   pass
             else:   await self.bot.channels["logs"].send(f"Weird, `{guild.name} | {guild.id}` wasn't chunked after trying to chunk?")
 
-        if owner.id in [member.id for member in self.bot.supportserver.members]:
-            role = self.bot.supportserver.get_role(738009431052386304)
-            await self.bot.supportserver.get_member(owner.id).add_roles(role)
+        try:
+            if owner.id in [member.id for member in self.bot.supportserver.members if not isinstance(member, None)]:
+                role = self.bot.supportserver.get_role(738009431052386304)
+                await self.bot.supportserver.get_member(owner.id).add_roles(role)
 
-            embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild.name}")
-            embed.set_author(name=f"{str(owner)} (ID {owner.id})", icon_url=owner.avatar_url)
+                embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild.name}")
+                embed.set_author(name=f"{str(owner)} (ID {owner.id})", icon_url=owner.avatar_url)
 
-            await self.bot.channels["logs"].send(embed=embed)
+                await self.bot.channels["logs"].send(embed=embed)
+        except AttributeError:  pass
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
         settings.remove(guild)
+        self.bot.queue.pop(guild.id, None)
+        self.bot.playing.pop(guild.id, None)
         await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)} (owned by {str(guild.owner)}). I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.command()
     async def uptime(self, ctx):
-        ping = str((time.monotonic() - before) / 60).split(".")[0]
-        await ctx.send(f"{self.bot.user.mention} has been up for {ping} minutes")
+        await ctx.send(f"{self.bot.user.mention} has been up for {int(monotonic() // 60)} minutes")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["commands"])
@@ -867,29 +877,24 @@ class Settings(commands.Cog):
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
-    async def voice(self, ctx, lang : str):
-        langs = gTTS.lang.tts_langs(tld='co.uk')
-
-        if lang in langs:
+    async def voice(self, ctx, lang: str):
+        if lang in tts_langs:
             setlangs.set(ctx.author, lang)
-            await ctx.send(f"Changed your voice to: {setlangs.get(ctx.author)}")
+            await ctx.send(f"Changed your voice to: {tts_langs[setlangs.get(ctx.author)]}")
         else:
             await ctx.send("Invalid voice, do -voices")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
     async def voices(self, ctx, lang: str = None):
-        langs = gTTS.lang.tts_langs(tld='co.uk')
-
-        if lang in langs:
+        if lang in tts_langs:
             try:  return await self.voice(ctx, lang)
-            except: pass
-
+            except: return
 
         lang = setlangs.get(ctx.author)
+        langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
 
-        langs_string = basic.remove_chars(list(langs.keys()), "[", "]")
-        await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {lang}")
+        await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {tts_langs[lang]} | {lang}")
 #//////////////////////////////////////////////////////
 
 bot.add_cog(Main(bot))
