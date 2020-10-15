@@ -71,9 +71,26 @@ def emojitoword(text):
 
     return ' '.join([str(x) for x in output])
 
+def require_chunk():
+    return commands.check(async_require_chunk)
+
+async def async_require_chunk(ctx, dm=False):
+    while bot.chunking: pass
+
+    bot.chunking = True
+    if not ctx.guild.chunked:
+        if not dm:  message = await ctx.send("Loading! (should take less than a minute)")
+        await ctx.guild.chunk(cache=True)
+        if not dm:  await message.delete()
+    bot.chunking = False
+
+    await last_cached_message.edit(content=f"Just chunked: {ctx.guild.name} | {ctx.guild.id}")
+    return True
+
 # Define bot and remove overwritten commands
 BOT_PREFIX = "-"
-bot = commands.Bot(command_prefix=BOT_PREFIX, chunk_guilds_at_startup=False, case_insensitive=True, intents=intents)
+bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, chunk_guilds_at_startup=False, case_insensitive=True)
+bot.chunking = True
 
 if exists("cogs/common_user.py"):
     bot.load_extension("cogs.common_owner")
@@ -98,12 +115,6 @@ class Main(commands.Cog):
     def is_trusted(ctx):
         if str(ctx.author.id) in bot.trusted: return True
         else: raise commands.errors.NotOwner
-
-    async def fill_cache(self):
-        await self.bot.supportserver.chunk(cache=True)
-        for guild in self.bot.guilds:
-            if not guild.chunked:
-                await guild.chunk(cache=True)
 
     @tasks.loop(seconds=60.0)
     async def avoid_file_crashes(self):
@@ -261,6 +272,8 @@ class Main(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         global settings_loaded
+        global last_cached_message
+
         if settings_loaded:
             await self.bot.close()
 
@@ -298,10 +311,8 @@ class Main(commands.Cog):
         ping = str(time.monotonic() - before).split(".")[0]
         await starting_message.edit(content=f"Started and ready! Took `{ping} seconds`")
 
-        await self.fill_cache()
-
-        ping = str(time.monotonic() - before).split(".")[0]
-        await starting_message.edit(content=f"Started, ready, and cache filled! Took `{ping} seconds`")
+        last_cached_message = await self.bot.channels["logs"].send("Waiting to chunk a guild!")
+        bot.chunking = False
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -394,7 +405,9 @@ class Main(commands.Cog):
                             "gtg": " got to go ",
                             "iirc": "if I recall correctly",
                             "™️": "tm",
-                            "rn": "right now"
+                            "rn": "right now",
+                            "wdym": "what do you mean",
+                            "imo": "in my opinion",
                         }
 
                         if starts_with_tts: acronyms["-tts"] = ""
@@ -623,6 +636,7 @@ class Main(commands.Cog):
     async def uptime(self, ctx):
         await ctx.send(f"{self.bot.user.mention} has been up for {int(monotonic() // 60)} minutes")
 
+    @require_chunk()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["commands"])
     async def help(self, ctx):
@@ -648,6 +662,7 @@ class Main(commands.Cog):
         embed.set_footer(text="Do you want to get support for TTS Bot or invite it to your own server? https://discord.gg/zWPWwQC")
         await ctx.send(embed=embed)
 
+    @require_chunk()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["botstats", "stats"])
     async def info(self, ctx):
@@ -678,6 +693,7 @@ class Main(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.guild_only()
+    @require_chunk()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def join(self, ctx):
@@ -712,6 +728,7 @@ class Main(commands.Cog):
         await ctx.send("Joined your voice channel!")
 
     @commands.guild_only()
+    @require_chunk()
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):
@@ -740,6 +757,7 @@ class Main(commands.Cog):
         await ctx.send("Left voice channel!")
 
     @commands.guild_only()
+    @require_chunk()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def channel(self, ctx):
@@ -753,8 +771,9 @@ class Main(commands.Cog):
             await ctx.send("The channel hasn't been setup, do `-setup #textchannel`")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @require_chunk()
     @commands.command()
-    async def tts(self, ctx, no_input = True):
+    async def tts(self, ctx, *, no_input = True):
         if no_input:    await ctx.send(f"You don't need to do `-tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `-`!")
 
 class Settings(commands.Cog):
@@ -762,6 +781,7 @@ class Settings(commands.Cog):
         self.bot = bot
 
     @commands.guild_only()
+    @require_chunk()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def settings(self, ctx, help = None):
@@ -810,8 +830,9 @@ class Settings(commands.Cog):
         embed.set_footer(text="Change these settings with -set property value!")
         await ctx.send(embed=embed)
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.guild_only()
+    @require_chunk()
+    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.group()
     async def set(self, ctx):
         if ctx.invoked_subcommand is None:
@@ -868,13 +889,15 @@ class Settings(commands.Cog):
         await self.voice(ctx, voicecode)
 
     @commands.guild_only()
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @require_chunk()
     @commands.has_permissions(administrator=True)
+    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
         settings.set(ctx.guild, "channel", channel.id)
         await ctx.send(f"Setup complete, {channel.mention} will now accept -join and -leave!")
 
+    @require_chunk()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def voice(self, ctx, lang: str):
@@ -884,6 +907,7 @@ class Settings(commands.Cog):
         else:
             await ctx.send("Invalid voice, do -voices")
 
+    @require_chunk()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
     async def voices(self, ctx, lang: str = None):
