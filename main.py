@@ -194,11 +194,11 @@ class Main(commands.Cog):
                 await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
 
     @commands.command()
-    @commands.check(is_trusted)
     async def debug(self, ctx):
         with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
         await ctx.author.send(
             cleandoc(f"""
+                **TTS Bot debug info!**
                 Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
                 Guild is chunked: {str(ctx.guild.chunked)}
                 Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
@@ -432,7 +432,8 @@ class Main(commands.Cog):
                         temp_store_for_mp3 = BytesIO()
                         try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
                         except AssertionError:  return
-
+                        except gTTS.tts.gTTSError:
+                            await message.channel.send(f"Ah! gTTS couldn't process https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id} for some reason, please try again later.")
                         # Discard if over 30 seconds
                         temp_store_for_mp3.seek(0)
                         if not (int(MP3(temp_store_for_mp3).info.length) >= 30):
@@ -458,7 +459,8 @@ class Main(commands.Cog):
                             # Play selected audio
                             vc = message.guild.voice_client
                             if vc is not None:
-                                vc.play(FFmpegPCMAudio(selected.read(), pipe=True, options='-loglevel "quiet"'))
+                                try:    vc.play(FFmpegPCMAudio(selected.read(), pipe=True, options='-loglevel "quiet"'))
+                                except discord.errors.ClientException:  pass # sliences desyncs between discord.py and discord, implement actual fix soon!
 
                                 while vc.is_playing():  await asyncio.sleep(0.5)
 
@@ -598,7 +600,7 @@ class Main(commands.Cog):
             await guild.chunk(cache=True)
             self.bot.chunking = False
 
-        await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
+        await self.bot.channels["servers"].send(f"Just joined {guild.name}! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
         try:    await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
         except:
             if guild.chunked:   pass
