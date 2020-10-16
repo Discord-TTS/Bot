@@ -55,23 +55,6 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
 
         raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
-def emojitoword(text):
-    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
-    emojiRegex = re.compile(r'<:.+:\d+\d+>')
-    words = text.split(' ')
-    output = []
-
-    for x in words:
-
-        if emojiAniRegex.match(x):
-            output.append(f"animated emoji {x.split(':')[1]}")
-        elif emojiRegex.match(x):
-            output.append(f"emoji {x.split(':')[1]}")
-        else:
-            output.append(x)
-
-    return ' '.join([str(x) for x in output])
-
 def require_chunk():
     return commands.check(async_require_chunk)
 
@@ -396,7 +379,7 @@ class Main(commands.Cog):
                             self.bot.queue[message.guild.id] = dict()
 
                         # Emoji filter
-                        saythis = emojitoword(saythis)
+                        saythis = basic.emojitoword(saythis)
 
                         # Acronyms and removing -tts
                         saythis = f" {saythis} "
@@ -430,12 +413,13 @@ class Main(commands.Cog):
                         # Toggleable X said and attachment detection
                         if settings.get(message.guild, "xsaid"):
                             said_name = settings.nickname.get(message.guild, message.author)
+                            format = basic.exts_to_format(message.attachments)
 
                             if message.attachments:
-                                if len(message.clean_content.lower()) == 0:
-                                    saythis = f"{said_name} sent an image."
+                                if len(saythis) == 0:
+                                    saythis = f"{said_name} sent {format}."
                                 else:
-                                    saythis = f"{said_name} sent an image and said {saythis}"
+                                    saythis = f"{said_name} sent {format} and said {saythis}"
                             else:
                                 saythis = f"{said_name} said: {saythis}"
 
