@@ -31,6 +31,7 @@ config.read("config.ini")
 t = config["Main"]["Token"]
 
 # Define random variables
+BOT_PREFIX = "-"
 NoneType = type(None)
 settings_loaded = False
 before = time.monotonic()
@@ -56,20 +57,19 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
         raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
 async def require_chunk(ctx):
-    if not chunk_guilds.is_running():
-        chunk_guilds.start()
-
     if not ctx.guild.chunked:
+        try:    chunk_guilds.start()
+        except RuntimeError: pass
+
         if ctx.guild.id not in bot.chunk_queue:
             bot.chunk_queue.append(ctx.guild.id)
-        else:
-            while ctx.guild.id in bot.chunk_queue:  pass
 
     return True
 
-@tasks.loop(count=1)
+@tasks.loop(seconds=1)
 async def chunk_guilds():
     chunk_queue = bot.chunk_queue
+
     for guild in chunk_queue:
         guild = bot.get_guild(guild)
 
@@ -80,7 +80,6 @@ async def chunk_guilds():
         bot.chunk_queue.remove(guild.id)
 
 # Define bot and remove overwritten commands
-BOT_PREFIX = "-"
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, chunk_guilds_at_startup=False, case_insensitive=True)
 bot.chunk_queue = list()
 
@@ -200,18 +199,6 @@ class Main(commands.Cog):
                     config.write(configfile)
 
                 await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
-
-    @commands.command()
-    async def debug(self, ctx):
-        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
-        await ctx.author.send(
-            cleandoc(f"""
-                **TTS Bot debug info!**
-                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
-                Guild is chunked: {str(ctx.guild.chunked)}
-                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
-            """),
-            file=discord.File("queue.txt"))
 
     @commands.command()
     @commands.check(is_trusted)
@@ -598,21 +585,23 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        owner = guild.owner
         self.bot.queue[guild.id] = dict()
 
-        while not guild.chunked:
-            while self.bot.chunking: pass
+        try:    chunk_guilds.start()
+        except RuntimeError:    pass
 
-            self.bot.chunking = True
-            await guild.chunk(cache=True)
-            self.bot.chunking = False
+        self.bot.chunk_queue.append(guild.id)
+        await asyncio.sleep(5)
 
+        owner = guild.owner
         await self.bot.channels["servers"].send(f"Just joined {guild.name}! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
-        try:    await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
-        except:
-            if guild.chunked:   pass
-            else:   await self.bot.channels["logs"].send(f"Weird, `{guild.name} | {guild.id}` wasn't chunked after trying to chunk?")
+
+        try:    await owner.send(cleandoc(f"""
+            Hello, I am {self.bot.user.name} and I have just joined your server {guild.name}
+            If you want me to start working do `-setup <#text-channel>` and everything will work in there
+            If you want to get support for {self.bot.user.name}, join the support server!\nhttps://discord.gg/zWPWwQC
+            """))
+        except discord.errors.HTTPException:    pass
 
         try:
             if owner.id in [member.id for member in self.bot.supportserver.members if not isinstance(member, NoneType)]:
@@ -629,13 +618,25 @@ class Main(commands.Cog):
     async def on_guild_remove(self, guild):
         settings.remove(guild)
 
-        if guild.id in self.bot.queue:  self.bot.queue.remove(guild.id)
-        if guild.id in self.bot.playing:  self.bot.queue.playing(guild.id)
-        await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)} (owned by {str(guild.owner)}). I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
+        if guild.id in self.bot.queue:  self.bot.queue.pop(guild.id, None)
+        if guild.id in self.bot.playing:  self.bot.queue.pop(guild.id, None)
+        await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)}. I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.command()
     async def uptime(self, ctx):
         await ctx.send(f"{self.bot.user.mention} has been up for {int(monotonic() // 60)} minutes")
+
+    @commands.command()
+    async def debug(self, ctx):
+        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
+        await ctx.author.send(
+            cleandoc(f"""
+                **TTS Bot debug info!**
+                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
+                Guild is chunked: {str(ctx.guild.chunked)}
+                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
+            """),
+            file=discord.File("queue.txt"))
 
     @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
