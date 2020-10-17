@@ -55,26 +55,34 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
 
         raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
-def require_chunk():
-    return commands.check(async_require_chunk)
+async def require_chunk(ctx):
+    if not chunk_guilds.is_running():
+        chunk_guilds.start()
 
-async def async_require_chunk(ctx, dm=False):
-    while bot.chunking: pass
-
-    bot.chunking = True
     if not ctx.guild.chunked:
-        if not dm:  message = await ctx.send("Loading! (should take less than a minute)")
-        await ctx.guild.chunk(cache=True)
-        if not dm:  await message.delete()
-    bot.chunking = False
+        if ctx.guild.id not in bot.chunk_queue:
+            bot.chunk_queue.append(ctx.guild.id)
+        else:
+            while ctx.guild.id in bot.chunk_queue:  pass
 
-    await last_cached_message.edit(content=f"Just chunked: {ctx.guild.name} | {ctx.guild.id}")
     return True
+
+@tasks.loop(count=1)
+async def chunk_guilds():
+    chunk_queue = bot.chunk_queue
+    for guild in chunk_queue:
+        guild = bot.get_guild(guild)
+
+        if not guild.chunked:
+            await guild.chunk(cache=True)
+            await last_cached_message.edit(content=f"Just chunked: {guild.name} | {guild.id}")
+
+        bot.chunk_queue.remove(guild.id)
 
 # Define bot and remove overwritten commands
 BOT_PREFIX = "-"
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, chunk_guilds_at_startup=False, case_insensitive=True)
-bot.chunking = True
+bot.chunk_queue = list()
 
 if exists("cogs/common_user.py"):
     bot.load_extension("cogs.common_owner")
@@ -620,15 +628,16 @@ class Main(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
         settings.remove(guild)
-        self.bot.queue.pop(guild.id, None)
-        self.bot.playing.pop(guild.id, None)
+
+        if guild.id in self.bot.queue:  self.bot.queue.remove(guild.id)
+        if guild.id in self.bot.playing:  self.bot.queue.playing(guild.id)
         await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)} (owned by {str(guild.owner)}). I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.command()
     async def uptime(self, ctx):
         await ctx.send(f"{self.bot.user.mention} has been up for {int(monotonic() // 60)} minutes")
 
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["commands"])
     async def help(self, ctx):
@@ -654,7 +663,7 @@ class Main(commands.Cog):
         embed.set_footer(text="Do you want to get support for TTS Bot or invite it to your own server? https://discord.gg/zWPWwQC")
         await ctx.send(embed=embed)
 
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["botstats", "stats"])
     async def info(self, ctx):
@@ -685,7 +694,7 @@ class Main(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.guild_only()
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def join(self, ctx):
@@ -720,7 +729,7 @@ class Main(commands.Cog):
         await ctx.send("Joined your voice channel!")
 
     @commands.guild_only()
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):
@@ -749,7 +758,7 @@ class Main(commands.Cog):
         await ctx.send("Left voice channel!")
 
     @commands.guild_only()
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def channel(self, ctx):
@@ -762,7 +771,7 @@ class Main(commands.Cog):
         else:
             await ctx.send("The channel hasn't been setup, do `-setup #textchannel`")
 
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def tts(self, ctx):
@@ -774,7 +783,7 @@ class Settings(commands.Cog):
         self.bot = bot
 
     @commands.guild_only()
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def settings(self, ctx, help = None):
@@ -824,7 +833,7 @@ class Settings(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.guild_only()
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.group()
     async def set(self, ctx):
@@ -882,7 +891,7 @@ class Settings(commands.Cog):
         await self.voice(ctx, voicecode)
 
     @commands.guild_only()
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.has_permissions(administrator=True)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
@@ -890,7 +899,7 @@ class Settings(commands.Cog):
         settings.set(ctx.guild, "channel", channel.id)
         await ctx.send(f"Setup complete, {channel.mention} will now accept -join and -leave!")
 
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def voice(self, ctx, lang: str):
@@ -900,7 +909,7 @@ class Settings(commands.Cog):
         else:
             await ctx.send("Invalid voice, do -voices")
 
-    @require_chunk()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
     async def voices(self, ctx, lang: str = None):
