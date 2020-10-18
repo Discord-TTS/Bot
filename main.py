@@ -291,7 +291,6 @@ class Main(commands.Cog):
         await starting_message.edit(content=f"Started and ready! Took `{ping} seconds`")
 
         last_cached_message = await self.bot.channels["logs"].send("Waiting to chunk a guild!")
-        bot.chunking = False
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -362,12 +361,13 @@ class Main(commands.Cog):
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
                         #Auto Join
-                        if message.guild.voice_client is None and autojoin and self.bot.playing[message.guild.id] in (0, 1):
+                        if message.guild.voice_client is None and autojoin and basic.get_value(self.bot.playing, message.guild.id) in (0, 1):
                             try:  channel = message.author.voice.channel
                             except AttributeError: return
 
-                            self.bot.playing[message.guild.id] = 0
+                            self.bot.playing[message.guild.id] = 3
                             await channel.connect()
+                            self.bot.playing[message.guild.id] = 0
 
                         # Sometimes bot.guilds is wrong, because intents
                         if message.guild.id not in self.bot.queue:
@@ -396,14 +396,25 @@ class Main(commands.Cog):
                         saythis = saythis[1:-1]
                         if saythis == "?":  saythis = "what"
 
-                        # Spoiler filter
-                        saythis = re.sub(r"\|\|.*?\|\|", ". spoiler avoided.", saythis)
+                        # Regex replacements
+                        regex_replacements = {
+                            r"\|\|.*?\|\|": ". spoiler avoided.",
+                            r"```.*?```": ". code block.",
+                            r"`.*?`": ". code snippet.",
+                        }
+
+                        for regex, replacewith in regex_replacements.items():
+                            saythis = re.sub(regex, replacewith, saythis, flags=re.DOTALL)
 
                         # Url filter
-                        saythisbefore = saythis
-                        saythis = re.sub(r"(https?:\/\/)(\s)*(www\.)?(\s)*((\w|\s)+\.)*([\w\-\s]+\/)*([\w\-]+)((\?)?[\w\s]*=\s*[\w\%&]*)*", "", str(saythis))
-                        if saythisbefore != saythis:
-                            saythis = saythis + ". This message contained a link"
+                        changed = False
+                        for word in saythis.split(" "):
+                            if word.startswith("https://") or word.startswith("http://") or word.startswith("www."):
+                                saythis = saythis.replace(word, "")
+                                changed = True
+
+                        if changed:
+                            saythis += ". This message contained a link"
 
                         # Toggleable X said and attachment detection
                         if settings.get(message.guild, "xsaid"):
@@ -428,7 +439,8 @@ class Main(commands.Cog):
                         try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
                         except AssertionError:  return
                         except gTTS.tts.gTTSError:
-                            await message.channel.send(f"Ah! gTTS couldn't process https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id} for some reason, please try again later.")
+                            await message.channel.send(f"Ah! gTTS couldn't process {message.jump_url} for some reason, please try again later.")
+
                         # Discard if over 30 seconds
                         temp_store_for_mp3.seek(0)
                         if not (int(MP3(temp_store_for_mp3).info.length) >= 30):
@@ -509,7 +521,7 @@ class Main(commands.Cog):
         elif not (before.channel and not after.channel):   return # user left voice channel
         elif not vc:   return # bot in a voice channel
 
-        elif len(vc.channel.members) != 1:    return # bot is only one left
+        elif len([member for member in vc.channel.members if not member.bot]) != 0:    return # bot is only one left
         elif playing not in (0, 1):   return # bot not already joining/leaving a voice channel
 
         else:
@@ -619,7 +631,7 @@ class Main(commands.Cog):
         settings.remove(guild)
 
         if guild.id in self.bot.queue:  self.bot.queue.pop(guild.id, None)
-        if guild.id in self.bot.playing:  self.bot.queue.pop(guild.id, None)
+        if guild.id in self.bot.playing:  self.bot.playing.pop(guild.id, None)
         await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)}. I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.command()
