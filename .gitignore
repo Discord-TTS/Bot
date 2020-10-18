@@ -7,7 +7,7 @@ config.ini
 backup.py
 servers
 temp.txt
+queue.txt
 status.txt
 activity.txt
 activitytype.txt
-temp.txt

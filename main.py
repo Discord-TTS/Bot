@@ -31,6 +31,8 @@ config.read("config.ini")
 t = config["Main"]["Token"]
 
 # Define random variables
+BOT_PREFIX = "-"
+NoneType = type(None)
 settings_loaded = False
 before = time.monotonic()
 tts_langs = gTTS.lang.tts_langs(tld='co.uk')
@@ -54,26 +56,32 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
 
         raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
-def emojitoword(text):
-    emojiAniRegex = re.compile(r'<a\:.+:\d+>')
-    emojiRegex = re.compile(r'<:.+:\d+\d+>')
-    words = text.split(' ')
-    output = []
+async def require_chunk(ctx):
+    if not ctx.guild.chunked:
+        try:    chunk_guilds.start()
+        except RuntimeError: pass
 
-    for x in words:
+        if ctx.guild.id not in bot.chunk_queue:
+            bot.chunk_queue.append(ctx.guild.id)
 
-        if emojiAniRegex.match(x):
-            output.append(f"animated emoji {x.split(':')[1]}")
-        elif emojiRegex.match(x):
-            output.append(f"emoji {x.split(':')[1]}")
-        else:
-            output.append(x)
+    return True
 
-    return ' '.join([str(x) for x in output])
+@tasks.loop(seconds=1)
+async def chunk_guilds():
+    chunk_queue = bot.chunk_queue
+
+    for guild in chunk_queue:
+        guild = bot.get_guild(guild)
+
+        if not guild.chunked:
+            await guild.chunk(cache=True)
+            await last_cached_message.edit(content=f"Just chunked: {guild.name} | {guild.id}")
+
+        bot.chunk_queue.remove(guild.id)
 
 # Define bot and remove overwritten commands
-BOT_PREFIX = "-"
-bot = commands.Bot(command_prefix=BOT_PREFIX, chunk_guilds_at_startup=False, case_insensitive=True, intents=intents)
+bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, chunk_guilds_at_startup=False, case_insensitive=True)
+bot.chunk_queue = list()
 
 if exists("cogs/common_user.py"):
     bot.load_extension("cogs.common_owner")
@@ -98,12 +106,6 @@ class Main(commands.Cog):
     def is_trusted(ctx):
         if str(ctx.author.id) in bot.trusted: return True
         else: raise commands.errors.NotOwner
-
-    async def fill_cache(self):
-        await self.bot.supportserver.chunk(cache=True)
-        for guild in self.bot.guilds:
-            if not guild.chunked:
-                await guild.chunk(cache=True)
 
     @tasks.loop(seconds=60.0)
     async def avoid_file_crashes(self):
@@ -200,18 +202,6 @@ class Main(commands.Cog):
 
     @commands.command()
     @commands.check(is_trusted)
-    async def debug(self, ctx):
-        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
-        await ctx.author.send(
-            cleandoc(f"""
-                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
-                Guild is chunked: {str(ctx.guild.chunked)}
-                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
-            """),
-            file=discord.File("queue.txt"))
-
-    @commands.command()
-    @commands.check(is_trusted)
     async def save_files(self, ctx):
         settings.save()
         setlangs.save()
@@ -261,6 +251,8 @@ class Main(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         global settings_loaded
+        global last_cached_message
+
         if settings_loaded:
             await self.bot.close()
 
@@ -298,10 +290,7 @@ class Main(commands.Cog):
         ping = str(time.monotonic() - before).split(".")[0]
         await starting_message.edit(content=f"Started and ready! Took `{ping} seconds`")
 
-        await self.fill_cache()
-
-        ping = str(time.monotonic() - before).split(".")[0]
-        await starting_message.edit(content=f"Started, ready, and cache filled! Took `{ping} seconds`")
+        last_cached_message = await self.bot.channels["logs"].send("Waiting to chunk a guild!")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -372,19 +361,20 @@ class Main(commands.Cog):
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
                         #Auto Join
-                        if message.guild.voice_client is None and autojoin and self.bot.playing[message.guild.id] in (0, 1):
+                        if message.guild.voice_client is None and autojoin and basic.get_value(self.bot.playing, message.guild.id) in (0, 1):
                             try:  channel = message.author.voice.channel
                             except AttributeError: return
 
-                            self.bot.playing[message.guild.id] = 0
+                            self.bot.playing[message.guild.id] = 3
                             await channel.connect()
+                            self.bot.playing[message.guild.id] = 0
 
                         # Sometimes bot.guilds is wrong, because intents
                         if message.guild.id not in self.bot.queue:
                             self.bot.queue[message.guild.id] = dict()
 
                         # Emoji filter
-                        saythis = emojitoword(saythis)
+                        saythis = basic.emojitoword(saythis)
 
                         # Acronyms and removing -tts
                         saythis = f" {saythis} "
@@ -394,7 +384,9 @@ class Main(commands.Cog):
                             "gtg": " got to go ",
                             "iirc": "if I recall correctly",
                             "™️": "tm",
-                            "rn": "right now"
+                            "rn": "right now",
+                            "wdym": "what do you mean",
+                            "imo": "in my opinion",
                         }
 
                         if starts_with_tts: acronyms["-tts"] = ""
@@ -404,24 +396,36 @@ class Main(commands.Cog):
                         saythis = saythis[1:-1]
                         if saythis == "?":  saythis = "what"
 
-                        # Spoiler filter
-                        saythis = re.sub(r"\|\|.*?\|\|", ". spoiler avoided.", saythis)
+                        # Regex replacements
+                        regex_replacements = {
+                            r"\|\|.*?\|\|": ". spoiler avoided.",
+                            r"```.*?```": ". code block.",
+                            r"`.*?`": ". code snippet.",
+                        }
+
+                        for regex, replacewith in regex_replacements.items():
+                            saythis = re.sub(regex, replacewith, saythis, flags=re.DOTALL)
 
                         # Url filter
-                        saythisbefore = saythis
-                        saythis = re.sub(r"(https?:\/\/)(\s)*(www\.)?(\s)*((\w|\s)+\.)*([\w\-\s]+\/)*([\w\-]+)((\?)?[\w\s]*=\s*[\w\%&]*)*", "", str(saythis))
-                        if saythisbefore != saythis:
-                            saythis = saythis + ". This message contained a link"
+                        changed = False
+                        for word in saythis.split(" "):
+                            if word.startswith("https://") or word.startswith("http://") or word.startswith("www."):
+                                saythis = saythis.replace(word, "")
+                                changed = True
+
+                        if changed:
+                            saythis += ". This message contained a link"
 
                         # Toggleable X said and attachment detection
                         if settings.get(message.guild, "xsaid"):
                             said_name = settings.nickname.get(message.guild, message.author)
+                            format = basic.exts_to_format(message.attachments)
 
                             if message.attachments:
-                                if len(message.clean_content.lower()) == 0:
-                                    saythis = f"{said_name} sent an image."
+                                if len(saythis) == 0:
+                                    saythis = f"{said_name} sent {format}."
                                 else:
-                                    saythis = f"{said_name} sent an image and said {saythis}"
+                                    saythis = f"{said_name} sent {format} and said {saythis}"
                             else:
                                 saythis = f"{said_name} said: {saythis}"
 
@@ -434,6 +438,8 @@ class Main(commands.Cog):
                         temp_store_for_mp3 = BytesIO()
                         try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
                         except AssertionError:  return
+                        except gTTS.tts.gTTSError:
+                            await message.channel.send(f"Ah! gTTS couldn't process {message.jump_url} for some reason, please try again later.")
 
                         # Discard if over 30 seconds
                         temp_store_for_mp3.seek(0)
@@ -460,7 +466,8 @@ class Main(commands.Cog):
                             # Play selected audio
                             vc = message.guild.voice_client
                             if vc is not None:
-                                vc.play(FFmpegPCMAudio(selected.read(), pipe=True, options='-loglevel "quiet"'))
+                                try:    vc.play(FFmpegPCMAudio(selected.read(), pipe=True, options='-loglevel "quiet"'))
+                                except discord.errors.ClientException:  pass # sliences desyncs between discord.py and discord, implement actual fix soon!
 
                                 while vc.is_playing():  await asyncio.sleep(0.5)
 
@@ -514,7 +521,7 @@ class Main(commands.Cog):
         elif not (before.channel and not after.channel):   return # user left voice channel
         elif not vc:   return # bot in a voice channel
 
-        elif len(vc.channel.members) != 1:    return # bot is only one left
+        elif len([member for member in vc.channel.members if not member.bot]) != 0:    return # bot is only one left
         elif playing not in (0, 1):   return # bot not already joining/leaving a voice channel
 
         else:
@@ -590,19 +597,26 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        owner = guild.owner
         self.bot.queue[guild.id] = dict()
 
-        while not guild.chunked:   await guild.chunk(cache=True)
+        try:    chunk_guilds.start()
+        except RuntimeError:    pass
 
-        await self.bot.channels["servers"].send(f"Just joined {guild.name} (owned by {str(owner)})! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
-        try:    await owner.send(f"Hello, I am TTS Bot and I have just joined your server {guild.name}\nIf you want me to start working do -setup #textchannel and everything will work in there\nIf you want to get support for TTS Bot, join the support server!\nhttps://discord.gg/zWPWwQC")
-        except:
-            if guild.chunked:   pass
-            else:   await self.bot.channels["logs"].send(f"Weird, `{guild.name} | {guild.id}` wasn't chunked after trying to chunk?")
+        self.bot.chunk_queue.append(guild.id)
+        await asyncio.sleep(5)
+
+        owner = guild.owner
+        await self.bot.channels["servers"].send(f"Just joined {guild.name}! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
+
+        try:    await owner.send(cleandoc(f"""
+            Hello, I am {self.bot.user.name} and I have just joined your server {guild.name}
+            If you want me to start working do `-setup <#text-channel>` and everything will work in there
+            If you want to get support for {self.bot.user.name}, join the support server!\nhttps://discord.gg/zWPWwQC
+            """))
+        except discord.errors.HTTPException:    pass
 
         try:
-            if owner.id in [member.id for member in self.bot.supportserver.members if not isinstance(member, None)]:
+            if owner.id in [member.id for member in self.bot.supportserver.members if not isinstance(member, NoneType)]:
                 role = self.bot.supportserver.get_role(738009431052386304)
                 await self.bot.supportserver.get_member(owner.id).add_roles(role)
 
@@ -615,14 +629,28 @@ class Main(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
         settings.remove(guild)
-        self.bot.queue.pop(guild.id, None)
-        self.bot.playing.pop(guild.id, None)
-        await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)} (owned by {str(guild.owner)}). I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
+
+        if guild.id in self.bot.queue:  self.bot.queue.pop(guild.id, None)
+        if guild.id in self.bot.playing:  self.bot.playing.pop(guild.id, None)
+        await self.bot.channels["servers"].send(f"Just left/got kicked from {str(guild.name)}. I am now in {str(len(self.bot.guilds))} servers".replace("@", "@ "))
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.command()
     async def uptime(self, ctx):
         await ctx.send(f"{self.bot.user.mention} has been up for {int(monotonic() // 60)} minutes")
 
+    @commands.command()
+    async def debug(self, ctx):
+        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
+        await ctx.author.send(
+            cleandoc(f"""
+                **TTS Bot debug info!**
+                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
+                Guild is chunked: {str(ctx.guild.chunked)}
+                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
+            """),
+            file=discord.File("queue.txt"))
+
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["commands"])
     async def help(self, ctx):
@@ -648,6 +676,7 @@ class Main(commands.Cog):
         embed.set_footer(text="Do you want to get support for TTS Bot or invite it to your own server? https://discord.gg/zWPWwQC")
         await ctx.send(embed=embed)
 
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["botstats", "stats"])
     async def info(self, ctx):
@@ -678,6 +707,7 @@ class Main(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.guild_only()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def join(self, ctx):
@@ -712,6 +742,7 @@ class Main(commands.Cog):
         await ctx.send("Joined your voice channel!")
 
     @commands.guild_only()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):
@@ -740,6 +771,7 @@ class Main(commands.Cog):
         await ctx.send("Left voice channel!")
 
     @commands.guild_only()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def channel(self, ctx):
@@ -752,16 +784,19 @@ class Main(commands.Cog):
         else:
             await ctx.send("The channel hasn't been setup, do `-setup #textchannel`")
 
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
-    async def tts(self, ctx, no_input = True):
-        if no_input:    await ctx.send(f"You don't need to do `-tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `-`!")
+    async def tts(self, ctx):
+        if ctx.message != f"{BOT_PREFIX}tts":
+            await ctx.send(f"You don't need to do `-tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `-`!")
 
 class Settings(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
     @commands.guild_only()
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def settings(self, ctx, help = None):
@@ -810,8 +845,9 @@ class Settings(commands.Cog):
         embed.set_footer(text="Change these settings with -set property value!")
         await ctx.send(embed=embed)
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.guild_only()
+    @commands.check(require_chunk)
+    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.group()
     async def set(self, ctx):
         if ctx.invoked_subcommand is None:
@@ -868,13 +904,15 @@ class Settings(commands.Cog):
         await self.voice(ctx, voicecode)
 
     @commands.guild_only()
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.check(require_chunk)
     @commands.has_permissions(administrator=True)
+    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
         settings.set(ctx.guild, "channel", channel.id)
         await ctx.send(f"Setup complete, {channel.mention} will now accept -join and -leave!")
 
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def voice(self, ctx, lang: str):
@@ -884,6 +922,7 @@ class Settings(commands.Cog):
         else:
             await ctx.send("Invalid voice, do -voices")
 
+    @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
     async def voices(self, ctx, lang: str = None):
