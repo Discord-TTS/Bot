@@ -57,7 +57,7 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
         raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
 
 async def require_chunk(ctx):
-    if not ctx.guild.chunked:
+    if ctx.guild and not ctx.guild.chunked:
         try:    chunk_guilds.start()
         except RuntimeError: pass
 
@@ -360,8 +360,12 @@ class Main(commands.Cog):
                     # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
-                        #Auto Join
-                        if message.guild.voice_client is None and autojoin and basic.get_value(self.bot.playing, message.guild.id) in (0, 1):
+                        # Fixing playing value if not loaded
+                        if basic.get_value(self.bot.playing, message.guild.id) is None:
+                            self.bot.playing[message.guild.id] = 0
+
+                        # Auto Join
+                        if message.guild.voice_client is None and autojoin and self.bot.playing[message.guild.id] in (0, 1):
                             try:  channel = message.author.voice.channel
                             except AttributeError: return
 
@@ -417,7 +421,15 @@ class Main(commands.Cog):
                             saythis += ". This message contained a link"
 
                         # Toggleable X said and attachment detection
-                        if settings.get(message.guild, "xsaid"):
+                        xsaid = settings.get(message.guild, "xsaid")
+                        if xsaid:
+                            try:
+                                last_message = await message.channel.history(limit=2).flatten()
+                                last_message = last_message[1]
+                                if message.author.id == last_message.author.id: xsaid = False
+                            except discord.errors.Forbidden: pass
+
+                        if xsaid:
                             said_name = settings.nickname.get(message.guild, message.author)
                             format = basic.exts_to_format(message.attachments)
 
