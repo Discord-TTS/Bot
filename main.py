@@ -439,7 +439,7 @@ class Main(commands.Cog):
                         try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
                         except AssertionError:  return
                         except (gTTS.tts.gTTSError, ValueError):
-                            await message.channel.send(f"Ah! gTTS couldn't process {message.jump_url} for some reason, please try again later.")
+                            return await message.channel.send(f"Ah! gTTS couldn't process {message.jump_url} for some reason, please try again later.")
 
                         # Discard if over 30 seconds
                         temp_store_for_mp3.seek(0)
