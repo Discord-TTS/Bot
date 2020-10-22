@@ -80,7 +80,7 @@ async def chunk_guilds():
         bot.chunk_queue.remove(guild.id)
 
 # Define bot and remove overwritten commands
-bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, chunk_guilds_at_startup=False, case_insensitive=True)
+bot = commands.AutoShardedBot(command_prefix=BOT_PREFIX, intents=intents, chunk_guilds_at_startup=False, case_insensitive=True)
 bot.chunk_queue = list()
 
 if exists("cogs/common_user.py"):
