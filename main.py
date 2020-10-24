@@ -79,8 +79,10 @@ async def chunk_guilds():
 # Define bot and remove overwritten commands
 activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
 intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
+status = getattr(discord.Status, config["Activity"]["status"])
 
 bot = commands.AutoShardedBot(
+    status=status,
     intents=intents,
     activity=activity,
     case_insensitive=True,
@@ -397,7 +399,8 @@ class Main(commands.Cog):
                         try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
                         except AssertionError:  return
                         except (gTTS.tts.gTTSError, ValueError):
-                            return await message.channel.send(f"Ah! gTTS couldn't process {message.jump_url} for some reason, please try again later.")
+                            try:    return await message.add_reaction("🚫")
+                            except  discord.errors.Forbidden: return
 
                         # Discard if over 30 seconds
                         temp_store_for_mp3.seek(0)
