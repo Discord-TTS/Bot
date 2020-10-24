@@ -80,7 +80,7 @@ async def chunk_guilds():
 activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
 intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
 
-bot = commands.Bot(
+bot = commands.AutoShardedBot(
     intents=intents,
     activity=activity,
     case_insensitive=True,
