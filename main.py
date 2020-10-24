@@ -186,32 +186,6 @@ class Main(commands.Cog):
         await ctx.send(f"TTS Bot Voice Channels:\n{channellist}\nAnd just incase {str(tempplaying)}")
 
     @commands.command()
-    @commands.is_owner()
-    async def trust(self, ctx, mode, user: Union[discord.User, str] = ""):
-        if mode == "list":
-            await ctx.send("\n".join(self.bot.trusted))
-
-        elif isinstance(user, str):
-            return
-
-        elif mode == "add":
-            self.bot.trusted.append(str(user.id))
-            config["Main"]["trusted_ids"] = str(self.bot.trusted)
-            with open("config.ini", "w") as configfile:
-                config.write(configfile)
-
-            await ctx.send(f"Added {str(user)} | {user.id} to the trusted members")
-
-        elif mode == "del":
-            if str(user.id) in self.bot.trusted:
-                self.bot.trusted.remove(str(user.id))
-                config["Main"]["trusted_ids"] = str(self.bot.trusted)
-                with open("config.ini", "w") as configfile:
-                    config.write(configfile)
-
-                await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
-
-    @commands.command()
     @commands.check(is_trusted)
     async def save_files(self, ctx):
         settings.save()
@@ -234,30 +208,6 @@ class Main(commands.Cog):
             shutil.rmtree("servers", ignore_errors=True)
 
         await ctx.send("Done!")
-
-    @commands.command()
-    @commands.check(is_trusted)
-    async def block(self, ctx, user: discord.User, notify: bool = False):
-        if blocked_users.check(user):
-            return await ctx.send(f"{str(user)} | {user.id} is already blocked!")
-
-        blocked_users.add(user)
-
-        await ctx.send(f"Blocked {str(user)} | {str(user.id)}")
-        if notify:
-            await user.send("You have been blocked from support DMs.\nPossible Reasons: ```Sending invite links\nTrolling\nSpam```")
-
-    @commands.command()
-    @commands.check(is_trusted)
-    async def unblock(self, ctx, user: discord.User, notify: bool = False):
-        if not blocked_users.check(user):
-            return await ctx.send(f"{str(user)} | {user.id} isn't blocked!")
-
-        blocked_users.remove(user)
-
-        await ctx.send(f"Unblocked {str(user)} | {str(user.id)}")
-        if notify:
-            await user.send("You have been unblocked from support DMs.")
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.Cog.listener()
     async def on_ready(self):
