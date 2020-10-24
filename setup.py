@@ -12,16 +12,14 @@ token = input("Input a bot token: ")
 main_server = int(input("What is the ID of the main server for your bot? (Suggestions, errors and DMs will be sent here): "))
 trusted_ids = input("Input a list of trusted user IDs (allowing for moderation commands such as -(un)block, -dm, -refreshroles, -lookupinfo, and others.): ").split(", ")
 
-try:
-    with open("activity.txt", "x") as activity, open("activitytype.txt", "x") as activitytype, open("status.txt", "x") as status:
-        activitytype.write("watching")
-        activity.write("my owner set me up!")
-        status.write("idle")
+def write_blank_json(name, type):
+    with open(name, "x") as f:
+        json.dump(type, f)
 
-    with open("blocked_users.json", "x") as blocked_users, open("setlangs.json", "x") as setlangs, open("settings.json", "x") as settings:
-        json.dump(list(), blocked_users)
-        json.dump(dict(), setlangs)
-        json.dump(dict(), settings)
+try:
+    write_blank_json("blocked_users.json", list())
+    write_blank_json("setlangs.json", dict())
+    write_blank_json("settings.json", dict())
 except:
     print("Failed making one of the files! If you are resetting to default, delete the servers folder, all .txt, .json, and the .ini file before running this again!")
     raise SystemExit
@@ -30,6 +28,11 @@ config["Main"] = {
   "token": token,
   "main_server": main_server,
   "trusted_ids": trusted_ids,
+}
+config["Activity"] = {
+    "name": "my owner set me up!",
+    "type": "watching",
+    "status": "idle",
 }
 
 @bot.event

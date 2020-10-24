@@ -2,15 +2,16 @@ import asyncio
 import json
 import re
 import shutil
-import time
 from asyncio.exceptions import TimeoutError as asyncio_TimeoutError
 from concurrent.futures._base import TimeoutError as concurrent_TimeoutError
 from configparser import ConfigParser
 from inspect import cleandoc
 from io import BytesIO
+from os import remove
 from os.path import exists
 from subprocess import call
 from sys import exc_info
+from time import monotonic
 from traceback import format_exception
 from typing import Optional, Union
 
@@ -29,35 +30,31 @@ from utils.settings import settings_class as settings
 config = ConfigParser()
 config.read("config.ini")
 t = config["Main"]["Token"]
+config_channels = config["Channels"]
 
 # Define random variables
 BOT_PREFIX = "-"
 NoneType = type(None)
 settings_loaded = False
-before = time.monotonic()
+before = monotonic()
 tts_langs = gTTS.lang.tts_langs(tld='co.uk')
 to_enabled = {True: "Enabled", False: "Disabled"}
-OPUS_LIBS = ('libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib')
 
-intents = discord.Intents.none()
-intents.voice_states = True
-intents.messages = True
-intents.guilds = True
-intents.members = True
+if exists("activity.txt"):
+    with open("activity.txt") as f2, open("activitytype.txt") as f3, open("status.txt") as f4:
+        activity = f2.read()
+        activitytype = f3.read()
+        status = f4.read()
 
-# Define useful functions
-def load_opus_lib(opus_libs=OPUS_LIBS):
-    if opus.is_loaded():
-        return True
+    config["Activity"] = {"name": activity, "type": activitytype, "status": status}
 
-    for opus_lib in opus_libs:
-        try:    return opus.load_opus(opus_lib)
-        except OSError: pass
-
-        raise RuntimeError(f"Could not load an opus lib. Tried {', '.join(opus_libs)}")
+    with open("config.ini", "w") as configfile: config.write(configfile)
+    remove("activitytype.txt")
+    remove("activity.txt")
+    remove("status.txt")
 
 async def require_chunk(ctx):
-    if not ctx.guild.chunked:
+    if ctx.guild and not ctx.guild.chunked:
         try:    chunk_guilds.start()
         except RuntimeError: pass
 
@@ -80,8 +77,22 @@ async def chunk_guilds():
         bot.chunk_queue.remove(guild.id)
 
 # Define bot and remove overwritten commands
-bot = commands.AutoShardedBot(command_prefix=BOT_PREFIX, intents=intents, chunk_guilds_at_startup=False, case_insensitive=True)
+activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
+intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
+
+bot = commands.AutoShardedBot(
+    intents=intents,
+    activity=activity,
+    case_insensitive=True,
+    command_prefix=BOT_PREFIX,
+    chunk_guilds_at_startup=False,
+)
+
+bot.queue = dict()
+bot.playing = dict()
+bot.channels = dict()
 bot.chunk_queue = list()
+bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
 
 if exists("cogs/common_user.py"):
     bot.load_extension("cogs.common_owner")
@@ -175,32 +186,6 @@ class Main(commands.Cog):
         await ctx.send(f"TTS Bot Voice Channels:\n{channellist}\nAnd just incase {str(tempplaying)}")
 
     @commands.command()
-    @commands.is_owner()
-    async def trust(self, ctx, mode, user: Union[discord.User, str] = ""):
-        if mode == "list":
-            await ctx.send("\n".join(self.bot.trusted))
-
-        elif isinstance(user, str):
-            return
-
-        elif mode == "add":
-            self.bot.trusted.append(str(user.id))
-            config["Main"]["trusted_ids"] = str(self.bot.trusted)
-            with open("config.ini", "w") as configfile:
-                config.write(configfile)
-
-            await ctx.send(f"Added {str(user)} | {user.id} to the trusted members")
-
-        elif mode == "del":
-            if str(user.id) in self.bot.trusted:
-                self.bot.trusted.remove(str(user.id))
-                config["Main"]["trusted_ids"] = str(self.bot.trusted)
-                with open("config.ini", "w") as configfile:
-                    config.write(configfile)
-
-                await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
-
-    @commands.command()
     @commands.check(is_trusted)
     async def save_files(self, ctx):
         settings.save()
@@ -223,73 +208,34 @@ class Main(commands.Cog):
             shutil.rmtree("servers", ignore_errors=True)
 
         await ctx.send("Done!")
-
-    @commands.command()
-    @commands.check(is_trusted)
-    async def block(self, ctx, user: discord.User, notify: bool = False):
-        if blocked_users.check(user):
-            return await ctx.send(f"{str(user)} | {user.id} is already blocked!")
-
-        blocked_users.add(user)
-
-        await ctx.send(f"Blocked {str(user)} | {str(user.id)}")
-        if notify:
-            await user.send("You have been blocked from support DMs.\nPossible Reasons: ```Sending invite links\nTrolling\nSpam```")
-
-    @commands.command()
-    @commands.check(is_trusted)
-    async def unblock(self, ctx, user: discord.User, notify: bool = False):
-        if not blocked_users.check(user):
-            return await ctx.send(f"{str(user)} | {user.id} isn't blocked!")
-
-        blocked_users.remove(user)
-
-        await ctx.send(f"Unblocked {str(user)} | {str(user.id)}")
-        if notify:
-            await user.send("You have been unblocked from support DMs.")
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.Cog.listener()
     async def on_ready(self):
-        global settings_loaded
         global last_cached_message
-
-        if settings_loaded:
-            await self.bot.close()
-
-        self.bot.queue = dict()
-        self.bot.playing = dict()
-        self.bot.channels = dict()
-        self.bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
         self.bot.supportserver = self.bot.get_guild(int(config["Main"]["main_server"]))
-        config_channel = config["Channels"]
 
-        for channel_name in config_channel:
-            channel_id = int(config_channel[channel_name])
-            channel_object = self.bot.supportserver.get_channel(channel_id)
-            self.bot.channels[channel_name] = channel_object
+        try:
+            await last_cached_message.edit(f"~~{last_cached_message.content}~~")
+            await starting_message.edit(content=f"~~{starting_message.content}~~")
+            starting_message = await self.bot.channels["logs"].send(f"Restarting as {self.bot.user.name}!")
+            print(f":wagu: Restarting as {self.bot.user.name}!")
 
-        print(f"Starting as {self.bot.user.name}!")
-        starting_message = await self.bot.channels["logs"].send(f"Starting {self.bot.user.mention}")
+        except NameError:
+            print(f"Starting as {self.bot.user.name}")
 
-        # Load some files
-        with open("activity.txt") as f2, open("activitytype.txt") as f3, open("status.txt") as f4:
-            activity = f2.read()
-            activitytype = f3.read()
-            status = f4.read()
+            self.avoid_file_crashes.start()
+            for channel_name in config_channels:
+                channel_id = int(config_channels[channel_name])
+                channel_object = self.bot.supportserver.get_channel(channel_id)
+                self.bot.channels[channel_name] = channel_object
 
-        activitytype1 = getattr(discord.ActivityType, activitytype)
-        status1 = getattr(discord.Status, status)
-        await self.bot.change_presence(status=status1, activity=discord.Activity(name=activity, type=activitytype1))
+            starting_message = await self.bot.channels["logs"].send(f"Starting as {self.bot.user.name}!")
 
         for guild in self.bot.guilds:
             self.bot.playing[guild.id] = 0
             self.bot.queue[guild.id] = dict()
 
-        self.avoid_file_crashes.start()
-
-        ping = str(time.monotonic() - before).split(".")[0]
-        await starting_message.edit(content=f"Started and ready! Took `{ping} seconds`")
-
+        await starting_message.edit(content=f"Started and ready! Took `{int(monotonic() - before)} seconds`")
         last_cached_message = await self.bot.channels["logs"].send("Waiting to chunk a guild!")
 
     @commands.Cog.listener()
@@ -360,8 +306,12 @@ class Main(commands.Cog):
                     # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
-                        #Auto Join
-                        if message.guild.voice_client is None and autojoin and basic.get_value(self.bot.playing, message.guild.id) in (0, 1):
+                        # Fixing playing value if not loaded
+                        if basic.get_value(self.bot.playing, message.guild.id) is None:
+                            self.bot.playing[message.guild.id] = 0
+
+                        # Auto Join
+                        if message.guild.voice_client is None and autojoin and self.bot.playing[message.guild.id] in (0, 1):
                             try:  channel = message.author.voice.channel
                             except AttributeError: return
 
@@ -417,7 +367,15 @@ class Main(commands.Cog):
                             saythis += ". This message contained a link"
 
                         # Toggleable X said and attachment detection
-                        if settings.get(message.guild, "xsaid"):
+                        xsaid = settings.get(message.guild, "xsaid")
+                        if xsaid:
+                            try:
+                                last_message = await message.channel.history(limit=2).flatten()
+                                last_message = last_message[1]
+                                if message.author.id == last_message.author.id: xsaid = False
+                            except discord.errors.Forbidden: pass
+
+                        if xsaid:
                             said_name = settings.nickname.get(message.guild, message.author)
                             format = basic.exts_to_format(message.attachments)
 
@@ -599,19 +557,14 @@ class Main(commands.Cog):
     async def on_guild_join(self, guild):
         self.bot.queue[guild.id] = dict()
 
-        try:    chunk_guilds.start()
-        except RuntimeError:    pass
-
-        self.bot.chunk_queue.append(guild.id)
-        await asyncio.sleep(5)
-
-        owner = guild.owner
         await self.bot.channels["servers"].send(f"Just joined {guild.name}! I am now in {str(len(self.bot.guilds))} different servers!".replace("@", "@ "))
 
+        owner = await guild.fetch_member(guild.owner_id)
         try:    await owner.send(cleandoc(f"""
             Hello, I am {self.bot.user.name} and I have just joined your server {guild.name}
             If you want me to start working do `-setup <#text-channel>` and everything will work in there
-            If you want to get support for {self.bot.user.name}, join the support server!\nhttps://discord.gg/zWPWwQC
+            If you want to get support for {self.bot.user.name}, join the support server!
+            https://discord.gg/zWPWwQC
             """))
         except discord.errors.HTTPException:    pass
 
@@ -636,7 +589,7 @@ class Main(commands.Cog):
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.command()
     async def uptime(self, ctx):
-        await ctx.send(f"{self.bot.user.mention} has been up for {int(monotonic() // 60)} minutes")
+        await ctx.send(f"{self.bot.user.mention} has been up for {int((monotonic() - before) // 60)} minutes")
 
     @commands.command()
     async def debug(self, ctx):
