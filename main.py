@@ -1,215 +1,215 @@
-import asyncio
-import json
-import re
-import shutil
-from asyncio.exceptions import TimeoutError as asyncio_TimeoutError
-from concurrent.futures._base import TimeoutError as concurrent_TimeoutError
-from configparser import ConfigParser
-from inspect import cleandoc
-from io import BytesIO
-from os import remove
-from os.path import exists
-from subprocess import call
-from sys import exc_info
-from time import monotonic
-from traceback import format_exception
-from typing import Optional, Union
-
-import discord
-import gtts as gTTS
-from discord.ext import commands, tasks
-from mutagen.mp3 import MP3
-
-from patched_FFmpegPCM import FFmpegPCMAudio
-from utils import basic
-from utils.settings import blocked_users_class as blocked_users
-from utils.settings import setlangs_class as setlangs
-from utils.settings import settings_class as settings
-
+import asyncio # imports the asyncio module
+import json # imports the json module
+import re # imports the re module
+import shutil # imports the shutil module
+from asyncio.exceptions import TimeoutError as asyncio_TimeoutError # imports the TimeoutError module from asyncio.exceptions, as asyncio_TimeoutError
+from concurrent.futures._base import TimeoutError as concurrent_TimeoutError # imports the TimeoutError module from concurrent.futures.base as concurrent_TimeoutError
+from configparser import ConfigParser # imports the ConfigParser module from configparser
+from inspect import cleandoc # imports the cleandoc module from inspect
+from io import BytesIO # imports the BytesIO module from io
+from os import remove # imports the remove module from os
+from os.path import exists # imports the exists module from os.path
+from subprocess import call # imports the call module from subprocess
+from sys import exc_info # imports the exc_info module from sys
+from time import monotonic # imports the monotonic module from time
+from traceback import format_exception # imports the format_exception module from traceback
+from typing import Optional, Union # imports the Optional and Union modules from typing
+ # a blank line
+import discord # imports the discord module
+import gtts as gTTS # imports the gtts module as gTTS
+from discord.ext import commands, tasks # imports the commands and tasks modules from discord.ext
+from mutagen.mp3 import MP3 # imports the MP3 module from mutagen.mp3
+ # a blank line
+from patched_FFmpegPCM import FFmpegPCMAudio # imports the FFmpegPCMAudio module from patched_FFmpegPCM
+from utils import basic # imports the basic module from utils
+from utils.settings import blocked_users_class as blocked_users # imports the blocked_users_class module from utils.settings as blocked_users
+from utils.settings import setlangs_class as setlangs # imports the setlangs_class module from utils.settings as setlangs
+from utils.settings import settings_class as settings # imports the settings_class module from utils.settings as settings
+ # a blank line
 #//////////////////////////////////////////////////////
-config = ConfigParser()
-config.read("config.ini")
-t = config["Main"]["Token"]
-config_channels = config["Channels"]
-
+config = ConfigParser() # creates an alias for the ConfigParser() function as config
+config.read("config.ini") # uses the ConfigParser() function to read the config.ini file
+t = config["Main"]["Token"] # sets the "t" variable to the Main and Token variables inside config.ini
+config_channels = config["Channels"] # sets the config_channels variable to the Channels variable inside config.ini
+ # a blank line
 # Define random variables
-BOT_PREFIX = "-"
-before = monotonic()
-NoneType = type(None)
-settings_loaded = False
-tts_langs = gTTS.lang.tts_langs(tld='co.uk')
-to_enabled = {True: "Enabled", False: "Disabled"}
-
-if exists("activity.txt"):
-    with open("activity.txt") as f2, open("activitytype.txt") as f3, open("status.txt") as f4:
-        activity = f2.read()
-        activitytype = f3.read()
-        status = f4.read()
-
-    config["Activity"] = {"name": activity, "type": activitytype, "status": status}
-
-    with open("config.ini", "w") as configfile: config.write(configfile)
-    remove("activitytype.txt")
-    remove("activity.txt")
-    remove("status.txt")
-
-async def require_chunk(ctx):
-    if ctx.guild and not ctx.guild.chunked:
-        try:    chunk_guilds.start()
-        except RuntimeError: pass
-
-        if ctx.guild.id not in bot.chunk_queue:
-            bot.chunk_queue.append(ctx.guild.id)
-
-    return True
-
-@tasks.loop(seconds=1)
-async def chunk_guilds():
-    chunk_queue = bot.chunk_queue
-
-    for guild in chunk_queue:
-        guild = bot.get_guild(guild)
-
-        if not guild.chunked:
-            await guild.chunk(cache=True)
-            await last_cached_message.edit(content=f"Just chunked: {guild.name} | {guild.id}")
-
-        bot.chunk_queue.remove(guild.id)
-
-# Define bot and remove overwritten commands
-activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
-intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
-status = getattr(discord.Status, config["Activity"]["status"])
-
-bot = commands.AutoShardedBot(
-    status=status,
-    intents=intents,
-    activity=activity,
-    case_insensitive=True,
-    command_prefix=BOT_PREFIX,
-    chunk_guilds_at_startup=False,
-)
-
-bot.queue = dict()
-bot.playing = dict()
-bot.channels = dict()
-bot.chunk_queue = list()
-bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
-
-if exists("cogs/common_user.py"):
-    bot.load_extension("cogs.common_owner")
-    bot.load_extension("cogs.common_trusted")
-    bot.load_extension("cogs.common_user")
-elif exists("cogs/common.py"):
-    bot.load_extension("cogs.common")
-else:
-    print("Error: Cannot find cogs to load? Did you do 'git clone --recurse-submodules'?")
-    raise SystemExit
-
-for overwriten_command in ("help", "end", "botstats"):
-    bot.remove_command(overwriten_command)
-#//////////////////////////////////////////////////////
-class Main(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-
-    def cog_unload(self):
-        self.avoid_file_crashes.cancel()
-
-    def is_trusted(ctx):
-        if str(ctx.author.id) in bot.trusted: return True
-        else: raise commands.errors.NotOwner
-
-    @tasks.loop(seconds=60.0)
-    async def avoid_file_crashes(self):
-        try:
-            settings.save()
-            setlangs.save()
-            blocked_users.save()
-        except Exception as e:
-            error = getattr(e, 'original', e)
-
-            temp = f"```{''.join(format_exception(type(error), error, error.__traceback__))}```"
-            if len(temp) >= 1900:
-                with open("temp.txt", "w") as f:  f.write(temp)
-                await self.bot.channels["errors"].send(file=discord.File("temp.txt"))
-            else:
-                await self.bot.channels["errors"].send(temp)
-
-    @avoid_file_crashes.before_loop
-    async def before_file_saving_loop(self):
-        await self.bot.wait_until_ready()
-
+BOT_PREFIX = "-" # sets the bot's prefix to "-"
+before = monotonic() # creates an alias for the monotonic() function as before
+NoneType = type(None) # sets the NoneType variable to type(None)
+settings_loaded = False # sets a variable to indicate the settings haven't been loaded
+tts_langs = gTTS.lang.tts_langs(tld='co.uk') # sets the tts_langs variable to the output of gTTS.lang.tts_langs, with the option "tld='co.uk'"
+to_enabled = {True: "Enabled", False: "Disabled"} # defines a function to replace boolean values True and False with Enabled and Disabled
+ # a blank line
+if exists("activity.txt"): # checks for the existence of the activity.txt file
+    with open("activity.txt") as f2, open("activitytype.txt") as f3, open("status.txt") as f4: # if it does exist, set the f2 variable to it, the f3 variable to activitytype.txt, and the f4 variable to status.txt
+        activity = f2.read() # sets the activity variable to the contents of f2
+        activitytype = f3.read() # sets the activitytype variable to the contents of f3
+        status = f4.read() # sets the status variable to the contents of f4
+ # a blank line
+    config["Activity"] = {"name": activity, "type": activitytype, "status": status} # sets up Activity within Config to contain the value of activity as "name", the value of activitytype as "type", and the value of status as "status".
+ # a blank line
+    with open("config.ini", "w") as configfile: config.write(configfile) # writes the config settings to the config.ini file
+    remove("activitytype.txt") # deletes the activitytype.txt file
+    remove("activity.txt") # deletes the activity.txt file
+    remove("status.txt") # deletes the status.txt file
+ # a blank line
+async def require_chunk(ctx): # defines the require_chunk function, with a ctx parameter
+    if ctx.guild and not ctx.guild.chunked: # checks if a guild is being used and if it isn't chunked
+        try:    chunk_guilds.start() # if the check passes, attempts to chunk the guild
+        except RuntimeError: pass # gives up if it doesn't work
+ # a blank line
+        if ctx.guild.id not in bot.chunk_queue: # checks if the guild id isn't queued to be chunked
+            bot.chunk_queue.append(ctx.guild.id) # adds the guild id to the queue of servers to be chunked
+ # a blank line
+    return True # returns True
+ # a blank line
+@tasks.loop(seconds=1) # uhhh i don't know what @ means
+async def chunk_guilds(): # defines the chunk_guilds function
+    chunk_queue = bot.chunk_queue # sets the chunk_queue variable to the contents of bot.chunk_queue
+ # a blank line
+    for guild in chunk_queue: # runs the following for every guild in the chunk queue
+        guild = bot.get_guild(guild) # sets the guild variable to the guild currently being processed
+ # a blank line
+        if not guild.chunked: # runs the following if the guild isn't chunked
+            await guild.chunk(cache=True) # waits for the guild to be chunked
+            await last_cached_message.edit(content=f"Just chunked: {guild.name} | {guild.id}") # edits the last log message to mention the guild it just chunked
+ # a blank line
+        bot.chunk_queue.remove(guild.id) # removes the now-chunked guild from the chunk queue
+ # a blank line
+# Define bot and remove overwritten commands # adds a comment to explain what this code does
+activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"])) # sets the activity variable to a combination of the discord activity variable, the attribute of its activitytype, and the Activity and type variables from the config
+intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True) # sets the intents variable to the output of the discord.Intents function, where voice_states is True, messages is True, guilds is True, and members is True
+status = getattr(discord.Status, config["Activity"]["status"]) # sets the status variable to a combination of the discord status variable, and the Activity and status options in config
+ # a blank line
+bot = commands.AutoShardedBot( # adds the following to the bot variable
+    status=status, # sets status to status
+    intents=intents, # sets intents to intents
+    activity=activity, # sets activity to activity
+    case_insensitive=True, # sets case_insensitive to True
+    command_prefix=BOT_PREFIX, # sets command_prefix to the previously defined bot prefix
+    chunk_guilds_at_startup=False, # sets chunk_guilds_at_startup to False
+) # ends the loop
+ # a blank line
+bot.queue = dict() # sets the type of bot.queue to a dict
+bot.playing = dict() # sets the type of bot.playing to a dict
+bot.channels = dict() # sets the type of bot.channels to a dict
+bot.chunk_queue = list() # sets the type of bot.chunk_queue to a list
+bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ") # populates the list of trusted users
+ # a blank line
+if exists("cogs/common_user.py"): # checks for the existence of the common_user.py file in the cogs folder
+    bot.load_extension("cogs.common_owner") # loads the extension cogs.common_owner
+    bot.load_extension("cogs.common_trusted") # loads the extension cogs.common_trusted
+    bot.load_extension("cogs.common_user") # loads the extension cogs.common_user
+elif exists("cogs/common.py"): # if the previous if statement failed, checks for the common.py file in the cogs folder
+    bot.load_extension("cogs.common") # loads the extension cogs.common
+else: # if none of the two statements passed
+    print("Error: Cannot find cogs to load? Did you do 'git clone --recurse-submodules'?") # prints an error message
+    raise SystemExit # exits the bot
+ # a blank line
+for overwriten_command in ("help", "end", "botstats"): # checks for duplicate help, end and botstats commands
+    bot.remove_command(overwriten_command) # removes duplicate commands
+#////////////////////////////////////////////////////// # a comment to separate parts of the code
+class Main(commands.Cog): # defines the Main class
+    def __init__(self, bot): # defines the __init__ function of the Main class
+        self.bot = bot # sets the self.bot variable to the bot variable
+ # a blank line
+    def cog_unload(self): # defines the cog_unload function of the Main class
+        self.avoid_file_crashes.cancel() # runs the self.avoid_file_crashes.cancel() function
+ # a blank line
+    def is_trusted(ctx): # defines the is_trusted function of the Main class
+        if str(ctx.author.id) in bot.trusted: return True # if the contents of ctx.author.id are contained in bot.trusted, return True
+        else: raise commands.errors.NotOwner # if not, print an error
+ # a blank line
+    @tasks.loop(seconds=60.0) # what the fuck does @ mean
+    async def avoid_file_crashes(self): # defines avoid_file_crashes
+        try: # attempts the following
+            settings.save() # saves settings
+            setlangs.save() # saves setlangs
+            blocked_users.save() # saves blocked_users
+        except Exception as e: # if an error happens
+            error = getattr(e, 'original', e) # sets the error variable to the error that occurred
+ # a blank line
+            temp = f"```{''.join(format_exception(type(error), error, error.__traceback__))}```" # sets the temp variable to the error that happened
+            if len(temp) >= 1900: # checks if the length of the temp variable is more than 1900
+                with open("temp.txt", "w") as f:  f.write(temp) # writes the temp variable to the file temp.txt
+                await self.bot.channels["errors"].send(file=discord.File("temp.txt")) # sends the temp.txt file to the errors channel
+            else: # if the previous if statement was false
+                await self.bot.channels["errors"].send(temp) # sends the contents of the temp variable to the errors channel
+ # a blank line
+    @avoid_file_crashes.before_loop # what the fuck does @ mean
+    async def before_file_saving_loop(self): # defines the before_file_saving_loop function
+        await self.bot.wait_until_ready() # waits until the bot is ready
+ # a blank line
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    @commands.command()
-    @commands.is_owner()
-    async def end(self, ctx):
-        self.avoid_file_crashes.cancel()
-        settings.save()
-        setlangs.save()
-        blocked_users.save()
+    @commands.command() # what the fuck does @ mean
+    @commands.is_owner() # what the fuck does @ mean
+    async def end(self, ctx): # defines the end command
+        self.avoid_file_crashes.cancel() # runs the avoid_file_crashes.cancel function
+        settings.save() # saves settings
+        setlangs.save() # saves setlangs
+        blocked_users.save() # saves blocked users
 
-        await self.bot.close()
+        await self.bot.close() # waits for the bot to close
 
-    @commands.command()
-    @commands.is_owner()
-    async def leave_unused_guilds(self, ctx, sure: bool = False):
-        guilds_to_leave = []
-        with open("settings.json") as f:
-            temp_settings = f.read()
+    @commands.command() # what the fuck does @ mean
+    @commands.is_owner() # what the fuck does @ mean
+    async def leave_unused_guilds(self, ctx, sure: bool = False): # defines the leave_unused_guilds command
+        guilds_to_leave = [] # creates the guilds_to_leave variable
+        with open("settings.json") as f: # sets the f variable to the contents of the file settings.json
+            temp_settings = f.read() # sets the temp_settings variable to the contents of the f variable
 
-        for guild in self.bot.guilds:
-            guild_id = str(guild.id)
-            if guild_id not in temp_settings:
-                guilds_to_leave.append(guild)
+        for guild in self.bot.guilds: # runs this code for every guild the bot is in
+            guild_id = str(guild.id) # sets guild_id to the current guild id
+            if guild_id not in temp_settings: # checks if the guild is not in temp_settings
+                guilds_to_leave.append(guild) # adds the guild id to the list of guilds to leave
 
-        if not sure:
-            await ctx.send(f"Are you sure you want me to leave {len(guilds_to_leave)} guilds?")
-        else:
-            for guild in guilds_to_leave:
-                try:    await guild.owner.send("Hey! TTS Bot has not been setup on your server so I have left! If you want to reinvite me, join https://discord.gg/zWPWwQC and look in #invites-and-rules.")
-                except: pass
-                await guild.leave()
+        if not sure: # checks if sure is false
+            await ctx.send(f"Are you sure you want me to leave {len(guilds_to_leave)} guilds?") # asks if the user is sure they want the bot to leave guilds
+        else: # if the above if statement isn't true
+            for guild in guilds_to_leave: # runs the following for every guild in guilds_to_leave
+                try:    await guild.owner.send("Hey! TTS Bot has not been setup on your server so I have left! If you want to reinvite me, join https://discord.gg/zWPWwQC and look in #invites-and-rules.") # tries to dm the owner of a guild being left about leaving the guild
+                except: pass # if the above fails, give up
+                await guild.leave() # waits until the guild has been left
 
-            await self.bot.channels["logs"].send(f"Just left {len(guilds_to_leave)} guilds due to no setup, requested by {ctx.author.name}")
+            await self.bot.channels["logs"].send(f"Just left {len(guilds_to_leave)} guilds due to no setup, requested by {ctx.author.name}") # adds a log message that a guild was left
 
-    @commands.command()
-    @commands.is_owner()
-    async def channellist(self, ctx):
-        channellist = str()
-        for guild1 in self.bot.guilds:
-            try:  channellist = f"{channellist} \n{str(guild1.voice_client.channel)} in {guild1.name}"
-            except: pass
+    @commands.command() # what the fuck does @ mean
+    @commands.is_owner() # what the fuck does @ mean
+    async def channellist(self, ctx): # defines the channellist command
+        channellist = str() # defines the channellist variable as a string
+        for guild1 in self.bot.guilds: # runs the following for all guilds the bot is in
+            try:  channellist = f"{channellist} \n{str(guild1.voice_client.channel)} in {guild1.name}" # attempts to find a connected voice channel in the current guild
+            except: pass # if the above fails, give up
 
-        tempplaying = dict()
-        for key in self.bot.playing:
-            if self.bot.playing[key] != 0:
-                tempplaying[key] = self.bot.playing[key]
-        await ctx.send(f"TTS Bot Voice Channels:\n{channellist}\nAnd just incase {str(tempplaying)}")
+        tempplaying = dict() # defines the tempplaying variable as a dict
+        for key in self.bot.playing: # runs the following for every instance of key in self.bot.playing
+            if self.bot.playing[key] != 0: # checks if self.bot.playing is a non-zero value
+                tempplaying[key] = self.bot.playing[key] # sets the tempplaying variable to the contents of self.bot.playing
+        await ctx.send(f"TTS Bot Voice Channels:\n{channellist}\nAnd just incase {str(tempplaying)}") # sends the list of channels the bot is in
 
-    @commands.command()
-    @commands.check(is_trusted)
-    async def save_files(self, ctx):
-        settings.save()
-        setlangs.save()
-        blocked_users.save()
-        await ctx.send("Saved all files!")
+    @commands.command() # what the fuck does @ mean
+    @commands.check(is_trusted) # what the fuck does @ mean
+    async def save_files(self, ctx): # defines the save_files command
+        settings.save() # saves settings
+        setlangs.save() # saves setlangs
+        blocked_users.save() # saves blocked_users
+        await ctx.send("Saved all files!") # sends a message indicating that files were saved
 
-    @commands.command()
-    @commands.check(is_trusted)
-    async def cleanup(self, ctx):
-        guild_id_list = [str(guild.id) for guild in self.bot.guilds]
+    @commands.command() # what the fuck does @ mean
+    @commands.check(is_trusted) # what the fuck does @ mean
+    async def cleanup(self, ctx): # defines the cleanup command
+        guild_id_list = [str(guild.id) for guild in self.bot.guilds] # sets the guild_id_list variable to a list of guilds the bot is in
 
-        user_id_list = list()
-        [[user_id_list.append(str(member.id)) for member in guild.members] for guild in bot.guilds]
+        user_id_list = list() # defines the user_id_list variable as a list
+        [[user_id_list.append(str(member.id)) for member in guild.members] for guild in bot.guilds] # appends a member's user id to the user_id_list for every member in every server the bot is in
 
-        settings.cleanup(guild_id_list)
-        setlangs.cleanup(user_id_list)
+        settings.cleanup(guild_id_list) # performs the settings.cleanup function
+        setlangs.cleanup(user_id_list) # performs the setlands.cleanup function
 
-        if exists("servers"):
-            shutil.rmtree("servers", ignore_errors=True)
+        if exists("servers"): # checks if the servers folder exists
+            shutil.rmtree("servers", ignore_errors=True) # if it does, delete it and ignore errors
 
-        await ctx.send("Done!")
+        await ctx.send("Done!") # send "Done!"
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.Cog.listener()
     async def on_ready(self):
