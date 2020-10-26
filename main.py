@@ -34,9 +34,9 @@ config_channels = config["Channels"]
 
 # Define random variables
 BOT_PREFIX = "-"
+before = monotonic()
 NoneType = type(None)
 settings_loaded = False
-before = monotonic()
 tts_langs = gTTS.lang.tts_langs(tld='co.uk')
 to_enabled = {True: "Enabled", False: "Disabled"}
 
@@ -511,7 +511,7 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
-        if hasattr(ctx.command, 'on_error') or isinstance(error, commands.CommandNotFound) or isinstance(error, commands.NotOwner):
+        if hasattr(ctx.command, 'on_error') or isinstance(error, (commands.CommandNotFound, commands.NotOwner)):
             return
 
         if ctx.guild is not None and not ctx.guild.chunked:
@@ -524,24 +524,24 @@ class Main(commands.Cog):
 
         error = getattr(error, 'original', error)
 
-        for typed_wrong in (commands.BadArgument, commands.MissingRequiredArgument, commands.UnexpectedQuoteError, commands.ExpectedClosingQuoteError):
-            if isinstance(error, typed_wrong):
-                return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
+        if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument, commands.UnexpectedQuoteError, commands.ExpectedClosingQuoteError)):
+            return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
 
-        for Timeout_Error in (concurrent_TimeoutError, asyncio_TimeoutError):
-            if isinstance(error, Timeout_Error):
-                return await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
+        elif isinstance(error, (concurrent_TimeoutError, asyncio_TimeoutError)):
+            return await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
 
-        if isinstance(error, commands.NoPrivateMessage):
+        elif isinstance(error, commands.NoPrivateMessage):
             return await ctx.author.send("**Error:** This command cannot be used in private messages!")
 
         elif isinstance(error, commands.MissingPermissions):
-            return await ctx.send(f"**Error:** You are missing {error.missing_perms} to run this command!")
+            return await ctx.send(f"**Error:** You are missing {', '.join(error.missing_perms)} to run this command!")
+
         elif isinstance(error, commands.BotMissingPermissions):
-            if "send_messages" in str(error.missing_perms):
+            if "send_messages" in error.missing_perms:
                 return await ctx.author.send("**Error:** I could not complete this command as I don't have send messages permissions!")
 
-            return await ctx.send(f'**Error:** I am missing the permissions: {basic.remove_chars(error.missing_perms, "[", "]")}')
+            return await ctx.send(f"**Error:** I am missing the permissions: {', '.join(error.missing_perms)}")
+
         elif isinstance(error, discord.errors.Forbidden):
             await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {str(ctx.message.content)} sent by {str(ctx.author)}")
             return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `-suggest *what command you just run*`")
@@ -744,7 +744,7 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def tts(self, ctx):
-        if ctx.message != f"{BOT_PREFIX}tts":
+        if ctx.message.content != f"{BOT_PREFIX}tts":
             await ctx.send(f"You don't need to do `-tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `-`!")
 
 class Settings(commands.Cog):
