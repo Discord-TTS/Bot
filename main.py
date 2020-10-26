@@ -287,6 +287,10 @@ class Main(commands.Cog):
             if bot_ignore and message.author.bot:
                 return
 
+            # if not a webhook but still a user, return to fix errors
+            if message.author.discriminator != "0000" and isinstance(message.author, discord.User):
+                return
+
             # if author is not a bot, and is not in a voice channel, and doesn't start with -tts
             if not message.author.bot and message.author.voice is None and starts_with_tts is False:
                 return
