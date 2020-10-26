@@ -376,12 +376,12 @@ class Main(commands.Cog):
 
                         # Toggleable X said and attachment detection
                         xsaid = settings.get(message.guild, "xsaid")
-                        if xsaid:
-                            try:
-                                last_message = await message.channel.history(limit=2).flatten()
-                                last_message = last_message[1]
-                                if message.author.id == last_message.author.id: xsaid = False
-                            except discord.errors.Forbidden: pass
+                        # if xsaid:
+                            # try:
+                                # last_message = await message.channel.history(limit=2).flatten()
+                                # last_message = last_message[1]
+                                # if message.author.id == last_message.author.id: xsaid = False
+                            # except discord.errors.Forbidden: pass
 
                         if xsaid:
                             said_name = settings.nickname.get(message.guild, message.author)
