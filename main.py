@@ -225,7 +225,9 @@ class Main(commands.Cog):
         except NameError:
             print(f"Starting as {self.bot.user.name}")
 
-            self.avoid_file_crashes.start()
+            try:    self.avoid_file_crashes.start()
+            except RuntimeError:    pass
+
             for channel_name in config_channels:
                 channel_id = int(config_channels[channel_name])
                 channel_object = self.bot.supportserver.get_channel(channel_id)
