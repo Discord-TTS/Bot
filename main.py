@@ -376,12 +376,13 @@ class Main(commands.Cog):
 
                         # Toggleable X said and attachment detection
                         xsaid = settings.get(message.guild, "xsaid")
+
                         # if xsaid:
-                            # try:
-                                # last_message = await message.channel.history(limit=2).flatten()
-                                # last_message = last_message[1]
-                                # if message.author.id == last_message.author.id: xsaid = False
-                            # except discord.errors.Forbidden: pass
+                        #     try:
+                        #         last_message = await message.channel.history(limit=2).flatten()
+                        #         last_message = last_message[1]
+                        #         if message.author.id == last_message.author.id: xsaid = False
+                        #     except discord.errors.Forbidden: pass
 
                         if xsaid:
                             said_name = settings.nickname.get(message.guild, message.author)
@@ -406,7 +407,7 @@ class Main(commands.Cog):
                         except AssertionError:  return
                         except (gTTS.tts.gTTSError, ValueError):
                             try:    return await message.add_reaction("🚫")
-                            except  discord.errors.Forbidden: return
+                            except (discord.errors.Forbidden, discord.errors.NotFound): return
 
                         # Discard if over 30 seconds
                         temp_store_for_mp3.seek(0)
@@ -501,9 +502,9 @@ class Main(commands.Cog):
         errors = exc_info()
 
         if event == "on_message":
-            if args[0].author.id == bot.user.id:    return
+            message = args[0]
+            if message.author.id == bot.user.id:    return
 
-            message = await args[0].channel.fetch_message(args[0].id)
             if isinstance(errors[1], discord.errors.Forbidden):
                 try:    return await message.author.send("Unknown Permission Error, please give TTS Bot the required permissions!")
                 except discord.errors.Forbidden:    return
