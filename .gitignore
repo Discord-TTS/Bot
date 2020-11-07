@@ -1,4 +1,3 @@
-*.json
 *.save
 *.mp3
 *.bak
@@ -10,4 +9,7 @@ temp.txt
 queue.txt
 status.txt
 activity.txt
+settings.json
+setlangs.json
+blocked_users.json
 activitytype.txt

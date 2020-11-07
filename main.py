@@ -5,6 +5,7 @@ import shutil
 from asyncio.exceptions import TimeoutError as asyncio_TimeoutError
 from concurrent.futures._base import TimeoutError as concurrent_TimeoutError
 from configparser import ConfigParser
+from functools import partial as make_func
 from inspect import cleandoc
 from io import BytesIO
 from os import remove
@@ -36,9 +37,10 @@ config_channels = config["Channels"]
 BOT_PREFIX = "-"
 before = monotonic()
 NoneType = type(None)
-settings_loaded = False
-tts_langs = gTTS.lang.tts_langs(tld='co.uk')
 to_enabled = {True: "Enabled", False: "Disabled"}
+
+with open("langs.json") as lang_file:
+    tts_langs = json.load(lang_file)
 
 if exists("activity.txt"):
     with open("activity.txt") as f2, open("activitytype.txt") as f3, open("status.txt") as f4:
@@ -140,6 +142,31 @@ class Main(commands.Cog):
     async def before_file_saving_loop(self):
         await self.bot.wait_until_ready()
 
+    async def get_tts(self, message, text, lang):
+        make_tts_func = make_func(self.make_tts, text, lang)
+        temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
+
+        # Discard if over 30 seconds
+        temp_store_for_mp3.seek(0)
+        if not (int(MP3(temp_store_for_mp3).info.length) >= 30):
+            self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
+
+    def make_tts(self, text, lang) -> BytesIO:
+        temp_store_for_mp3 = BytesIO()
+        in_vcs = len(self.bot.voice_clients)
+        if   in_vcs < 5:  max_range = 50
+        elif in_vcs < 20: max_range = 10
+        elif in_vcs < 30: max_range = 5
+
+        for attempt in range(1, max_range):
+            try:
+                gTTS.gTTS(text=text, lang=lang, lang_check=False).write_to_fp(temp_store_for_mp3)
+                break
+            except ValueError:
+                print(f"Token Seed not found, attempt: {attempt}")
+                if attempt == max_range: raise
+
+        return temp_store_for_mp3
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.command()
     @commands.is_owner()
@@ -219,7 +246,7 @@ class Main(commands.Cog):
         try:
             await last_cached_message.edit(content=f"~~{last_cached_message.content}~~")
             await starting_message.edit(content=f"~~{starting_message.content}~~")
-            starting_message = await self.bot.channels["logs"].send(f"Restarting as {self.bot.user.name}!")
+            starting_message = await self.bot.channels["logs"].send(f"Restarted as {self.bot.user.name}!")
             print(f":wagu: Restarting as {self.bot.user.name}!")
 
         except NameError:
@@ -233,13 +260,12 @@ class Main(commands.Cog):
                 channel_object = self.bot.supportserver.get_channel(channel_id)
                 self.bot.channels[channel_name] = channel_object
 
-            starting_message = await self.bot.channels["logs"].send(f"Starting as {self.bot.user.name}!")
+            for guild in self.bot.guilds:
+                self.bot.playing[guild.id] = 0
+                self.bot.queue[guild.id] = dict()
 
-        for guild in self.bot.guilds:
-            self.bot.playing[guild.id] = 0
-            self.bot.queue[guild.id] = dict()
+            starting_message = await self.bot.channels["logs"].send(f"Started and ready! Took `{int(monotonic() - before)} seconds`")
 
-        await starting_message.edit(content=f"Started and ready! Took `{int(monotonic() - before)} seconds`")
         last_cached_message = await self.bot.channels["logs"].send("Waiting to chunk a guild!")
 
     @commands.Cog.listener()
@@ -314,7 +340,7 @@ class Main(commands.Cog):
                     # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
-                        # Fixing playing value if not loaded
+                        # Fixing values if not loaded
                         if basic.get_value(self.bot.playing, message.guild.id) is None:
                             self.bot.playing[message.guild.id] = 0
 
@@ -402,18 +428,10 @@ class Main(commands.Cog):
                         # Read language file
                         lang = setlangs.get(message.author)
 
-                        temp_store_for_mp3 = BytesIO()
-                        try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
-                        except AssertionError:  return
-                        except (gTTS.tts.gTTSError, ValueError):
-                            try:    return await message.add_reaction("🚫")
-                            except (discord.errors.Forbidden, discord.errors.NotFound): return
-
-                        # Discard if over 30 seconds
-                        temp_store_for_mp3.seek(0)
-                        if not (int(MP3(temp_store_for_mp3).info.length) >= 30):
-                            self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
-                            del temp_store_for_mp3
+                        try:
+                            await self.get_tts(message, saythis, lang)
+                        except (gTTS.tts.gTTSError, ValueError, AssertionError):
+                            return print(f"Just skipped '{saythis}', sliently returned.")
 
                         # Queue, please don't touch this, it works somehow
                         while self.bot.playing[message.guild.id] != 0:
@@ -602,7 +620,17 @@ class Main(commands.Cog):
         await ctx.send(f"{self.bot.user.mention} has been up for {int((monotonic() - before) // 60)} minutes")
 
     @commands.command()
-    async def debug(self, ctx):
+    async def debug(self, ctx, reset="nope"):
+        if reset.lower() == "reset":
+            self.bot.playing[ctx.guild.id] = 0
+            self.bot.queue[ctx.guild.id] = dict()
+            embed = discord.Embed(
+                title="Values Reset!",
+                description="Playing and queue values for this guild have been reset, hopefully this will fix issues."
+            )
+            embed.set_footer(text="Debug Command, please only run if told.")
+            return await ctx.send(embed=embed)
+
         with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
         await ctx.author.send(
             cleandoc(f"""
