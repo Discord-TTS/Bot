@@ -15,8 +15,8 @@ from time import monotonic
 from traceback import format_exception
 from typing import Optional, Union
 
-import aiogtts as aiogTTS
 import discord
+import gtts as gTTS
 from discord.ext import commands, tasks
 from mutagen.mp3 import MP3
 
@@ -36,7 +36,8 @@ config_channels = config["Channels"]
 BOT_PREFIX = "-"
 before = monotonic()
 NoneType = type(None)
-tts_object = aiogTTS.aiogTTS()
+settings_loaded = False
+tts_langs = gTTS.lang.tts_langs(tld='co.uk')
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 if exists("activity.txt"):
@@ -92,7 +93,6 @@ bot = commands.AutoShardedBot(
 bot.queue = dict()
 bot.playing = dict()
 bot.channels = dict()
-bot.tts_langs = list()
 bot.chunk_queue = list()
 bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
 
@@ -232,8 +232,6 @@ class Main(commands.Cog):
                 channel_id = int(config_channels[channel_name])
                 channel_object = self.bot.supportserver.get_channel(channel_id)
                 self.bot.channels[channel_name] = channel_object
-
-            self.bot.tts_langs = await aiogTTS.lang.tts_langs(session=tts_object.session)
 
             starting_message = await self.bot.channels["logs"].send(f"Starting as {self.bot.user.name}!")
 
@@ -405,10 +403,9 @@ class Main(commands.Cog):
                         lang = setlangs.get(message.author)
 
                         temp_store_for_mp3 = BytesIO()
-                        try:
-                            await tts_object.write_to_fp(saythis, temp_store_for_mp3, lang=lang, lang_check=False)
+                        try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
                         except AssertionError:  return
-                        except (aiogTTS.tts.aiogTTSError, ValueError):
+                        except (gTTS.tts.gTTSError, ValueError):
                             try:    return await message.add_reaction("🚫")
                             except (discord.errors.Forbidden, discord.errors.NotFound): return
 
@@ -882,9 +879,9 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def voice(self, ctx, lang: str):
-        if lang in self.bot.tts_langs:
+        if lang in tts_langs:
             setlangs.set(ctx.author, lang)
-            await ctx.send(f"Changed your voice to: {self.bot.tts_langs[setlangs.get(ctx.author)]}")
+            await ctx.send(f"Changed your voice to: {tts_langs[setlangs.get(ctx.author)]}")
         else:
             await ctx.send("Invalid voice, do -voices")
 
@@ -892,14 +889,14 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
     async def voices(self, ctx, lang: str = None):
-        if lang in self.bot.tts_langs:
+        if lang in tts_langs:
             try:  return await self.voice(ctx, lang)
             except: return
 
         lang = setlangs.get(ctx.author)
-        langs_string = basic.remove_chars(list(self.bot.tts_langs.keys()), "[", "]")
+        langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
 
-        await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {self.bot.tts_langs[lang]} | {lang}")
+        await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {tts_langs[lang]} | {lang}")
 #//////////////////////////////////////////////////////
 
 bot.add_cog(Main(bot))
