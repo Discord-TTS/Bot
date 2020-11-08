@@ -14,7 +14,7 @@ from subprocess import call
 from sys import exc_info
 from time import monotonic
 from traceback import format_exception
-from typing import Optional, Union
+from typing import Optional
 
 import discord
 import gtts as gTTS
@@ -148,7 +148,7 @@ class Main(commands.Cog):
 
         # Discard if over 30 seconds
         temp_store_for_mp3.seek(0)
-        if not (int(MP3(temp_store_for_mp3).info.length) >= 30):
+        if int(MP3(temp_store_for_mp3).info.length) <= 30:
             self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
 
     def make_tts(self, text, lang) -> BytesIO:
@@ -281,14 +281,14 @@ class Main(commands.Cog):
                 print (update_for_main, update_for_dev, cog_update, "\n===============================================")
 
                 if update_for_main or update_for_dev:
-                    await self.bot.channels['logs'].send(f"Detected new bot commit! Pulling changes")
+                    await self.bot.channels['logs'].send("Detected new bot commit! Pulling changes")
                     call(['git', 'pull'])
                     print("===============================================")
                     await self.bot.channels['logs'].send("Restarting bot...")
                     await self.end(message)
 
                 elif cog_update:
-                    await self.bot.channels['logs'].send(f"Detected new cog commit! Pulling changes")
+                    await self.bot.channels['logs'].send("Detected new cog commit! Pulling changes")
                     call(['git', 'submodule', 'update', '--recursive', '--remote'])
                     print("===============================================")
                     await self.bot.channels['logs'].send("Reloading cog...")
@@ -298,7 +298,7 @@ class Main(commands.Cog):
                         self.bot.reload_extension("cogs.common_owner")
                         self.bot.reload_extension("cogs.common_trusted")
                     except Exception as e:
-                        await self.bot.channels['logs'].send(f'**`ERROR:`** {type(e).__name__} - {e}')
+                        await self.bot.channels['logs'].send(f"**`ERROR:`** {type(e).__name__} - {e}")
                     else:
                         await self.bot.channels['logs'].send('**`SUCCESS`**')
 
@@ -401,16 +401,7 @@ class Main(commands.Cog):
                             saythis += ". This message contained a link"
 
                         # Toggleable X said and attachment detection
-                        xsaid = settings.get(message.guild, "xsaid")
-
-                        # if xsaid:
-                        #     try:
-                        #         last_message = await message.channel.history(limit=2).flatten()
-                        #         last_message = last_message[1]
-                        #         if message.author.id == last_message.author.id: xsaid = False
-                        #     except discord.errors.Forbidden: pass
-
-                        if xsaid:
+                        if settings.get(message.guild, "xsaid"):
                             said_name = settings.nickname.get(message.guild, message.author)
                             format = basic.exts_to_format(message.attachments)
 
@@ -662,7 +653,7 @@ class Main(commands.Cog):
           `-suggest *suggestion*`: Suggests a new feature! (could also DM TTS Bot)
           `-invite`: Sends the instructions to invite TTS Bot!"""
 
-        embed=discord.Embed(title="TTS Bot Help!", url="https://discord.gg/zWPWwQC", description=cleandoc(message), color=0x3498db)
+        embed = discord.Embed(title="TTS Bot Help!", url="https://discord.gg/zWPWwQC", description=cleandoc(message), color=0x3498db)
         embed.add_field(name="Universal Commands", value=cleandoc(message1), inline=False)
         embed.set_footer(text="Do you want to get support for TTS Bot or invite it to your own server? https://discord.gg/zWPWwQC")
         await ctx.send(embed=embed)
@@ -691,7 +682,7 @@ class Main(commands.Cog):
             Repository: https://github.com/Gnome-py/Discord-TTS-Bot
         """)
 
-        embed=discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section, url="https://discord.gg/zWPWwQC", color=0x3498db)
+        embed = discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section, url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.set_footer(text=footer)
         embed.set_thumbnail(url=str(self.bot.user.avatar_url))
 
@@ -800,7 +791,7 @@ class Settings(commands.Cog):
               -set nickname `@person` `new name`: Sets your (or someone else if admin) name for xsaid.
 
               -set voice `language-code`: Changes your voice to a `-voices` code, equivalent to `-voice`""")
-            embed=discord.Embed(title="Settings > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
+            embed = discord.Embed(title="Settings > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
             embed.add_field(name="Available properties:", value=message, inline=False)
 
         else:
@@ -829,7 +820,7 @@ class Settings(commands.Cog):
               :small_blue_diamond:Language: `{lang}`
               :small_blue_diamond:Nickname: `{nickname}`""")
 
-            embed=discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
+            embed = discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
             embed.add_field(name="**Server Wide**", value=message1, inline=False)
             embed.add_field(name="**User Specific**", value=message2, inline=False)
 
@@ -929,5 +920,4 @@ class Settings(commands.Cog):
 
 bot.add_cog(Main(bot))
 bot.add_cog(Settings(bot))
-try:    bot.run(t)
-except RuntimeError: pass
+bot.run(t)
