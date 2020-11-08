@@ -18,11 +18,13 @@ from typing import Optional
 
 import discord
 import gtts as gTTS
+from cryptography.fernet import Fernet
 from discord.ext import commands, tasks
 from mutagen.mp3 import MP3
 
 from patched_FFmpegPCM import FFmpegPCMAudio
 from utils import basic
+from utils.cache import cache
 from utils.settings import blocked_users_class as blocked_users
 from utils.settings import setlangs_class as setlangs
 from utils.settings import settings_class as settings
@@ -32,6 +34,17 @@ config = ConfigParser()
 config.read("config.ini")
 t = config["Main"]["Token"]
 config_channels = config["Channels"]
+
+regenerate_cache = False
+if "key" not in config["Main"]:
+    key = Fernet.generate_key()
+    config["Main"]["key"] = str(key)
+    with open("cache.json", "wb") as cachefile: cachefile.write(Fernet(key).encrypt(b"{}"))
+    with open("config.ini", "w") as configfile: config.write(configfile)
+
+cache_key_str = config["Main"]["key"][2:-1]
+cache_key_bytes = str.encode(cache_key_str)
+cache = cache(cache_key_bytes)
 
 # Define random variables
 BOT_PREFIX = "-"
@@ -125,6 +138,7 @@ class Main(commands.Cog):
     @tasks.loop(seconds=60.0)
     async def avoid_file_crashes(self):
         try:
+            cache.save()
             settings.save()
             setlangs.save()
             blocked_users.save()
@@ -143,13 +157,21 @@ class Main(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def get_tts(self, message, text, lang):
-        make_tts_func = make_func(self.make_tts, text, lang)
-        temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
+        cache_mp3 = cache.get(text, lang)
+        if not cache_mp3:
+            make_tts_func = make_func(self.make_tts, text, lang)
+            temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
 
-        # Discard if over 30 seconds
-        temp_store_for_mp3.seek(0)
-        if int(MP3(temp_store_for_mp3).info.length) <= 30:
-            self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
+            # Discard if over 30 seconds
+            temp_store_for_mp3.seek(0)
+            if int(MP3(temp_store_for_mp3).info.length) <= 30:
+                temp_store_for_mp3.seek(0)
+                temp_store_for_mp3 = temp_store_for_mp3.read()
+
+                self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
+                cache.set(text, lang, message.id, temp_store_for_mp3)
+        else:
+            self.bot.queue[message.guild.id][message.id] = cache_mp3
 
     def make_tts(self, text, lang) -> BytesIO:
         temp_store_for_mp3 = BytesIO()
@@ -163,8 +185,8 @@ class Main(commands.Cog):
                 gTTS.gTTS(text=text, lang=lang, lang_check=False).write_to_fp(temp_store_for_mp3)
                 break
             except ValueError:
-                print(f"Token Seed not found, attempt: {attempt}")
-                if attempt == max_range: raise
+                if attempt == max_range:
+                    raise
 
         return temp_store_for_mp3
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,6 +194,7 @@ class Main(commands.Cog):
     @commands.is_owner()
     async def end(self, ctx):
         self.avoid_file_crashes.cancel()
+        cache.save()
         settings.save()
         setlangs.save()
         blocked_users.save()
@@ -438,12 +461,11 @@ class Main(commands.Cog):
                             # Select first in queue
                             message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
                             selected = self.bot.queue[message.guild.id][message_id_to_read]
-                            selected.seek(0)
 
                             # Play selected audio
                             vc = message.guild.voice_client
                             if vc is not None:
-                                try:    vc.play(FFmpegPCMAudio(selected.read(), pipe=True, options='-loglevel "quiet"'))
+                                try:    vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'))
                                 except discord.errors.ClientException:  pass # sliences desyncs between discord.py and discord, implement actual fix soon!
 
                                 while vc.is_playing():  await asyncio.sleep(0.5)

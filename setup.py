@@ -3,6 +3,7 @@ import json
 import os
 
 import discord
+from cryptography.fernet import Fernet
 from discord.ext import commands
 
 bot = commands.Bot(command_prefix="-")
@@ -12,20 +13,10 @@ token = input("Input a bot token: ")
 main_server = int(input("What is the ID of the main server for your bot? (Suggestions, errors and DMs will be sent here): "))
 trusted_ids = input("Input a list of trusted user IDs (allowing for moderation commands such as -(un)block, -dm, -refreshroles, -lookupinfo, and others.): ").split(", ")
 
-def write_blank_json(name, type):
-    with open(name, "x") as f:
-        json.dump(type, f)
-
-try:
-    write_blank_json("blocked_users.json", list())
-    write_blank_json("setlangs.json", dict())
-    write_blank_json("settings.json", dict())
-except:
-    print("Failed making one of the files! If you are resetting to default, delete the servers folder, all .txt, .json, and the .ini file before running this again!")
-    raise SystemExit
-
+cache_key = Fernet.generate_key()
 config["Main"] = {
   "token": token,
+  "cache_key": cache_key,
   "main_server": main_server,
   "trusted_ids": trusted_ids,
 }
@@ -34,6 +25,20 @@ config["Activity"] = {
     "type": "watching",
     "status": "idle",
 }
+
+def write_blank_json(name, type):
+    with open(name, "x") as f:
+        json.dump(type, f)
+
+try:
+    write_blank_json("blocked_users.json", list())
+    write_blank_json("setlangs.json", dict())
+    write_blank_json("settings.json", dict())
+    with open("cache.json", "wb") as cachefile:
+        cachefile.write(Fernet(cache_key).encrypt(b"{}"))
+except:
+    print("Failed making one of the files! If you are resetting to default, delete the servers folder, all .txt, .json, and the .ini file before running this again!")
+    raise SystemExit
 
 @bot.event
 async def on_ready():

@@ -4,9 +4,10 @@
 __pycache__
 config.ini
 backup.py
-servers
+cache
 temp.txt
 queue.txt
+cache.json
 status.txt
 activity.txt
 settings.json
