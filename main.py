@@ -5,23 +5,26 @@ import shutil
 from asyncio.exceptions import TimeoutError as asyncio_TimeoutError
 from concurrent.futures._base import TimeoutError as concurrent_TimeoutError
 from configparser import ConfigParser
+from functools import partial as make_func
 from inspect import cleandoc
 from io import BytesIO
-from os import remove
+from os import listdir, remove
 from os.path import exists
 from subprocess import call
 from sys import exc_info
 from time import monotonic
 from traceback import format_exception
-from typing import Optional, Union
+from typing import Optional
 
 import discord
 import gtts as gTTS
+from cryptography.fernet import Fernet
 from discord.ext import commands, tasks
 from mutagen.mp3 import MP3
 
 from patched_FFmpegPCM import FFmpegPCMAudio
 from utils import basic
+from utils.cache import cache
 from utils.settings import blocked_users_class as blocked_users
 from utils.settings import setlangs_class as setlangs
 from utils.settings import settings_class as settings
@@ -32,13 +35,24 @@ config.read("config.ini")
 t = config["Main"]["Token"]
 config_channels = config["Channels"]
 
+if "key" not in config["Main"]:
+    key = Fernet.generate_key()
+    config["Main"]["key"] = str(key)
+    with open("cache.json", "wb") as cachefile: cachefile.write(Fernet(key).encrypt(b"{}"))
+    with open("config.ini", "w") as configfile: config.write(configfile)
+
+cache_key_str = config["Main"]["key"][2:-1]
+cache_key_bytes = str.encode(cache_key_str)
+cache = cache(cache_key_bytes)
+
 # Define random variables
 BOT_PREFIX = "-"
 before = monotonic()
 NoneType = type(None)
-settings_loaded = False
-tts_langs = gTTS.lang.tts_langs(tld='co.uk')
 to_enabled = {True: "Enabled", False: "Disabled"}
+
+with open("langs.json") as lang_file:
+    tts_langs = json.load(lang_file)
 
 if exists("activity.txt"):
     with open("activity.txt") as f2, open("activitytype.txt") as f3, open("status.txt") as f4:
@@ -123,9 +137,23 @@ class Main(commands.Cog):
     @tasks.loop(seconds=60.0)
     async def avoid_file_crashes(self):
         try:
+            cache.save()
             settings.save()
             setlangs.save()
             blocked_users.save()
+
+            cache_size = basic.get_size("cache")
+            if cache_size >= 1073741824:
+                print("Deleting 100 messages from cache!")
+                cache_folder = listdir("cache")
+                cache_folder.sort(reverse=False, key=lambda x: int(''.join(filter(str.isdigit, x))))
+
+                for count, cached_message in enumerate(cache_folder):
+                    remove(f"cache/{cached_message}")
+                    cache.remove(cached_message)
+
+                    if count == 100: break
+
         except Exception as e:
             error = getattr(e, 'original', e)
 
@@ -140,11 +168,45 @@ class Main(commands.Cog):
     async def before_file_saving_loop(self):
         await self.bot.wait_until_ready()
 
+    async def get_tts(self, message, text, lang):
+        cache_mp3 = cache.get(text, lang, message.id)
+        if not cache_mp3:
+            make_tts_func = make_func(self.make_tts, text, lang)
+            temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
+
+            # Discard if over 30 seconds
+            temp_store_for_mp3.seek(0)
+            if int(MP3(temp_store_for_mp3).info.length) <= 30:
+                temp_store_for_mp3.seek(0)
+                temp_store_for_mp3 = temp_store_for_mp3.read()
+
+                self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
+                cache.set(text, lang, message.id, temp_store_for_mp3)
+        else:
+            self.bot.queue[message.guild.id][message.id] = cache_mp3
+
+    def make_tts(self, text, lang) -> BytesIO:
+        temp_store_for_mp3 = BytesIO()
+        in_vcs = len(self.bot.voice_clients)
+        if   in_vcs < 5:  max_range = 50
+        elif in_vcs < 20: max_range = 10
+        elif in_vcs < 30: max_range = 5
+
+        for attempt in range(1, max_range):
+            try:
+                gTTS.gTTS(text=text, lang=lang, lang_check=False).write_to_fp(temp_store_for_mp3)
+                break
+            except ValueError:
+                if attempt == max_range:
+                    raise
+
+        return temp_store_for_mp3
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.command()
     @commands.is_owner()
     async def end(self, ctx):
         self.avoid_file_crashes.cancel()
+        cache.save()
         settings.save()
         setlangs.save()
         blocked_users.save()
@@ -193,6 +255,7 @@ class Main(commands.Cog):
         settings.save()
         setlangs.save()
         blocked_users.save()
+
         await ctx.send("Saved all files!")
 
     @commands.command()
@@ -217,9 +280,9 @@ class Main(commands.Cog):
         self.bot.supportserver = self.bot.get_guild(int(config["Main"]["main_server"]))
 
         try:
-            await last_cached_message.edit(f"~~{last_cached_message.content}~~")
+            await last_cached_message.edit(content=f"~~{last_cached_message.content}~~")
             await starting_message.edit(content=f"~~{starting_message.content}~~")
-            starting_message = await self.bot.channels["logs"].send(f"Restarting as {self.bot.user.name}!")
+            starting_message = await self.bot.channels["logs"].send(f"Restarted as {self.bot.user.name}!")
             print(f":wagu: Restarting as {self.bot.user.name}!")
 
         except NameError:
@@ -233,13 +296,12 @@ class Main(commands.Cog):
                 channel_object = self.bot.supportserver.get_channel(channel_id)
                 self.bot.channels[channel_name] = channel_object
 
-            starting_message = await self.bot.channels["logs"].send(f"Starting as {self.bot.user.name}!")
+            for guild in self.bot.guilds:
+                self.bot.playing[guild.id] = 0
+                self.bot.queue[guild.id] = dict()
 
-        for guild in self.bot.guilds:
-            self.bot.playing[guild.id] = 0
-            self.bot.queue[guild.id] = dict()
+            starting_message = await self.bot.channels["logs"].send(f"Started and ready! Took `{int(monotonic() - before)} seconds`")
 
-        await starting_message.edit(content=f"Started and ready! Took `{int(monotonic() - before)} seconds`")
         last_cached_message = await self.bot.channels["logs"].send("Waiting to chunk a guild!")
 
     @commands.Cog.listener()
@@ -255,14 +317,14 @@ class Main(commands.Cog):
                 print (update_for_main, update_for_dev, cog_update, "\n===============================================")
 
                 if update_for_main or update_for_dev:
-                    await self.bot.channels['logs'].send(f"Detected new bot commit! Pulling changes")
+                    await self.bot.channels['logs'].send("Detected new bot commit! Pulling changes")
                     call(['git', 'pull'])
                     print("===============================================")
                     await self.bot.channels['logs'].send("Restarting bot...")
                     await self.end(message)
 
                 elif cog_update:
-                    await self.bot.channels['logs'].send(f"Detected new cog commit! Pulling changes")
+                    await self.bot.channels['logs'].send("Detected new cog commit! Pulling changes")
                     call(['git', 'submodule', 'update', '--recursive', '--remote'])
                     print("===============================================")
                     await self.bot.channels['logs'].send("Reloading cog...")
@@ -272,7 +334,7 @@ class Main(commands.Cog):
                         self.bot.reload_extension("cogs.common_owner")
                         self.bot.reload_extension("cogs.common_trusted")
                     except Exception as e:
-                        await self.bot.channels['logs'].send(f'**`ERROR:`** {type(e).__name__} - {e}')
+                        await self.bot.channels['logs'].send(f"**`ERROR:`** {type(e).__name__} - {e}")
                     else:
                         await self.bot.channels['logs'].send('**`SUCCESS`**')
 
@@ -314,7 +376,7 @@ class Main(commands.Cog):
                     # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
-                        # Fixing playing value if not loaded
+                        # Fixing values if not loaded
                         if basic.get_value(self.bot.playing, message.guild.id) is None:
                             self.bot.playing[message.guild.id] = 0
 
@@ -375,15 +437,7 @@ class Main(commands.Cog):
                             saythis += ". This message contained a link"
 
                         # Toggleable X said and attachment detection
-                        xsaid = settings.get(message.guild, "xsaid")
-                        # if xsaid:
-                            # try:
-                                # last_message = await message.channel.history(limit=2).flatten()
-                                # last_message = last_message[1]
-                                # if message.author.id == last_message.author.id: xsaid = False
-                            # except discord.errors.Forbidden: pass
-
-                        if xsaid:
+                        if settings.get(message.guild, "xsaid"):
                             said_name = settings.nickname.get(message.guild, message.author)
                             format = basic.exts_to_format(message.attachments)
 
@@ -401,18 +455,10 @@ class Main(commands.Cog):
                         # Read language file
                         lang = setlangs.get(message.author)
 
-                        temp_store_for_mp3 = BytesIO()
-                        try:  gTTS.gTTS(text=saythis, lang=lang).write_to_fp(temp_store_for_mp3)
-                        except AssertionError:  return
-                        except (gTTS.tts.gTTSError, ValueError):
-                            try:    return await message.add_reaction("🚫")
-                            except  discord.errors.Forbidden: return
-
-                        # Discard if over 30 seconds
-                        temp_store_for_mp3.seek(0)
-                        if not (int(MP3(temp_store_for_mp3).info.length) >= 30):
-                            self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
-                            del temp_store_for_mp3
+                        try:
+                            await self.get_tts(message, saythis, lang)
+                        except (gTTS.tts.gTTSError, ValueError, AssertionError):
+                            return print(f"Just skipped '{saythis}', sliently returned.")
 
                         # Queue, please don't touch this, it works somehow
                         while self.bot.playing[message.guild.id] != 0:
@@ -428,12 +474,11 @@ class Main(commands.Cog):
                             # Select first in queue
                             message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
                             selected = self.bot.queue[message.guild.id][message_id_to_read]
-                            selected.seek(0)
 
                             # Play selected audio
                             vc = message.guild.voice_client
                             if vc is not None:
-                                try:    vc.play(FFmpegPCMAudio(selected.read(), pipe=True, options='-loglevel "quiet"'))
+                                try:    vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'))
                                 except discord.errors.ClientException:  pass # sliences desyncs between discord.py and discord, implement actual fix soon!
 
                                 while vc.is_playing():  await asyncio.sleep(0.5)
@@ -501,9 +546,9 @@ class Main(commands.Cog):
         errors = exc_info()
 
         if event == "on_message":
-            if args[0].author.id == bot.user.id:    return
+            message = args[0]
+            if message.author.id == bot.user.id:    return
 
-            message = await args[0].channel.fetch_message(args[0].id)
             if isinstance(errors[1], discord.errors.Forbidden):
                 try:    return await message.author.send("Unknown Permission Error, please give TTS Bot the required permissions!")
                 except discord.errors.Forbidden:    return
@@ -601,7 +646,17 @@ class Main(commands.Cog):
         await ctx.send(f"{self.bot.user.mention} has been up for {int((monotonic() - before) // 60)} minutes")
 
     @commands.command()
-    async def debug(self, ctx):
+    async def debug(self, ctx, reset="nope"):
+        if reset.lower() == "reset":
+            self.bot.playing[ctx.guild.id] = 0
+            self.bot.queue[ctx.guild.id] = dict()
+            embed = discord.Embed(
+                title="Values Reset!",
+                description="Playing and queue values for this guild have been reset, hopefully this will fix issues."
+            )
+            embed.set_footer(text="Debug Command, please only run if told.")
+            return await ctx.send(embed=embed)
+
         with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
         await ctx.author.send(
             cleandoc(f"""
@@ -633,7 +688,7 @@ class Main(commands.Cog):
           `-suggest *suggestion*`: Suggests a new feature! (could also DM TTS Bot)
           `-invite`: Sends the instructions to invite TTS Bot!"""
 
-        embed=discord.Embed(title="TTS Bot Help!", url="https://discord.gg/zWPWwQC", description=cleandoc(message), color=0x3498db)
+        embed = discord.Embed(title="TTS Bot Help!", url="https://discord.gg/zWPWwQC", description=cleandoc(message), color=0x3498db)
         embed.add_field(name="Universal Commands", value=cleandoc(message1), inline=False)
         embed.set_footer(text="Do you want to get support for TTS Bot or invite it to your own server? https://discord.gg/zWPWwQC")
         await ctx.send(embed=embed)
@@ -662,7 +717,7 @@ class Main(commands.Cog):
             Repository: https://github.com/Gnome-py/Discord-TTS-Bot
         """)
 
-        embed=discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section, url="https://discord.gg/zWPWwQC", color=0x3498db)
+        embed = discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section, url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.set_footer(text=footer)
         embed.set_thumbnail(url=str(self.bot.user.avatar_url))
 
@@ -771,7 +826,7 @@ class Settings(commands.Cog):
               -set nickname `@person` `new name`: Sets your (or someone else if admin) name for xsaid.
 
               -set voice `language-code`: Changes your voice to a `-voices` code, equivalent to `-voice`""")
-            embed=discord.Embed(title="Settings > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
+            embed = discord.Embed(title="Settings > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
             embed.add_field(name="Available properties:", value=message, inline=False)
 
         else:
@@ -800,7 +855,7 @@ class Settings(commands.Cog):
               :small_blue_diamond:Language: `{lang}`
               :small_blue_diamond:Nickname: `{nickname}`""")
 
-            embed=discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
+            embed = discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
             embed.add_field(name="**Server Wide**", value=message1, inline=False)
             embed.add_field(name="**User Specific**", value=message2, inline=False)
 
@@ -900,5 +955,4 @@ class Settings(commands.Cog):
 
 bot.add_cog(Main(bot))
 bot.add_cog(Settings(bot))
-try:    bot.run(t)
-except RuntimeError: pass
+bot.run(t)
