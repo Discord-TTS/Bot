@@ -1,3 +1,4 @@
+import os
 from re import compile
 
 audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")
@@ -41,6 +42,16 @@ def remove_chars(remove_from, *chars):
     for char in chars:  input_string = input_string.replace(char, "")
 
     return input_string
+
+def get_size(start_path='.'):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+
+    return total_size
 
 def sort_dict(dict_to_sort):
     keys = list(dict_to_sort.keys())

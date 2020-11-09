@@ -8,7 +8,7 @@ from configparser import ConfigParser
 from functools import partial as make_func
 from inspect import cleandoc
 from io import BytesIO
-from os import remove
+from os import listdir, remove
 from os.path import exists
 from subprocess import call
 from sys import exc_info
@@ -35,7 +35,6 @@ config.read("config.ini")
 t = config["Main"]["Token"]
 config_channels = config["Channels"]
 
-regenerate_cache = False
 if "key" not in config["Main"]:
     key = Fernet.generate_key()
     config["Main"]["key"] = str(key)
@@ -142,6 +141,19 @@ class Main(commands.Cog):
             settings.save()
             setlangs.save()
             blocked_users.save()
+
+            cache_size = basic.get_size("cache")
+            if cache_size >= 1073741824:
+                print("Deleting 100 messages from cache!")
+                cache_folder = listdir("cache")
+                cache_folder.sort(reverse=False, key=lambda x: int(''.join(filter(str.isdigit, x))))
+
+                for count, cached_message in enumerate(cache_folder):
+                    remove(f"cache/{cached_message}")
+                    cache.remove(cached_message)
+
+                    if count == 100: break
+
         except Exception as e:
             error = getattr(e, 'original', e)
 
@@ -157,7 +169,7 @@ class Main(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def get_tts(self, message, text, lang):
-        cache_mp3 = cache.get(text, lang)
+        cache_mp3 = cache.get(text, lang, message.id)
         if not cache_mp3:
             make_tts_func = make_func(self.make_tts, text, lang)
             temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
@@ -243,6 +255,7 @@ class Main(commands.Cog):
         settings.save()
         setlangs.save()
         blocked_users.save()
+
         await ctx.send("Saved all files!")
 
     @commands.command()
