@@ -9,11 +9,11 @@ class cache():
         self.key = key
         with open("cache.json", "rb") as cache_file:
             cache_db_enc = cache_file.read()
-            self.cache_db = json.loads(Fernet(self.key).decrypt(cache_db_enc))
+            self.cache_db = json.loads(Fernet(self.key).decrypt(cache_db_enc).decode())
 
     def save(self):
         with open("cache.json", "wb") as cache_file:
-            cache_db_bytes = str.encode(str(self.cache_db))
+            cache_db_bytes = str.encode(json.dumps(self.cache_db))
             cache_db_enc = Fernet(self.key).encrypt(cache_db_bytes)
             cache_file.write(cache_db_enc)
 
