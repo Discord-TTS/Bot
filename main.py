@@ -20,7 +20,7 @@ import discord
 import gtts as gTTS
 from cryptography.fernet import Fernet
 from discord.ext import commands, tasks
-from mutagen.mp3 import MP3
+from mutagen.mp3 import MP3, HeaderNotFoundError
 
 from patched_FFmpegPCM import FFmpegPCMAudio
 from utils import basic
@@ -174,9 +174,14 @@ class Main(commands.Cog):
             make_tts_func = make_func(self.make_tts, text, lang)
             temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
 
+            try:
+                temp_store_for_mp3.seek(0)
+                file_length = int(MP3(temp_store_for_mp3).info.length)
+            except HeaderNotFoundError:
+                return
+
             # Discard if over 30 seconds
-            temp_store_for_mp3.seek(0)
-            if int(MP3(temp_store_for_mp3).info.length) <= 30:
+            if file_length <= 30:
                 temp_store_for_mp3.seek(0)
                 temp_store_for_mp3 = temp_store_for_mp3.read()
 
@@ -276,6 +281,7 @@ class Main(commands.Cog):
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.Cog.listener()
     async def on_ready(self):
+        global starting_message
         global last_cached_message
         self.bot.supportserver = self.bot.get_guild(int(config["Main"]["main_server"]))
 
@@ -377,7 +383,7 @@ class Main(commands.Cog):
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
                         # Fixing values if not loaded
-                        if basic.get_value(self.bot.playing, message.guild.id) is None:
+                        if message.guild.id not in self.bot.playing:
                             self.bot.playing[message.guild.id] = 0
 
                         # Auto Join
@@ -407,6 +413,7 @@ class Main(commands.Cog):
                             "rn": "right now",
                             "wdym": "what do you mean",
                             "imo": "in my opinion",
+                            "uwu": "oowoo"
                         }
 
                         if starts_with_tts: acronyms["-tts"] = ""
@@ -505,9 +512,13 @@ class Main(commands.Cog):
                     files = [await attachment.to_file() for attachment in message.attachments]
                     webhook = await basic.ensure_webhook(self.bot.channels["dm_logs"], name="TTS-DM-LOGS")
 
+                    if not files and not message.content: return
                     await webhook.send(message.content, username=str(message.author), avatar_url=message.author.avatar_url, files=files)
 
             else:
+                if len(pins) >= 49:
+                    return await message.channel.send("Error: Pinned messages are full, cannot pin the Welcome to Support DMs message!")
+
                 embed_message = cleandoc("""
                     **All messages after this will be sent to a private channel on the support server (-invite) where we can assist you.**
                     Please keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day, repeat your message.
@@ -805,8 +816,8 @@ class Main(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def tts(self, ctx):
-        if ctx.message.content != f"{BOT_PREFIX}tts":
-            await ctx.send(f"You don't need to do `-tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `-`!")
+        if ctx.message.content == f"{BOT_PREFIX}tts":
+            await ctx.send(f"You don't need to do `{BOT_PREFIX}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{BOT_PREFIX}`!")
 
 class Settings(commands.Cog):
     def __init__(self, bot):
