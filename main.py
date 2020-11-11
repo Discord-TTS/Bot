@@ -194,8 +194,9 @@ class Main(commands.Cog):
         temp_store_for_mp3 = BytesIO()
         in_vcs = len(self.bot.voice_clients)
         if   in_vcs < 5:  max_range = 50
-        elif in_vcs < 20: max_range = 10
-        elif in_vcs < 30: max_range = 5
+        elif in_vcs < 20: max_range = 20
+        else:
+            max_range = 10
 
         for attempt in range(1, max_range):
             try:
