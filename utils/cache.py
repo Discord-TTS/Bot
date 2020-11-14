@@ -1,5 +1,6 @@
 import json
 from os import rename
+from os.path import exists
 
 from cryptography.fernet import Fernet
 
@@ -20,11 +21,15 @@ class cache():
     def get(self, text, lang, message_id):
         search_for = str([text, lang])
         if search_for in self.cache_db:
-            filename = self.cache_db[search_for]
-            with open(f"cache/{filename}.mp3.enc", "rb") as mp3:
+            filename = f"cache/{self.cache_db[search_for]}.mp3.enc"
+            if not exists(filename):
+                self.remove(message_id)
+                return False
+
+            with open(filename, "rb") as mp3:
                 decrypted_mp3 = Fernet(self.key).decrypt(mp3.read())
 
-            rename(f"cache/{filename}.mp3.enc", f"cache/{message_id}.mp3.enc")
+            rename(filename, f"cache/{message_id}.mp3.enc")
             self.cache_db[search_for] = message_id
             return decrypted_mp3
         else:
