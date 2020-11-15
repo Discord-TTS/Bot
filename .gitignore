@@ -6,6 +6,7 @@ config.ini
 backup.py
 cache
 temp.txt
+bot_lists.py
 queue.txt
 cache.json
 status.txt

@@ -295,6 +295,8 @@ class Main(commands.Cog):
         except NameError:
             print(f"Starting as {self.bot.user.name}")
 
+            if self.bot.user.id == 513423712582762502:
+                bot.load_extension("bot_lists")
             try:    self.avoid_file_crashes.start()
             except RuntimeError:    pass
 
@@ -435,27 +437,36 @@ class Main(commands.Cog):
                             saythis = re.sub(regex, replacewith, saythis, flags=re.DOTALL)
 
                         # Url filter
-                        changed = False
+                        contained_url = False
                         for word in saythis.split(" "):
-                            if word.startswith("https://") or word.startswith("http://") or word.startswith("www."):
+                            if word.startswith(("https://", "http://", "www.")):
                                 saythis = saythis.replace(word, "")
-                                changed = True
-
-                        if changed:
-                            saythis += ". This message contained a link"
+                                contained_url = True
 
                         # Toggleable X said and attachment detection
                         if settings.get(message.guild, "xsaid"):
                             said_name = settings.nickname.get(message.guild, message.author)
                             format = basic.exts_to_format(message.attachments)
 
+                            if contained_url:
+                                if saythis:
+                                    saythis += " and sent a link."
+                                else:
+                                    saythis = "a link."
+
                             if message.attachments:
                                 if len(saythis) == 0:
-                                    saythis = f"{said_name} sent {format}."
+                                    saythis = f"{said_name} sent {format}"
                                 else:
                                     saythis = f"{said_name} sent {format} and said {saythis}"
                             else:
                                 saythis = f"{said_name} said: {saythis}"
+
+                        elif contained_url:
+                            if saythis:
+                                saythis += ". This message contained a link"
+                            else:
+                                saythis = "a link."
 
                         if basic.remove_chars(saythis, " ", "?", ".", ")", "'", '"') == "":
                             return
@@ -465,8 +476,10 @@ class Main(commands.Cog):
 
                         try:
                             await self.get_tts(message, saythis, lang)
-                        except (ValueError, AssertionError):
-                            return print(f"Just skipped '{saythis}', sliently returned.")
+                        except ValueError:
+                            return print(f"Run out of attempts generating {saythis}.")
+                        except AssertionError:
+                            return print(f"Skipped {saythis}, apparently blank message.")
 
                         # Queue, please don't touch this, it works somehow
                         while self.bot.playing[message.guild.id] != 0:
