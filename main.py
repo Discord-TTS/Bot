@@ -180,8 +180,9 @@ class Main(commands.Cog):
             except HeaderNotFoundError:
                 return
 
-            # Discard if over 30 seconds
-            if file_length <= 30:
+            # Discard if over max length seconds
+            max_length = settings.limits.get(message.guild, "msg_length")
+            if file_length <= max_length:
                 temp_store_for_mp3.seek(0)
                 temp_store_for_mp3 = temp_store_for_mp3.read()
 
@@ -480,6 +481,7 @@ class Main(commands.Cog):
                             return print(f"Run out of attempts generating {saythis}.")
                         except AssertionError:
                             return print(f"Skipped {saythis}, apparently blank message.")
+
 
                         # Queue, please don't touch this, it works somehow
                         while self.bot.playing[message.guild.id] != 0:
@@ -848,7 +850,9 @@ class Settings(commands.Cog):
     @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
-    async def settings(self, ctx, help = None):
+    async def settings(self, ctx, *, help = None):
+        if not isinstance(help, NoneType):  help = help.lower()
+
         if help == "help":
             message = cleandoc("""
               -set channel `#channel`: Sets the text channel to read from
@@ -860,7 +864,10 @@ class Settings(commands.Cog):
               -set voice `language-code`: Changes your voice to a `-voices` code, equivalent to `-voice`""")
             embed = discord.Embed(title="Settings > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
             embed.add_field(name="Available properties:", value=message, inline=False)
-
+        elif help == "limits":
+            return await self.limits(ctx)
+        elif help == "limits help":
+            return await self.help(ctx)
         else:
             channel = ctx.guild.get_channel(settings.get(ctx.guild, "channel"))
             say = settings.get(ctx.guild, "xsaid")
@@ -902,27 +909,26 @@ class Settings(commands.Cog):
         if ctx.invoked_subcommand is None:
             await ctx.send("Error: Invalid property, do `-settings help` to get a list!")
 
-    @commands.has_permissions(administrator=True)
     @set.command()
+    @commands.has_permissions(administrator=True)
     async def xsaid(self, ctx, value: bool):
         settings.set(ctx.guild, "xsaid", value)
         await ctx.send(f"xsaid is now: {to_enabled[value]}")
 
-    @commands.has_permissions(administrator=True)
     @set.command(aliases=["auto_join"])
+    @commands.has_permissions(administrator=True)
     async def autojoin(self, ctx, value: bool):
         settings.set(ctx.guild, "auto_join", value)
         await ctx.send(f"Auto Join is now: {to_enabled[value]}")
 
-    @commands.has_permissions(administrator=True)
     @set.command(aliases=["bot_ignore", "ignore_bots", "ignorebots"])
+    @commands.has_permissions(administrator=True)
     async def botignore(self, ctx, value: bool):
         settings.set(ctx.guild, "bot_ignore", value)
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
     async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname):
-
         if user:
             if nickname:
                 if not ctx.channel.permissions_for(ctx.author).administrator:
@@ -943,14 +949,58 @@ class Settings(commands.Cog):
             settings.nickname.set(ctx.guild, user, nickname)
             await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {user.name}'s nickname to {nickname}"))
 
-    @commands.has_permissions(administrator=True)
     @set.command()
+    @commands.has_permissions(administrator=True)
     async def channel(self, ctx, channel: discord.TextChannel):
         await self.setup(ctx, channel)
 
     @set.command(aliases=("voice", "lang"))
     async def language(self, ctx, voicecode):
         await self.voice(ctx, voicecode)
+
+    @set.group()
+    @commands.has_permissions(administrator=True)
+    async def limits(self, ctx):
+        additional_message = None
+        if ctx.invoked_subcommand is not None:  return
+        if ctx.message.content != f"{BOT_PREFIX}set limits":    additional_message = "Error: Invalid property!"
+
+        msg_length = settings.limits.get(ctx.guild, "msg_length")
+        repeated_chars = settings.limits.get(ctx.guild, "repeated_chars")
+
+        message1 = cleandoc(f"""
+            :small_orange_diamond: Max Message Length: `{msg_length} seconds`
+            :small_orange_diamond: Max Repeated Characters: `{repeated_chars}`
+            """)
+
+        embed=discord.Embed(title="Current Limits", description=message1, url="https://discord.gg/zWPWwQC", color=0x3498db)
+        embed.set_footer(text="Change these settings with -set limits property value!")
+        await ctx.send(additional_message, embed=embed)
+
+    @limits.command()
+    async def help(self, ctx):
+        message = cleandoc("""
+            -set limits msg_length `seconds`: Max seconds for a TTS'd message
+            -set limits repeated_chars `number`: Max repetion of a character (0 = off)
+            """)
+
+        embed=discord.Embed(title="Settings > Limits > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
+        embed.add_field(name="Available properties:", value=message, inline=False)
+        embed.set_footer(text="Change these settings with -set limits property value!")
+        await ctx.send(embed=embed)
+
+    @limits.command(aliases=("length", "max_length", "max_msg_length", "msglength", "maxlength"))
+    async def msg_length(self, ctx, length: int):
+        if length > 60: return await ctx.send("Hey! You can't set max message length above 60 seconds!")
+        if length < 20: return await ctx.send("Hey! You can't set max message length below 20 seconds!")
+
+        settings.limits.set(ctx.guild, "msg_length", length)
+        await ctx.send(f"Max message length (in seconds) is now: {length}")
+
+    @limits.command(aliases=("repeated_characters", "repeated_letters"))
+    async def repeated_chars(self, ctx, chars: int):
+        settings.limits.set(ctx.guild, "repeated_chars", chars)
+        await ctx.send(f"Max repeated characters is now: {chars}")
 
     @commands.guild_only()
     @commands.check(require_chunk)

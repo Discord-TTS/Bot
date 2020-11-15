@@ -6,7 +6,8 @@ with open("settings.json") as f:    settings = json.load(f)
 with open("setlangs.json") as f:    setlangs = json.load(f)
 with open("blocked_users.json") as f:    blocked_users = json.load(f)
 
-default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "nicknames": dict()}
+default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "nicknames": dict(), "limits": dict()}
+default_limits = {"msg_length": 30, "repeated_chars": 0}
 
 class settings_class():
     def save():
@@ -67,6 +68,23 @@ class settings_class():
                 return
 
             settings_class.set(guild, "nicknames", nicknames)
+
+    class limits():
+        def get(guild, setting):
+            all_limits = settings_class.get(guild, "limits")
+            limit = get_value(all_limits, setting, default_value=default_limits[setting])
+
+            return limit
+
+        def set(guild, setting, value):
+            all_limits = settings_class.get(guild, "limits")
+
+            if value != default_limits[setting]:
+                all_limits[setting] = value
+            elif value == get_value(all_limits, setting):
+                del all_limits[setting]
+
+            settings_class.set(guild, "limits", all_limits)
 
 class setlangs_class():
     def save():
