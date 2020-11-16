@@ -1014,6 +1014,7 @@ class Settings(commands.Cog):
 
     @limits.command(aliases=("repeated_characters", "repeated_letters", "chars"))
     async def repeated_chars(self, ctx, chars: int):
+        if chars > 100: return await ctx.send("Hey! You can't set max repeated chars above 100!")
         if chars < 5: return await ctx.send("Hey! You can't set max repeated chars below 5!")
 
         settings.limits.set(ctx.guild, "repeated_chars", chars)
