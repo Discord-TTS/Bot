@@ -47,7 +47,7 @@ cache_key_bytes = str.encode(cache_key_str)
 cache = cache(cache_key_bytes)
 
 # Define random variables
-BOT_PREFIX = "t-"
+BOT_PREFIX = "-"
 before = monotonic()
 NoneType = type(None)
 to_enabled = {True: "Enabled", False: "Disabled"}
@@ -183,7 +183,7 @@ class Main(commands.Cog):
 
             # Discard if over max length seconds
             max_length = settings.limits.get(message.guild, "msg_length")
-            if file_length <= max_length:
+            if file_length < max_length:
                 temp_store_for_mp3.seek(0)
                 temp_store_for_mp3 = temp_store_for_mp3.read()
 
@@ -874,7 +874,7 @@ class Settings(commands.Cog):
               -set ignorebots `true/false`: Do not read other bot messages
               -set nickname `@person` `new name`: Sets your (or someone else if admin) name for xsaid.
               -set limits: Do `-settings limits help` to check!
-            
+
               -set voice `language-code`: Changes your voice to a `-voices` code, equivalent to `-voice`""")
             embed = discord.Embed(title="Settings > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
             embed.add_field(name="Available properties:", value=message, inline=False)
