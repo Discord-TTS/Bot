@@ -284,28 +284,33 @@ class Main(commands.Cog):
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @commands.Cog.listener()
     async def on_ready(self):
+        await self.bot.wait_until_ready()
+
         global starting_message
         global last_cached_message
         self.bot.supportserver = self.bot.get_guild(int(config["Main"]["main_server"]))
+
+        for channel_name in config_channels:
+            channel_id = int(config_channels[channel_name])
+            channel_object = self.bot.supportserver.get_channel(channel_id)
+            self.bot.channels[channel_name] = channel_object
 
         try:
             await last_cached_message.edit(content=f"~~{last_cached_message.content}~~")
             await starting_message.edit(content=f"~~{starting_message.content}~~")
             starting_message = await self.bot.channels["logs"].send(f"Restarted as {self.bot.user.name}!")
             print(f":wagu: Restarting as {self.bot.user.name}!")
-
         except NameError:
             print(f"Starting as {self.bot.user.name}")
 
             if self.bot.user.id == 513423712582762502:
-                bot.load_extension("bot_lists")
+                try:
+                    bot.load_extension("bot_lists")
+                except:
+                    print("Bot lists cog failed to load, skipped!")
+
             try:    self.avoid_file_crashes.start()
             except RuntimeError:    pass
-
-            for channel_name in config_channels:
-                channel_id = int(config_channels[channel_name])
-                channel_object = self.bot.supportserver.get_channel(channel_id)
-                self.bot.channels[channel_name] = channel_object
 
             for guild in self.bot.guilds:
                 self.bot.playing[guild.id] = 0
@@ -415,7 +420,9 @@ class Main(commands.Cog):
                             "imo": "in my opinion",
                             "irl": "in real life",
                             "gtg": " got to go ",
+                            ":)": "smiley face",
                             "rn": "right now",
+                            ":(": "sad face",
                             "uwu": "oowoo",
                             "@": " at ",
                             "™️": "tm"
@@ -457,7 +464,7 @@ class Main(commands.Cog):
                                     saythis = "a link."
 
                             if message.attachments:
-                                if len(saythis) == 0:
+                                if not saythis:
                                     saythis = f"{said_name} sent {format}"
                                 else:
                                     saythis = f"{said_name} sent {format} and said {saythis}"
@@ -470,7 +477,7 @@ class Main(commands.Cog):
                             else:
                                 saythis = "a link."
 
-                        if basic.remove_chars(saythis, " ", "?", ".", ")", "'", '"') == "":
+                        if basic.remove_chars(saythis, " ", "?", ".", ")", "'", "!", '"') == "":
                             return
 
                         repeated_chars_limit = settings.limits.get(message.guild, "repeated_chars")
