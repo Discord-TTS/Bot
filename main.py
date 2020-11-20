@@ -288,7 +288,14 @@ class Main(commands.Cog):
 
         global starting_message
         global last_cached_message
-        self.bot.supportserver = self.bot.get_guild(int(config["Main"]["main_server"]))
+
+        support_server_id = int(config["Main"]["main_server"])
+        self.bot.supportserver = self.bot.get_guild(support_server_id)
+
+        while self.bot.supportserver is None:
+            print("Waiting 5 seconds")
+            await asyncio.sleep(5)
+            self.bot.supportserver = self.bot.get_guild(support_server_id)
 
         for channel_name in config_channels:
             channel_id = int(config_channels[channel_name])
