@@ -1,121 +1,183 @@
-import json
+import asyncio
+from configparser import ConfigParser
 
-from utils.basic import get_value
+import asyncpg
 
-with open("settings.json") as f:    settings = json.load(f)
-with open("setlangs.json") as f:    setlangs = json.load(f)
-with open("blocked_users.json") as f:    blocked_users = json.load(f)
+default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True}
 
-default_settings = {"channel": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "nicknames": dict(), "limits": dict()}
-default_limits = {"msg_length": 30, "repeated_chars": 0}
+config = ConfigParser()
+config.read("config.ini")
 
 class settings_class():
-    def save():
-        with open("settings.json", "w") as f:    json.dump(settings, f)
+    def __init__(self, pool):
+        self.pool = pool
 
-    def remove(guild):
-        settings.pop(str(guild.id), None)
+    async def remove(self, guild):
+        async with self.pool.acquire() as conn:
+            await conn.execute("""
+                DELETE * FROM guilds WHERE guild_id = $1;
+                DELETE * FROM nicknames WHERE guild_id = $1;
+                """, str(guild.id))
 
-    def cleanup(guild_id_list):
-        for guild_id in settings.copy():
-            if guild_id not in guild_id_list:
-                del settings[guild_id]
-                continue
+    async def get(self, guild, setting):
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM guilds WHERE guild_id = $1", str(guild.id))
 
-            for key, value in settings[guild_id].copy().items():
-                if key not in default_settings or value == default_settings[key]:
-                    del settings[guild_id][key]
+        if row is None or dict(row)[setting] is None:
+            return default_settings[setting]
 
-            if settings[guild_id] == dict():
-                del settings[guild_id]
+        return dict(row)[setting]
 
-    def get(guild, setting):
-        return get_value(settings, str(guild.id), setting, default_value=default_settings[setting])
-
-    def set(guild, setting, value):
+    async def set(self, guild, setting, value):
         guild = str(guild.id)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                    "SELECT * FROM guilds WHERE guild_id = $1;",
+                    guild
+                )
 
-        if guild in settings:
-            if value == default_settings[setting] and setting in settings[guild]:
-                del settings[guild][setting]
-                return
+            if row is not None:
+                if value == default_settings[setting] and setting in dict(row):
+                    return await conn.execute("""
+                        UPDATE guilds
+                        SET $1 = $2
+                        WHERE guild_id = $3;""",
+                        setting, default_settings[setting], guild
+                    )
 
-            if settings[guild] == dict():
-                del settings[guild]
-                return
-        else:
-            settings[guild] = dict()
+                if dict(row) == dict():
+                    return await conn.execute(
+                        "DELETE * FROM guilds WHERE guild_id = $1;",
+                        guild
+                    )
 
-        settings[guild][setting] = value
-
-    class nickname():
-        def get(guild, user):
-            all_nicknames = settings_class.get(guild, "nicknames")
-            nickname = get_value(all_nicknames, str(user.id), default_value=user.display_name)
-
-            return nickname
-
-        def set(guild, user, nickname):
-            nicknames = settings_class.get(guild, "nicknames")
-
-            user_id = str(user.id)
-
-            if nickname != "" and nickname != user.display_name:
-                nicknames[user_id] = nickname
-            elif user_id in nicknames:
-                del nicknames[user_id]
+                await conn.execute(f"""
+                        UPDATE guilds
+                        SET {setting} = $1
+                        WHERE guild_id = $2;""",
+                        value, guild
+                    )
             else:
-                return
+                await conn.execute(f"""
+                    INSERT INTO guilds(guild_id, {setting})
+                    VALUES ($1, $2);
+                    """, guild, str(value))
 
-            settings_class.set(guild, "nicknames", nicknames)
+class nickname_class():
+    def __init__(self, pool):
+        self.pool = pool
 
-    class limits():
-        def get(guild, setting):
-            all_limits = settings_class.get(guild, "limits")
-            limit = get_value(all_limits, setting, default_value=default_limits[setting])
+    async def get(self, guild, user):
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM nicknames WHERE guild_id = $1 AND user_id = $2", str(guild.id), str(user.id))
 
-            return limit
+        if row is None or dict(row)["name"] is None:
+            return user.display_name
 
-        def set(guild, setting, value):
-            all_limits = settings_class.get(guild, "limits")
+        return dict(row)["name"]
 
-            if value != default_limits[setting]:
-                all_limits[setting] = value
-            elif value == get_value(all_limits, setting):
-                del all_limits[setting]
+    async def set(self, guild, user, nickname):
+        guild = str(guild.id)
+        user_id = str(user.id)
 
-            settings_class.set(guild, "limits", all_limits)
+        async with self.pool.acquire() as conn:
+            existing = await conn.fetchrow("""
+                SELECT * FROM nicknames
+                WHERE guild_id = $1 AND user_id = $2""",
+                guild, user_id
+                ) is not None
+
+            if not nickname or nickname == user.display_name:
+                await conn.execute("""
+                    DELETE FROM nicknames
+                    WHERE guild_id = $1 AND user_id = $2;
+                    """, guild, user_id
+                    )
+            elif existing:
+                await conn.execute("""
+                    UPDATE nicknames
+                    SET name = $1
+                    WHERE guild_id = $2 AND user_id = $3;
+                    """, nickname, guild, user_id
+                    )
+            else:
+                await conn.execute("""
+                    INSERT INTO nicknames(guild_id, user_id, name)
+                    VALUES ($1, $2, $3);
+                    """, guild, user_id, nickname
+                    )
 
 class setlangs_class():
-    def save():
-        with open("setlangs.json", "w") as f:    json.dump(setlangs, f)
+    def __init__(self, pool):
+        self.pool = pool
 
-    def cleanup(user_id_list):
-        for user_id, lang in setlangs.copy().items():
-            if user_id not in user_id_list or lang == "en-us":
-                del setlangs[user_id]
+    async def get(self, user):
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", str(user.id))
 
-    def get(user):
-        return get_value(setlangs, str(user.id), default_value="en-us")
+        if row is None or dict(row)["lang"] is None:
+            return "en-us"
 
-    def set(user, value):
+        return dict(row)["lang"]
+
+    async def set(self, user, lang):
         user = str(user.id)
-        value = value.lower()
+        lang = lang.lower()
+        async with self.pool.acquire() as conn:
+            existing = await conn.fetchrow("""
+                SELECT * FROM userinfo
+                WHERE user_id = $1""",
+                user) is not None
 
-        if value == "en-us" and user in setlangs:
-            del setlangs[user]
-        else:
-            setlangs[user] = value
+            if lang == "en-us" and existing:
+                await conn.execute("""
+                    DELETE FROM userinfo
+                    WHERE user_id = $1;
+                    """, user)
+            elif existing:
+                await conn.execute("""
+                    UPDATE userinfo
+                    SET lang = $1
+                    WHERE user_id = $2;
+                    """, lang, user)
+            else:
+                await conn.execute("""
+                    INSERT INTO userinfo(user_id, lang)
+                    VALUES ($1, $2);
+                    """, user, lang)
 
 class blocked_users_class():
-    def save():
-        with open("blocked_users.json", "w") as f:    json.dump(blocked_users, f)
+    def __init__(self, pool):
+        self.pool = pool
 
-    def check(user):
-        return user.id in blocked_users
+    async def change(self, user, value):
+        user = str(user.id)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user)
 
-    def add(user):
-        blocked_users.append(user.id)
+            if row is None:
+                await conn.execute("""
+                    INSERT INTO userinfo(user_id, blocked)
+                    VALUES ($1, $2);
+                    """, user, value)
+            else:
+                await conn.execute("""
+                    UPDATE userinfo
+                    SET blocked = $1
+                    WHERE user_id = $2
+                    """, value, user)
 
-    def remove(user):
-        blocked_users.remove(user.id)
+    async def check(self, user):
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", str(user.id))
+
+        if row is None:
+            return False
+
+        return dict(row)["blocked"]
+
+    async def add(self, user):
+        await self.change(user, True)
+
+    async def remove(self, user):
+        await self.change(user, False)
