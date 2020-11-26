@@ -295,9 +295,10 @@ class Main(commands.Cog):
                     print("Bot lists cog failed to load, skipped!")
 
             pool = await asyncpg.create_pool(
+                        host=config["PostgreSQL Info"]["ip"],
                         user=config["PostgreSQL Info"]["name"],
-                        password=config["PostgreSQL Info"]["pass"],
-                        host=config["PostgreSQL Info"]["ip"]
+                        database=config["PostgreSQL Info"]["db"],
+                        password=config["PostgreSQL Info"]["pass"]
                     )
 
             blocked_users = settings.blocked_users_class(pool)
@@ -990,7 +991,7 @@ class Settings(commands.Cog):
             :small_orange_diamond: Max Repeated Characters: `{repeated_chars}`
             """)
 
-        embed=discord.Embed(title="Current Limits", description=message1, url="https://discord.gg/zWPWwQC", color=0x3498db)
+        embed = discord.Embed(title="Current Limits", description=message1, url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.set_footer(text="Change these settings with -set limits property value!")
         await ctx.send(additional_message, embed=embed)
 
@@ -1001,7 +1002,7 @@ class Settings(commands.Cog):
             -set limits chars `number`: Max repetion of a character (0 = off)
             """)
 
-        embed=discord.Embed(title="Settings > Limits > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
+        embed = discord.Embed(title="Settings > Limits > Help", url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.add_field(name="Available properties:", value=message, inline=False)
         embed.set_footer(text="Change these settings with -set limits property value!")
         await ctx.send(embed=embed)
@@ -1028,7 +1029,7 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
-        await settings.set(ctx.guild, "channel", channel.id)
+        await settings.set(ctx.guild, "channel", str(channel.id))
         await ctx.send(f"Setup complete, {channel.mention} will now accept -join and -leave!")
 
     @commands.check(require_chunk)

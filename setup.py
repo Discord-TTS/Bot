@@ -11,6 +11,7 @@ config = configparser.ConfigParser()
 
 psql_name = input("What is the username to sign into your PostgreSQL DB: ")
 psql_pass = input("What is the password to sign into your PostgreSQL DB: ")
+psql_db = input("Which database do you want to connect to (blank = default): ")
 psql_ip = input("What is the IP for the PostgreSQL DB (blank = 127.0.0.1): ")
 if psql_ip == "":
     psql_ip = "127.0.0.1"
@@ -34,7 +35,8 @@ config["Activity"] = {
 config["PostgreSQL Info"] = {
     "name": psql_name,
     "pass": psql_pass,
-    "ip": psql_ip
+    "ip": psql_ip,
+    "db": psql_db
 }
 
 @bot.event
@@ -70,8 +72,8 @@ async def on_ready():
             blocked  bool DEFAULT False
         );
         CREATE TABLE cache_lookup (
-            message       BYTEA PRIMARY KEY,
-            message_id    text  UNIQUE
+            message    BYTEA PRIMARY KEY,
+            message_id text  UNIQUE
         );""")
 
     botcategory = await guild.create_category("TTS Bot")

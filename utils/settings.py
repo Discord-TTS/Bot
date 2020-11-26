@@ -1,12 +1,8 @@
 import asyncio
-from configparser import ConfigParser
 
 import asyncpg
 
 default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True}
-
-config = ConfigParser()
-config.read("config.ini")
 
 class settings_class():
     def __init__(self, pool):
@@ -124,12 +120,10 @@ class setlangs_class():
         user = str(user.id)
         lang = lang.lower()
         async with self.pool.acquire() as conn:
-            existing = await conn.fetchrow("""
-                SELECT * FROM userinfo
-                WHERE user_id = $1""",
-                user) is not None
+            userinfo = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user)
+            existing = userinfo is not None
 
-            if lang == "en-us" and existing:
+            if lang == "en-us" and existing and not dict(userinfo)["blocked"]:
                 await conn.execute("""
                     DELETE FROM userinfo
                     WHERE user_id = $1;
