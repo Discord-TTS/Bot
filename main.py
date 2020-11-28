@@ -677,7 +677,7 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
-        settings.remove(guild)
+        await settings.remove(guild)
         self.bot.playing[guild.id] = 2
 
         if guild.id in self.bot.queue:  self.bot.queue.pop(guild.id, None)
