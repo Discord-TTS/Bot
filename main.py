@@ -10,6 +10,7 @@ from io import BytesIO, StringIO
 from itertools import groupby
 from os import listdir, remove
 from os.path import exists
+from random import choice as pick_random
 from subprocess import call
 from sys import exc_info
 from time import monotonic
@@ -23,9 +24,9 @@ from cryptography.fernet import Fernet
 from discord.ext import commands, tasks
 from mutagen.mp3 import MP3, HeaderNotFoundError
 
-from patched_FFmpegPCM import FFmpegPCMAudio
-from utils import basic, settings, cache
 from cogs import common_trusted
+from patched_FFmpegPCM import FFmpegPCMAudio
+from utils import basic, cache, settings
 
 #//////////////////////////////////////////////////////
 config = ConfigParser()
@@ -48,6 +49,12 @@ NoneType = type(None)
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 tts_langs = gTTS.lang.tts_langs()
+
+footer_messages = [
+    "If you find a bug or want to ask a question, join the support server: discord.gg/zWPWwQC",
+    "if you want to support the development of TTS Bot, check out `-donate`!",
+    "There are loads of customizable settings, check out `-settings help`",
+]
 
 if exists("activity.txt"):
     with open("activity.txt") as f2, open("activitytype.txt") as f3, open("status.txt") as f4:
@@ -81,7 +88,6 @@ async def chunk_guilds():
 
         if not guild.chunked:
             await guild.chunk(cache=True)
-            await last_cached_message.edit(content=f"Just chunked: {guild.name} | {guild.id}")
 
         bot.chunk_queue.remove(guild.id)
 
@@ -108,8 +114,6 @@ bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").s
 if exists("cogs/common_user.py"):
     bot.load_extension("cogs.common_owner")
     bot.load_extension("cogs.common_user")
-elif exists("cogs/common.py"):
-    bot.load_extension("cogs.common")
 else:
     print("Error: Cannot find cogs to load? Did you do 'git clone --recurse-submodules'?")
     raise SystemExit
@@ -190,7 +194,7 @@ class Main(commands.Cog):
 
         for attempt in range(1, max_range):
             try:
-                gTTS.gTTS(text=text, lang=lang, lang_check=False).write_to_fp(temp_store_for_mp3)
+                gTTS.gTTS(text=text, lang=lang).write_to_fp(temp_store_for_mp3)
                 break
             except ValueError:
                 if attempt == max_range:
@@ -265,7 +269,6 @@ class Main(commands.Cog):
         global nicknames
         global blocked_users
         global starting_message
-        global last_cached_message
 
         support_server_id = int(config["Main"]["main_server"])
         self.bot.supportserver = self.bot.get_guild(support_server_id)
@@ -281,7 +284,6 @@ class Main(commands.Cog):
             self.bot.channels[channel_name] = channel_object
 
         try:
-            await last_cached_message.edit(content=f"~~{last_cached_message.content}~~")
             await starting_message.edit(content=f"~~{starting_message.content}~~")
             starting_message = await self.bot.channels["logs"].send(f"Restarted as {self.bot.user.name}!")
             print(f":wagu: Restarting as {self.bot.user.name}!")
@@ -317,12 +319,10 @@ class Main(commands.Cog):
 
             starting_message = await self.bot.channels["logs"].send(f"Started and ready! Took `{int(monotonic() - before)} seconds`")
 
-        last_cached_message = await self.bot.channels["logs"].send("Waiting to chunk a guild!")
-
     @commands.Cog.listener()
     async def on_message(self, message):
         try:
-            last_cached_message.content
+            starting_message.content
         except:
             return print("Skipping message, bot not started!")
 
@@ -411,12 +411,12 @@ class Main(commands.Cog):
                             "wdym": "what do you mean",
                             "imo": "in my opinion",
                             "irl": "in real life",
-                            "gtg": " got to go ",
+                            "gtg": "got to go",
                             ":)": "smiley face",
                             "rn": "right now",
                             ":(": "sad face",
                             "uwu": "oowoo",
-                            "@": " at ",
+                            "@": "at",
                             "™️": "tm"
                         }
 
@@ -799,7 +799,16 @@ class Main(commands.Cog):
         await channel.connect()
         self.bot.playing[ctx.guild.id] = 0
 
-        await ctx.send("Joined your voice channel!")
+        embed = discord.Embed(
+            title="Joined your voice channel!",
+            description="Just type normally and TTS Bot will say your messages!"
+        )
+        embed.set_thumbnail(url=str(self.bot.user.avatar_url))
+        embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+        embed.set_footer(text=pick_random(footer_messages))
+
+        await self.get_tts(ctx.message, f"{ctx.guild.me.display_name} said: Joined your voice channel!", "en-us")
+        await ctx.send(embed=embed)
 
     @commands.guild_only()
     @commands.check(require_chunk)
