@@ -34,11 +34,11 @@ class settings_class():
 
             if row is not None:
                 if value == default_settings[setting] and setting in dict(row):
-                    return await conn.execute("""
+                    return await conn.execute(f"""
                         UPDATE guilds
-                        SET $1 = $2
-                        WHERE guild_id = $3;""",
-                        setting, default_settings[setting], guild
+                        SET {setting} = $1
+                        WHERE guild_id = $2;""",
+                        default_settings[setting], guild
                     )
 
                 if dict(row) == dict():
