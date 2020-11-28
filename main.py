@@ -43,18 +43,18 @@ cache_key_str = config["Main"]["key"][2:-1]
 cache_key_bytes = cache_key_str.encode()
 
 # Define random variables
-BOT_PREFIX = "-"
+BOT_PREFIX = "t-"
 before = monotonic()
 NoneType = type(None)
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 tts_langs = gTTS.lang.tts_langs()
 
-footer_messages = [
+footer_messages = (
     "If you find a bug or want to ask a question, join the support server: discord.gg/zWPWwQC",
-    "if you want to support the development of TTS Bot, check out `-donate`!",
-    "There are loads of customizable settings, check out `-settings help`",
-]
+    "if you want to support the development of TTS Bot, check out -donate!",
+    "There are loads of customizable settings, check out -settings help",
+)
 
 if exists("activity.txt"):
     with open("activity.txt") as f2, open("activitytype.txt") as f3, open("status.txt") as f4:
@@ -321,10 +321,8 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        try:
-            starting_message.content
-        except:
-            return print("Skipping message, bot not started!")
+        try:    starting_message.content
+        except: return print("Skipping message, bot not started!")
 
         if message.channel.id == 749971061843558440 and message.embeds and str(message.author) == "GitHub#0000":
             if " new commit" in message.embeds[0].title:
@@ -533,11 +531,15 @@ class Main(commands.Cog):
                 if "https://discord.gg/" in message.content.lower():
                     await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
 
+                elif message.content.lower() == "help":
+                    await message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
+                    await self.bot.channels["logs"].send(f"{str(message.author)} just got the 'dont ask to ask' message")
+
                 elif not await blocked_users.check(message.author):
                     files = [await attachment.to_file() for attachment in message.attachments]
-                    webhook = await basic.ensure_webhook(self.bot.channels["dm_logs"], name="TTS-DM-LOGS")
-
                     if not files and not message.content: return
+
+                    webhook = await basic.ensure_webhook(self.bot.channels["dm_logs"], name="TTS-DM-LOGS")
                     await webhook.send(message.content, username=str(message.author), avatar_url=message.author.avatar_url, files=files)
 
             else:
@@ -545,8 +547,8 @@ class Main(commands.Cog):
                     return await message.channel.send("Error: Pinned messages are full, cannot pin the Welcome to Support DMs message!")
 
                 embed_message = cleandoc("""
-                    **All messages after this will be sent to a private channel on the support server (-invite) where we can assist you.**
-                    Please keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day, repeat your message.
+                    **All messages after this will be sent to a private channel where we can assist you.**
+                    Please keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day repeat your message.
                     There are some basic rules if you want to get help though:
                     `1.` Ask your question, don't just ask for help
                     `2.` Don't spam, troll, or send random stuff (including server invites)
@@ -554,6 +556,8 @@ class Main(commands.Cog):
                 """)
 
                 embed = discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description=embed_message)
+                embed.set_footer(text=pick_random(footer_messages))
+
                 dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=embed)
 
                 await self.bot.channels["logs"].send(f"{str(message.author)} just got the 'Welcome to Support DMs' message")
@@ -1039,7 +1043,19 @@ class Settings(commands.Cog):
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
         await settings.set(ctx.guild, "channel", str(channel.id))
-        await ctx.send(f"Setup complete, {channel.mention} will now accept -join and -leave!")
+
+        embed = discord.Embed(
+            title="TTS Bot has been setup!",
+            description=cleandoc(f"""
+                TTS Bot will now accept commands and read from {channel.mention}.
+                Just do `-join` and start talking!
+                """)
+            )
+        embed.set_footer(text=pick_random(footer_messages))
+        embed.set_thumbnail(url=str(self.bot.user.avatar_url))
+        embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+
+        await ctx.send(embed=embed)
 
     @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
@@ -1049,7 +1065,7 @@ class Settings(commands.Cog):
             await setlangs.set(ctx.author, lang)
             await ctx.send(f"Changed your voice to: {tts_langs[lang]}")
         else:
-            await ctx.send("Invalid voice, do -voices")
+            await ctx.send("Invalid voice, do `-voices`")
 
     @commands.check(require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
@@ -1062,7 +1078,13 @@ class Settings(commands.Cog):
         lang = await setlangs.get(ctx.author)
         langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
 
-        await ctx.send(f"My currently supported language codes are: \n{langs_string}\nAnd you are using: {tts_langs[lang]} | {lang}")
+        embed = discord.Embed(title="TTS Bot Languages")
+        embed.set_footer(text=pick_random(footer_messages))
+        embed.add_field(name="Currently Supported Languages", value=langs_string)
+        embed.add_field(name="Current Language used", value=f"{tts_langs[lang]} | {lang}")
+        embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+
+        await ctx.send(embed=embed)
 #//////////////////////////////////////////////////////
 
 bot.add_cog(Main(bot))
