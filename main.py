@@ -43,7 +43,7 @@ cache_key_str = config["Main"]["key"][2:-1]
 cache_key_bytes = cache_key_str.encode()
 
 # Define random variables
-BOT_PREFIX = "t-"
+BOT_PREFIX = "-"
 before = monotonic()
 NoneType = type(None)
 to_enabled = {True: "Enabled", False: "Disabled"}
