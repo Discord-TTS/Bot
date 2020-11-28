@@ -1,4 +1,5 @@
 discord.py[voice]
 cryptography
+asyncpg
 mutagen
 gtts

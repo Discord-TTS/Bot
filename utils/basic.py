@@ -1,9 +1,9 @@
 import os
 from re import compile
 
+image_files = ("bmp", "gif", "ico", "png", "psd", "svg", "jpg")
 audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")
 video_files = ("avi", "mp4", "wmv", "m4v", "mpg", "mpeg")
-image_files = ("bmp", "gif", "ico", "png", "psd", "svg")
 document_files = ("doc", "docx", "txt", "odt", "rtf")
 compressed_files = ("zip", "7z", "rar", "gz", "xz")
 script_files = ("bat", "sh", "jar", "py", "php")
