@@ -379,6 +379,12 @@ class Main(commands.Cog):
                     # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
                     if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
 
+                        # Fix values
+                        if message.guild.id not in self.bot.queue:
+                            self.bot.queue[message.guild.id] = dict()
+                        if message.guild.id not in self.bot.playing:
+                            self.bot.playing[message.guild.id] = 0
+
                         # Auto Join
                         if message.guild.voice_client is None and autojoin and self.bot.playing[message.guild.id] in (0, 1):
                             try:  channel = message.author.voice.channel
@@ -386,12 +392,6 @@ class Main(commands.Cog):
 
                             self.bot.playing[message.guild.id] = 3
                             await channel.connect()
-                            self.bot.playing[message.guild.id] = 0
-
-                        # Fix values
-                        if message.guild.id not in self.bot.queue:
-                            self.bot.queue[message.guild.id] = dict()
-                        if message.guild.id not in self.bot.playing:
                             self.bot.playing[message.guild.id] = 0
 
                         # Get settings
