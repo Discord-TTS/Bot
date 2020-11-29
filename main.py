@@ -408,16 +408,24 @@ class Main(commands.Cog):
                         saythis = f" {saythis} "
                         acronyms = {
                             "iirc": "if I recall correctly",
+                            "afaik": "as far as I know",
                             "wdym": "what do you mean",
                             "imo": "in my opinion",
+                            "brb": "be right back",
                             "irl": "in real life",
-                            "gtg": " got to go ",
+                            "jk": "just kidding",
+                            "gtg": "got to go",
                             ":)": "smiley face",
                             "rn": "right now",
+                            "™️": "trademark",
                             ":(": "sad face",
+                            "/s": "sarcasm",
+                            "ig": "I guess",
+                            "ik": "I know",
                             "uwu": "oowoo",
-                            "@": " at ",
-                            "™️": "tm"
+                            "rly": "really",
+                            "cya": "see ya",
+                            "@": "at",
                         }
 
                         if starts_with_tts: acronyms["-tts"] = ""
