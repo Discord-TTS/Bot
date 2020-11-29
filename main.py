@@ -414,10 +414,10 @@ class Main(commands.Cog):
                             "brb": "be right back",
                             "irl": "in real life",
                             "jk": "just kidding",
+                            "btw": "by the way",
                             "gtg": "got to go",
                             ":)": "smiley face",
                             "rn": "right now",
-                            "™️": "tm",
                             ":(": "sad face",
                             "ig": "i guess",
                             "ik": "i know",
@@ -425,6 +425,7 @@ class Main(commands.Cog):
                             "rly": "really",
                             "cya": "see ya",
                             "@": "at",
+                            "™️": "tm"
                         }
 
                         if starts_with_tts: acronyms["-tts"] = ""
