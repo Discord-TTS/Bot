@@ -52,7 +52,8 @@ tts_langs = gTTS.lang.tts_langs()
 
 footer_messages = (
     "If you find a bug or want to ask a question, join the support server: discord.gg/zWPWwQC",
-    "if you want to support the development of TTS Bot, check out -donate!",
+    "If you want to support the development and hosting of TTS Bot, check out -donate!",
+    "You can vote for me or review me on top.gg!\nhttps://top.gg/bot/513423712582762502",
     "There are loads of customizable settings, check out -settings help",
 )
 
@@ -799,10 +800,6 @@ class Main(commands.Cog):
         if ctx.guild.voice_client is not None and ctx.guild.voice_client != channel:
             return await ctx.send("Error: I am already in a voice channel!")
 
-        self.bot.playing[ctx.guild.id] = 3
-        await channel.connect()
-        self.bot.playing[ctx.guild.id] = 0
-
         embed = discord.Embed(
             title="Joined your voice channel!",
             description="Just type normally and TTS Bot will say your messages!"
@@ -811,8 +808,16 @@ class Main(commands.Cog):
         embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
         embed.set_footer(text=pick_random(footer_messages))
 
-        await self.get_tts(ctx.message, f"{ctx.guild.me.display_name} said: Joined your voice channel!", "en-us")
-        await ctx.send(embed=embed)
+        self.bot.playing[ctx.guild.id] = 3
+        self.bot.queue[ctx.guild.id] = dict()
+
+        await channel.connect()
+        self.bot.playing[ctx.guild.id] = 0
+
+        await asyncio.gather(
+            self.get_tts(ctx.message, f"{ctx.guild.me.display_name} said: Joined your voice channel!", "en-us"),
+            ctx.send(embed=embed)
+        )
 
     @commands.guild_only()
     @commands.check(require_chunk)
@@ -838,6 +843,7 @@ class Main(commands.Cog):
             return await ctx.send("Error: You need to be in the same voice channel as me to make me leave!")
 
         self.bot.playing[ctx.guild.id] = 2
+        self.bot.queue[ctx.guild.id] = dict()
         await ctx.guild.voice_client.disconnect(force=True)
         self.bot.playing[ctx.guild.id] = 0
 
