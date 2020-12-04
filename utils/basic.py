@@ -70,7 +70,7 @@ def emojitoword(text):
 
     for a in words:
         for x in a.split('><'):
-            x = f'<{x.replace("<", "").replace(">", "")}>'
+            x = f'<{remove_chars(x, "<", ">")}>'
             if emojiAniRegex.match(x):
                 output.append(f"animated emoji {x.split(':')[1]}")
             elif emojiRegex.match(x):
