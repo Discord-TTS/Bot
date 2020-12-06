@@ -20,7 +20,6 @@ class Settings(commands.Cog):
         self.bot = bot
 
     @commands.guild_only()
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def settings(self, ctx, *, help = None):
@@ -82,7 +81,6 @@ class Settings(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.guild_only()
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.group()
     async def set(self, ctx):
@@ -188,7 +186,6 @@ class Settings(commands.Cog):
         await ctx.send(f"Max repeated characters is now: {chars}")
 
     @commands.guild_only()
-    @commands.check(basic.require_chunk)
     @commands.has_permissions(administrator=True)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
@@ -208,7 +205,6 @@ class Settings(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def voice(self, ctx, lang: str):
@@ -218,7 +214,6 @@ class Settings(commands.Cog):
         else:
             await ctx.send("Invalid voice, do `-voices`")
 
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
     async def voices(self, ctx, lang: str = None):

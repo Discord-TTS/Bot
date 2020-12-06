@@ -10,7 +10,6 @@ class cmds_main(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["commands"])
     async def help(self, ctx):
@@ -37,7 +36,6 @@ class cmds_main(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.guild_only()
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def join(self, ctx):
@@ -85,7 +83,6 @@ class cmds_main(commands.Cog):
         )
 
     @commands.guild_only()
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):

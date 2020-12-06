@@ -14,6 +14,8 @@ from patched_FFmpegPCM import FFmpegPCMAudio
 from utils import basic, cache, settings
 
 #//////////////////////////////////////////////////////
+print("Starting TTS Bot!")
+
 start_time = monotonic()
 config = ConfigParser()
 config.read("config.ini")
@@ -49,7 +51,6 @@ pool = bot.loop.run_until_complete(
 bot.queue = dict()
 bot.playing = dict()
 bot.channels = dict()
-bot.chunk_queue = list()
 bot.remove_command("help")
 bot.settings = settings.settings_class(pool)
 bot.setlangs = settings.setlangs_class(pool)
@@ -61,6 +62,7 @@ bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").s
 for cog in listdir("cogs"):
     if cog.endswith(".py"):
         bot.load_extension(f"cogs.{cog[:-3]}")
+        print(f"Successfully loaded {cog}!")
 
 @bot.event
 async def on_ready():
@@ -83,7 +85,7 @@ async def on_ready():
         await bot.starting_message.edit(content=f"~~{bot.starting_message.content}~~")
         bot.starting_message = await bot.channels["logs"].send(f"Restarted as {bot.user.name}!")
     except AttributeError:
-        print(f"Starting as {bot.user.name}")
+        print(f"\nStarted as {bot.user.name}!")
 
         for guild in bot.guilds:
             bot.playing[guild.id] = 0

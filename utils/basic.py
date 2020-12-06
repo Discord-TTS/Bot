@@ -102,11 +102,3 @@ def exts_to_format(attachments):
 
     if not returned_format: returned_format = "a file"
     return returned_format
-
-async def require_chunk(ctx):
-    if ctx.guild and not ctx.guild.chunked and ctx.guild.id not in ctx.bot.chunk_queue:
-        ctx.bot.chunk_queue.append(ctx.guild.id)
-        await ctx.guild.chunk(cache=True)
-        ctx.bot.chunk_queue.remove(ctx.guild.id)
-
-    return True

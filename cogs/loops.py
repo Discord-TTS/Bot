@@ -32,15 +32,8 @@ class loops(commands.Cog):
 
                     if count == 100: break
 
-        except Exception as e:
-            error = getattr(e, 'original', e)
-
-            temp = f"```{''.join(format_exception(type(error), error, error.__traceback__))}```"
-            if len(temp) >= 1900:
-                with open("temp.txt", "w") as f:  f.write(temp)
-                await self.bot.channels["errors"].send(file=discord.File("temp.txt"))
-            else:
-                await self.bot.channels["errors"].send(temp)
+        except Exception as error:
+            await self.bot.on_error("cache_cleanup", error)
 
     @cache_cleanup.before_loop
     async def before_file_saving_loop(self):

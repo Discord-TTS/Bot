@@ -19,14 +19,12 @@ class cmds_extra(commands.Cog):
     async def uptime(self, ctx):
         await ctx.send(f"{self.bot.user.mention} has been up for {(monotonic() - start_time) / 60:.2f} minutes")
 
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def tts(self, ctx):
         if ctx.message.content == f"{self.bot.command_prefix}tts":
             await ctx.send(f"You don't need to do `{self.bot.command_prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{self.bot.command_prefix}`!")
 
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["botstats", "stats"])
     async def info(self, ctx):
@@ -51,7 +49,6 @@ class cmds_extra(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.guild_only()
-    @commands.check(basic.require_chunk)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def channel(self, ctx):
