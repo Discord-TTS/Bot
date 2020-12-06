@@ -1,6 +1,8 @@
 import os
 from re import compile
 
+from discord.ext import tasks
+
 image_files = ("bmp", "gif", "ico", "png", "psd", "svg", "jpg")
 audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")
 video_files = ("avi", "mp4", "wmv", "m4v", "mpg", "mpeg")
@@ -20,6 +22,13 @@ full_dict = {
     video_files: "a video file",
     program_files: "a program",
 }
+
+footer_messages = (
+    "If you find a bug or want to ask a question, join the support server: discord.gg/zWPWwQC",
+    "If you want to support the development and hosting of TTS Bot, check out -donate!",
+    "You can vote for me or review me on top.gg!\nhttps://top.gg/bot/513423712582762502",
+    "There are loads of customizable settings, check out -settings help",
+)
 
 async def ensure_webhook(channel, name="TTS-Webhook"):
     webhooks = await channel.webhooks()
@@ -93,3 +102,11 @@ def exts_to_format(attachments):
 
     if not returned_format: returned_format = "a file"
     return returned_format
+
+async def require_chunk(ctx):
+    if ctx.guild and not ctx.guild.chunked and ctx.guild.id not in ctx.bot.chunk_queue:
+        ctx.bot.chunk_queue.append(ctx.guild.id)
+        await ctx.guild.chunk(cache=True)
+        ctx.bot.chunk_queue.remove(ctx.guild.id)
+
+    return True

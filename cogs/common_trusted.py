@@ -16,13 +16,10 @@ if exists("config.ini"):
     config = ConfigParser()
     config.read("config.ini")
 
-def setup_with_db(bot, db_pool):
-    global blocked_users
-    blocked_users = settings.blocked_users_class(db_pool)
+def setup(bot):
+    bot.add_cog(common_trusted(bot))
 
-    bot.add_cog(Gnome(bot))
-
-class Gnome(commands.Cog):
+class common_trusted(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 

@@ -1,6 +1,7 @@
 *.save
 *.mp3
 *.bak
+.*
 __pycache__
 cache
 temp.txt

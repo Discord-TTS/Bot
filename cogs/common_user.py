@@ -29,18 +29,6 @@ class User(commands.Cog):
             https://www.patreon.com/Gnome_the_Bot_Maker
         """))
 
-    @commands.command()
-    @commands.bot_has_permissions(send_messages=True, read_messages=True)
-    async def botstats(self, ctx):
-        message = cleandoc(f"""
-          {self.bot.user.name} in {len(self.bot.guilds)} servers
-          {self.bot.user.name} can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people"""
-        )
-
-        embed=discord.Embed(title=f"{self.bot.user.name} Stats", description=message, url="https://discord.gg/zWPWwQC", color=0x5bc0ec)
-        embed.set_thumbnail(url="https://publicdomainvectors.org/photos/1462438735.png")
-        await ctx.send(embed=embed)
-
     @commands.command(aliases=["ping"])
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def lag(self, ctx):
