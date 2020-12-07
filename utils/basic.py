@@ -75,15 +75,14 @@ def emojitoword(text):
     words = text.split(' ')
     output = []
 
-    for a in words:
-        for x in a.split('><'):
-            x = f'<{remove_chars(x, "<", ">")}>'
-            if emojiAniRegex.match(x):
-                output.append(f"animated emoji {x.split(':')[1]}")
-            elif emojiRegex.match(x):
-                output.append(f"emoji {x.split(':')[1]}")
-            else:
-                output.append(x)
+    for x in words:
+
+        if emojiAniRegex.match(x):
+            output.append(f"animated emoji {x.split(':')[1]}")
+        elif emojiRegex.match(x):
+            output.append(f"emoji {x.split(':')[1]}")
+        else:
+            output.append(x)
 
     return ' '.join([str(x) for x in output])
 
