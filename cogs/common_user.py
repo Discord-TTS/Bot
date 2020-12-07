@@ -42,23 +42,18 @@ class User(commands.Cog):
         if suggestion.lower().replace("*", "") == "suggestion":
             return await ctx.send("Hey! You are meant to replace `*suggestion*` with your actual suggestion!")
 
-        if exists("config.ini"):
-            if not blocked_users.check(ctx.message.author):
-                webhook = await ensure_webhook(self.bot.channels["suggestions"], "SUGGESTIONS")
-                files = [await attachment.to_file() for attachment in ctx.message.attachments]
+        if not blocked_users.check(ctx.message.author):
+            webhook = await ensure_webhook(self.bot.channels["suggestions"], "SUGGESTIONS")
+            files = [await attachment.to_file() for attachment in ctx.message.attachments]
 
-                await webhook.send(suggestion, username=str(ctx.author), avatar_url=ctx.author.avatar_url, files=files)
-        else:
-            await self.bot.get_channel(696325283296444498).send(f"{str(ctx.author)} in {ctx.guild.name} suggested: {suggestion}")
+            await webhook.send(suggestion, username=str(ctx.author), avatar_url=ctx.author.avatar_url, files=files)
+
         await ctx.send("Suggestion noted")
 
     @commands.command()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def invite(self, ctx):
-        try:
-            if str(ctx.guild.id) == str(config["Main"]["main_server"]):
-                await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
-            else:
-                await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{self.bot.get_channel(694127922801410119).name} to invite {self.bot.user.mention}!")
-        except:
-            await ctx.send(f"To invite {self.bot.user.mention}, join <https://discord.gg/zWPWwQC> and the invites are in '#invites-and-rules'!")
+        if str(ctx.guild.id) == str(config["Main"]["main_server"]):
+            await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
+        else:
+            await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{self.bot.get_channel(694127922801410119).name} to invite {self.bot.user.mention}!")

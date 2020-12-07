@@ -43,8 +43,8 @@ class cmds_dev(commands.Cog):
         await ctx.author.send(
             cleandoc(f"""
                 **TTS Bot debug info!**
-                Playing is currently set to {str(self.bot.playing[ctx.guild.id])}
-                Guild is chunked: {str(ctx.guild.chunked)}
+                Playing is currently set to {self.bot.playing.get(ctx.guild.id)}
+                Guild is chunked: {ctx.guild.chunked}
                 Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
             """),
             file=discord.File("queue.txt"))

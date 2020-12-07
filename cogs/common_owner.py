@@ -54,7 +54,7 @@ class Gnome(commands.Cog):
             with open("config.ini", "w") as configfile:
                 config.write(configfile)
 
-            await ctx.send(f"Added {str(user)} | {user.id} to the trusted members")
+            await ctx.send(f"Added {user} | {user.id} to the trusted members")
 
         elif mode == "del":
             if str(user.id) in self.bot.trusted:
@@ -63,7 +63,7 @@ class Gnome(commands.Cog):
                 with open("config.ini", "w") as configfile:
                     config.write(configfile)
 
-                await ctx.send(f"Removed {str(user)} | {user.id} from the trusted members")
+                await ctx.send(f"Removed {user} | {user.id} from the trusted members")
 
     @commands.command()
     @commands.is_owner()

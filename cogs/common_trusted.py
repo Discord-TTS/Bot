@@ -31,11 +31,11 @@ class common_trusted(commands.Cog):
     @commands.check(is_trusted)
     async def block(self, ctx, user: discord.User, notify: bool = False):
         if await self.bot.blocked_users.check(user):
-            return await ctx.send(f"{str(user)} | {user.id} is already blocked!")
+            return await ctx.send(f"{user} | {user.id} is already blocked!")
 
         await self.bot.blocked_users.add(user)
 
-        await ctx.send(f"Blocked {str(user)} | {str(user.id)}")
+        await ctx.send(f"Blocked {user} | {user.id}")
         if notify:
             await user.send("You have been blocked from support DMs.\nPossible Reasons: ```Sending invite links\nTrolling\nSpam```")
 
@@ -43,11 +43,11 @@ class common_trusted(commands.Cog):
     @commands.check(is_trusted)
     async def unblock(self, ctx, user: discord.User, notify: bool = False):
         if not await self.bot.blocked_users.check(user):
-            return await ctx.send(f"{str(user)} | {user.id} isn't blocked!")
+            return await ctx.send(f"{user} | {user.id} isn't blocked!")
 
         await self.bot.blocked_users.remove(user)
 
-        await ctx.send(f"Unblocked {str(user)} | {str(user.id)}")
+        await ctx.send(f"Unblocked {user} | {user.id}")
         if notify:
             await user.send("You have been unblocked from support DMs.")
 
@@ -74,7 +74,7 @@ class common_trusted(commands.Cog):
         embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
 
         sent = await todm.send(embed=embed)
-        await ctx.send(f"Sent message to {str(todm)}:", embed=sent.embeds[0])
+        await ctx.send(f"Sent message to {todm}:", embed=sent.embeds[0])
 
     @commands.command()
     @commands.check(is_trusted)
@@ -127,7 +127,7 @@ class common_trusted(commands.Cog):
                 await guild_owner.add_roles(ofs_role)
 
                 embed = discord.Embed(description=f"Role Added: Gave {ofs_role.mention} to {guild_owner.mention}")
-                embed.set_author(name=f"{str(guild_owner)} (ID {guild_owner.id})", icon_url=guild_owner.avatar_url)
+                embed.set_author(name=f"{guild_owner} (ID {guild_owner.id})", icon_url=guild_owner.avatar_url)
                 embed.set_thumbnail(url=guild_owner.avatar_url)
 
             if highlighted_ofs not in guild_owner.roles:
