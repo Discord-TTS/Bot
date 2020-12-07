@@ -1,7 +1,7 @@
+from inspect import cleandoc
+
 import discord
 from discord.ext import commands
-
-from inspect import cleandoc
 
 def setup(bot):
     bot.add_cog(cmds_dev(bot))

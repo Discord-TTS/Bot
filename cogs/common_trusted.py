@@ -4,8 +4,6 @@ from os.path import exists
 import discord
 from discord.ext import commands
 
-from utils import settings
-
 switch = {
     513423712582762502: 738009431052386304, #tts
     565820959089754119: 738009620601241651, #f@h
@@ -85,7 +83,7 @@ class common_trusted(commands.Cog):
         async for history_message in ctx.channel.history(limit=10):
             if history_message.author.discriminator == "0000":
                 converter = commands.UserConverter()
-                todm = await converter.convert(ctx,history_message.author.name)
+                todm = await converter.convert(ctx, history_message.author.name)
                 return await self.dm(ctx, todm, message=message)
         await ctx.send("Webhook not found")
 

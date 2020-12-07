@@ -1,10 +1,8 @@
+from inspect import cleandoc
+from time import monotonic
+
 import discord
 from discord.ext import commands
-
-from time import monotonic
-from inspect import cleandoc
-
-from utils import basic
 
 start_time = monotonic()
 

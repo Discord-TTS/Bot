@@ -2,7 +2,6 @@ from hashlib import sha256
 from os import rename
 from os.path import exists
 
-import asyncpg
 from cryptography.fernet import Fernet
 
 

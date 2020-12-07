@@ -1,4 +1,3 @@
-from configparser import ConfigParser
 from typing import Union
 
 import discord
@@ -87,5 +86,5 @@ class Gnome(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
-    async def leaveguild(self, ctx, guild : int):
+    async def leaveguild(self, ctx, guild: int):
         await self.bot.get_guild(guild).leave()

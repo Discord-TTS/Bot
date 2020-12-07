@@ -3,7 +3,6 @@ from inspect import cleandoc
 from os.path import exists
 from time import monotonic
 
-import discord
 from discord.ext import commands
 
 from utils.basic import ensure_webhook

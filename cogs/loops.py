@@ -1,7 +1,5 @@
 from os import listdir, remove
-from traceback import format_exception
 
-import discord
 from discord.ext import commands, tasks
 
 from utils import basic

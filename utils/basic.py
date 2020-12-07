@@ -1,8 +1,6 @@
 import os
 from re import compile
 
-from discord.ext import tasks
-
 image_files = ("bmp", "gif", "ico", "png", "psd", "svg", "jpg")
 audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")
 video_files = ("avi", "mp4", "wmv", "m4v", "mpg", "mpeg")

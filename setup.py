@@ -1,5 +1,4 @@
 import configparser
-import os
 
 import asyncpg
 import discord
@@ -86,11 +85,11 @@ async def on_ready():
     logs = await guild.create_text_channel("logs", category=botcategory, overwrites=overwrites)
 
     config["Channels"] = {
-      "errors": errors.id,
-      "dm_logs": dm_logs.id,
-      "servers": servers.id,
-      "suggestions": suggestions.id,
-      "logs": logs.id
+        "errors": errors.id,
+        "dm_logs": dm_logs.id,
+        "servers": servers.id,
+        "suggestions": suggestions.id,
+        "logs": logs.id
     }
 
     await logs.send(f"Are you sure you want {[str(bot.get_user(int(trusted_id))) for trusted_id in trusted_ids]} to be trusted? (do -yes to accept)")

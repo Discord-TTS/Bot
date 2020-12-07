@@ -4,8 +4,6 @@ from subprocess import call
 import discord
 from discord.ext import commands
 
-from utils import basic
-
 NoneType = type(None)
 
 def setup(bot):

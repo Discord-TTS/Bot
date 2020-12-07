@@ -1,16 +1,12 @@
 import asyncio
-import re
 from configparser import ConfigParser
 from os import listdir
-from random import choice as pick_random
 from time import monotonic
 
 import asyncpg
 import discord
-from cryptography.fernet import Fernet
 from discord.ext import commands
 
-from patched_FFmpegPCM import FFmpegPCMAudio
 from utils import basic, cache, settings
 
 #//////////////////////////////////////////////////////
