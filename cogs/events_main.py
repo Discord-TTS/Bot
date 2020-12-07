@@ -137,13 +137,21 @@ class Main(commands.Cog):
                         saythis = f" {saythis} "
                         acronyms = {
                             "iirc": "if I recall correctly",
+                            "afaik": "as far as I know",
                             "wdym": "what do you mean",
                             "imo": "in my opinion",
+                            "brb": "be right back",
                             "irl": "in real life",
-                            "gtg": "got to go",
+                            "jk": "just kidding",
+                            "btw": "by the way",
                             ":)": "smiley face",
+                            "gtg": "got to go",
                             "rn": "right now",
                             ":(": "sad face",
+                            "ig": "i guess",
+                            "rly": "really",
+                            "cya": "see ya",
+                            "ik": "i know",
                             "uwu": "oowoo",
                             "@": "at",
                             "™️": "tm"
