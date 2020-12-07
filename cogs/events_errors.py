@@ -43,14 +43,6 @@ class events_errors(commands.Cog):
         if hasattr(ctx.command, 'on_error') or isinstance(error, (commands.CommandNotFound, commands.NotOwner)):
             return
 
-        if ctx.guild is not None and not ctx.guild.chunked:
-            message = "**Warning:** The server you are in hasn't been fully loaded yet, this could cause issues!"
-
-            try:  await ctx.send(message)
-            except:
-                try:    await ctx.author.send(message)
-                except: pass
-
         error = getattr(error, 'original', error)
 
         if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument, commands.UnexpectedQuoteError, commands.ExpectedClosingQuoteError)):

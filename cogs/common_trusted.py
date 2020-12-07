@@ -32,10 +32,10 @@ class common_trusted(commands.Cog):
     @commands.command()
     @commands.check(is_trusted)
     async def block(self, ctx, user: discord.User, notify: bool = False):
-        if await blocked_users.check(user):
+        if await self.bot.blocked_users.check(user):
             return await ctx.send(f"{str(user)} | {user.id} is already blocked!")
 
-        await blocked_users.add(user)
+        await self.bot.blocked_users.add(user)
 
         await ctx.send(f"Blocked {str(user)} | {str(user.id)}")
         if notify:
@@ -44,10 +44,10 @@ class common_trusted(commands.Cog):
     @commands.command()
     @commands.check(is_trusted)
     async def unblock(self, ctx, user: discord.User, notify: bool = False):
-        if not await blocked_users.check(user):
+        if not await self.bot.blocked_users.check(user):
             return await ctx.send(f"{str(user)} | {user.id} isn't blocked!")
 
-        await blocked_users.remove(user)
+        await self.bot.blocked_users.remove(user)
 
         await ctx.send(f"Unblocked {str(user)} | {str(user.id)}")
         if notify:

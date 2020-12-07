@@ -12,6 +12,7 @@ from discord.ext import commands
 from mutagen.mp3 import MP3, HeaderNotFoundError
 
 from utils import basic
+from patched_FFmpegPCM import FFmpegPCMAudio
 
 def setup(bot):
     bot.add_cog(Main(bot))
@@ -114,7 +115,7 @@ class Main(commands.Cog):
                             self.bot.playing[message.guild.id] = 0
 
                         # Auto Join
-                        if message.guild.voice_client is None and autojoin and self.bot.playing[message.guild.id] in (0, 1):
+                        if message.guild.voice_client is None and autojoin and self.bot.playing.get(message.guild.id) in (0, 1):
                             try:  channel = message.author.voice.channel
                             except AttributeError: return
 
@@ -221,8 +222,8 @@ class Main(commands.Cog):
                             return print(f"Skipped {saythis}, apparently blank message.")
 
                         # Queue, please don't touch this, it works somehow
-                        while self.bot.playing[message.guild.id] != 0:
-                            if self.bot.playing[message.guild.id] == 2: return
+                        while self.bot.playing.get(message.guild.id) != 0:
+                            if self.bot.playing.get(message.guild.id) in (None, 2): return
                             await asyncio.sleep(0.5)
 
                         self.bot.playing[message.guild.id] = 1

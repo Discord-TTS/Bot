@@ -75,11 +75,11 @@ class Gnome(commands.Cog):
 
         await channel.send(tosay)
 
-    @commands.command()
+    @commands.command(aliases=("rc", "reload"))
     @commands.is_owner()
     async def reload_cog(self, ctx, *, toreload: str):
         try:
-            self.bot.reload_extension(toreload)
+            self.bot.reload_extension(f"cogs.{toreload}")
         except Exception as e:
             await ctx.send(f'**`ERROR:`** {type(e).__name__} - {e}')
         else:

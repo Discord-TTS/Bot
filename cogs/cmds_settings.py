@@ -2,10 +2,12 @@ import asyncio
 from inspect import cleandoc
 from random import choice as pick_random
 from typing import Optional
+import re
 
 import discord
 from discord.ext import commands
 from gtts.lang import tts_langs
+
 from utils import basic
 
 NoneType = type(None)

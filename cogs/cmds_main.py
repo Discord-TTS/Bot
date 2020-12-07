@@ -1,3 +1,6 @@
+from random import choice as pick_random
+import asyncio
+
 import discord
 from discord.ext import commands
 
@@ -39,9 +42,6 @@ class cmds_main(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def join(self, ctx):
-        if basic.get_value(self.bot.playing, ctx.guild.id) == 3:
-            return await ctx.send("Error: Already trying to join your voice channel!")
-
         if ctx.channel.id != int(await self.bot.settings.get(ctx.guild, "channel")):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
@@ -77,23 +77,14 @@ class cmds_main(commands.Cog):
         await channel.connect()
         self.bot.playing[ctx.guild.id] = 0
 
-        await asyncio.gather(
-            self.get_tts(ctx.message, f"{ctx.guild.me.display_name} said: Joined your voice channel!", "en-us"),
-            ctx.send(embed=embed)
-        )
+        await ctx.send(embed=embed)
 
     @commands.guild_only()
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):
-        if basic.get_value(self.bot.playing, ctx.guild.id) == 2:
-            return await ctx.send("Error: Already trying to leave your voice channel!")
-
         if ctx.channel.id != int(await self.bot.settings.get(ctx.guild, "channel")):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
-
-        if basic.get_value(self.bot.playing, ctx.guild.id) == 3:
-            return await ctx.send("Error: Trying to join a voice channel!")
 
         elif ctx.author.voice is None:
             return await ctx.send("Error: You need to be in a voice channel to make me leave!")
