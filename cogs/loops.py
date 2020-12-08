@@ -26,7 +26,7 @@ class loops(commands.Cog):
 
                 for count, cached_message in enumerate(cache_folder):
                     remove(f"cache/{cached_message}")
-                    self.bot.cache.remove(cached_message)
+                    await self.bot.cache.remove(cached_message)
 
                     if count == 100: break
 

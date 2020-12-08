@@ -1,5 +1,6 @@
-from random import choice as pick_random
 import asyncio
+from inspect import cleandoc
+from random import choice as pick_random
 
 import discord
 from discord.ext import commands

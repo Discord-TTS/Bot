@@ -51,12 +51,15 @@ class events_errors(commands.Cog):
 
         elif isinstance(error, commands.CommandOnCooldown):
             cooldown_error = await ctx.send(f"**{self.bot.command_prefix}{ctx.command} is on cooldown!** Please try again in {error.retry_after:.1f} seconds.")
-
             await asyncio.sleep(error.retry_after)
-            return await asyncio.gather(
-                ctx.message.delete(),
-                cooldown_error.delete()
-            )
+
+            try:
+                await cooldown_error.delete()
+                await ctx.message.delete()
+            except discord.errors.Forbidden:
+                pass
+            finally:
+                return
 
         elif isinstance(error, (concurrent_TimeoutError, asyncio_TimeoutError)):
             return await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
