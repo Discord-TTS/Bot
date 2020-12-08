@@ -77,7 +77,7 @@ class Main(commands.Cog):
                 self.bot.settings.get(message.guild, "channel")
                 )
 
-            starts_with_tts = saythis.startswith("-tts")
+            starts_with_tts = saythis.startswith(f"{self.bot.command_prefix}tts")
 
             # if author is a bot and bot ignore is on
             if bot_ignore and message.author.bot:

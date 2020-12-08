@@ -1,4 +1,5 @@
 from inspect import cleandoc
+from io import StringIO
 
 import discord
 from discord.ext import commands
@@ -13,7 +14,6 @@ class cmds_dev(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def end(self, ctx):
-        self.cache_cleanup.cancel()
         await self.bot.close()
 
     @commands.command()
@@ -39,7 +39,6 @@ class cmds_dev(commands.Cog):
             embed.set_footer(text="Debug Command, please only run if told.")
             return await ctx.send(embed=embed)
 
-        with open("queue.txt", "w") as f:   f.write(str(self.bot.queue[ctx.guild.id]))
         await ctx.author.send(
             cleandoc(f"""
                 **TTS Bot debug info!**
@@ -47,4 +46,8 @@ class cmds_dev(commands.Cog):
                 Guild is chunked: {ctx.guild.chunked}
                 Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
             """),
-            file=discord.File("queue.txt"))
+            file=discord.File(
+                StringIO(str(self.bot.queue[ctx.guild.id])),
+                filename="queue.txt"
+                )
+            )

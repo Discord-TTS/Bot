@@ -6,7 +6,6 @@ from time import monotonic
 from discord.ext import commands
 
 from utils.basic import ensure_webhook
-from utils.settings import blocked_users_class as blocked_users
 
 def setup(bot):
     if exists("config.ini"):
@@ -31,10 +30,10 @@ class User(commands.Cog):
     @commands.command(aliases=["ping"])
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def lag(self, ctx):
-        before = monotonic()
-        message1 = await ctx.send("Loading!")
-        ping = (monotonic() - before) * 1000
-        await message1.edit(content=f"Current Latency: `{int(ping)}ms`")
+        ping_before = monotonic()
+        ping_message = await ctx.send("Loading!")
+        ping = (monotonic() - ping_before) * 1000
+        await ping_message.edit(content=f"Current Latency: `{ping:.0f}ms`")
 
     @commands.command()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
@@ -42,7 +41,7 @@ class User(commands.Cog):
         if suggestion.lower().replace("*", "") == "suggestion":
             return await ctx.send("Hey! You are meant to replace `*suggestion*` with your actual suggestion!")
 
-        if not blocked_users.check(ctx.message.author):
+        if not await self.bot.blocked_users.check(ctx.message.author):
             webhook = await ensure_webhook(self.bot.channels["suggestions"], "SUGGESTIONS")
             files = [await attachment.to_file() for attachment in ctx.message.attachments]
 
@@ -53,7 +52,7 @@ class User(commands.Cog):
     @commands.command()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def invite(self, ctx):
-        if str(ctx.guild.id) == str(config["Main"]["main_server"]):
+        if ctx.guild == self.bot.supportserver:
             await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
         else:
             await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{self.bot.get_channel(694127922801410119).name} to invite {self.bot.user.mention}!")

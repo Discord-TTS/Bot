@@ -39,6 +39,7 @@ class cmds_main(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.guild_only()
+    @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def join(self, ctx):
@@ -80,6 +81,7 @@ class cmds_main(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.guild_only()
+    @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.bot_has_permissions(send_messages=True)
     @commands.command()
     async def leave(self, ctx):

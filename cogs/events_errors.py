@@ -1,3 +1,4 @@
+import asyncio
 from asyncio.exceptions import TimeoutError as asyncio_TimeoutError
 from concurrent.futures._base import TimeoutError as concurrent_TimeoutError
 from inspect import cleandoc
@@ -47,6 +48,15 @@ class events_errors(commands.Cog):
 
         if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument, commands.UnexpectedQuoteError, commands.ExpectedClosingQuoteError)):
             return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
+
+        elif isinstance(error, commands.CommandOnCooldown):
+            cooldown_error = await ctx.send(f"**{self.bot.command_prefix}{ctx.command} is on cooldown!** Please try again in {error.retry_after:.1f} seconds.")
+
+            await asyncio.sleep(error.retry_after)
+            return await asyncio.gather(
+                ctx.message.delete(),
+                cooldown_error.delete()
+            )
 
         elif isinstance(error, (concurrent_TimeoutError, asyncio_TimeoutError)):
             return await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")

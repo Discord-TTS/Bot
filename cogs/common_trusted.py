@@ -1,4 +1,5 @@
 from configparser import ConfigParser
+from io import StringIO
 from os.path import exists
 
 import discord
@@ -22,8 +23,8 @@ class common_trusted(commands.Cog):
         self.bot = bot
 
     def is_trusted(ctx):
-        if not exists("config.ini") and ctx.author.id in (341486397917626381, 438418848811581452):  return True
-        elif exists("config.ini") and str(ctx.author.id) in config["Main"]["trusted_ids"]:  return True
+        if exists("config.ini") and str(ctx.author.id) in config["Main"]["trusted_ids"]:
+            return True
 
         raise commands.errors.NotOwner
     #////////////////////////////////////////////////////////
@@ -37,7 +38,7 @@ class common_trusted(commands.Cog):
 
         await ctx.send(f"Blocked {user} | {user.id}")
         if notify:
-            await user.send("You have been blocked from support DMs.\nPossible Reasons: ```Sending invite links\nTrolling\nSpam```")
+            await user.send("You have been blocked from support DMs.")
 
     @commands.command()
     @commands.check(is_trusted)
@@ -68,7 +69,7 @@ class common_trusted(commands.Cog):
 
     @commands.command()
     @commands.check(is_trusted)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     async def dm(self, ctx, todm: discord.User, *, message):
         embed = discord.Embed(title="Message from the developers:", description=message)
         embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
@@ -175,7 +176,11 @@ class common_trusted(commands.Cog):
         servers = [guild.name for guild in self.bot.guilds]
 
         if len(str(servers)) >= 2000:
-            with open("servers.txt", "w") as f: f.write(str(servers))
-            await ctx.send(file=discord.File("servers.txt"))
-        else:
-            await ctx.send(servers)
+            return await ctx.send(
+                file=discord.File(
+                    StringIO(str(servers)),
+                    filename="servers.txt"
+                )
+            )
+
+        await ctx.send(servers)
