@@ -58,7 +58,7 @@ bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").s
 for cog in listdir("cogs"):
     if cog.endswith(".py"):
         bot.load_extension(f"cogs.{cog[:-3]}")
-        print(f"Successfully loaded {cog}!")
+        print(f"Successfully loaded: {cog}")
 
 @bot.event
 async def on_ready():
@@ -81,7 +81,7 @@ async def on_ready():
         await bot.starting_message.edit(content=f"~~{bot.starting_message.content}~~")
         bot.starting_message = await bot.channels["logs"].send(f"Restarted as {bot.user.name}!")
     except AttributeError:
-        print(f"\nStarted as {bot.user.name}!")
+        print(f"Logged into Discord as {bot.user.name}!")
 
         for guild in bot.guilds:
             bot.playing[guild.id] = 0
@@ -89,4 +89,5 @@ async def on_ready():
 
         bot.starting_message = await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
 
+print("\nLogging into Discord...")
 bot.run(t)

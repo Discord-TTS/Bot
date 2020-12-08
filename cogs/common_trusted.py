@@ -162,9 +162,13 @@ class common_trusted(commands.Cog):
         if guild_object is False:
             raise commands.BadArgument
 
+        owner = self.bot.get_user(guild_object.owner_id)
+        if not owner:
+            owner = await self.bot.fetch_user(guild_object.owner_id)
+
         embed = discord.Embed(title=guild_object.name)
         embed.add_field(name="Guild ID", value=guild_object.id, inline=False)
-        embed.add_field(name="Owner Name | ID", value=f"{guild_object.owner.name} | {guild_object.owner.id}", inline=False)
+        embed.add_field(name="Owner Name | ID", value=f"{owner.name} | {owner.id}", inline=False)
         embed.add_field(name="Member Count", value=guild_object.member_count, inline=False)
         embed.set_thumbnail(url=str(guild_object.icon_url))
         await ctx.send(embed=embed)

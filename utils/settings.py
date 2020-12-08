@@ -6,10 +6,10 @@ class settings_class():
 
     async def remove(self, guild):
         async with self.pool.acquire() as conn:
-            await conn.execute("""
-                DELETE * FROM guilds WHERE guild_id = $1;
-                DELETE * FROM nicknames WHERE guild_id = $1;
-                """, str(guild.id))
+            await conn.execute(f"""
+                DELETE FROM guilds WHERE guild_id = '{guild.id}';
+                DELETE FROM nicknames WHERE guild_id = '{guild.id}';
+                """)
 
     async def get(self, guild, setting):
         async with self.pool.acquire() as conn:

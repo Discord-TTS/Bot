@@ -2,7 +2,10 @@ from typing import Union
 
 import discord
 from discord.ext import commands
+from configparser import ConfigParser
 
+config = ConfigParser()
+config.read("config.ini")
 
 def setup(bot):
     bot.add_cog(Gnome(bot))

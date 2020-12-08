@@ -32,7 +32,7 @@ class cmds_extra(commands.Cog):
           Currently in:
             :small_blue_diamond: {channels} voice channels
             :small_orange_diamond: {len(self.bot.guilds)} servers
-          and can be used by {sum([guild.member_count for guild in self.bot.guilds]):,} people!
+          and can be used by {sum(guild.member_count for guild in self.bot.guilds):,} people!
         """)
 
         footer = cleandoc("""
