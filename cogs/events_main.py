@@ -71,11 +71,14 @@ class Main(commands.Cog):
             saythis = message.clean_content.lower()
 
             # Get settings
-            autojoin, bot_ignore, channel = await asyncio.gather(
-                self.bot.settings.get(message.guild, "auto_join"),
-                self.bot.settings.get(message.guild, "bot_ignore"),
-                self.bot.settings.get(message.guild, "channel")
+            autojoin, bot_ignore, channel = await self.bot.settings.get(
+                message.guild,
+                settings=(
+                    "auto_join",
+                    "bot_ignore",
+                    "channel"
                 )
+            )
 
             starts_with_tts = saythis.startswith(f"{self.bot.command_prefix}tts")
 
@@ -124,10 +127,13 @@ class Main(commands.Cog):
                             self.bot.playing[message.guild.id] = 0
 
                         # Get settings
-                        lang, xsaid, repeated_chars_limit = await asyncio.gather(
-                            self.bot.setlangs.get(message.author),
-                            self.bot.settings.get(message.guild, "xsaid"),
-                            self.bot.settings.get(message.guild, "repeated_chars")
+                        lang = await self.bot.setlangs.get(message.author)
+                        xsaid, repeated_chars_limit = await self.bot.settings.get(
+                            message.guild,
+                            settings=(
+                                "xsaid",
+                                "repeated_chars"
+                            )
                         )
 
                         # Emoji filter
@@ -236,7 +242,7 @@ class Main(commands.Cog):
 
                         self.bot.playing[message.guild.id] = 1
 
-                        while self.bot.queue[message.guild.id] != dict():
+                        while self.bot.queue.get(message.guild.id) not in (dict(), None):
                             # Sort Queue
                             self.bot.queue[message.guild.id] = basic.sort_dict(self.bot.queue[message.guild.id])
 
@@ -253,7 +259,7 @@ class Main(commands.Cog):
                                 while vc.is_playing():  await asyncio.sleep(0.5)
 
                                 # Delete said message from queue
-                                if message_id_to_read in self.bot.queue[message.guild.id]:
+                                if message_id_to_read in self.bot.queue.get(message.guild.id, ""):
                                     del self.bot.queue[message.guild.id][message_id_to_read]
 
                             else:

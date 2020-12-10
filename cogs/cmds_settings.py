@@ -44,14 +44,19 @@ class Settings(commands.Cog):
         elif help == "limits help":
             return await self.help(ctx)
         else:
-            lang, say, channel, join, bot_ignore, nickname = await asyncio.gather(
+            lang, nickname = await asyncio.gather(
                 self.bot.setlangs.get(ctx.author),
-                self.bot.settings.get(ctx.guild, "xsaid"),
-                self.bot.settings.get(ctx.guild, "channel"),
-                self.bot.settings.get(ctx.guild, "auto_join"),
-                self.bot.settings.get(ctx.guild, "bot_ignore"),
                 self.bot.nicknames.get(ctx.guild, ctx.author)
             )
+            say, channel, join, bot_ignore = await self.bot.settings.get(
+                ctx.guild,
+                settings=(
+                    "xsaid",
+                    "channel",
+                    "auto_join",
+                    "bot_ignore"
+                    )
+                )
 
             channel = ctx.guild.get_channel(int(channel))
 
@@ -145,9 +150,12 @@ class Settings(commands.Cog):
         if ctx.invoked_subcommand is not None:  return
         if ctx.message.content != f"{self.bot.command_prefix}set limits":    additional_message = "Error: Invalid property!"
 
-        msg_length, repeated_chars = await asyncio.gather(
-            self.bot.settings.get(ctx.guild, "msg_length"),
-            self.bot.settings.get(ctx.guild, "repeated_chars")
+        msg_length, repeated_chars = await self.bot.settings.get(
+            ctx.guild,
+            settings=(
+                "msg_length",
+                "repeated_chars"
+            )
         )
 
         message1 = cleandoc(f"""

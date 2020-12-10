@@ -159,7 +159,7 @@ class common_trusted(commands.Cog):
                 if guild in all_guild.name:
                     guild_object = all_guild
 
-        if guild_object is False:
+        if not guild_object:
             raise commands.BadArgument
 
         owner = self.bot.get_user(guild_object.owner_id)

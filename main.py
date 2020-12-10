@@ -30,7 +30,7 @@ bot = commands.AutoShardedBot(
     status=status,
     intents=intents,
     activity=activity,
-    command_prefix="-",
+    command_prefix="t-",
     case_insensitive=True,
     chunk_guilds_at_startup=False,
 )

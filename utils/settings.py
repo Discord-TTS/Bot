@@ -11,14 +11,26 @@ class settings_class():
                 DELETE FROM nicknames WHERE guild_id = '{guild.id}';
                 """)
 
-    async def get(self, guild, setting):
+    async def get(self, guild, setting = None, settings = None):
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow("SELECT * FROM guilds WHERE guild_id = $1", str(guild.id))
 
-        if row is None or dict(row)[setting] is None:
-            return default_settings[setting]
+        if not settings:
+            if row is None or dict(row)[setting] is None:
+                return default_settings[setting]
 
-        return dict(row)[setting]
+            return dict(row)[setting]
+
+        row_dict = dict(row)
+        settings_values = list()
+
+        for setting in settings:
+            if not setting:
+                setting = default_settings[setting]
+
+            settings_values.append(row_dict[setting])
+
+        return settings_values
 
     async def set(self, guild, setting, value):
         guild = str(guild.id)
