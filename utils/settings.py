@@ -21,6 +21,9 @@ class settings_class():
 
             return dict(row)[setting]
 
+        if row is None:
+            return [default_settings[setting] for setting in settings]
+
         row_dict = dict(row)
         settings_values = list()
 
