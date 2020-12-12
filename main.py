@@ -30,6 +30,7 @@ bot = commands.AutoShardedBot(
     status=status,
     intents=intents,
     activity=activity,
+    help_command=None,
     command_prefix="-",
     case_insensitive=True,
     chunk_guilds_at_startup=False,
@@ -47,7 +48,7 @@ pool = bot.loop.run_until_complete(
 bot.queue = dict()
 bot.playing = dict()
 bot.channels = dict()
-bot.remove_command("help")
+bot.currently_playing = dict()
 bot.settings = settings.settings_class(pool)
 bot.setlangs = settings.setlangs_class(pool)
 bot.nicknames = settings.nickname_class(pool)

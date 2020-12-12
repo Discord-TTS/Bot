@@ -32,6 +32,9 @@ class cmds_dev(commands.Cog):
         if reset.lower() == "reset":
             self.bot.playing[ctx.guild.id] = 0
             self.bot.queue[ctx.guild.id] = dict()
+            if self.bot.currently_playing.get(ctx.guild.id) is not None and not self.bot.currently_playing[ctx.guild.id].done():
+                self.bot.currently_playing[ctx.guild.id].set_result("done")
+
             embed = discord.Embed(
                 title="Values Reset!",
                 description="Playing and queue values for this guild have been reset, hopefully this will fix issues."

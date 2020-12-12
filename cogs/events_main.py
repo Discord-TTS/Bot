@@ -62,6 +62,10 @@ class Main(commands.Cog):
 
         return temp_store_for_mp3
 
+    def finish_future(self, fut, *args):
+        if not fut.done():
+            self.bot.loop.call_soon_threadsafe(fut.set_result, "done")
+
     @commands.Cog.listener()
     async def on_message(self, message):
         try:    self.bot.starting_message.content
@@ -253,13 +257,20 @@ class Main(commands.Cog):
                             # Play selected audio
                             vc = message.guild.voice_client
                             if vc is not None:
-                                try:    vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'))
-                                except discord.errors.ClientException:  pass # sliences desyncs between discord.py and discord, implement actual fix soon!
+                                self.bot.currently_playing[message.guild.id] = self.bot.loop.create_future()
+                                finish_future = make_func(self.finish_future, self.bot.currently_playing[message.guild.id])
 
-                                while vc.is_playing():  await asyncio.sleep(0.5)
+                                try:
+                                    vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'), after=finish_future)
+                                except discord.errors.ClientException:
+                                    self.bot.currently_playing[message.guild.id].set_result("done")
+
+                                result = await self.bot.currently_playing[message.guild.id]
+                                if result == "skipped":
+                                    self.bot.queue[message.guild.id] = dict()
 
                                 # Delete said message from queue
-                                if message_id_to_read in self.bot.queue.get(message.guild.id, ""):
+                                elif message_id_to_read in self.bot.queue.get(message.guild.id, ""):
                                     del self.bot.queue[message.guild.id][message_id_to_read]
 
                             else:

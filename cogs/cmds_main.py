@@ -10,6 +10,15 @@ from utils import basic
 def setup(bot):
     bot.add_cog(cmds_main(bot))
 
+async def channel_check(ctx):
+    right_channel = ctx.channel.id == int(await ctx.bot.settings.get(ctx.guild, "channel"))
+
+    if right_channel:
+        return True
+    else:
+        await ctx.send(f"Error: Wrong channel, do {ctx.bot.command_prefix}channel get the channel that has been setup.")
+        raise commands.NotOwner
+
 class cmds_main(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -21,8 +30,9 @@ class cmds_main(commands.Cog):
           `-setup #textchannel`: Setup the bot to read messages from that channel
 
           `-join`: Joins the voice channel you're in
-          `-leave`: Leaves voice channel
-
+          `-leave`: Leaves voice channel TTS Bot is in
+          `-clear`: Clears the message queue
+        
           `-settings`: Display the current settings
           `-settings help`: Displays list of available settings
           `-set property value`: Sets a setting
@@ -41,12 +51,10 @@ class cmds_main(commands.Cog):
 
     @commands.guild_only()
     @commands.cooldown(1, 10, commands.BucketType.guild)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.check(channel_check)
     @commands.command()
     async def join(self, ctx):
-        if ctx.channel.id != int(await self.bot.settings.get(ctx.guild, "channel")):
-            return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
-
         if ctx.author.voice is None:
             return await ctx.send("Error: You need to be in a voice channel to make me join your voice channel!")
 
@@ -84,6 +92,7 @@ class cmds_main(commands.Cog):
     @commands.guild_only()
     @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.bot_has_permissions(send_messages=True)
+    @commands.check(channel_check)
     @commands.command()
     async def leave(self, ctx):
         if ctx.channel.id != int(await self.bot.settings.get(ctx.guild, "channel")):
@@ -104,3 +113,15 @@ class cmds_main(commands.Cog):
         self.bot.playing[ctx.guild.id] = 0
 
         await ctx.send("Left voice channel!")
+
+    @commands.guild_only()
+    @commands.bot_has_permissions(read_messages=True, send_messages=True, add_reactions=True)
+    @commands.check(channel_check)
+    @commands.command(aliases=("clear", "leaveandjoin"))
+    async def skip(self, ctx):
+        if self.bot.queue.get(ctx.guild.id) in (None, dict()) or self.bot.currently_playing[ctx.guild.id].done():
+            return await ctx.send("**Error:** Nothing in message queue to skip!")
+
+        ctx.guild.voice_client.stop()
+        self.bot.currently_playing[ctx.guild.id].set_result("skipped")
+        return await ctx.message.add_reaction("\N{THUMBS UP SIGN}")

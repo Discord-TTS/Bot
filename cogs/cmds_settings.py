@@ -25,7 +25,7 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def settings(self, ctx, *, help = None):
-        if not isinstance(help, NoneType):  help = help.lower()
+        if not isinstance(help, NoneType): help = help.lower()
 
         if help == "help":
             message = cleandoc("""
@@ -113,6 +113,7 @@ class Settings(commands.Cog):
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
+    @commands.bot_has_permissions(embed_links=True)
     async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname):
         if user:
             if nickname:
@@ -147,8 +148,9 @@ class Settings(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def limits(self, ctx):
         additional_message = None
-        if ctx.invoked_subcommand is not None:  return
-        if ctx.message.content != f"{self.bot.command_prefix}set limits":    additional_message = "Error: Invalid property!"
+        if ctx.invoked_subcommand is not None: return
+        if ctx.message.content != f"{self.bot.command_prefix}set limits":
+            additional_message = "Error: Invalid property!"
 
         msg_length, repeated_chars = await self.bot.settings.get(
             ctx.guild,
@@ -197,7 +199,7 @@ class Settings(commands.Cog):
 
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
         await self.bot.settings.set(ctx.guild, "channel", str(channel.id))
@@ -224,12 +226,11 @@ class Settings(commands.Cog):
         else:
             await ctx.send("Invalid voice, do `-voices`")
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
-    async def voices(self, ctx, lang: str = None):
+    async def voices(self, ctx, lang=None):
         if lang in tts_langs:
-            try:  return await self.voice(ctx, lang)
-            except: return
+            return await self.voice(ctx, lang)
 
         lang = await self.bot.setlangs.get(ctx.author)
         langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")

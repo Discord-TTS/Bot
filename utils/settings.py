@@ -68,7 +68,7 @@ class settings_class():
                 await conn.execute(f"""
                     INSERT INTO guilds(guild_id, {setting})
                     VALUES ($1, $2);
-                    """, guild, str(value))
+                    """, guild, value)
 
 class nickname_class():
     def __init__(self, pool):
