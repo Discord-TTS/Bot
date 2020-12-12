@@ -7,6 +7,7 @@ from discord.ext import commands
 
 from utils import basic
 
+
 def setup(bot):
     bot.add_cog(cmds_main(bot))
 
@@ -32,7 +33,7 @@ class cmds_main(commands.Cog):
           `-join`: Joins the voice channel you're in
           `-leave`: Leaves voice channel TTS Bot is in
           `-clear`: Clears the message queue
-        
+
           `-settings`: Display the current settings
           `-settings help`: Displays list of available settings
           `-set property value`: Sets a setting

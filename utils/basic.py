@@ -28,14 +28,18 @@ footer_messages = (
     "There are loads of customizable settings, check out -settings help",
 )
 
+
 async def ensure_webhook(channel, name="TTS-Webhook"):
     webhooks = await channel.webhooks()
-    if len(webhooks) == 0:  webhook = await channel.create_webhook(name)
-    else:   webhook = webhooks[0]
+    if webhooks:
+        webhook = webhooks[0]
+    else:
+        webhook = await channel.create_webhook(name)
 
     return webhook
 
-def get_value(dictionary, *nested_values, default_value = None):
+
+def get_value(dictionary, *nested_values, default_value=None):
     try:
         for value in nested_values:
             dictionary = dictionary[value]
@@ -44,11 +48,14 @@ def get_value(dictionary, *nested_values, default_value = None):
 
     return dictionary
 
+
 def remove_chars(remove_from, *chars):
     input_string = str(remove_from)
-    for char in chars:  input_string = input_string.replace(char, "")
+    for char in chars:
+        input_string = input_string.replace(char, "")
 
     return input_string
+
 
 def get_size(start_path='.'):
     total_size = 0
@@ -60,6 +67,7 @@ def get_size(start_path='.'):
 
     return total_size
 
+
 def sort_dict(dict_to_sort):
     keys = list(dict_to_sort.keys())
     keys.sort()
@@ -68,6 +76,7 @@ def sort_dict(dict_to_sort):
         newdict[x] = dict_to_sort[x]
 
     return newdict
+
 
 def emojitoword(text):
     emojiAniRegex = compile(r'<a\:.+:\d+>')
@@ -86,17 +95,23 @@ def emojitoword(text):
 
     return ' '.join([str(x) for x in output])
 
-def exts_to_format(attachments):
-    if len(attachments) >= 2:   return "multiple files"
-    if len(attachments) == 0:   return False
 
-    ext = attachments[0].filename.split(".")[-1]
+def exts_to_format(attachments):
+    if not attachments:
+        return False
+
+    if len(attachments) >= 2:
+        return "multiple files"
+
     returned_format = False
+    ext = attachments[0].filename.split(".")[-1]
 
     for file_exts, format in full_dict.items():
         if ext in file_exts:
             returned_format = format
             break
 
-    if not returned_format: returned_format = "a file"
+    if not returned_format:
+        return "a file"
+
     return returned_format

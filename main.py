@@ -9,7 +9,6 @@ from discord.ext import commands
 
 from utils import basic, cache, settings
 
-#//////////////////////////////////////////////////////
 print("Starting TTS Bot!")
 
 start_time = monotonic()
@@ -37,13 +36,13 @@ bot = commands.AutoShardedBot(
 )
 
 pool = bot.loop.run_until_complete(
-        asyncpg.create_pool(
-            host=config["PostgreSQL Info"]["ip"],
-            user=config["PostgreSQL Info"]["name"],
-            database=config["PostgreSQL Info"]["db"],
-            password=config["PostgreSQL Info"]["pass"]
-        )
+    asyncpg.create_pool(
+        host=config["PostgreSQL Info"]["ip"],
+        user=config["PostgreSQL Info"]["name"],
+        database=config["PostgreSQL Info"]["db"],
+        password=config["PostgreSQL Info"]["pass"]
     )
+)
 
 bot.queue = dict()
 bot.playing = dict()
@@ -60,6 +59,7 @@ for cog in listdir("cogs"):
     if cog.endswith(".py"):
         bot.load_extension(f"cogs.{cog[:-3]}")
         print(f"Successfully loaded: {cog}")
+
 
 @bot.event
 async def on_ready():

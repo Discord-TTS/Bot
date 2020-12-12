@@ -14,8 +14,10 @@ from mutagen.mp3 import MP3, HeaderNotFoundError
 from utils import basic
 from patched_FFmpegPCM import FFmpegPCMAudio
 
+
 def setup(bot):
     bot.add_cog(Main(bot))
+
 
 class Main(commands.Cog):
     def __init__(self, bot):
@@ -47,8 +49,10 @@ class Main(commands.Cog):
     def make_tts(self, text, lang) -> BytesIO:
         temp_store_for_mp3 = BytesIO()
         in_vcs = len(self.bot.voice_clients)
-        if   in_vcs < 5:  max_range = 50
-        elif in_vcs < 20: max_range = 20
+        if in_vcs < 5:
+            max_range = 50
+        elif in_vcs < 20:
+            max_range = 20
         else:
             max_range = 10
 
@@ -68,8 +72,10 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        try:    self.bot.starting_message.content
-        except: return print("Skipping message, bot not started!")
+        try:
+            self.bot.starting_message.content
+        except:
+            return print("Skipping message, bot not started!")
 
         if message.guild is not None:
             saythis = message.clean_content.lower()
@@ -123,8 +129,10 @@ class Main(commands.Cog):
 
                         # Auto Join
                         if message.guild.voice_client is None and autojoin and self.bot.playing.get(message.guild.id) in (0, 1):
-                            try:  channel = message.author.voice.channel
-                            except AttributeError: return
+                            try:
+                                channel = message.author.voice.channel
+                            except AttributeError:
+                                return
 
                             self.bot.playing[message.guild.id] = 3
                             await channel.connect()
@@ -167,12 +175,15 @@ class Main(commands.Cog):
                             "™️": "tm"
                         }
 
-                        if starts_with_tts: acronyms["-tts"] = ""
+                        if starts_with_tts:
+                            acronyms["-tts"] = ""
+
                         for toreplace, replacewith in acronyms.items():
                             saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
 
                         saythis = saythis[1:-1]
-                        if saythis == "?":  saythis = "what"
+                        if saythis == "?":
+                            saythis = "what"
 
                         # Regex replacements
                         regex_replacements = {
@@ -241,7 +252,8 @@ class Main(commands.Cog):
 
                         # Queue, please don't touch this, it works somehow
                         while self.bot.playing.get(message.guild.id) != 0:
-                            if self.bot.playing.get(message.guild.id) in (None, 2): return
+                            if self.bot.playing.get(message.guild.id) in (None, 2):
+                                return
                             await asyncio.sleep(0.5)
 
                         self.bot.playing[message.guild.id] = 1
@@ -292,7 +304,8 @@ class Main(commands.Cog):
 
                 elif not await self.bot.blocked_users.check(message.author):
                     files = [await attachment.to_file() for attachment in message.attachments]
-                    if not files and not message.content: return
+                    if not files and not message.content:
+                        return
 
                     webhook = await basic.ensure_webhook(self.bot.channels["dm_logs"], name="TTS-DM-LOGS")
                     await webhook.send(message.content, username=str(message.author), avatar_url=message.author.avatar_url, files=files)
@@ -324,14 +337,18 @@ class Main(commands.Cog):
         vc = guild.voice_client
         playing = basic.get_value(self.bot.playing, guild.id)
 
-        if member == self.bot.user:   return # someone other than bot left vc
-        elif not (before.channel and not after.channel):   return # user left voice channel
-        elif not vc:   return # bot in a voice channel
+        if member == self.bot.user:
+            return  # someone other than bot left vc
+        if not (before.channel and not after.channel):
+            return  # user left voice channel
+        if not vc:
+            return  # bot in a voice channel
 
-        elif len([member for member in vc.channel.members if not member.bot]) != 0:    return # bot is only one left
-        elif playing not in (0, 1):   return # bot not already joining/leaving a voice channel
+        if len([member for member in vc.channel.members if not member.bot]) != 0:
+            return  # bot is only one left
+        if playing not in (0, 1):
+            return  # bot not already joining/leaving a voice channel
 
-        else:
-            self.bot.playing[guild.id] = 2
-            await vc.disconnect(force=True)
-            self.bot.playing[guild.id] = 0
+        self.bot.playing[guild.id] = 2
+        await vc.disconnect(force=True)
+        self.bot.playing[guild.id] = 0

@@ -1,4 +1,3 @@
-from configparser import ConfigParser
 from inspect import cleandoc
 from os.path import exists
 from time import monotonic
@@ -7,11 +6,8 @@ from discord.ext import commands
 
 from utils.basic import ensure_webhook
 
-def setup(bot):
-    if exists("config.ini"):
-        config = ConfigParser()
-        config.read("config.ini")
 
+def setup(bot):
     bot.add_cog(User(bot))
 
 class User(commands.Cog):

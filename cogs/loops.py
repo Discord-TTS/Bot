@@ -4,8 +4,10 @@ from discord.ext import commands, tasks
 
 from utils import basic
 
+
 def setup(bot):
     bot.add_cog(loops(bot))
+
 
 class loops(commands.Cog):
     def __init__(self, bot):
@@ -28,7 +30,8 @@ class loops(commands.Cog):
                     remove(f"cache/{cached_message}")
                     await self.bot.cache.remove(cached_message)
 
-                    if count == 100: break
+                    if count == 100:
+                        break
 
         except Exception as error:
             await self.bot.on_error("cache_cleanup", error)

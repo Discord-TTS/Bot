@@ -21,10 +21,10 @@ trusted_ids = input("Input a list of trusted user IDs (allowing for moderation c
 
 cache_key = Fernet.generate_key()
 config["Main"] = {
-  "token": token,
-  "cache_key": cache_key,
-  "main_server": main_server,
-  "trusted_ids": trusted_ids,
+    "token": token,
+    "cache_key": cache_key,
+    "main_server": main_server,
+    "trusted_ids": trusted_ids,
 }
 config["Activity"] = {
     "name": "my owner set me up!",
@@ -37,6 +37,7 @@ config["PostgreSQL Info"] = {
     "ip": psql_ip,
     "db": psql_db
 }
+
 
 @bot.event
 async def on_ready():
@@ -94,6 +95,7 @@ async def on_ready():
 
     await logs.send(f"Are you sure you want {[str(bot.get_user(int(trusted_id))) for trusted_id in trusted_ids]} to be trusted? (do -yes to accept)")
 
+
 @bot.command()
 @commands.is_owner()
 async def yes(ctx):
@@ -102,6 +104,7 @@ async def yes(ctx):
 
     await logs.send("Finished and written to config.ini, change the names of the channels all you want and now TTS Bot should be startable!")
     await bot.close()
+
 
 @bot.command()
 @commands.is_owner()

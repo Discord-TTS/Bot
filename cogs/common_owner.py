@@ -1,19 +1,18 @@
+from configparser import ConfigParser
 from typing import Union
 
 import discord
 from discord.ext import commands
-from configparser import ConfigParser
 
 config = ConfigParser()
 config.read("config.ini")
 
 def setup(bot):
-    bot.add_cog(Gnome(bot))
+    bot.add_cog(common_owner(bot))
 
-class Gnome(commands.Cog):
+class common_owner(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-    #////////////////////////////////////////////////////////
 
     @commands.command()
     @commands.is_owner()
@@ -23,8 +22,10 @@ class Gnome(commands.Cog):
         await ctx.message.delete()
 
         if isinstance(user, int):
-            try:    user = await self.bot.fetch_user(user)
-            except: user = str(user)
+            try:
+                user = await self.bot.fetch_user(user)
+            except:
+                user = str(user)
 
         if isinstance(user, str):
             name = user
@@ -72,8 +73,8 @@ class Gnome(commands.Cog):
     @commands.is_owner()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def say(self, ctx, channel: discord.TextChannel, *, tosay):
-        try:    await ctx.message.delete()
-        except: pass
+        if ctx.channel.permissions_for(ctx.guild.me).manage_messages:
+            await ctx.message.delete()
 
         await channel.send(tosay)
 

@@ -52,5 +52,5 @@ class cmds_dev(commands.Cog):
             file=discord.File(
                 StringIO(str(self.bot.queue[ctx.guild.id])),
                 filename="queue.txt"
-                )
             )
+        )

@@ -12,7 +12,7 @@ class cache():
 
     def get_hash(self, to_hash: bytes) -> bytes:
         to_hash = sha256(to_hash)
-        for x in range(9):
+        for _ in range(9):
             to_hash = sha256(to_hash.digest() + self.key)
 
         return to_hash.digest()
@@ -40,7 +40,7 @@ class cache():
                         SET message_id = $1
                         WHERE message_id = $2;
                         """, message_id, og_message_id
-                        )
+                                       )
                     return decrypted_mp3
 
     async def set(self, text, lang, message_id, file_bytes):
@@ -56,14 +56,14 @@ class cache():
                     INSERT INTO cache_lookup(message, message_id)
                     VALUES ($1, $2);
                     """, search_for, message_id,
-                    )
+                                   )
             else:
                 await conn.execute("""
                     UPDATE cache_lookup
                     SET message_id = $1
                     WHERE message = $2;
                     """, message_id, search_for
-                    )
+                                   )
 
     async def remove(self, message_id):
         message_id = str(message_id)

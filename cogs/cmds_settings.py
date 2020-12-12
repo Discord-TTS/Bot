@@ -10,7 +10,6 @@ from gtts.lang import tts_langs
 
 from utils import basic
 
-NoneType = type(None)
 tts_langs = tts_langs()
 to_enabled = {True: "Enabled", False: "Disabled"}
 
@@ -24,8 +23,9 @@ class Settings(commands.Cog):
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
-    async def settings(self, ctx, *, help = None):
-        if not isinstance(help, NoneType): help = help.lower()
+    async def settings(self, ctx, *, help=None):
+        if help is None:
+            help = help.lower()
 
         if help == "help":
             message = cleandoc("""
@@ -55,8 +55,8 @@ class Settings(commands.Cog):
                     "channel",
                     "auto_join",
                     "bot_ignore"
-                    )
                 )
+            )
 
             channel = ctx.guild.get_channel(int(channel))
 
@@ -148,7 +148,8 @@ class Settings(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def limits(self, ctx):
         additional_message = None
-        if ctx.invoked_subcommand is not None: return
+        if ctx.invoked_subcommand is not None:
+            return
         if ctx.message.content != f"{self.bot.command_prefix}set limits":
             additional_message = "Error: Invalid property!"
 
@@ -183,16 +184,20 @@ class Settings(commands.Cog):
 
     @limits.command(aliases=("length", "max_length", "max_msg_length", "msglength", "maxlength"))
     async def msg_length(self, ctx, length: int):
-        if length > 60: return await ctx.send("Hey! You can't set max message length above 60 seconds!")
-        if length < 20: return await ctx.send("Hey! You can't set max message length below 20 seconds!")
+        if length > 60:
+            return await ctx.send("Hey! You can't set max message length above 60 seconds!")
+        if length < 20:
+            return await ctx.send("Hey! You can't set max message length below 20 seconds!")
 
         await self.bot.settings.set(ctx.guild, "msg_length", str(length))
         await ctx.send(f"Max message length (in seconds) is now: {length}")
 
     @limits.command(aliases=("repeated_characters", "repeated_letters", "chars"))
     async def repeated_chars(self, ctx, chars: int):
-        if chars > 100: return await ctx.send("Hey! You can't set max repeated chars above 100!")
-        if chars < 5: return await ctx.send("Hey! You can't set max repeated chars below 5!")
+        if chars > 100:
+            return await ctx.send("Hey! You can't set max repeated chars above 100!")
+        if chars < 5:
+            return await ctx.send("Hey! You can't set max repeated chars below 5!")
 
         await self.bot.settings.set(ctx.guild, "repeated_chars", str(chars))
         await ctx.send(f"Max repeated characters is now: {chars}")
@@ -210,7 +215,7 @@ class Settings(commands.Cog):
                 TTS Bot will now accept commands and read from {channel.mention}.
                 Just do `-join` and start talking!
                 """)
-            )
+        )
         embed.set_footer(text=pick_random(basic.footer_messages))
         embed.set_thumbnail(url=str(self.bot.user.avatar_url))
         embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
