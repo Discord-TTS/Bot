@@ -24,7 +24,7 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def settings(self, ctx, *, help=None):
-        if help is None:
+        if help is not None:
             help = help.lower()
 
         if help == "help":

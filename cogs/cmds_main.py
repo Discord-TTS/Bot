@@ -118,6 +118,7 @@ class cmds_main(commands.Cog):
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, add_reactions=True)
     @commands.check(channel_check)
+    @commands.cooldown(1, 60, commands.BucketType.member)
     @commands.command(aliases=("clear", "leaveandjoin"))
     async def skip(self, ctx):
         if self.bot.queue.get(ctx.guild.id) in (None, dict()) or self.bot.currently_playing[ctx.guild.id].done():
@@ -126,3 +127,8 @@ class cmds_main(commands.Cog):
         ctx.guild.voice_client.stop()
         self.bot.currently_playing[ctx.guild.id].set_result("skipped")
         return await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
+
+    @skip.after_invoke
+    async def reset_cooldown(self, ctx):
+        if ctx.channel.permissions_for(ctx.author).administrator:
+            self.skip.reset_cooldown(ctx)
