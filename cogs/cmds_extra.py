@@ -10,23 +10,26 @@ start_time = monotonic()
 def setup(bot):
     bot.add_cog(cmds_extra(bot))
 
-class cmds_extra(commands.Cog):
+class cmds_extra(commands.Cog, name="Extra Commands"):
     def __init__(self, bot):
         self.bot = bot
 
     @commands.command()
     async def uptime(self, ctx):
+        "Shows how long TTS Bot has been online"
         await ctx.send(f"{self.bot.user.mention} has been up for {(monotonic() - start_time) / 60:.2f} minutes")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
-    @commands.command()
+    @commands.command(hidden=True)
     async def tts(self, ctx):
         if ctx.message.content == f"{self.bot.command_prefix}tts":
             await ctx.send(f"You don't need to do `{self.bot.command_prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{self.bot.command_prefix}`!")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
-    @commands.command(aliases=["botstats", "stats"])
-    async def info(self, ctx):
+    @commands.command(aliases=["info", "stats"])
+    async def botstats(self, ctx):
+        "Shows various different stats"
+
         channels = len(self.bot.voice_clients)
 
         main_section = cleandoc(f"""
@@ -51,6 +54,7 @@ class cmds_extra(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def channel(self, ctx):
+        "Shows the current setup channel!"
         channel = int(await self.bot.settings.get(ctx.guild, "channel"))
 
         if channel == ctx.channel.id:

@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 
 from utils import basic, cache, settings
+from cogs.help import FancyHelpCommand
 
 print("Starting TTS Bot!")
 
@@ -29,10 +30,10 @@ bot = commands.AutoShardedBot(
     status=status,
     intents=intents,
     activity=activity,
-    help_command=None,
-    command_prefix="-",
+    command_prefix="t-",
     case_insensitive=True,
     chunk_guilds_at_startup=False,
+    help_command=FancyHelpCommand()
 )
 
 pool = bot.loop.run_until_complete(

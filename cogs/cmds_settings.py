@@ -24,6 +24,7 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def settings(self, ctx, *, help=None):
+        f"Displays the current settings!"
         if help is not None:
             help = help.lower()
 
@@ -207,6 +208,7 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
+        "Setup the bot to read messages from `<channel>`"
         await self.bot.settings.set(ctx.guild, "channel", str(channel.id))
 
         embed = discord.Embed(
@@ -223,7 +225,7 @@ class Settings(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
-    @commands.command()
+    @commands.command(hidden=True)
     async def voice(self, ctx, lang: str):
         if lang in tts_langs:
             await self.bot.setlangs.set(ctx.author, lang)

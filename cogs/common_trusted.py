@@ -11,7 +11,7 @@ config.read("config.ini")
 def setup(bot):
     bot.add_cog(common_trusted(bot))
 
-class common_trusted(commands.Cog):
+class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
     def __init__(self, bot):
         self.bot = bot
 

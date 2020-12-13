@@ -7,7 +7,7 @@ from discord.ext import commands
 def setup(bot):
     bot.add_cog(cmds_dev(bot))
 
-class cmds_dev(commands.Cog):
+class cmds_dev(commands.Cog, command_attrs=dict(hidden=True)):
     def __init__(self, bot):
         self.bot = bot
 
