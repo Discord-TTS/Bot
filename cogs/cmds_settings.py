@@ -92,30 +92,35 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.group()
     async def set(self, ctx):
+        "Changes a setting (do ``-help set`` for more info)"
         if ctx.invoked_subcommand is None:
             await ctx.send("Error: Invalid property, do `-settings help` to get a list!")
 
     @set.command()
     @commands.has_permissions(administrator=True)
     async def xsaid(self, ctx, value: bool):
+        "Makes the bot say \"<user> said\" before each message"
         await self.bot.settings.set(ctx.guild, "xsaid", value)
         await ctx.send(f"xsaid is now: {to_enabled[value]}")
 
     @set.command(aliases=["auto_join"])
     @commands.has_permissions(administrator=True)
     async def autojoin(self, ctx, value: bool):
+        "If you type a message in the setup channel, the bot will join your vc"
         await self.bot.settings.set(ctx.guild, "auto_join", value)
         await ctx.send(f"Auto Join is now: {to_enabled[value]}")
 
     @set.command(aliases=["bot_ignore", "ignore_bots", "ignorebots"])
     @commands.has_permissions(administrator=True)
     async def botignore(self, ctx, value: bool):
+        "Messages sent by bots and webhooks are not read"
         await self.bot.settings.set(ctx.guild, "bot_ignore", value)
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
     @commands.bot_has_permissions(embed_links=True)
     async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname):
+        "Replaces your username in \"<user> said\" with a given name"
         if user:
             if nickname:
                 if not ctx.channel.permissions_for(ctx.author).administrator:
@@ -139,15 +144,18 @@ class Settings(commands.Cog):
     @set.command()
     @commands.has_permissions(administrator=True)
     async def channel(self, ctx, channel: discord.TextChannel):
+        "Setup the bot to read messages from `<channel>`"
         await self.setup(ctx, channel)
 
     @set.command(aliases=("voice", "lang"))
     async def language(self, ctx, voicecode):
+        "Changes the voice your messages are read in (Do -voices for a list of language codes)"
         await self.voice(ctx, voicecode)
 
     @set.group()
     @commands.has_permissions(administrator=True)
     async def limits(self, ctx):
+        "A group of settings to modify the limits of what the bot reads (Do -help set limits for more info)"
         additional_message = None
         if ctx.invoked_subcommand is not None:
             return
@@ -185,6 +193,7 @@ class Settings(commands.Cog):
 
     @limits.command(aliases=("length", "max_length", "max_msg_length", "msglength", "maxlength"))
     async def msg_length(self, ctx, length: int):
+        "Max seconds for a TTS'd message"
         if length > 60:
             return await ctx.send("Hey! You can't set max message length above 60 seconds!")
         if length < 20:
@@ -195,6 +204,7 @@ class Settings(commands.Cog):
 
     @limits.command(aliases=("repeated_characters", "repeated_letters", "chars"))
     async def repeated_chars(self, ctx, chars: int):
+        "Max repetion of a character (0 = off)"
         if chars > 100:
             return await ctx.send("Hey! You can't set max repeated chars above 100!")
         if chars < 5:
@@ -227,6 +237,7 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(hidden=True)
     async def voice(self, ctx, lang: str):
+        "Changes the voice your messages are read in (Do -voices for a list of language codes)"
         if lang in tts_langs:
             await self.bot.setlangs.set(ctx.author, lang)
             await ctx.send(f"Changed your voice to: {tts_langs[lang]}")
@@ -236,6 +247,7 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
     async def voices(self, ctx, lang=None):
+        "Lists all language codes the bot accepts"
         if lang in tts_langs:
             return await self.voice(ctx, lang)
 
