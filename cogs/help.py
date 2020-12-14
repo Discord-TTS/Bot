@@ -1,17 +1,27 @@
 import discord
 from discord.ext import commands
-from inspect import cleandoc
 
-def setup(bot): pass
+def setup(bot):
+    bot.add_cog(FancyHelpCommandCog(bot))
 
 class FakeCog():
     def __init__(self, name):
         self.qualified_name = name
 
+class FancyHelpCommandCog(commands.Cog):
+    def __init__(self, bot):
+        bot.help_command = FancyHelpCommand()
+
 class FancyHelpCommand(commands.HelpCommand):
     COLOUR = 0x3498db
+    def __init__(self, *args, **kwargs):
+        kwargs["verify_checks"] = False
+        super().__init__(*args, **kwargs)
 
-    def get_ending_note(self):
+    def get_ending_note(self, is_group=False):
+        if is_group:
+            args = " ".join(self.context.message.content.split()[1:])
+            return f"Use {self.clean_prefix}{self.invoked_with} {args} [command] for more info on a command."
         return f"Use {self.clean_prefix}{self.invoked_with} [command] for more info on a command."
 
     def get_command_signature(self, command):
@@ -44,6 +54,7 @@ class FancyHelpCommand(commands.HelpCommand):
             if cog is None:
                 cog = FakeCog("Uncategoried")
 
+            commands = await self.filter_commands(commands)
             if commands:
                 command_names = "\n".join(f"`{self.get_command_signature(c)}:` {c.short_doc or 'no description'}" for c in commands)
                 description += f"**__{cog.qualified_name}__**\n{command_names}\n\n"
@@ -59,20 +70,23 @@ class FancyHelpCommand(commands.HelpCommand):
         await self.get_destination().send(embed=embed)
 
     async def send_group_help(self, group):
-        description = group.help or ""
+        is_group = isinstance(group, commands.Group)
+        if is_group:
+            commands = await self.filter_commands(group.commands, sort=True)
+            description = "\n".join(f"`{self.get_command_signature(c)}:` {c.short_doc or 'no description'}" for c in commands)
+        else:
+            description = f"{group.help}\n```{self.clean_prefix}{group.qualified_name} {group.signature}```"
 
-        if isinstance(group, commands.Group):
-            description = "\n".join(f"`{self.get_command_signature(c)}:` {c.short_doc or 'no description'}" for c in group.commands)
-
-        print(description)
         embed = discord.Embed(
             title=f"`{self.clean_prefix}{group.qualified_name}` Help!",
             description=description,
             colour=self.COLOUR
             )
 
-        embed.set_footer(text=self.get_ending_note())
+        embed.set_footer(text=self.get_ending_note(is_group))
         await self.get_destination().send(embed=embed)
 
+    async def send_cog_help(self, cog):
+        await super().send_error_message(self.command_not_found(cog))
+
     send_command_help = send_group_help
-    send_cog_help = send_bot_help
