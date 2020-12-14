@@ -72,8 +72,8 @@ class FancyHelpCommand(commands.HelpCommand):
     async def send_group_help(self, group):
         is_group = isinstance(group, commands.Group)
         if is_group:
-            commands = await self.filter_commands(group.commands, sort=True)
-            description = "\n".join(f"`{self.get_command_signature(c)}:` {c.short_doc or 'no description'}" for c in commands)
+            group_commands = await self.filter_commands(group.commands, sort=True)
+            description = "\n".join(f"`{self.get_command_signature(c)}:` {c.short_doc or 'no description'}" for c in group_commands)
         else:
             description = f"{group.help}\n```{self.clean_prefix}{group.qualified_name} {group.signature}```"
 
