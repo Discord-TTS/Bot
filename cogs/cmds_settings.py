@@ -196,7 +196,7 @@ class Settings(commands.Cog):
     async def repeated_chars(self, ctx, chars: int):
         if chars > 100:
             return await ctx.send("Hey! You can't set max repeated chars above 100!")
-        if chars < 5:
+        if chars < 5 and chars != 0:
             return await ctx.send("Hey! You can't set max repeated chars below 5!")
 
         await self.bot.settings.set(ctx.guild, "repeated_chars", str(chars))
