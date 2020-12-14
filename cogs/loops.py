@@ -17,7 +17,7 @@ class loops(commands.Cog):
     def cog_unload(self):
         self.cache_cleanup.cancel()
 
-    @tasks.loop(seconds=60.0)
+    @tasks.loop(seconds=60)
     async def cache_cleanup(self):
         try:
             cache_size = basic.get_size("cache")
@@ -37,5 +37,5 @@ class loops(commands.Cog):
             await self.bot.on_error("cache_cleanup", error)
 
     @cache_cleanup.before_loop
-    async def before_file_saving_loop(self):
+    async def before_loops(self):
         await self.bot.wait_until_ready()

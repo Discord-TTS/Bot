@@ -20,35 +20,9 @@ async def channel_check(ctx):
         await ctx.send(f"Error: Wrong channel, do {ctx.bot.command_prefix}channel get the channel that has been setup.")
         raise commands.NotOwner
 
-class cmds_main(commands.Cog):
+class cmds_main(commands.Cog, name="Main Commands"):
     def __init__(self, bot):
         self.bot = bot
-
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
-    @commands.command(aliases=["commands"])
-    async def help(self, ctx):
-        message = """
-          `-setup #textchannel`: Setup the bot to read messages from that channel
-
-          `-join`: Joins the voice channel you're in
-          `-leave`: Leaves voice channel TTS Bot is in
-          `-clear`: Clears the message queue
-
-          `-settings`: Display the current settings
-          `-settings help`: Displays list of available settings
-          `-set property value`: Sets a setting
-          """
-        message1 = """
-          `-help`: Shows this message
-          `-botstats`: Shows various different stats
-          `-donate`: Help improve TTS Bot's development and hosting through Patreon
-          `-suggest *suggestion*`: Suggests a new feature! (could also DM TTS Bot)
-          `-invite`: Sends the instructions to invite TTS Bot!"""
-
-        embed = discord.Embed(title="TTS Bot Help!", url="https://discord.gg/zWPWwQC", description=cleandoc(message), color=0x3498db)
-        embed.add_field(name="Universal Commands", value=cleandoc(message1), inline=False)
-        embed.set_footer(text="Do you want to get support for TTS Bot or invite it to your own server? https://discord.gg/zWPWwQC")
-        await ctx.send(embed=embed)
 
     @commands.guild_only()
     @commands.cooldown(1, 10, commands.BucketType.guild)
@@ -56,6 +30,7 @@ class cmds_main(commands.Cog):
     @commands.check(channel_check)
     @commands.command()
     async def join(self, ctx):
+        "Joins the voice channel you're in!"
         if ctx.author.voice is None:
             return await ctx.send("Error: You need to be in a voice channel to make me join your voice channel!")
 
@@ -96,6 +71,7 @@ class cmds_main(commands.Cog):
     @commands.check(channel_check)
     @commands.command()
     async def leave(self, ctx):
+        "Leaves voice channel TTS Bot is in!"
         if ctx.channel.id != int(await self.bot.settings.get(ctx.guild, "channel")):
             return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
 
@@ -121,6 +97,7 @@ class cmds_main(commands.Cog):
     @commands.cooldown(1, 60, commands.BucketType.member)
     @commands.command(aliases=("clear", "leaveandjoin"))
     async def skip(self, ctx):
+        "Clears the message queue!"
         if self.bot.queue.get(ctx.guild.id) in (None, dict()) or self.bot.currently_playing[ctx.guild.id].done():
             return await ctx.send("**Error:** Nothing in message queue to skip!")
 
