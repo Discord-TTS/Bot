@@ -23,7 +23,7 @@ class Main(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def get_tts(self, message, text, lang):
+    async def get_tts(self, message, text, lang, max_length):
         cache_mp3 = await self.bot.cache.get(text, lang, message.id)
         if not cache_mp3:
             make_tts_func = make_func(self.make_tts, text, lang)
@@ -36,7 +36,6 @@ class Main(commands.Cog):
                 return
 
             # Discard if over max length seconds
-            max_length = await self.bot.settings.get(message.guild, "msg_length")
             if file_length < int(max_length):
                 temp_store_for_mp3.seek(0)
                 temp_store_for_mp3 = temp_store_for_mp3.read()
@@ -140,11 +139,12 @@ class Main(commands.Cog):
 
                         # Get settings
                         lang = await self.bot.setlangs.get(message.author)
-                        xsaid, repeated_chars_limit = await self.bot.settings.get(
+                        xsaid, repeated_chars_limit, msg_length = await self.bot.settings.get(
                             message.guild,
                             settings=(
                                 "xsaid",
-                                "repeated_chars"
+                                "repeated_chars",
+                                "msg_length"
                             )
                         )
 
@@ -244,7 +244,7 @@ class Main(commands.Cog):
                             saythis = "".join(saythis_list)
 
                         try:
-                            await self.get_tts(message, saythis, lang)
+                            await self.get_tts(message, saythis, lang, msg_length)
                         except ValueError:
                             return print(f"Run out of attempts generating {saythis}.")
                         except AssertionError:
@@ -277,7 +277,12 @@ class Main(commands.Cog):
                                 except discord.errors.ClientException:
                                     self.bot.currently_playing[message.guild.id].set_result("done")
 
-                                result = await self.bot.currently_playing[message.guild.id]
+                                try:
+                                    result = await asyncio.wait_for(self.bot.currently_playing[message.guild.id], timeout=int(msg_length) + 1)
+                                except asyncio.TimeoutError:
+                                    await self.bot.channels["errors"].send(f"```asyncio.TimeoutError``` Future Failed to be finished in guild: `{message.guild.id}`")
+                                    result = "failed"
+
                                 if result == "skipped":
                                     self.bot.queue[message.guild.id] = dict()
 

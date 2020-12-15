@@ -11,6 +11,7 @@ class FakeCog():
 class FancyHelpCommandCog(commands.Cog):
     def __init__(self, bot):
         bot.help_command = FancyHelpCommand()
+        bot.help_command.cog = self
 
 class FancyHelpCommand(commands.HelpCommand):
     COLOUR = 0x3498db
@@ -87,6 +88,6 @@ class FancyHelpCommand(commands.HelpCommand):
         await self.get_destination().send(embed=embed)
 
     async def send_cog_help(self, cog):
-        await super().send_error_message(self.command_not_found(cog))
+        await super().send_error_message(self.command_not_found(cog.qualified_name))
 
     send_command_help = send_group_help
