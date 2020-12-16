@@ -13,6 +13,7 @@ from discord.ext import commands
 def setup(bot):
     bot.add_cog(events_errors(bot))
 
+
 class events_errors(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -32,10 +33,12 @@ class events_errors(commands.Cog):
 
         elif event in ("on_guild_join", "on_guild_remove"):
             guild = args[0]
-            info = f"Guild = {guild.name} | {guild.id}"
+            info = f"Guild = {guild} | {guild.id}"
 
-        try:    error_message = f"Event: `{event}`\nInfo: `{info}`\n```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
-        except: error_message = f"```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
+        try:
+            error_message = f"Event: `{event}`\nInfo: `{info}`\n```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
+        except:
+            error_message = f"```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
 
         await self.bot.channels["errors"].send(cleandoc(error_message))
 

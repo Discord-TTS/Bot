@@ -5,29 +5,22 @@ from os.path import exists
 import discord
 from discord.ext import commands
 
-switch = {
-    513423712582762502: 738009431052386304, #tts
-    565820959089754119: 738009620601241651, #f@h
-    689564772512825363: 738009624443224195 #channel
-}
-
-if exists("config.ini"):
-    config = ConfigParser()
-    config.read("config.ini")
+config = ConfigParser()
+config.read("config.ini")
 
 def setup(bot):
     bot.add_cog(common_trusted(bot))
 
-class common_trusted(commands.Cog):
+class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
     def __init__(self, bot):
         self.bot = bot
 
     def is_trusted(ctx):
-        if exists("config.ini") and str(ctx.author.id) in config["Main"]["trusted_ids"]:
+        if str(ctx.author.id) in config["Main"]["trusted_ids"]:
             return True
 
         raise commands.errors.NotOwner
-    #////////////////////////////////////////////////////////
+
     @commands.command()
     @commands.check(is_trusted)
     async def block(self, ctx, user: discord.User, notify: bool = False):
@@ -56,14 +49,15 @@ class common_trusted(commands.Cog):
     @commands.check(is_trusted)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def getinvite(self, ctx, guild: int):
-        invite = False
         guild = self.bot.get_guild(guild)
 
         for channel in guild.channels:
-            try:    invite = str(await channel.create_invite())
-            except: continue
+            try:
+                invite = str(await channel.create_invite())
+            except:
+                continue
             if invite:
-                return await ctx.send(f"Invite to {guild.name} | {guild.id}: {invite}")
+                return await ctx.send(f"Invite to {guild} | {guild.id}: {invite}")
 
         await ctx.send("Error: No permissions to make an invite!")
 
@@ -95,7 +89,7 @@ class common_trusted(commands.Cog):
         if not self.bot.supportserver.chunked:
             await self.bot.supportserver.chunk(cache=True)
 
-        ofs_role = self.bot.supportserver.get_role(switch[self.bot.user.id])
+        ofs_role = self.bot.supportserver.get_role(738009431052386304)
         highlighted_ofs = self.bot.supportserver.get_role(703307566654160969)
 
         people_with_owner_of_server = [member.id for member in ofs_role.members]
@@ -109,7 +103,7 @@ class common_trusted(commands.Cog):
 
         for ofs_person in people_with_owner_of_server:
             if ofs_person not in owner_list:
-                roles = [ofs_role,]
+                roles = [ofs_role, ]
                 embed = discord.Embed(description=f"Role Removed: Removed {ofs_role.mention} from <@{ofs_person}>")
                 if ofs_person in people_with_highlighted_ofs:
                     roles.append(highlighted_ofs)
@@ -118,11 +112,12 @@ class common_trusted(commands.Cog):
                 await self.bot.channels["logs"].send(embed=embed)
 
         for guild_owner in owner_list:
-            if guild_owner not in supportserver_members: continue
+            if guild_owner not in supportserver_members:
+                continue
 
             guild_owner = self.bot.supportserver.get_member(guild_owner)
-            additional_message = False
-            embed = False
+            additional_message = None
+            embed = None
 
             if guild_owner.id not in people_with_owner_of_server:
                 await guild_owner.add_roles(ofs_role)
@@ -137,9 +132,6 @@ class common_trusted(commands.Cog):
                     await guild_owner.add_roles(highlighted_ofs)
 
             if embed or additional_message:
-                if not embed: embed = None
-                if not additional_message: additional_message = None
-
                 await self.bot.channels["logs"].send(additional_message, embed=embed)
 
         await ctx.send("Done!")
@@ -159,7 +151,7 @@ class common_trusted(commands.Cog):
                 if guild in all_guild.name:
                     guild_object = all_guild
 
-        if guild_object is False:
+        if not guild_object:
             raise commands.BadArgument
 
         owner = self.bot.get_user(guild_object.owner_id)

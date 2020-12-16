@@ -7,7 +7,7 @@ from discord.ext import commands
 def setup(bot):
     bot.add_cog(cmds_dev(bot))
 
-class cmds_dev(commands.Cog):
+class cmds_dev(commands.Cog, command_attrs=dict(hidden=True)):
     def __init__(self, bot):
         self.bot = bot
 
@@ -32,6 +32,9 @@ class cmds_dev(commands.Cog):
         if reset.lower() == "reset":
             self.bot.playing[ctx.guild.id] = 0
             self.bot.queue[ctx.guild.id] = dict()
+            if self.bot.currently_playing.get(ctx.guild.id) is not None and not self.bot.currently_playing[ctx.guild.id].done():
+                self.bot.currently_playing[ctx.guild.id].set_result("done")
+
             embed = discord.Embed(
                 title="Values Reset!",
                 description="Playing and queue values for this guild have been reset, hopefully this will fix issues."
@@ -49,5 +52,5 @@ class cmds_dev(commands.Cog):
             file=discord.File(
                 StringIO(str(self.bot.queue[ctx.guild.id])),
                 filename="queue.txt"
-                )
             )
+        )

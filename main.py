@@ -9,7 +9,6 @@ from discord.ext import commands
 
 from utils import basic, cache, settings
 
-#//////////////////////////////////////////////////////
 print("Starting TTS Bot!")
 
 start_time = monotonic()
@@ -29,6 +28,7 @@ status = getattr(discord.Status, config["Activity"]["status"])
 bot = commands.AutoShardedBot(
     status=status,
     intents=intents,
+    help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
     activity=activity,
     command_prefix="-",
     case_insensitive=True,
@@ -36,18 +36,18 @@ bot = commands.AutoShardedBot(
 )
 
 pool = bot.loop.run_until_complete(
-        asyncpg.create_pool(
-            host=config["PostgreSQL Info"]["ip"],
-            user=config["PostgreSQL Info"]["name"],
-            database=config["PostgreSQL Info"]["db"],
-            password=config["PostgreSQL Info"]["pass"]
-        )
+    asyncpg.create_pool(
+        host=config["PostgreSQL Info"]["ip"],
+        user=config["PostgreSQL Info"]["name"],
+        database=config["PostgreSQL Info"]["db"],
+        password=config["PostgreSQL Info"]["pass"]
     )
+)
 
 bot.queue = dict()
 bot.playing = dict()
 bot.channels = dict()
-bot.remove_command("help")
+bot.currently_playing = dict()
 bot.settings = settings.settings_class(pool)
 bot.setlangs = settings.setlangs_class(pool)
 bot.nicknames = settings.nickname_class(pool)
@@ -59,6 +59,7 @@ for cog in listdir("cogs"):
     if cog.endswith(".py"):
         bot.load_extension(f"cogs.{cog[:-3]}")
         print(f"Successfully loaded: {cog}")
+
 
 @bot.event
 async def on_ready():
