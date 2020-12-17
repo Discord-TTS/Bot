@@ -30,7 +30,7 @@ bot = commands.AutoShardedBot(
     intents=intents,
     help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
     activity=activity,
-    command_prefix="-",
+    command_prefix="t-",
     case_insensitive=True,
     chunk_guilds_at_startup=False,
 )

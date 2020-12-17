@@ -340,7 +340,7 @@ class Main(commands.Cog):
     async def on_voice_state_update(self, member, before, after):
         guild = member.guild
         vc = guild.voice_client
-        playing = basic.get_value(self.bot.playing, guild.id)
+        playing = self.bot.playing.get(guild.id)
 
         if member == self.bot.user:
             return  # someone other than bot left vc
