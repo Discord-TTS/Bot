@@ -96,7 +96,7 @@ class Main(commands.Cog):
                 return
 
             # if author is not a bot, and is not in a voice channel, and doesn't start with -tts
-            if not message.author.bot and message.author.voice is None and starts_with_tts is False:
+            if not message.author.bot and not message.author.voice and not starts_with_tts:
                 return
 
             # if bot not in voice channel and autojoin is off
@@ -267,7 +267,7 @@ class Main(commands.Cog):
 
                     # Play selected audio
                     vc = message.guild.voice_client
-                    if vc is not None:
+                    if vc:
                         self.bot.currently_playing[message.guild.id] = self.bot.loop.create_future()
                         finish_future = make_func(self.finish_future, self.bot.currently_playing[message.guild.id])
 
@@ -293,7 +293,7 @@ class Main(commands.Cog):
                         # If not in a voice channel anymore, clear the queue
                         self.bot.queue[message.guild.id] = dict()
 
-        elif message.author.bot is False:
+        elif not message.author.bot:
             pins = await message.author.pins()
 
             if [True for pinned_message in pins if pinned_message.embeds and pinned_message.embeds[0].title == f"Welcome to {self.bot.user.name} Support DMs!"]:
