@@ -99,196 +99,199 @@ class Main(commands.Cog):
             if not message.author.bot and message.author.voice is None and starts_with_tts is False:
                 return
 
-            # if bot **not** in voice channel and autojoin **is off**, return
-            if message.guild.voice_client is None and autojoin is False:
+            # if bot not in voice channel and autojoin is off
+            if not message.guild.voice_client and not autojoin:
                 return
 
             # Check if a setup channel
             if message.channel.id != int(channel):
                 return
 
-            # If message is **not** empty **or** there is an attachment
-            if saythis or message.attachments:
+            # If message is empty and there is no attachments
+            if not saythis and not message.attachments:
+                return
 
-                # Ignore messages starting with -
-                if saythis.startswith(self.bot.command_prefix) is False or starts_with_tts:
+            # Ignore messages starting with -
+            if saythis.startswith(self.bot.command_prefix) and not starts_with_tts:
+                return
 
-                    # This line :( | if autojoin is True **or** message starts with -tts **or** author in same voice channel as bot
-                    if autojoin or starts_with_tts or message.author.bot or message.author.voice.channel == message.guild.voice_client.channel:
+            # if not autojoin and message doesn't start with tts and the author isn't a bot and the author is in the wrong voice channel
+            if not autojoin and not starts_with_tts and not message.author.bot and message.author.voice.channel != message.guild.voice_client.channel:
+                return
 
-                        # Fix values
-                        if message.guild.id not in self.bot.queue:
-                            self.bot.queue[message.guild.id] = dict()
-                        if message.guild.id not in self.bot.message_locks:
-                            self.bot.message_locks[message.guild.id] = asyncio.Lock()
+            # Fix values
+            if message.guild.id not in self.bot.queue:
+                self.bot.queue[message.guild.id] = dict()
+            if message.guild.id not in self.bot.message_locks:
+                self.bot.message_locks[message.guild.id] = asyncio.Lock()
 
-                        leaving = self.bot.should_return.get(message.guild.id)
+            should_return = self.bot.should_return.get(message.guild.id)
 
-                        # Auto Join
-                        if message.guild.voice_client is None and autojoin and not leaving:
-                            try:
-                                channel = message.author.voice.channel
-                            except AttributeError:
-                                return
+            # Auto Join
+            if message.guild.voice_client is None and autojoin and not should_return:
+                try:
+                    channel = message.author.voice.channel
+                except AttributeError:
+                    return
 
-                            self.bot.should_return[message.guild.id] = True
-                            await channel.connect()
-                            self.bot.should_return[message.guild.id] = False
+                self.bot.should_return[message.guild.id] = True
+                await channel.connect()
+                self.bot.should_return[message.guild.id] = False
 
-                        # Get settings
-                        lang = await self.bot.setlangs.get(message.author)
-                        xsaid, repeated_chars_limit, msg_length = await self.bot.settings.get(
-                            message.guild,
-                            settings=(
-                                "xsaid",
-                                "repeated_chars",
-                                "msg_length"
-                            )
-                        )
+            # Get settings
+            lang = await self.bot.setlangs.get(message.author)
+            xsaid, repeated_chars_limit, msg_length = await self.bot.settings.get(
+                message.guild,
+                settings=(
+                    "xsaid",
+                    "repeated_chars",
+                    "msg_length"
+                )
+            )
 
-                        # Emoji filter
-                        saythis = basic.emojitoword(saythis)
+            # Emoji filter
+            saythis = basic.emojitoword(saythis)
 
-                        # Acronyms and removing -tts
-                        saythis = f" {saythis} "
-                        acronyms = {
-                            "iirc": "if I recall correctly",
-                            "afaik": "as far as I know",
-                            "wdym": "what do you mean",
-                            "imo": "in my opinion",
-                            "brb": "be right back",
-                            "irl": "in real life",
-                            "jk": "just kidding",
-                            "btw": "by the way",
-                            ":)": "smiley face",
-                            "gtg": "got to go",
-                            "rn": "right now",
-                            ":(": "sad face",
-                            "ig": "i guess",
-                            "rly": "really",
-                            "cya": "see ya",
-                            "ik": "i know",
-                            "uwu": "oowoo",
-                            "@": "at",
-                            "™️": "tm"
-                        }
+            # Acronyms and removing -tts
+            saythis = f" {saythis} "
+            acronyms = {
+                "iirc": "if I recall correctly",
+                "afaik": "as far as I know",
+                "wdym": "what do you mean",
+                "imo": "in my opinion",
+                "brb": "be right back",
+                "irl": "in real life",
+                "jk": "just kidding",
+                "btw": "by the way",
+                ":)": "smiley face",
+                "gtg": "got to go",
+                "rn": "right now",
+                ":(": "sad face",
+                "ig": "i guess",
+                "rly": "really",
+                "cya": "see ya",
+                "ik": "i know",
+                "uwu": "oowoo",
+                "@": "at",
+                "™️": "tm"
+            }
 
-                        if starts_with_tts:
-                            acronyms["-tts"] = ""
+            if starts_with_tts:
+                acronyms["-tts"] = ""
 
-                        for toreplace, replacewith in acronyms.items():
-                            saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
+            for toreplace, replacewith in acronyms.items():
+                saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
 
-                        saythis = saythis[1:-1]
-                        if saythis == "?":
-                            saythis = "what"
+            saythis = saythis[1:-1]
+            if saythis == "?":
+                saythis = "what"
 
-                        # Regex replacements
-                        regex_replacements = {
-                            r"\|\|.*?\|\|": ". spoiler avoided.",
-                            r"```.*?```": ". code block.",
-                            r"`.*?`": ". code snippet.",
-                        }
+            # Regex replacements
+            regex_replacements = {
+                r"\|\|.*?\|\|": ". spoiler avoided.",
+                r"```.*?```": ". code block.",
+                r"`.*?`": ". code snippet.",
+            }
 
-                        for regex, replacewith in regex_replacements.items():
-                            saythis = re.sub(regex, replacewith, saythis, flags=re.DOTALL)
+            for regex, replacewith in regex_replacements.items():
+                saythis = re.sub(regex, replacewith, saythis, flags=re.DOTALL)
 
-                        # Url filter
-                        contained_url = False
-                        for word in saythis.split(" "):
-                            if word.startswith(("https://", "http://", "www.")):
-                                saythis = saythis.replace(word, "")
-                                contained_url = True
+            # Url filter
+            contained_url = False
+            for word in saythis.split(" "):
+                if word.startswith(("https://", "http://", "www.")):
+                    saythis = saythis.replace(word, "")
+                    contained_url = True
 
-                        # Toggleable xsaid and attachment + links detection
-                        if xsaid:
-                            said_name = await self.bot.nicknames.get(message.guild, message.author)
-                            format = basic.exts_to_format(message.attachments)
+            # Toggleable xsaid and attachment + links detection
+            if xsaid:
+                said_name = await self.bot.nicknames.get(message.guild, message.author)
+                format = basic.exts_to_format(message.attachments)
 
-                            if contained_url:
-                                if saythis:
-                                    saythis += " and sent a link."
-                                else:
-                                    saythis = "a link."
+                if contained_url:
+                    if saythis:
+                        saythis += " and sent a link."
+                    else:
+                        saythis = "a link."
 
-                            if message.attachments:
-                                if not saythis:
-                                    saythis = f"{said_name} sent {format}"
-                                else:
-                                    saythis = f"{said_name} sent {format} and said {saythis}"
-                            else:
-                                saythis = f"{said_name} said: {saythis}"
+                if message.attachments:
+                    if not saythis:
+                        saythis = f"{said_name} sent {format}"
+                    else:
+                        saythis = f"{said_name} sent {format} and said {saythis}"
+                else:
+                    saythis = f"{said_name} said: {saythis}"
 
-                        elif contained_url:
-                            if saythis:
-                                saythis += ". This message contained a link"
-                            else:
-                                saythis = "a link."
+            elif contained_url:
+                if saythis:
+                    saythis += ". This message contained a link"
+                else:
+                    saythis = "a link."
 
-                        if basic.remove_chars(saythis, " ", "?", ".", ")", "'", "!", '"') == "":
-                            return
+            if basic.remove_chars(saythis, " ", "?", ".", ")", "'", "!", '"') == "":
+                return
 
-                        # Repeated chars removal if setting is not 0
-                        repeated_chars_limit = int(repeated_chars_limit)
-                        if saythis.isprintable() and repeated_chars_limit != 0:
-                            saythis_chars = ["".join(grp) for num, grp in groupby(saythis)]
-                            saythis_list = list()
+            # Repeated chars removal if setting is not 0
+            repeated_chars_limit = int(repeated_chars_limit)
+            if saythis.isprintable() and repeated_chars_limit != 0:
+                saythis_chars = ["".join(grp) for num, grp in groupby(saythis)]
+                saythis_list = list()
 
-                            for char in saythis_chars:
-                                if len(char) > repeated_chars_limit:
-                                    saythis_list.append(char[0] * repeated_chars_limit)
-                                else:
-                                    saythis_list.append(char)
+                for char in saythis_chars:
+                    if len(char) > repeated_chars_limit:
+                        saythis_list.append(char[0] * repeated_chars_limit)
+                    else:
+                        saythis_list.append(char)
 
-                            saythis = "".join(saythis_list)
+                saythis = "".join(saythis_list)
 
-                        # Adds filtered message to queue
+            # Adds filtered message to queue
+            try:
+                await self.get_tts(message, saythis, lang, msg_length)
+            except ValueError:
+                return print(f"Run out of attempts generating {saythis}.")
+            except AssertionError:
+                return print(f"Skipped {saythis}, apparently blank message.")
+
+            async with self.bot.message_locks[message.guild.id]:
+                if self.bot.should_return[message.guild.id]:
+                    return
+
+                while self.bot.queue.get(message.guild.id) not in (dict(), None):
+                    # Sort Queue
+                    self.bot.queue[message.guild.id] = basic.sort_dict(self.bot.queue[message.guild.id])
+
+                    # Select first in queue
+                    message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
+                    selected = self.bot.queue[message.guild.id][message_id_to_read]
+
+                    # Play selected audio
+                    vc = message.guild.voice_client
+                    if vc is not None:
+                        self.bot.currently_playing[message.guild.id] = self.bot.loop.create_future()
+                        finish_future = make_func(self.finish_future, self.bot.currently_playing[message.guild.id])
+
                         try:
-                            await self.get_tts(message, saythis, lang, msg_length)
-                        except ValueError:
-                            return print(f"Run out of attempts generating {saythis}.")
-                        except AssertionError:
-                            return print(f"Skipped {saythis}, apparently blank message.")
+                            vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'), after=finish_future)
+                        except discord.errors.ClientException:
+                            self.bot.currently_playing[message.guild.id].set_result("done")
 
-                        async with self.bot.message_locks[message.guild.id]:
-                            if self.bot.should_return[message.guild.id]:
-                                return
+                        try:
+                            result = await asyncio.wait_for(self.bot.currently_playing[message.guild.id], timeout=int(msg_length) + 1)
+                        except asyncio.TimeoutError:
+                            await self.bot.channels["errors"].send(f"```asyncio.TimeoutError``` Future Failed to be finished in guild: `{message.guild.id}`")
+                            result = "failed"
 
-                            while self.bot.queue.get(message.guild.id) not in (dict(), None):
-                                # Sort Queue
-                                self.bot.queue[message.guild.id] = basic.sort_dict(self.bot.queue[message.guild.id])
+                        if result == "skipped":
+                            self.bot.queue[message.guild.id] = dict()
 
-                                # Select first in queue
-                                message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
-                                selected = self.bot.queue[message.guild.id][message_id_to_read]
+                        # Delete said message from queue
+                        elif message_id_to_read in self.bot.queue.get(message.guild.id, ()):
+                            del self.bot.queue[message.guild.id][message_id_to_read]
 
-                                # Play selected audio
-                                vc = message.guild.voice_client
-                                if vc is not None:
-                                    self.bot.currently_playing[message.guild.id] = self.bot.loop.create_future()
-                                    finish_future = make_func(self.finish_future, self.bot.currently_playing[message.guild.id])
-
-                                    try:
-                                        vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'), after=finish_future)
-                                    except discord.errors.ClientException:
-                                        self.bot.currently_playing[message.guild.id].set_result("done")
-
-                                    try:
-                                        result = await asyncio.wait_for(self.bot.currently_playing[message.guild.id], timeout=int(msg_length) + 1)
-                                    except asyncio.TimeoutError:
-                                        await self.bot.channels["errors"].send(f"```asyncio.TimeoutError``` Future Failed to be finished in guild: `{message.guild.id}`")
-                                        result = "failed"
-
-                                    if result == "skipped":
-                                        self.bot.queue[message.guild.id] = dict()
-
-                                    # Delete said message from queue
-                                    elif message_id_to_read in self.bot.queue.get(message.guild.id, ()):
-                                        del self.bot.queue[message.guild.id][message_id_to_read]
-
-                                else:
-                                    # If not in a voice channel anymore, clear the queue
-                                    self.bot.queue[message.guild.id] = dict()
+                    else:
+                        # If not in a voice channel anymore, clear the queue
+                        self.bot.queue[message.guild.id] = dict()
 
         elif message.author.bot is False:
             pins = await message.author.pins()
