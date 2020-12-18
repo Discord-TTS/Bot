@@ -1,4 +1,5 @@
 import configparser
+from os import mkdir
 
 import asyncpg
 import discord
@@ -19,10 +20,12 @@ token = input("Input a bot token: ")
 main_server = int(input("What is the ID of the main server for your bot? (Suggestions, errors and DMs will be sent here): "))
 trusted_ids = input("Input a list of trusted user IDs (allowing for moderation commands such as -(un)block, -dm, -refreshroles, -lookupinfo, and others.): ").split(", ")
 
+mkdir("cache")
+
 cache_key = Fernet.generate_key()
 config["Main"] = {
     "token": token,
-    "cache_key": cache_key,
+    "key": cache_key,
     "main_server": main_server,
     "trusted_ids": trusted_ids,
 }
@@ -48,6 +51,7 @@ async def on_ready():
     conn = await asyncpg.connect(
         user=psql_name,
         password=psql_pass,
+        database=psql_db,
         host=psql_ip
     )
 
