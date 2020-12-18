@@ -30,9 +30,10 @@ bot = commands.AutoShardedBot(
     intents=intents,
     help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
     activity=activity,
-    command_prefix="t-",
+    command_prefix="-",
     case_insensitive=True,
     chunk_guilds_at_startup=False,
+    allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
 )
 
 pool = bot.loop.run_until_complete(
@@ -45,8 +46,9 @@ pool = bot.loop.run_until_complete(
 )
 
 bot.queue = dict()
-bot.playing = dict()
 bot.channels = dict()
+bot.should_return = dict()
+bot.message_locks = dict()
 bot.currently_playing = dict()
 bot.settings = settings.settings_class(pool)
 bot.setlangs = settings.setlangs_class(pool)
@@ -83,11 +85,6 @@ async def on_ready():
         bot.starting_message = await bot.channels["logs"].send(f"Restarted as {bot.user.name}!")
     except AttributeError:
         print(f"Logged into Discord as {bot.user.name}!")
-
-        for guild in bot.guilds:
-            bot.playing[guild.id] = 0
-            bot.queue[guild.id] = dict()
-
         bot.starting_message = await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
 
 print("\nLogging into Discord...")

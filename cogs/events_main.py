@@ -24,8 +24,8 @@ class Main(commands.Cog):
         self.bot = bot
 
     async def get_tts(self, message, text, lang, max_length):
-        cache_mp3 = await self.bot.cache.get(text, lang, message.id)
-        if not cache_mp3:
+        mp3 = await self.bot.cache.get(text, lang, message.id)
+        if not mp3:
             make_tts_func = make_func(self.make_tts, text, lang)
             temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
 
@@ -36,14 +36,15 @@ class Main(commands.Cog):
                 return
 
             # Discard if over max length seconds
-            if file_length < int(max_length):
-                temp_store_for_mp3.seek(0)
-                temp_store_for_mp3 = temp_store_for_mp3.read()
+            if file_length > int(max_length):
+                return
 
-                self.bot.queue[message.guild.id][message.id] = temp_store_for_mp3
-                await self.bot.cache.set(text, lang, message.id, temp_store_for_mp3)
-        else:
-            self.bot.queue[message.guild.id][message.id] = cache_mp3
+            temp_store_for_mp3.seek(0)
+            mp3 = temp_store_for_mp3.read()
+
+            await self.bot.cache.set(text, lang, message.id, mp3)
+
+        self.bot.queue[message.guild.id][message.id] = mp3
 
     def make_tts(self, text, lang) -> BytesIO:
         temp_store_for_mp3 = BytesIO()
@@ -59,7 +60,7 @@ class Main(commands.Cog):
             try:
                 gTTS.gTTS(text=text, lang=lang).write_to_fp(temp_store_for_mp3)
                 break
-            except ValueError:
+            except (ValueError, gtts.tts.gTTSError):
                 if attempt == max_range:
                     raise
 
@@ -71,11 +72,6 @@ class Main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        try:
-            self.bot.starting_message.content
-        except:
-            return print("Skipping message, bot not started!")
-
         if message.guild is not None:
             saythis = message.clean_content.lower()
 
@@ -123,19 +119,21 @@ class Main(commands.Cog):
                         # Fix values
                         if message.guild.id not in self.bot.queue:
                             self.bot.queue[message.guild.id] = dict()
-                        if message.guild.id not in self.bot.playing:
-                            self.bot.playing[message.guild.id] = 0
+                        if message.guild.id not in self.bot.message_locks:
+                            self.bot.message_locks[message.guild.id] = asyncio.Lock()
+
+                        leaving = self.bot.should_return.get(message.guild.id)
 
                         # Auto Join
-                        if message.guild.voice_client is None and autojoin and self.bot.playing.get(message.guild.id) in (0, 1):
+                        if message.guild.voice_client is None and autojoin and not leaving:
                             try:
                                 channel = message.author.voice.channel
                             except AttributeError:
                                 return
 
-                            self.bot.playing[message.guild.id] = 3
+                            self.bot.should_return[message.guild.id] = True
                             await channel.connect()
-                            self.bot.playing[message.guild.id] = 0
+                            self.bot.should_return[message.guild.id] = False
 
                         # Get settings
                         lang = await self.bot.setlangs.get(message.author)
@@ -202,7 +200,7 @@ class Main(commands.Cog):
                                 saythis = saythis.replace(word, "")
                                 contained_url = True
 
-                        # Toggleable X said and attachment detection
+                        # Toggleable xsaid and attachment + links detection
                         if xsaid:
                             said_name = await self.bot.nicknames.get(message.guild, message.author)
                             format = basic.exts_to_format(message.attachments)
@@ -230,6 +228,7 @@ class Main(commands.Cog):
                         if basic.remove_chars(saythis, " ", "?", ".", ")", "'", "!", '"') == "":
                             return
 
+                        # Repeated chars removal if setting is not 0
                         repeated_chars_limit = int(repeated_chars_limit)
                         if saythis.isprintable() and repeated_chars_limit != 0:
                             saythis_chars = ["".join(grp) for num, grp in groupby(saythis)]
@@ -243,6 +242,7 @@ class Main(commands.Cog):
 
                             saythis = "".join(saythis_list)
 
+                        # Adds filtered message to queue
                         try:
                             await self.get_tts(message, saythis, lang, msg_length)
                         except ValueError:
@@ -250,52 +250,46 @@ class Main(commands.Cog):
                         except AssertionError:
                             return print(f"Skipped {saythis}, apparently blank message.")
 
-                        # Queue, please don't touch this, it works somehow
-                        while self.bot.playing.get(message.guild.id) != 0:
-                            if self.bot.playing.get(message.guild.id) in (None, 2):
+                        async with self.bot.message_locks[message.guild.id]:
+                            if self.bot.should_return[message.guild.id]:
                                 return
-                            await asyncio.sleep(0.5)
 
-                        self.bot.playing[message.guild.id] = 1
+                            while self.bot.queue.get(message.guild.id) not in (dict(), None):
+                                # Sort Queue
+                                self.bot.queue[message.guild.id] = basic.sort_dict(self.bot.queue[message.guild.id])
 
-                        while self.bot.queue.get(message.guild.id) not in (dict(), None):
-                            # Sort Queue
-                            self.bot.queue[message.guild.id] = basic.sort_dict(self.bot.queue[message.guild.id])
+                                # Select first in queue
+                                message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
+                                selected = self.bot.queue[message.guild.id][message_id_to_read]
 
-                            # Select first in queue
-                            message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
-                            selected = self.bot.queue[message.guild.id][message_id_to_read]
+                                # Play selected audio
+                                vc = message.guild.voice_client
+                                if vc is not None:
+                                    self.bot.currently_playing[message.guild.id] = self.bot.loop.create_future()
+                                    finish_future = make_func(self.finish_future, self.bot.currently_playing[message.guild.id])
 
-                            # Play selected audio
-                            vc = message.guild.voice_client
-                            if vc is not None:
-                                self.bot.currently_playing[message.guild.id] = self.bot.loop.create_future()
-                                finish_future = make_func(self.finish_future, self.bot.currently_playing[message.guild.id])
+                                    try:
+                                        vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'), after=finish_future)
+                                    except discord.errors.ClientException:
+                                        self.bot.currently_playing[message.guild.id].set_result("done")
 
-                                try:
-                                    vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'), after=finish_future)
-                                except discord.errors.ClientException:
-                                    self.bot.currently_playing[message.guild.id].set_result("done")
+                                    try:
+                                        result = await asyncio.wait_for(self.bot.currently_playing[message.guild.id], timeout=int(msg_length) + 1)
+                                    except asyncio.TimeoutError:
+                                        await self.bot.channels["errors"].send(f"```asyncio.TimeoutError``` Future Failed to be finished in guild: `{message.guild.id}`")
+                                        result = "failed"
 
-                                try:
-                                    result = await asyncio.wait_for(self.bot.currently_playing[message.guild.id], timeout=int(msg_length) + 1)
-                                except asyncio.TimeoutError:
-                                    await self.bot.channels["errors"].send(f"```asyncio.TimeoutError``` Future Failed to be finished in guild: `{message.guild.id}`")
-                                    result = "failed"
+                                    if result == "skipped":
+                                        self.bot.queue[message.guild.id] = dict()
 
-                                if result == "skipped":
+                                    # Delete said message from queue
+                                    elif message_id_to_read in self.bot.queue.get(message.guild.id, ()):
+                                        del self.bot.queue[message.guild.id][message_id_to_read]
+
+                                else:
+                                    # If not in a voice channel anymore, clear the queue
                                     self.bot.queue[message.guild.id] = dict()
 
-                                # Delete said message from queue
-                                elif message_id_to_read in self.bot.queue.get(message.guild.id, ""):
-                                    del self.bot.queue[message.guild.id][message_id_to_read]
-
-                            else:
-                                # If not in a voice channel anymore, clear the queue
-                                self.bot.queue[message.guild.id] = dict()
-
-                        # Queue should be empty now, let next on_message though
-                        self.bot.playing[message.guild.id] = 0
         elif message.author.bot is False:
             pins = await message.author.pins()
 
@@ -340,7 +334,7 @@ class Main(commands.Cog):
     async def on_voice_state_update(self, member, before, after):
         guild = member.guild
         vc = guild.voice_client
-        playing = self.bot.playing.get(guild.id)
+        no_speak = self.bot.should_return.get(guild.id)
 
         if member == self.bot.user:
             return  # someone other than bot left vc
@@ -351,9 +345,8 @@ class Main(commands.Cog):
 
         if len([member for member in vc.channel.members if not member.bot]) != 0:
             return  # bot is only one left
-        if playing not in (0, 1):
+        if no_speak:
             return  # bot not already joining/leaving a voice channel
 
-        self.bot.playing[guild.id] = 2
+        self.bot.should_return[guild.id] = True
         await vc.disconnect(force=True)
-        self.bot.playing[guild.id] = 0

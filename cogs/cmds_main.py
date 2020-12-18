@@ -57,11 +57,11 @@ class cmds_main(commands.Cog, name="Main Commands"):
         embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
         embed.set_footer(text=pick_random(basic.footer_messages))
 
-        self.bot.playing[ctx.guild.id] = 3
+        self.bot.should_return[ctx.guild.id] = True
         self.bot.queue[ctx.guild.id] = dict()
 
         await channel.connect()
-        self.bot.playing[ctx.guild.id] = 0
+        self.bot.should_return[ctx.guild.id] = False
 
         await ctx.send(embed=embed)
 
@@ -84,10 +84,9 @@ class cmds_main(commands.Cog, name="Main Commands"):
         elif ctx.author.voice.channel != ctx.guild.voice_client.channel:
             return await ctx.send("Error: You need to be in the same voice channel as me to make me leave!")
 
-        self.bot.playing[ctx.guild.id] = 2
+        self.bot.should_return = True
         self.bot.queue[ctx.guild.id] = dict()
         await ctx.guild.voice_client.disconnect(force=True)
-        self.bot.playing[ctx.guild.id] = 0
 
         await ctx.send("Left voice channel!")
 
