@@ -77,7 +77,7 @@ class cmds_main(commands.Cog, name="Main Commands"):
         elif ctx.author.voice.channel != ctx.guild.voice_client.channel:
             return await ctx.send("Error: You need to be in the same voice channel as me to make me leave!")
 
-        self.bot.should_return = True
+        self.bot.should_return[ctx.guild.id] = True
         self.bot.queue[ctx.guild.id] = dict()
         await ctx.guild.voice_client.disconnect(force=True)
 

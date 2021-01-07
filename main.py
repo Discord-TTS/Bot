@@ -5,6 +5,7 @@ from time import monotonic
 
 import asyncpg
 import discord
+from aiohttp import ClientSession
 from discord.ext import commands
 
 from utils import basic, cache, settings
@@ -50,6 +51,7 @@ bot.channels = dict()
 bot.should_return = dict()
 bot.message_locks = dict()
 bot.currently_playing = dict()
+bot.session = ClientSession()
 bot.settings = settings.settings_class(pool)
 bot.setlangs = settings.setlangs_class(pool)
 bot.nicknames = settings.nickname_class(pool)
