@@ -1,20 +1,32 @@
 import discord
 from discord.ext import commands
 
+
 def setup(bot):
     bot.add_cog(FancyHelpCommandCog(bot))
+
 
 class FakeCog():
     def __init__(self, name):
         self.qualified_name = name
 
-class FancyHelpCommandCog(commands.Cog):
+
+class FancyHelpCommandCog(commands.Cog, name="Uncategoried"):
     def __init__(self, bot):
-        bot.help_command = FancyHelpCommand()
+        help_command = FancyHelpCommand()
+
+        bot.help_command = help_command
         bot.help_command.cog = self
+        bot.help_command.add_check(
+            commands.bot_has_permissions(
+                read_messages=True, send_messages=True, embed_links=True
+            ).predicate
+        )
+
 
 class FancyHelpCommand(commands.HelpCommand):
     COLOUR = 0x3498db
+
     def __init__(self, *args, **kwargs):
         kwargs["verify_checks"] = False
         super().__init__(*args, **kwargs)
@@ -64,7 +76,7 @@ class FancyHelpCommand(commands.HelpCommand):
             title="TTS Bot Help!",
             description=description,
             colour=self.COLOUR
-            )
+        )
 
         embed.set_author(name=self.context.author.display_name, icon_url=str(self.context.author.avatar_url))
         embed.set_footer(text=self.get_ending_note())
@@ -82,7 +94,7 @@ class FancyHelpCommand(commands.HelpCommand):
             title=f"`{self.clean_prefix}{group.qualified_name}` Help!",
             description=description,
             colour=self.COLOUR
-            )
+        )
 
         embed.set_footer(text=self.get_ending_note(is_group))
         await self.get_destination().send(embed=embed)

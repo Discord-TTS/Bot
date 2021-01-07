@@ -1,5 +1,6 @@
 from inspect import cleandoc
 from io import StringIO
+from asyncio import Lock
 
 import discord
 from discord.ext import commands
@@ -14,43 +15,36 @@ class cmds_dev(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.command()
     @commands.is_owner()
     async def end(self, ctx):
+        await self.bot.session.close()
         await self.bot.close()
 
     @commands.command()
     @commands.is_owner()
     async def channellist(self, ctx):
-        channellist = "".join([f"{voice_client.channel} in {voice_client.channel.guild.name}" for voice_client in self.bot.voice_clients])
-
-        tempplaying = dict()
-        for key in self.bot.playing:
-            if self.bot.playing[key] != 0:
-                tempplaying[key] = self.bot.playing[key]
-        await ctx.send(f"TTS Bot Voice Channels:\n{channellist}\nAnd just incase {tempplaying}")
+        channellist = "\n".join(f"{voice_client.channel} in {voice_client.channel.guild.name}" for voice_client in self.bot.voice_clients)
+        await ctx.send(f"TTS Bot Voice Channels:```{channellist}```")
 
     @commands.command()
     async def debug(self, ctx, reset="nope"):
         if reset.lower() == "reset":
-            self.bot.playing[ctx.guild.id] = 0
             self.bot.queue[ctx.guild.id] = dict()
+            self.bot.message_locks[ctx.guild.id] = Lock()
             if self.bot.currently_playing.get(ctx.guild.id) is not None and not self.bot.currently_playing[ctx.guild.id].done():
                 self.bot.currently_playing[ctx.guild.id].set_result("done")
 
-            embed = discord.Embed(
-                title="Values Reset!",
-                description="Playing and queue values for this guild have been reset, hopefully this will fix issues."
-            )
-            embed.set_footer(text="Debug Command, please only run if told.")
-            return await ctx.send(embed=embed)
+            return await ctx.send("All internal guild values reset, try doing whatever you were doing again!")
 
-        await ctx.author.send(
-            cleandoc(f"""
-                **TTS Bot debug info!**
-                Playing is currently set to {self.bot.playing.get(ctx.guild.id)}
-                Guild is chunked: {ctx.guild.chunked}
-                Queue for {ctx.guild.name} | {ctx.guild.id} is attached:
-            """),
-            file=discord.File(
-                StringIO(str(self.bot.queue[ctx.guild.id])),
-                filename="queue.txt"
-            )
+        lock = self.bot.message_locks.get(ctx.guild.id, False)
+        if lock:
+            lock = lock.locked()
+
+        embed = discord.Embed(
+            title="TTS Bot debug info!",
+            description=cleandoc(f"""
+                Reading messages is currently locked: {lock}
+                Shouldn't read messages: {self.bot.should_return.get(ctx.guild.id)}
+                Queue has {len(self.bot.queue.get(ctx.guild.id, ()))} message(s) in it
+            """)
         )
+
+        await ctx.send(embed=embed)

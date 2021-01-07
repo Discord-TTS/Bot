@@ -29,7 +29,7 @@ class events_errors(commands.Cog):
             if message.guild is None:
                 info = f"DM support | Sent by {message.author}"
             else:
-                info = f"General TTS | Sent by {message.author}"
+                info = f"General TTS | Sent by {message.author} in {message.guild}|{message.guild.id}"
 
         elif event in ("on_guild_join", "on_guild_remove"):
             guild = args[0]
