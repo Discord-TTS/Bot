@@ -1,8 +1,11 @@
 from inspect import cleandoc
+from os import getpid
 from time import monotonic
 
 import discord
 from discord.ext import commands
+from psutil import Process
+
 from utils.basic import ensure_webhook
 
 start_time = monotonic()
@@ -35,7 +38,10 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
         main_section = cleandoc(f"""
           Currently in:
             :small_blue_diamond: {channels} voice channels
-            :small_orange_diamond: {len(self.bot.guilds)} servers
+            :small_blue_diamond: {len(self.bot.guilds)} servers
+          Currently using:
+            :small_orange_diamond: {len(self.bot.shards)} shards
+            :small_orange_diamond: {Process(getpid()).memory_info().rss / 1024 ** 2:.1f}MB of RAM
           and can be used by {sum(guild.member_count for guild in self.bot.guilds):,} people!
         """)
 

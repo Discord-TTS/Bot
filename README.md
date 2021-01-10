@@ -10,7 +10,7 @@ Text to speech Discord Bot using gTTS and discord.py!
 - Type normally in the setup text channel!
 
 ### Hard (Self Host):
-- Make sure you have python 3.5 or above installed (tested with 3.8, should work with 3.5)
+- Make sure you have python 3.5 or above installed (tested with 3.8, should work with 3.5) and a postgresql database ready
 - Make a bot account with [the Discord Developer Portal](https://discord.com/developers/applications/) and note down the token
 - Toggle the `Server Members Intent` toggle in the portal
 - Make sure you have a Discord server ready to be setup as a hub for TTS Bot
@@ -21,15 +21,8 @@ Text to speech Discord Bot using gTTS and discord.py!
 
 ## Variable Explaination:
 
-### `bot.playing[guild_id]`:
-
-- 0 = Not speaking/playing audio  
-1 = Speaking/playing audio  
-2 = Leaving voice channel  
-3 = Joining voice channel  
-
 ### `bot.queue[guild_id]`:
-- Dictionary of message_id: [BytesIO](https://docs.python.org/3/library/io.html#io.BytesIO) objects of gTTS output
+- Dictionary of message_id: bytes objects of gTTS output
 
 ### `bot.trusted`:
 - List of trusted people, stored in the config.ini["Main"]["trusted_ids"]

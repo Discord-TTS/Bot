@@ -1,3 +1,4 @@
+from asyncio import sleep
 from inspect import cleandoc
 from subprocess import call
 
@@ -58,10 +59,12 @@ class events_other(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
         await self.bot.settings.remove(guild)
-        self.bot.playing[guild.id] = 2
+        self.bot.should_return[guild.id] = True
+        await sleep(0)
 
         if guild.id in self.bot.queue:
             self.bot.queue.pop(guild.id, None)
-        if guild.id in self.bot.playing:
-            self.bot.playing.pop(guild.id, None)
+        if guild.id in self.bot.should_return:
+            self.bot.should_return.pop(guild.id, None)
+
         await self.bot.channels["servers"].send(f"Just left/got kicked from {guild}. I am now in {len(self.bot.guilds)} servers".replace("@", "@ "))
