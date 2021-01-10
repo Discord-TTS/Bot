@@ -21,11 +21,15 @@ class loops(commands.Cog):
     async def cache_cleanup(self):
         try:
             cache_size = basic.get_size("cache")
-            if cache_size >= 1073741824:
+            if cache_size >= 2000000000:
                 cache_folder = listdir("cache")
                 cache_folder.sort(reverse=False, key=lambda x: int(''.join(filter(str.isdigit, x))))
+                cache_folder = cache_folder[:1000]
 
-                await self.bot.cache.bulk_remove(cache_folder[:1000])
+                for file in cache_folder:
+                    remove(f"cache/{file}")
+
+                await self.bot.cache.bulk_remove(cache_folder)
 
         except Exception as error:
             await self.bot.on_error("cache_cleanup", error)
