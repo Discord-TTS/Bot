@@ -4,3 +4,4 @@ easygTTS
 asyncpg
 mutagen
 gtts
+psutil
