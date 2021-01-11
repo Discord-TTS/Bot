@@ -18,9 +18,7 @@ class events_other(commands.Cog):
         if message.channel == self.bot.channels["dm_logs"] and not message.author.bot and message.reference:
             webhook_message = await self.bot.channels["dm_logs"].fetch_message(message.reference.message_id)
             webhook_author = webhook_message.author
-            print(webhook_author.bot)
             if webhook_author.bot:
-                print("test")
                 todm= webhook_author.name
                 converter = commands.UserConverter()
                 todm = await converter.convert(message.channel, todm)
