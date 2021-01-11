@@ -15,6 +15,16 @@ class events_other(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        if message.channel == self.bot.channels["dm_logs"] and not message.author.bot and message.reference:
+            webhook_message = await self.bot.channels["dm_logs"].fetch_message(message.reference.message_id)
+            webhook_author = webhook_message.author
+            if webhook_author.bot:
+                todm= webhook_author.name
+                converter = commands.UserConverter()
+                todm = await converter.convert(message.channel, todm)
+                dm = self.bot.get_command("dm")
+                ctx = await self.bot.get_context(message)
+                await dm(ctx, todm, message=message.content)
         if message.channel.id == 749971061843558440 and message.embeds and str(message.author) == "GitHub#0000":
             if " new commit" in message.embeds[0].title:
                 update_for_main = message.embeds[0].title.startswith("[Discord-TTS-Bot:master]") and self.bot.user.id == 513423712582762502
