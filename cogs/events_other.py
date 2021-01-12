@@ -15,11 +15,11 @@ class events_other(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.channel == self.bot.channels["dm_logs"] and not message.author.bot and message.reference:
-            webhook_message = await self.bot.channels["dm_logs"].fetch_message(message.reference.message_id)
-            webhook_author = webhook_message.author
-            if webhook_author.bot:
-                todm= webhook_author.name
+        if message.channel in (self.bot.channels["dm_logs"],self.bot.channels["suggestions"]) and not message.author.bot and message.reference:
+            referenced_message = await message.channel.fetch_message(message.reference.message_id)
+            reference_author = referenced_message.author
+            if reference_author.discriminator == "0000":
+                todm= reference_author.name
                 converter = commands.UserConverter()
                 todm = await converter.convert(message.channel, todm)
                 dm = self.bot.get_command("dm")
