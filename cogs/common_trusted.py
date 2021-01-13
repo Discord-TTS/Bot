@@ -84,6 +84,21 @@ class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
 
     @commands.command()
     @commands.check(is_trusted)
+    async def dmhistory(self, ctx, user: discord.User, amount=10):
+        messages=[]
+        async for message in user.history(limit=amount):
+            if message.embeds:
+                messages.append(f"``{message.author}``:{message.embeds[0].description}")
+            else:
+                messages.append(f"``{message.author}``:{message.content}")
+        tosend=""
+        messages.reverse()
+        for message in messages:
+            tosend+=f"\n{message}"
+        await ctx.send(tosend)
+
+    @commands.command()
+    @commands.check(is_trusted)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def refreshroles(self, ctx):
         if not self.bot.supportserver.chunked:
