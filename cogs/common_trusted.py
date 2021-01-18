@@ -88,14 +88,19 @@ class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
         messages=[]
         async for message in user.history(limit=amount):
             if message.embeds:
-                messages.append(f"``{message.author}``:{message.embeds[0].description}")
+                if message.embeds[0].author:
+                    messages.append(f"``{message.embeds[0].author.name}⚙️``:{message.embeds[0].description}")
+                else:
+                    messages.append(f"``{message.author}⚙️``:{message.embeds[0].description}")
+
             else:
                 messages.append(f"``{message.author}``:{message.content}")
         tosend=""
         messages.reverse()
         for message in messages:
             tosend+=f"\n{message}"
-        await ctx.send(tosend)
+        embed = discord.Embed(title=f"Message history of {user.name}",description=tosend)
+        await ctx.send(embed=embed)
 
     @commands.command()
     @commands.check(is_trusted)
