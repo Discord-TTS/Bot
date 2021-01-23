@@ -64,7 +64,8 @@ async def on_ready():
             bot_ignore     bool DEFAULT True,
             auto_join      bool DEFAULT False,
             msg_length     text DEFAULT 30,
-            repeated_chars text DEFAULT 0
+            repeated_chars text DEFAULT 0,
+            prefix         text DEFAULT '-'
         );
         CREATE TABLE nicknames (
             guild_id text,
