@@ -34,13 +34,14 @@ class Settings(commands.Cog):
             self.bot.nicknames.get(ctx.guild, ctx.author)
         )
 
-        say, channel, join, bot_ignore = await self.bot.settings.get(
+        say, channel, join, bot_ignore, prefix = await self.bot.settings.get(
             ctx.guild,
             settings=(
                 "xsaid",
                 "channel",
                 "auto_join",
-                "bot_ignore"
+                "bot_ignore",
+                "prefix"
             )
         )
 
@@ -60,6 +61,7 @@ class Settings(commands.Cog):
             :small_orange_diamond: XSaid: `{say}`
             :small_orange_diamond: Auto Join: `{join}`
             :small_orange_diamond: Ignore Bots: `{bot_ignore}`
+            :small_orange_diamond: Prefix: `{prefix}`
             :star: Limits: Do `-settings limits` to check!""")
 
         message2 = cleandoc(f"""
@@ -101,6 +103,15 @@ class Settings(commands.Cog):
         "Messages sent by bots and webhooks are not read"
         await self.bot.settings.set(ctx.guild, "bot_ignore", value)
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
+
+    @set.command()
+    @commands.has_permissions(administrator=True)
+    async def prefix(self, ctx: commands.Context, value: str) -> None:
+        """
+        The prefix used before commands
+        """
+        await self.bot.settings.set(ctx.guild, "prefix", value)
+        await ctx.send(f"Prefix is now: {value}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
     @commands.bot_has_permissions(embed_links=True)
