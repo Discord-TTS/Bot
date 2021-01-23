@@ -42,7 +42,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
           Currently using:
             :small_orange_diamond: {len(self.bot.shards)} shards
             :small_orange_diamond: {Process(getpid()).memory_info().rss / 1024 ** 2:.1f}MB of RAM
-          and can be used by {sum(guild.member_count for guild in self.bot.guilds):,} people!
+          and can be used by {sum(guild.member_count for guild in self.bot.guilds if not guild.unavailable):,} people!
         """)
 
         footer = cleandoc("""
