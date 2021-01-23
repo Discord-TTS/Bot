@@ -110,12 +110,13 @@ class Settings(commands.Cog):
 
     @set.command()
     @commands.has_permissions(administrator=True)
-    async def prefix(self, ctx: commands.Context, value: str) -> None:
-        """
-        The prefix used before commands
-        """
-        await self.bot.settings.set(ctx.guild, "prefix", value)
-        await ctx.send(f"Prefix is now: {value}")
+    async def prefix(self, ctx: commands.Context, prefix: str) -> Optional[discord.Message]:
+        """The prefix used before commands"""
+        if prefix > 5 or prefix.count(" ") > 1:
+            return await ctx.send("**Error**: Invalid Prefix! Please use 5 or less characters with maximum 1 space.")
+
+        await self.bot.settings.set(ctx.guild, "prefix", prefix)
+        await ctx.send(f"Command Prefix is now: {prefix}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
     @commands.bot_has_permissions(embed_links=True)
