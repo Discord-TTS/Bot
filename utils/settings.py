@@ -4,6 +4,7 @@ default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid"
 class settings_class():
     def __init__(self, pool):
         self.pool = pool
+        self._cache = dict()
 
     async def remove(self, guild):
         async with self.pool.acquire() as conn:
@@ -13,8 +14,13 @@ class settings_class():
                 """)
 
     async def get(self, guild, setting=None, settings=None):
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM guilds WHERE guild_id = $1", str(guild.id))
+        if not self._cache.get(guild.id):
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT * FROM guilds WHERE guild_id = $1", str(guild.id))
+
+            self._cache[guild.id] = row
+        else:
+            row = self._cache[guild.id]
 
         if not settings:
             if row is None or dict(row)[setting] is None:
@@ -37,6 +43,8 @@ class settings_class():
         return settings_values
 
     async def set(self, guild, setting, value):
+        self._cache.pop(guild.id, None)
+
         guild = str(guild.id)
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
