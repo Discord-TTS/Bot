@@ -26,8 +26,12 @@ class Settings(commands.Cog):
     async def settings(self, ctx, *, help=None):
         "Displays the current settings!"
 
-        if help and help.lower() == "help":
-            return await ctx.send_help("set")
+        if help:
+            help = help.lower()
+            if help == "help":
+                return await ctx.send_help("set")
+            elif help == "limits":
+                return await ctx.send_help("set limits")
 
         lang, nickname = await asyncio.gather(
             self.bot.setlangs.get(ctx.author),
