@@ -78,7 +78,7 @@ class Main(commands.Cog):
                 )
             )
 
-            starts_with_tts = saythis.startswith(f"{self.bot.command_prefix}tts")
+            starts_with_tts = saythis.startswith(f"{self.bot.command_prefix()}tts")
 
             # if author is a bot and bot ignore is on
             if bot_ignore and message.author.bot:
@@ -105,7 +105,7 @@ class Main(commands.Cog):
                 return
 
             # Ignore messages starting with -
-            if saythis.startswith(self.bot.command_prefix) and not starts_with_tts:
+            if saythis.startswith(self.bot.command_prefix()) and not starts_with_tts:
                 return
 
             # if not autojoin and message doesn't start with tts and the author isn't a bot and the author is in the wrong voice channel
