@@ -1,6 +1,6 @@
 from asyncio import Lock
 
-default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "prefix": "-"}
+default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "prefix": "l-"}
 
 
 class settings_class():
@@ -17,6 +17,9 @@ class settings_class():
                 """)
 
     async def get(self, guild, setting=None, settings=None):
+        if setting == "prefix":
+            return "l-"
+
         async with self._cache_lock:
             row = self._cache.get(guild.id)
 
@@ -41,6 +44,8 @@ class settings_class():
         for setting in settings:
             if not setting:
                 setting = default_settings[setting]
+            if setting == "prefix":
+                row_dict[setting] = "l-"
 
             settings_values.append(row_dict[setting])
 

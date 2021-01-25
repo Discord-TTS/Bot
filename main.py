@@ -26,12 +26,15 @@ activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discor
 intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
 status = getattr(discord.Status, config["Activity"]["status"])
 
+async def dummy_prefix(bot, message):
+    return "l-"
+
 bot = commands.AutoShardedBot(
     status=status,
     intents=intents,
     help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
     activity=activity,
-    command_prefix="l-",
+    command_prefix=dummy_prefix,
     case_insensitive=True,
     chunk_guilds_at_startup=False,
     allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
