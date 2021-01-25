@@ -53,7 +53,7 @@ class events_errors(commands.Cog):
             return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
 
         elif isinstance(error, commands.CommandOnCooldown):
-            cooldown_error = await ctx.send(f"**{self.bot.command_prefix}{ctx.command} is on cooldown!** Please try again in {error.retry_after:.1f} seconds.")
+            cooldown_error = await ctx.send(f"**{ctx.prefix}{ctx.command} is on cooldown!** Please try again in {error.retry_after:.1f} seconds.")
             await asyncio.sleep(error.retry_after)
 
             try:

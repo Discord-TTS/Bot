@@ -25,8 +25,10 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(hidden=True)
     async def tts(self, ctx):
-        if ctx.message.content == f"{self.bot.command_prefix}tts":
-            await ctx.send(f"You don't need to do `{self.bot.command_prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{self.bot.command_prefix}`!")
+        prefix = await self.bot.settings(ctx.guild, "prefix")
+
+        if ctx.message.content == f"{prefix}tts":
+            await ctx.send(f"You don't need to do `{prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{prefix}`!")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["info", "stats"])

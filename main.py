@@ -28,11 +28,11 @@ intents = discord.Intents(voice_states=True, messages=True, guilds=True, members
 status = getattr(discord.Status, config["Activity"]["status"])
 
 
-async def prefix(client: discord.Client, message: discord.Message) -> str:
+async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
     """
     gets the prefix for a guild based on the passed message object
     """
-    return await client.settings.get(message.guild, "prefix")
+    return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
 
 
 bot = commands.AutoShardedBot(

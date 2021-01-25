@@ -69,16 +69,20 @@ class Main(commands.Cog):
             saythis = message.clean_content.lower()
 
             # Get settings
-            autojoin, bot_ignore, channel = await self.bot.settings.get(
+            repeated_chars_limit, bot_ignore, msg_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
                 message.guild,
                 settings=(
-                    "auto_join",
+                    "repeated_chars",
                     "bot_ignore",
-                    "channel"
+                    "msg_length",
+                    "auto_join",
+                    "channel",
+                    "prefix",
+                    "xsaid",
                 )
             )
 
-            starts_with_tts = saythis.startswith(f"{self.bot.command_prefix()}tts")
+            starts_with_tts = saythis.startswith(f"{prefix}tts")
 
             # if author is a bot and bot ignore is on
             if bot_ignore and message.author.bot:
@@ -105,7 +109,7 @@ class Main(commands.Cog):
                 return
 
             # Ignore messages starting with -
-            if saythis.startswith(self.bot.command_prefix()) and not starts_with_tts:
+            if saythis.startswith(prefix) and not starts_with_tts:
                 return
 
             # if not autojoin and message doesn't start with tts and the author isn't a bot and the author is in the wrong voice channel
@@ -131,16 +135,8 @@ class Main(commands.Cog):
                 await channel.connect()
                 self.bot.should_return[message.guild.id] = False
 
-            # Get settings
+            # Get lang
             lang = await self.bot.setlangs.get(message.author)
-            xsaid, repeated_chars_limit, msg_length = await self.bot.settings.get(
-                message.guild,
-                settings=(
-                    "xsaid",
-                    "repeated_chars",
-                    "msg_length"
-                )
-            )
 
             # Emoji filter
             saythis = basic.emojitoword(saythis)
