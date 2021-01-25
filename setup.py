@@ -40,7 +40,8 @@ config["PostgreSQL Info"] = {
     "ip": psql_ip,
     "db": psql_db
 }
-
+with open("premium_users.json", "w") as f:
+    f.write("{}")
 
 @bot.event
 async def on_ready():

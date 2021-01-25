@@ -1,4 +1,5 @@
 import asyncio
+import json
 from configparser import ConfigParser
 from os import listdir
 from time import monotonic
@@ -59,11 +60,42 @@ bot.cache = cache.cache(cache_key_bytes, pool)
 bot.blocked_users = settings.blocked_users_class(pool)
 bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
 
+with open("patreon_users.json") as f:
+    bot.patreon_json = json.load(f) 
+
 for cog in listdir("cogs"):
     if cog.endswith(".py"):
         bot.load_extension(f"cogs.{cog[:-3]}")
         print(f"Successfully loaded: {cog}")
 
+@bot.check
+async def premium_check(ctx):
+    if not ctx.guild:
+        return True
+
+    if str(ctx.author.id) in bot.trusted:
+        return True
+
+    if str(ctx.command) == "donate":
+        return True
+
+    premium_user_for_guild = bot.patreon_json.get(str(ctx.guild.id))
+    if premium_user_for_guild in (member.id for member in bot.patreon_role.members):
+        return True
+
+    permissions = ctx.channel.permissions_for(ctx.guild.me)
+    if permissions.send_messages:
+        if permissions.embed_links:
+            embed = discord.Embed(
+                title="TTS Bot Premium",
+                description=f"Hey! This server isn't premium! Please purchase TTS Bot Premium via Patreon! (`{ctx.prefix}donate`)",
+            )
+            embed.set_footer(text="If this is an error, please contact Gnome!#6669.")
+            embed.set_thumbnail(url=bot.user.avatar_url)
+
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send(f"Hey! This server isn't premium! Please purchase TTS Bot premium via Patreon! (`{ctx.prefix}donate`)\n*If this is an error, please contact Gnome!#6669.*")
 
 @bot.event
 async def on_ready():
@@ -88,6 +120,9 @@ async def on_ready():
     except AttributeError:
         print(f"Logged into Discord as {bot.user.name}!")
         bot.starting_message = await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
+
+        await bot.supportserver.chunk(cache=True)
+        bot.patreon_role = discord.utils.get(bot.supportserver.roles, name="Patreon!")
 
 print("\nLogging into Discord...")
 bot.run(t)
