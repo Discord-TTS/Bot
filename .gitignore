@@ -16,3 +16,4 @@ settings.json
 setlangs.json
 activitytype.txt
 blocked_users.json
+cogs/jsk.py

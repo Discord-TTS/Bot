@@ -7,18 +7,15 @@ from itertools import groupby
 from random import choice as pick_random
 
 import discord
-import easygTTS
-import gtts as gTTS
 from discord.ext import commands
-from mutagen.mp3 import MP3, HeaderNotFoundError
-
-from utils import basic
 from patched_FFmpegPCM import FFmpegPCMAudio
+from pydub import AudioSegment
+from utils import basic
+from voxpopuli import Voice
 
 
 def setup(bot):
     bot.add_cog(Main(bot))
-
 
 class Main(commands.Cog):
     def __init__(self, bot):
@@ -26,71 +23,27 @@ class Main(commands.Cog):
         self.proxy = False
 
     async def get_tts(self, message, text, lang, max_length):
-        mp3 = await self.bot.cache.get(text, lang, message.id)
-        if not mp3:
-            temp_store_for_mp3 = None
-            if not self.proxy:
-                make_tts_func = make_func(self.make_tts, text, lang)
-                temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
-
-            if temp_store_for_mp3 == "Rate limited":
-                self.proxy = True
-                self.bot.loop.create_task(self.clear_rate_limit())
-                await self.bot.channels["logs"].send(f"<@341486397917626381> Rate limit mode engaged, swapped to easygTTS")
-
-            if self.proxy:
-                if not getattr(self, "gtts", False):
-                    self.gtts = easygTTS.gtts(session=self.bot.session)
-
-                temp_store_for_mp3 = BytesIO(await self.gtts.get(text=text, lang=lang))
-
-            try:
-                temp_store_for_mp3.seek(0)
-                file_length = int(MP3(temp_store_for_mp3).info.length)
-            except HeaderNotFoundError:
-                return
-
-            # Discard if over max length seconds
-            if file_length > int(max_length):
-                return
-
-            temp_store_for_mp3.seek(0)
-            mp3 = temp_store_for_mp3.read()
-
-            await self.bot.cache.set(text, lang, message.id, mp3)
-
-        self.bot.queue[message.guild.id][message.id] = mp3
-
-    def make_tts(self, text, lang) -> BytesIO:
-        temp_store_for_mp3 = BytesIO()
-        in_vcs = len(self.bot.voice_clients)
-        if in_vcs < 5:
-            max_range = 50
-        elif in_vcs < 20:
-            max_range = 20
+        if lang in basic.gtts_to_espeak:
+            voice = Voice(lang=basic.gtts_to_espeak[lang])
         else:
-            max_range = 10
-
-        for attempt in range(1, max_range):
-            try:
-                gTTS.gTTS(text=text, lang=lang).write_to_fp(temp_store_for_mp3)
-                break
-            except (ValueError, gTTS.tts.gTTSError) as e:
-                if e.rsp.status_code == 429:
-                    return "Rate limited"
-                if attempt == max_range:
-                    raise
-
-        return temp_store_for_mp3
+            voice = Voice(lang="en")
+        make_espeak_func = make_func(self.make_espeak, text, voice, max_length)
+        wav = await self.bot.loop.run_in_executor(None, make_espeak_func)
+        self.bot.queue[message.guild.id][message.id] = wav
+        return wav
 
     def finish_future(self, fut, *args):
         if not fut.done():
             self.bot.loop.call_soon_threadsafe(fut.set_result, "done")
 
-    async def clear_rate_limit(self):
-        await asyncio.sleep(3599)
-        self.proxy = False
-        await self.bot.channels["logs"].send("<@341486397917626381> Returned to normal")
+    def make_espeak(self, text, voice, max_length):
+        wav = voice.to_audio(text)
+        pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
+        if len(pydub_wav)/1000 > int(max_length):
+            return
+        return wav
+
+
 
     @commands.Cog.listener()
     async def on_message(self, message):

@@ -225,11 +225,16 @@ class Settings(commands.Cog):
             return await self.voice(ctx, lang)
 
         lang = await self.bot.setlangs.get(ctx.author)
-        langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
-
+        langs_string_pre = tts_langs.keys()
+        langs_string_pre2 = []
+        for str_lang in langs_string_pre:
+            if str_lang in basic.gtts_to_espeak.keys():
+                str_lang = f"**{str_lang}**"
+            langs_string_pre2.append(str_lang )
+        langs_string = basic.remove_chars(langs_string_pre2, "[", "]")
         embed = discord.Embed(title="TTS Bot Languages")
         embed.set_footer(text=pick_random(basic.footer_messages))
-        embed.add_field(name="Currently Supported Languages", value=langs_string)
+        embed.add_field(name="Supported Languages (bold are supported by TTS Lite)", value=langs_string)
         embed.add_field(name="Current Language used", value=f"{tts_langs[lang]} | {lang}")
         embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
 

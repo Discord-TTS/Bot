@@ -2,6 +2,7 @@ discord.py[voice]
 cryptography
 easygTTS
 asyncpg
-mutagen
 gtts
 psutil
+pydub
+voxpopuli
