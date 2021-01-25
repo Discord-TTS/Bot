@@ -23,26 +23,26 @@ class Main(commands.Cog):
         self.proxy = False
 
     async def get_tts(self, message, text, lang, max_length):
-        if lang in basic.gtts_to_espeak:
-            voice = Voice(lang=basic.gtts_to_espeak[lang])
-        else:
-            voice = Voice(lang="en")
-        make_espeak_func = make_func(self.make_espeak, text, voice, max_length)
+        make_espeak_func = make_func(self.make_espeak, text, lang, max_length)
         wav = await self.bot.loop.run_in_executor(None, make_espeak_func)
-        self.bot.queue[message.guild.id][message.id] = wav
+
+        if wav:
+            self.bot.queue[message.guild.id][message.id] = wav
+
+    def make_espeak(self, text, lang, max_length):
+        voice = Voice(lang=basic.gtts_to_espeak[lang]) if lang in basic.gtts_to_espeak else Voice(lang="en")
+        wav = voice.to_audio(text)
+
+        pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
+        if len(pydub_wav)/1000 > int(max_length):
+            return
+
+        return wav
+
 
     def finish_future(self, fut, *args):
         if not fut.done():
             self.bot.loop.call_soon_threadsafe(fut.set_result, "done")
-
-    def make_espeak(self, text, voice, max_length):
-        wav = voice.to_audio(text)
-        pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
-        if len(pydub_wav)/1000 > int(max_length):
-            return
-        return wav
-
-
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -220,12 +220,7 @@ class Main(commands.Cog):
                 saythis = "".join(saythis_list)
 
             # Adds filtered message to queue
-            try:
-                await self.get_tts(message, saythis, lang, msg_length)
-            except ValueError:
-                return print(f"Run out of attempts generating {saythis}.")
-            except AssertionError:
-                return print(f"Skipped {saythis}, apparently blank message.")
+            await self.get_tts(message, saythis, lang, msg_length)
 
             async with self.bot.message_locks[message.guild.id]:
                 if self.bot.should_return[message.guild.id]:

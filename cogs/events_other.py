@@ -25,12 +25,10 @@ class events_other(commands.Cog):
                 dm = self.bot.get_command("dm")
                 ctx = await self.bot.get_context(message)
                 await dm(ctx, todm, message=message.content)
+
         if message.channel.id == 749971061843558440 and message.embeds and str(message.author) == "GitHub#0000":
             if " new commit" in message.embeds[0].title:
-                update_for_main = message.embeds[0].title.startswith("[Discord-TTS-Bot:master]") and self.bot.user.id == 513423712582762502
-                update_for_dev = message.embeds[0].title.startswith("[Discord-TTS-Bot:dev]") and self.bot.user.id == 698218518335848538
-
-                if update_for_main or update_for_dev:
+                if message.embeds[0].title.startswith("[Discord-TTS-Bot:lite]"):
                     await self.bot.channels['logs'].send("Detected new bot commit! Pulling changes")
                     call(['git', 'pull'])
                     print("===============================================")
