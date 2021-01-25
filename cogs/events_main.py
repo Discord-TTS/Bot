@@ -30,7 +30,6 @@ class Main(commands.Cog):
         make_espeak_func = make_func(self.make_espeak, text, voice, max_length)
         wav = await self.bot.loop.run_in_executor(None, make_espeak_func)
         self.bot.queue[message.guild.id][message.id] = wav
-        return wav
 
     def finish_future(self, fut, *args):
         if not fut.done():
