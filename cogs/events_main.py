@@ -30,7 +30,7 @@ class Main(commands.Cog):
             self.bot.queue[message.guild.id][message.id] = wav
 
     def make_espeak(self, text, lang, max_length):
-        voice = Voice(lang=basic.gtts_to_espeak[lang]) if lang in basic.gtts_to_espeak else Voice(lang="en")
+        voice = Voice(lang=basic.gtts_to_espeak[lang], speed=130) if lang in basic.gtts_to_espeak else Voice(lang="en",speed=130)
         wav = voice.to_audio(text)
 
         pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
