@@ -1,5 +1,6 @@
 import configparser
 from os import mkdir
+from getpass import getpass
 
 import asyncpg
 import discord
@@ -10,13 +11,13 @@ bot = commands.Bot(command_prefix="-", intents=discord.Intents(guilds=True, memb
 config = configparser.ConfigParser()
 
 psql_name = input("What is the username to sign into your PostgreSQL DB: ")
-psql_pass = input("What is the password to sign into your PostgreSQL DB: ")
+psql_pass = getpass("What is the password to sign into your PostgreSQL DB: ")
 psql_db = input("Which database do you want to connect to (blank = default): ")
 psql_ip = input("What is the IP for the PostgreSQL DB (blank = 127.0.0.1): ")
 if psql_ip == "":
     psql_ip = "127.0.0.1"
 
-token = input("Input a bot token: ")
+token = getpass("Input a bot token: ")
 main_server = int(input("What is the ID of the main server for your bot? (Suggestions, errors and DMs will be sent here): "))
 trusted_ids = input("Input a list of trusted user IDs (allowing for moderation commands such as -(un)block, -dm, -refreshroles, -lookupinfo, and others.): ").split(", ")
 
@@ -63,7 +64,8 @@ async def on_ready():
             bot_ignore     bool DEFAULT True,
             auto_join      bool DEFAULT False,
             msg_length     text DEFAULT 30,
-            repeated_chars text DEFAULT 0
+            repeated_chars text DEFAULT 0,
+            prefix         text DEFAULT '-'
         );
         CREATE TABLE nicknames (
             guild_id text,

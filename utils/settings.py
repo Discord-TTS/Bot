@@ -1,9 +1,13 @@
-default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True}
+from asyncio import Lock
+
+default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "prefix": "-"}
 
 
 class settings_class():
     def __init__(self, pool):
         self.pool = pool
+        self._cache = dict()
+        self._cache_lock = Lock()
 
     async def remove(self, guild):
         async with self.pool.acquire() as conn:
@@ -13,8 +17,14 @@ class settings_class():
                 """)
 
     async def get(self, guild, setting=None, settings=None):
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM guilds WHERE guild_id = $1", str(guild.id))
+        async with self._cache_lock:
+            row = self._cache.get(guild.id)
+
+            if not row:
+                async with self.pool.acquire() as conn:
+                    row = await conn.fetchrow("SELECT * FROM guilds WHERE guild_id = $1", str(guild.id))
+
+                self._cache[guild.id] = row
 
         if not settings:
             if row is None or dict(row)[setting] is None:
@@ -37,40 +47,36 @@ class settings_class():
         return settings_values
 
     async def set(self, guild, setting, value):
-        guild = str(guild.id)
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM guilds WHERE guild_id = $1;",
-                guild
-            )
+        guild_id = str(guild.id)
+        async with self._cache_lock:
+            row = self._cache.pop(guild.id, None)
+            async with self.pool.acquire() as conn:
+                if row is not None:
+                    if value == default_settings[setting] and setting in dict(row):
+                        return await conn.execute(f"""
+                            UPDATE guilds
+                            SET {setting} = $1
+                            WHERE guild_id = $2;""",
+                            default_settings[setting], guild_id
+                            )
 
-            if row is not None:
-                if value == default_settings[setting] and setting in dict(row):
-                    return await conn.execute(f"""
-                        UPDATE guilds
-                        SET {setting} = $1
-                        WHERE guild_id = $2;""",
-                        default_settings[setting], guild
+                    if dict(row) == dict():
+                        return await conn.execute(
+                            "DELETE * FROM guilds WHERE guild_id = $1;",
+                            guild_id
                         )
 
-                if dict(row) == dict():
-                    return await conn.execute(
-                        "DELETE * FROM guilds WHERE guild_id = $1;",
-                        guild
-                    )
-
-                await conn.execute(f"""
-                        UPDATE guilds
-                        SET {setting} = $1
-                        WHERE guild_id = $2;""",
-                        value, guild
-                                    )
-            else:
-                await conn.execute(f"""
-                    INSERT INTO guilds(guild_id, {setting})
-                    VALUES ($1, $2);
-                    """, guild, value)
-
+                    await conn.execute(f"""
+                            UPDATE guilds
+                            SET {setting} = $1
+                            WHERE guild_id = $2;""",
+                            value, guild_id
+                                        )
+                else:
+                    await conn.execute(f"""
+                        INSERT INTO guilds(guild_id, {setting})
+                        VALUES ($1, $2);
+                        """, guild_id, value)
 
 class nickname_class():
     def __init__(self, pool):

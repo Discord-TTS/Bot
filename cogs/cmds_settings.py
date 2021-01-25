@@ -26,21 +26,26 @@ class Settings(commands.Cog):
     async def settings(self, ctx, *, help=None):
         "Displays the current settings!"
 
-        if help and help.lower() == "help":
-            return await ctx.send_help("set")
+        if help:
+            help = help.lower()
+            if help == "help":
+                return await ctx.send_help("set")
+            elif help == "limits":
+                return await ctx.send_help("set limits")
 
         lang, nickname = await asyncio.gather(
             self.bot.setlangs.get(ctx.author),
             self.bot.nicknames.get(ctx.guild, ctx.author)
         )
 
-        say, channel, join, bot_ignore = await self.bot.settings.get(
+        say, channel, join, bot_ignore, prefix = await self.bot.settings.get(
             ctx.guild,
             settings=(
                 "xsaid",
                 "channel",
                 "auto_join",
-                "bot_ignore"
+                "bot_ignore",
+                "prefix"
             )
         )
 
@@ -60,6 +65,7 @@ class Settings(commands.Cog):
             :small_orange_diamond: XSaid: `{say}`
             :small_orange_diamond: Auto Join: `{join}`
             :small_orange_diamond: Ignore Bots: `{bot_ignore}`
+            :small_orange_diamond: Prefix: `{prefix}`
             :star: Limits: Do `-settings limits` to check!""")
 
         message2 = cleandoc(f"""
@@ -102,6 +108,16 @@ class Settings(commands.Cog):
         await self.bot.settings.set(ctx.guild, "bot_ignore", value)
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
 
+    @set.command()
+    @commands.has_permissions(administrator=True)
+    async def prefix(self, ctx: commands.Context, *, prefix: str) -> Optional[discord.Message]:
+        """The prefix used before commands"""
+        if len(prefix) > 5 or prefix.count(" ") > 1:
+            return await ctx.send("**Error**: Invalid Prefix! Please use 5 or less characters with maximum 1 space.")
+
+        await self.bot.settings.set(ctx.guild, "prefix", prefix)
+        await ctx.send(f"Command Prefix is now: {prefix}")
+
     @set.command(aliases=["nick_name", "nickname", "name"])
     @commands.bot_has_permissions(embed_links=True)
     async def nick(self, ctx, user: Optional[discord.Member] = False, *, nickname):
@@ -142,9 +158,12 @@ class Settings(commands.Cog):
     async def limits(self, ctx):
         "A group of settings to modify the limits of what the bot reads"
         additional_message = None
+        prefix = await self.bot.settings(ctx.guild, "prefix")
+
         if ctx.invoked_subcommand is not None:
             return
-        if ctx.message.content != f"{self.bot.command_prefix}set limits":
+
+        if ctx.message.content != f"{prefix}set limits":
             return await ctx.send_help(ctx.command)
 
         msg_length, repeated_chars = await self.bot.settings.get(

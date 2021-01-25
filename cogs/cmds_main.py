@@ -16,14 +16,29 @@ class cmds_main(commands.Cog, name="Main Commands"):
     def __init__(self, bot):
         self.bot = bot
 
+    async def channel_check(self, ctx):
+        channel, prefix = await self.bot.settings.get(
+            ctx.guild,
+            settings=(
+                "channel",
+                "prefix"
+            )
+        )
+
+        if ctx.channel.id != int(channel):
+            await ctx.send(f"Error: Wrong channel, do {prefix}channel get the channel that has been setup.")
+            return False
+
+        return True
+
     @commands.guild_only()
     @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command()
     async def join(self, ctx):
         "Joins the voice channel you're in!"
-        if ctx.channel.id != int(await ctx.bot.settings.get(ctx.guild, "channel")):
-            return await ctx.send(f"Error: Wrong channel, do {ctx.bot.command_prefix}channel get the channel that has been setup.")
+        if not await self.channel_check(ctx):
+            return
 
         if not ctx.author.voice:
             return await ctx.send("Error: You need to be in a voice channel to make me join your voice channel!")
@@ -65,8 +80,8 @@ class cmds_main(commands.Cog, name="Main Commands"):
     @commands.command()
     async def leave(self, ctx):
         "Leaves voice channel TTS Bot is in!"
-        if ctx.channel.id != int(await self.bot.settings.get(ctx.guild, "channel")):
-            return await ctx.send("Error: Wrong channel, do -channel get the channel that has been setup.")
+        if not await self.channel_check(ctx):
+            return
 
         elif not ctx.author.voice:
             return await ctx.send("Error: You need to be in a voice channel to make me leave!")
@@ -89,8 +104,8 @@ class cmds_main(commands.Cog, name="Main Commands"):
     @commands.command(aliases=("clear", "leaveandjoin"))
     async def skip(self, ctx):
         "Clears the message queue!"
-        if ctx.channel.id != int(await ctx.bot.settings.get(ctx.guild, "channel")):
-            return await ctx.send(f"Error: Wrong channel, do {ctx.bot.command_prefix}channel get the channel that has been setup.")
+        if not await self.channel_check(ctx):
+            return
 
         if self.bot.queue.get(ctx.guild.id) in (None, dict()) or self.bot.currently_playing[ctx.guild.id].done():
             return await ctx.send("**Error:** Nothing in message queue to skip!")
