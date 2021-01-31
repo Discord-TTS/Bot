@@ -158,7 +158,7 @@ class Settings(commands.Cog):
     async def limits(self, ctx):
         "A group of settings to modify the limits of what the bot reads"
         additional_message = None
-        prefix = await self.bot.settings(ctx.guild, "prefix")
+        prefix = await self.bot.settings.get(ctx.guild, "prefix")
 
         if ctx.invoked_subcommand is not None:
             return

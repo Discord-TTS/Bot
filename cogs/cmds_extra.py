@@ -25,7 +25,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(hidden=True)
     async def tts(self, ctx):
-        prefix = await self.bot.settings(ctx.guild, "prefix")
+        prefix = await self.bot.settings.get(ctx.guild, "prefix")
 
         if ctx.message.content == f"{prefix}tts":
             await ctx.send(f"You don't need to do `{prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{prefix}`!")
