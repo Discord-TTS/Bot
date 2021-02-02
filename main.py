@@ -29,7 +29,7 @@ status = getattr(discord.Status, config["Activity"]["status"])
 async def dummy_prefix(bot, message):
     return "l-"
 
-bot = commands.AutoShardedBot(
+bot = commands.Bot(
     status=status,
     intents=intents,
     help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
