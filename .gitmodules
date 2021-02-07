@@ -1,3 +1,0 @@
-[submodule "cogs"]
-	path = cogs
-	url = https://github.com/gnome-py/Common-Cogs

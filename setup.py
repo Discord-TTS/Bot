@@ -1,5 +1,5 @@
 import configparser
-import os
+from os import mkdir
 
 import asyncpg
 import discord
@@ -20,12 +20,14 @@ token = input("Input a bot token: ")
 main_server = int(input("What is the ID of the main server for your bot? (Suggestions, errors and DMs will be sent here): "))
 trusted_ids = input("Input a list of trusted user IDs (allowing for moderation commands such as -(un)block, -dm, -refreshroles, -lookupinfo, and others.): ").split(", ")
 
+mkdir("cache")
+
 cache_key = Fernet.generate_key()
 config["Main"] = {
-  "token": token,
-  "cache_key": cache_key,
-  "main_server": main_server,
-  "trusted_ids": trusted_ids,
+    "token": token,
+    "key": cache_key,
+    "main_server": main_server,
+    "trusted_ids": trusted_ids,
 }
 config["Activity"] = {
     "name": "my owner set me up!",
@@ -39,6 +41,7 @@ config["PostgreSQL Info"] = {
     "db": psql_db
 }
 
+
 @bot.event
 async def on_ready():
     global config
@@ -48,6 +51,7 @@ async def on_ready():
     conn = await asyncpg.connect(
         user=psql_name,
         password=psql_pass,
+        database=psql_db,
         host=psql_ip
     )
 
@@ -86,14 +90,15 @@ async def on_ready():
     logs = await guild.create_text_channel("logs", category=botcategory, overwrites=overwrites)
 
     config["Channels"] = {
-      "errors": errors.id,
-      "dm_logs": dm_logs.id,
-      "servers": servers.id,
-      "suggestions": suggestions.id,
-      "logs": logs.id
+        "errors": errors.id,
+        "dm_logs": dm_logs.id,
+        "servers": servers.id,
+        "suggestions": suggestions.id,
+        "logs": logs.id
     }
 
     await logs.send(f"Are you sure you want {[str(bot.get_user(int(trusted_id))) for trusted_id in trusted_ids]} to be trusted? (do -yes to accept)")
+
 
 @bot.command()
 @commands.is_owner()
@@ -103,6 +108,7 @@ async def yes(ctx):
 
     await logs.send("Finished and written to config.ini, change the names of the channels all you want and now TTS Bot should be startable!")
     await bot.close()
+
 
 @bot.command()
 @commands.is_owner()

@@ -1,8 +1,5 @@
-import asyncio
-
-import asyncpg
-
 default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True}
+
 
 class settings_class():
     def __init__(self, pool):
@@ -10,27 +7,42 @@ class settings_class():
 
     async def remove(self, guild):
         async with self.pool.acquire() as conn:
-            await conn.execute("""
-                DELETE * FROM guilds WHERE guild_id = $1;
-                DELETE * FROM nicknames WHERE guild_id = $1;
-                """, str(guild.id))
+            await conn.execute(f"""
+                DELETE FROM guilds WHERE guild_id = '{guild.id}';
+                DELETE FROM nicknames WHERE guild_id = '{guild.id}';
+                """)
 
-    async def get(self, guild, setting):
+    async def get(self, guild, setting=None, settings=None):
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow("SELECT * FROM guilds WHERE guild_id = $1", str(guild.id))
 
-        if row is None or dict(row)[setting] is None:
-            return default_settings[setting]
+        if not settings:
+            if row is None or dict(row)[setting] is None:
+                return default_settings[setting]
 
-        return dict(row)[setting]
+            return dict(row)[setting]
+
+        if row is None:
+            return [default_settings[setting] for setting in settings]
+
+        row_dict = dict(row)
+        settings_values = list()
+
+        for setting in settings:
+            if not setting:
+                setting = default_settings[setting]
+
+            settings_values.append(row_dict[setting])
+
+        return settings_values
 
     async def set(self, guild, setting, value):
         guild = str(guild.id)
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
-                    "SELECT * FROM guilds WHERE guild_id = $1;",
-                    guild
-                )
+                "SELECT * FROM guilds WHERE guild_id = $1;",
+                guild
+            )
 
             if row is not None:
                 if value == default_settings[setting] and setting in dict(row):
@@ -39,7 +51,7 @@ class settings_class():
                         SET {setting} = $1
                         WHERE guild_id = $2;""",
                         default_settings[setting], guild
-                    )
+                        )
 
                 if dict(row) == dict():
                     return await conn.execute(
@@ -52,12 +64,13 @@ class settings_class():
                         SET {setting} = $1
                         WHERE guild_id = $2;""",
                         value, guild
-                    )
+                                    )
             else:
                 await conn.execute(f"""
                     INSERT INTO guilds(guild_id, {setting})
                     VALUES ($1, $2);
-                    """, guild, str(value))
+                    """, guild, value)
+
 
 class nickname_class():
     def __init__(self, pool):
@@ -88,20 +101,21 @@ class nickname_class():
                     DELETE FROM nicknames
                     WHERE guild_id = $1 AND user_id = $2;
                     """, guild, user_id
-                    )
+                                   )
             elif existing:
                 await conn.execute("""
                     UPDATE nicknames
                     SET name = $1
                     WHERE guild_id = $2 AND user_id = $3;
                     """, nickname, guild, user_id
-                    )
+                                   )
             else:
                 await conn.execute("""
                     INSERT INTO nicknames(guild_id, user_id, name)
                     VALUES ($1, $2, $3);
                     """, guild, user_id, nickname
-                    )
+                                   )
+
 
 class setlangs_class():
     def __init__(self, pool):
@@ -139,6 +153,7 @@ class setlangs_class():
                     INSERT INTO userinfo(user_id, lang)
                     VALUES ($1, $2);
                     """, user, lang)
+
 
 class blocked_users_class():
     def __init__(self, pool):
