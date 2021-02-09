@@ -5,8 +5,8 @@ Text to speech Discord Bot using gTTS and discord.py!
 ## Setup Guide:
 ### Easy:
 - Invite the bot with [this invite](https://discordapp.com/api/oauth2/authorize?client_id=513423712582762502&permissions=36719617&scope=bot)
-- Run -setup #text_channel_to_read_from
-- Run -join in that text channel, while being in a voice channel
+- Run l-setup #text_channel_to_read_from
+- Run l-join in that text channel, while being in a voice channel
 - Type normally in the setup text channel!
 
 ### Hard (Self Host):

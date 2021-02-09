@@ -74,7 +74,7 @@ class Settings(commands.Cog):
         embed.add_field(name="**Server Wide**", value=message1, inline=False)
         embed.add_field(name="**User Specific**", value=message2, inline=False)
 
-        embed.set_footer(text="Change these settings with -set property value!")
+        embed.set_footer(text="Change these settings with l-set property value!")
         await ctx.send(embed=embed)
 
     @commands.guild_only()
@@ -133,12 +133,12 @@ class Settings(commands.Cog):
     @set.command()
     @commands.has_permissions(administrator=True)
     async def channel(self, ctx, channel: discord.TextChannel):
-        "Alias of `-setup`"
+        "Alias of `l-setup`"
         await self.setup(ctx, channel)
 
     @set.command(aliases=("voice", "lang"))
     async def language(self, ctx, voicecode):
-        "Alias of `-voice`"
+        "Alias of `l-voice`"
         await self.voice(ctx, voicecode)
 
     @set.group()
@@ -168,7 +168,7 @@ class Settings(commands.Cog):
             """)
 
         embed = discord.Embed(title="Current Limits", description=message1, url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.set_footer(text="Change these settings with -set limits property value!")
+        embed.set_footer(text="Change these settings with l-set limits property value!")
         await ctx.send(additional_message, embed=embed)
 
     @limits.command(aliases=("length", "max_length", "max_msg_length", "msglength", "maxlength"))
@@ -217,12 +217,12 @@ class Settings(commands.Cog):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(hidden=True)
     async def voice(self, ctx, lang: str):
-        "Changes the voice your messages are read in, full list in `-voices`"
+        "Changes the voice your messages are read in, full list in `l-voices`"
         if lang in tts_langs:
             await self.bot.setlangs.set(ctx.author, lang)
             await ctx.send(f"Changed your voice to: {tts_langs[lang]}")
         else:
-            await ctx.send("Invalid voice, do `-voices`")
+            await ctx.send("Invalid voice, do `l-voices`")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])

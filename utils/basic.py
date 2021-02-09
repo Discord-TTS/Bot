@@ -23,9 +23,9 @@ full_dict = {
 
 footer_messages = (
     "If you find a bug or want to ask a question, join the support server: discord.gg/zWPWwQC",
-    "If you want to support the development and hosting of TTS Bot, check out -donate!",
+    "If you want to support the development and hosting of TTS Bot, check out l-donate!",
     "You can vote for me or review me on top.gg!\nhttps://top.gg/bot/513423712582762502",
-    "There are loads of customizable settings, check out -settings help",
+    "There are loads of customizable settings, check out l-settings help",
 )
 
 gtts_to_espeak={

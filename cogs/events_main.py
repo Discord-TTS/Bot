@@ -147,7 +147,7 @@ class Main(commands.Cog):
             }
 
             if starts_with_tts:
-                acronyms["-tts"] = ""
+                acronyms["l-tts"] = ""
 
             for toreplace, replacewith in acronyms.items():
                 saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
@@ -266,7 +266,7 @@ class Main(commands.Cog):
                     await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
 
                 elif message.content.lower() == "help":
-                    await message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
+                    await message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `l-help`!")
                     await self.bot.channels["logs"].send(f"{message.author} just got the 'dont ask to ask' message")
 
                 elif not await self.bot.blocked_users.check(message.author):

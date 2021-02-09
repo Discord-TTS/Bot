@@ -36,7 +36,7 @@ class common_owner(commands.Cog, command_attrs=dict(hidden=True)):
 
         webhooks = await ctx.channel.webhooks()
         if len(webhooks) == 0:
-            webhook = await ctx.channel.create_webhook(name="Temp Webhook For -sudo")
+            webhook = await ctx.channel.create_webhook(name="Temp Webhook For l-sudo")
             await webhook.send(message, username=name, avatar_url=avatar)
             await webhook.delete()
         else:

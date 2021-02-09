@@ -69,7 +69,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
         elif channel != 0:
             await ctx.send(f"The current setup channel is: <#{channel}>")
         else:
-            await ctx.send("The channel hasn't been setup, do `-setup #textchannel`")
+            await ctx.send("The channel hasn't been setup, do `l-setup #textchannel`")
 
     @commands.command()
     @commands.bot_has_permissions(send_messages=True, read_messages=True)
