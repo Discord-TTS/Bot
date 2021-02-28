@@ -45,7 +45,6 @@ gtts_to_espeak={
     "is":"ic",
     "it":"it",
     "ja":"jp",
-    "ko":"hn",
     "la":"la",
     "nl":"nl",
     "pl":"pl",
