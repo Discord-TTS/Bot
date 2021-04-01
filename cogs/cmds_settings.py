@@ -10,7 +10,7 @@ from gtts.lang import tts_langs
 
 from utils import basic
 
-tts_langs = tts_langs()
+tts_langs = {lang: name for lang, name in tts_langs().items() if "-" not in lang}
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 def setup(bot):

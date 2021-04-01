@@ -132,18 +132,19 @@ class setlangs_class():
             row = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", str(user.id))
 
         if row is None or dict(row)["lang"] is None:
-            return "en-us"
+            return "en"
 
-        return dict(row)["lang"]
+        return dict(row)["lang"].split("-")[0]
 
     async def set(self, user, lang):
         user = str(user.id)
-        lang = lang.lower()
+        lang = lang.lower().split("-")[0]
+
         async with self.pool.acquire() as conn:
             userinfo = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user)
             existing = userinfo is not None
 
-            if lang == "en-us" and existing and not dict(userinfo)["blocked"]:
+            if lang == "en" and existing and not dict(userinfo)["blocked"]:
                 await conn.execute("""
                     DELETE FROM userinfo
                     WHERE user_id = $1;

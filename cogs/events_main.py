@@ -26,29 +26,30 @@ class Main(commands.Cog):
         self.proxy = False
 
     async def get_tts(self, message, text, lang, max_length):
+        lang = lang.split("-")[0]
         mp3 = await self.bot.cache.get(text, lang, message.id)
+
         if not mp3:
             temp_store_for_mp3 = None
             if not self.proxy:
                 make_tts_func = make_func(self.make_tts, text, lang)
-                temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
+                temp_store_for_mp3, file_length = await self.bot.loop.run_in_executor(None, make_tts_func)
 
             if temp_store_for_mp3 == "Rate limited":
                 self.proxy = True
                 self.bot.loop.create_task(self.clear_rate_limit())
-                await self.bot.channels["logs"].send(f"<@341486397917626381> Rate limit mode engaged, swapped to easygTTS")
 
             if self.proxy:
                 if not getattr(self, "gtts", False):
                     self.gtts = easygTTS.gtts(session=self.bot.session)
 
-                temp_store_for_mp3 = BytesIO(await self.gtts.get(text=text, lang=lang))
+                try:
+                    temp_store_for_mp3 = BytesIO(await self.gtts.get(text=text, lang=lang))
+                    temp_store_for_mp3.seek(0)
 
-            try:
-                temp_store_for_mp3.seek(0)
-                file_length = int(MP3(temp_store_for_mp3).info.length)
-            except HeaderNotFoundError:
-                return
+                    file_length = int(MP3(temp_store_for_mp3).info.length)
+                except HeaderNotFoundError:
+                    return
 
             # Discard if over max length seconds
             if file_length > int(max_length):
@@ -63,34 +64,26 @@ class Main(commands.Cog):
 
     def make_tts(self, text, lang) -> BytesIO:
         temp_store_for_mp3 = BytesIO()
-        in_vcs = len(self.bot.voice_clients)
-        if in_vcs < 5:
-            max_range = 50
-        elif in_vcs < 20:
-            max_range = 20
-        else:
-            max_range = 10
 
-        for attempt in range(1, max_range):
-            try:
-                gTTS.gTTS(text=text, lang=lang).write_to_fp(temp_store_for_mp3)
-                break
-            except (ValueError, gTTS.tts.gTTSError) as e:
-                if e.rsp.status_code == 429:
-                    return "Rate limited"
-                if attempt == max_range:
-                    raise
+        try:
+            gTTS.gTTS(text=text, lang=lang).write_to_fp(temp_store_for_mp3)
+        except gTTS.tts.gTTSError as e:
+            if e.rsp.status_code == 429:
+                return "Rate limited"
+            raise
 
-        return temp_store_for_mp3
+        return temp_store_for_mp3, int(MP3(temp_store_for_mp3).info.length)
 
     def finish_future(self, fut, *args):
         if not fut.done():
             self.bot.loop.call_soon_threadsafe(fut.set_result, "done")
 
     async def clear_rate_limit(self):
-        await asyncio.sleep(3599)
+        print("Swapped to easygTTS")
+        await asyncio.sleep(3601)
+
+        print("Retrying normal gTTS")
         self.proxy = False
-        await self.bot.channels["logs"].send("<@341486397917626381> Returned to normal")
 
     @commands.Cog.listener()
     async def on_message(self, message):
