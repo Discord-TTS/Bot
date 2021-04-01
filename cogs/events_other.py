@@ -15,6 +15,9 @@ class events_other(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
+            await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
+
         if message.channel in (self.bot.channels["dm_logs"],self.bot.channels["suggestions"]) and not message.author.bot and message.reference:
             referenced_message = await message.channel.fetch_message(message.reference.message_id)
             reference_author = referenced_message.author

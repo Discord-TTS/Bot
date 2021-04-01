@@ -26,29 +26,30 @@ class Main(commands.Cog):
         self.proxy = False
 
     async def get_tts(self, message, text, lang, max_length):
+        lang = lang.split("-")[0]
         mp3 = await self.bot.cache.get(text, lang, message.id)
+
         if not mp3:
             temp_store_for_mp3 = None
             if not self.proxy:
                 make_tts_func = make_func(self.make_tts, text, lang)
-                temp_store_for_mp3 = await self.bot.loop.run_in_executor(None, make_tts_func)
+                temp_store_for_mp3, file_length = await self.bot.loop.run_in_executor(None, make_tts_func)
 
             if temp_store_for_mp3 == "Rate limited":
                 self.proxy = True
                 self.bot.loop.create_task(self.clear_rate_limit())
-                await self.bot.channels["logs"].send(f"<@341486397917626381> Rate limit mode engaged, swapped to easygTTS")
 
             if self.proxy:
                 if not getattr(self, "gtts", False):
                     self.gtts = easygTTS.gtts(session=self.bot.session)
 
-                temp_store_for_mp3 = BytesIO(await self.gtts.get(text=text, lang=lang))
+                try:
+                    temp_store_for_mp3 = BytesIO(await self.gtts.get(text=text, lang=lang))
+                    temp_store_for_mp3.seek(0)
 
-            try:
-                temp_store_for_mp3.seek(0)
-                file_length = int(MP3(temp_store_for_mp3).info.length)
-            except HeaderNotFoundError:
-                return
+                    file_length = int(MP3(temp_store_for_mp3).info.length)
+                except HeaderNotFoundError:
+                    return
 
             # Discard if over max length seconds
             if file_length > int(max_length):
@@ -63,34 +64,26 @@ class Main(commands.Cog):
 
     def make_tts(self, text, lang) -> BytesIO:
         temp_store_for_mp3 = BytesIO()
-        in_vcs = len(self.bot.voice_clients)
-        if in_vcs < 5:
-            max_range = 50
-        elif in_vcs < 20:
-            max_range = 20
-        else:
-            max_range = 10
 
-        for attempt in range(1, max_range):
-            try:
-                gTTS.gTTS(text=text, lang=lang).write_to_fp(temp_store_for_mp3)
-                break
-            except (ValueError, gTTS.tts.gTTSError) as e:
-                if e.rsp.status_code == 429:
-                    return "Rate limited"
-                if attempt == max_range:
-                    raise
+        try:
+            gTTS.gTTS(text=text, lang=lang).write_to_fp(temp_store_for_mp3)
+        except gTTS.tts.gTTSError as e:
+            if e.rsp.status_code == 429:
+                return "Rate limited"
+            raise
 
-        return temp_store_for_mp3
+        return temp_store_for_mp3, int(MP3(temp_store_for_mp3).info.length)
 
     def finish_future(self, fut, *args):
         if not fut.done():
             self.bot.loop.call_soon_threadsafe(fut.set_result, "done")
 
     async def clear_rate_limit(self):
-        await asyncio.sleep(3599)
+        print("Swapped to easygTTS")
+        await asyncio.sleep(3601)
+
+        print("Retrying normal gTTS")
         self.proxy = False
-        await self.bot.channels["logs"].send("<@341486397917626381> Returned to normal")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -98,16 +91,20 @@ class Main(commands.Cog):
             saythis = message.clean_content.lower()
 
             # Get settings
-            autojoin, bot_ignore, channel = await self.bot.settings.get(
+            repeated_chars_limit, bot_ignore, msg_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
                 message.guild,
                 settings=(
-                    "auto_join",
+                    "repeated_chars",
                     "bot_ignore",
-                    "channel"
+                    "msg_length",
+                    "auto_join",
+                    "channel",
+                    "prefix",
+                    "xsaid",
                 )
             )
 
-            starts_with_tts = saythis.startswith(f"{self.bot.command_prefix}tts")
+            starts_with_tts = saythis.startswith(f"{prefix}tts")
 
             # if author is a bot and bot ignore is on
             if bot_ignore and message.author.bot:
@@ -134,7 +131,7 @@ class Main(commands.Cog):
                 return
 
             # Ignore messages starting with -
-            if saythis.startswith(self.bot.command_prefix) and not starts_with_tts:
+            if saythis.startswith(prefix) and not starts_with_tts:
                 return
 
             # if not autojoin and message doesn't start with tts and the author isn't a bot and the author is in the wrong voice channel
@@ -160,16 +157,8 @@ class Main(commands.Cog):
                 await channel.connect()
                 self.bot.should_return[message.guild.id] = False
 
-            # Get settings
+            # Get lang
             lang = await self.bot.setlangs.get(message.author)
-            xsaid, repeated_chars_limit, msg_length = await self.bot.settings.get(
-                message.guild,
-                settings=(
-                    "xsaid",
-                    "repeated_chars",
-                    "msg_length"
-                )
-            )
 
             # Emoji filter
             saythis = basic.emojitoword(saythis)
@@ -199,7 +188,7 @@ class Main(commands.Cog):
             }
 
             if starts_with_tts:
-                acronyms["-tts"] = ""
+                acronyms[f"{prefix}tts"] = ""
 
             for toreplace, replacewith in acronyms.items():
                 saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
@@ -344,7 +333,7 @@ class Main(commands.Cog):
                     There are some basic rules if you want to get help though:
                     `1.` Ask your question, don't just ask for help
                     `2.` Don't spam, troll, or send random stuff (including server invites)
-                    `3.` Many questions are answered in `-help`, try that first (also the prefix is `-`)
+                    `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
                 """)
 
                 embed = discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description=embed_message)

@@ -26,12 +26,18 @@ activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discor
 intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
 status = getattr(discord.Status, config["Activity"]["status"])
 
+
+async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
+    "Gets the prefix for a guild based on the passed message object"
+    return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
+
+
 bot = commands.AutoShardedBot(
     status=status,
     intents=intents,
     help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
     activity=activity,
-    command_prefix="-",
+    command_prefix=prefix,
     case_insensitive=True,
     chunk_guilds_at_startup=False,
     allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
