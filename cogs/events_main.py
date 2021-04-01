@@ -188,7 +188,7 @@ class Main(commands.Cog):
             }
 
             if starts_with_tts:
-                acronyms["-tts"] = ""
+                acronyms[f"{prefix}tts"] = ""
 
             for toreplace, replacewith in acronyms.items():
                 saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
@@ -333,7 +333,7 @@ class Main(commands.Cog):
                     There are some basic rules if you want to get help though:
                     `1.` Ask your question, don't just ask for help
                     `2.` Don't spam, troll, or send random stuff (including server invites)
-                    `3.` Many questions are answered in `-help`, try that first (also the prefix is `-`)
+                    `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
                 """)
 
                 embed = discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description=embed_message)

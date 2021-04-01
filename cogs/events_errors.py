@@ -50,7 +50,7 @@ class events_errors(commands.Cog):
         error = getattr(error, 'original', error)
 
         if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument, commands.UnexpectedQuoteError, commands.ExpectedClosingQuoteError)):
-            return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
+            return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing {ctx.prefix}help!")
 
         elif isinstance(error, commands.CommandOnCooldown):
             cooldown_error = await ctx.send(f"**{ctx.prefix}{ctx.command} is on cooldown!** Please try again in {error.retry_after:.1f} seconds.")
@@ -81,7 +81,7 @@ class events_errors(commands.Cog):
 
         elif isinstance(error, discord.errors.Forbidden):
             await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}")
-            return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `-suggest *what command you just run*`")
+            return await ctx.author.send(f"Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `{ctx.prefix}suggest *what command you just run*`")
 
         first_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
         second_part = ''.join(format_exception(type(error), error, error.__traceback__))

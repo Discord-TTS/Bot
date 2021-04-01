@@ -66,7 +66,7 @@ class Settings(commands.Cog):
             :small_orange_diamond: Auto Join: `{join}`
             :small_orange_diamond: Ignore Bots: `{bot_ignore}`
             :small_orange_diamond: Prefix: `{prefix}`
-            :star: Limits: Do `-settings limits` to check!""")
+            :star: Limits: Do `{ctx.prefix}settings limits` to check!""")
 
         message2 = cleandoc(f"""
             :small_blue_diamond: Language: `{lang}`
@@ -76,7 +76,7 @@ class Settings(commands.Cog):
         embed.add_field(name="**Server Wide**", value=message1, inline=False)
         embed.add_field(name="**User Specific**", value=message2, inline=False)
 
-        embed.set_footer(text="Change these settings with -set property value!")
+        embed.set_footer(text=f"Change these settings with {ctx.prefix}set property value!")
         await ctx.send(embed=embed)
 
     @commands.guild_only()
@@ -180,7 +180,7 @@ class Settings(commands.Cog):
             """)
 
         embed = discord.Embed(title="Current Limits", description=message1, url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.set_footer(text="Change these settings with -set limits property value!")
+        embed.set_footer(text=f"Change these settings with {ctx.prefix}set limits property value!")
         await ctx.send(additional_message, embed=embed)
 
     @limits.command(aliases=("length", "max_length", "max_msg_length", "msglength", "maxlength"))
@@ -217,7 +217,7 @@ class Settings(commands.Cog):
             title="TTS Bot has been setup!",
             description=cleandoc(f"""
                 TTS Bot will now accept commands and read from {channel.mention}.
-                Just do `-join` and start talking!
+                Just do `{ctx.prefix}join` and start talking!
                 """)
         )
         embed.set_footer(text=pick_random(basic.footer_messages))
@@ -234,7 +234,7 @@ class Settings(commands.Cog):
             await self.bot.setlangs.set(ctx.author, lang)
             await ctx.send(f"Changed your voice to: {tts_langs[lang]}")
         else:
-            await ctx.send("Invalid voice, do `-voices`")
+            await ctx.send(f"Invalid voice, do `{ctx.prefix}voices`")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
