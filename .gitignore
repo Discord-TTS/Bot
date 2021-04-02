@@ -7,13 +7,6 @@ cache
 jsk.py
 temp.txt
 queue.txt
-backup.py
 config.ini
-cache.json
-status.txt
 bot_lists.py
-activity.txt
-settings.json
-setlangs.json
-activitytype.txt
-blocked_users.json
+patreon_users.json

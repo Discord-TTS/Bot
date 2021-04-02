@@ -5,15 +5,13 @@ from inspect import cleandoc
 from io import BytesIO
 from itertools import groupby
 from random import choice as pick_random
+from time import monotonic
 
 import discord
-import easygTTS
-import gtts as gTTS
 from discord.ext import commands
-from mutagen.mp3 import MP3, HeaderNotFoundError
-
-from utils import basic
 from patched_FFmpegPCM import FFmpegPCMAudio
+from pydub import AudioSegment
+from utils import basic
 
 
 def setup(bot):
@@ -28,42 +26,34 @@ class Main(commands.Cog):
     async def get_tts(self, message, text, lang, max_length):
         ogg = await self.bot.cache.get(text, lang, message.id)
         if not ogg:
-            
-
-            try:
-                temp_store_for_ogg.seek(0)
-                file_length = int(MP3(temp_store_for_ogg).info.length)
-            except HeaderNotFoundError:
+            ogg = await self.bot.gtts.get(text, voice_lang=lang)
+            length = await self.bot.loop.run_in_executor(None, make_func(self.get_duration, ogg))
+            if length > int(max_length):
                 return
-
-            # Discard if over max length seconds
-            if file_length > int(max_length):
-                return
-
-            temp_store_for_ogg.seek(0)
-            ogg = temp_store_for_ogg.read()
 
             await self.bot.cache.set(text, lang, message.id, ogg)
 
         self.bot.queue[message.guild.id][message.id] = ogg
 
+    def get_duration(self, audio_file: bytes) -> float:
+        return len(AudioSegment.from_file_using_temporary_files(BytesIO(audio_file))) / 1000
+
+
     def finish_future(self, fut, *args):
         if not fut.done():
             self.bot.loop.call_soon_threadsafe(fut.set_result, "done")
-
-    async def clear_rate_limit(self):
-        await asyncio.sleep(3599)
-        self.proxy = False
-        await self.bot.channels["logs"].send("<@341486397917626381> Returned to normal")
 
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.guild is not None:
 
             # Premium Check
-            if str(message.author.id) not in bot.trusted:
+            if not getattr(self.bot, "patreon_role", False):
+                return
+
+            if str(message.author.id) not in self.bot.trusted:
                 premium_user_for_guild = self.bot.patreon_json.get(str(message.guild.id))
-                if premium_user_for_guild not in (member.id for member in bot.patreon_role.members):
+                if premium_user_for_guild not in [member.id for member in self.bot.patreon_role.members]:
                     return
 
             saythis = message.clean_content.lower()
@@ -135,8 +125,9 @@ class Main(commands.Cog):
                 await channel.connect()
                 self.bot.should_return[message.guild.id] = False
 
-            # Get lang
-            lang = await self.bot.setlangs.get(message.author)
+            # Get lang and parse it into a useable format
+            partial_lang_tuple = await self.bot.setlangs.get(message.author)
+            lang = self.bot.get_cog("Settings")._make_lang_tuple(*partial_lang_tuple)
 
             # Emoji filter
             saythis = basic.emojitoword(saythis)
@@ -235,12 +226,7 @@ class Main(commands.Cog):
                 saythis = "".join(saythis_list)
 
             # Adds filtered message to queue
-            try:
-                await self.get_tts(message, saythis, lang, msg_length)
-            except ValueError:
-                return print(f"Run out of attempts generating {saythis}.")
-            except AssertionError:
-                return print(f"Skipped {saythis}, apparently blank message.")
+            await self.get_tts(message, saythis, lang, msg_length)
 
             async with self.bot.message_locks[message.guild.id]:
                 if self.bot.should_return[message.guild.id]:

@@ -2,8 +2,10 @@ import asyncio
 import json
 from configparser import ConfigParser
 from os import listdir
+from subprocess import PIPE, run
 from time import monotonic
 
+import asyncgTTS
 import asyncpg
 import discord
 from aiohttp import ClientSession
@@ -22,9 +24,11 @@ config_channels = config["Channels"]
 cache_key_str = config["Main"]["key"][2:-1]
 cache_key_bytes = cache_key_str.encode()
 
+GOOGLE_API_KEY = run(['gcloud', 'auth', 'application-default', 'print-access-token'], stdout=PIPE).stdout.decode().replace("\n", "")
+
 # Define bot and remove overwritten commands
 activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
-intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
+intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True, reactions=True)
 status = getattr(discord.Status, config["Activity"]["status"])
 
 
@@ -32,7 +36,7 @@ async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
     """
     gets the prefix for a guild based on the passed message object
     """
-    return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
+    return await bot.settings.get(message.guild, "prefix") if message.guild else "p-"
 
 
 bot = commands.AutoShardedBot(
@@ -55,12 +59,19 @@ pool = bot.loop.run_until_complete(
     )
 )
 
+bot.gtts = bot.loop.run_until_complete(
+    asyncgTTS.setup(
+        premium=True,
+        session=ClientSession(),
+        auth_token=GOOGLE_API_KEY
+    )
+)
+
 bot.queue = dict()
 bot.channels = dict()
 bot.should_return = dict()
 bot.message_locks = dict()
 bot.currently_playing = dict()
-bot.session = ClientSession()
 bot.settings = settings.settings_class(pool)
 bot.setlangs = settings.setlangs_class(pool)
 bot.nicknames = settings.nickname_class(pool)
@@ -69,7 +80,7 @@ bot.blocked_users = settings.blocked_users_class(pool)
 bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
 
 with open("patreon_users.json") as f:
-    bot.patreon_json = json.load(f) 
+    bot.patreon_json = json.load(f)
 
 for cog in listdir("cogs"):
     if cog.endswith(".py"):
@@ -78,13 +89,16 @@ for cog in listdir("cogs"):
 
 @bot.check
 async def premium_check(ctx):
+    if not getattr(bot, "patreon_role"):
+        return
+
     if not ctx.guild:
         return True
 
     if str(ctx.author.id) in bot.trusted:
         return True
 
-    if str(ctx.command) == "donate":
+    if str(ctx.command) in ("donate", "add_premium"):
         return True
 
     premium_user_for_guild = bot.patreon_json.get(str(ctx.guild.id))
@@ -103,7 +117,7 @@ async def premium_check(ctx):
 
             await ctx.send(embed=embed)
         else:
-            await ctx.send(f"Hey! This server isn't premium! Please purchase TTS Bot premium via Patreon! (`{ctx.prefix}donate`)\n*If this is an error, please contact Gnome!#6669.*")
+            await ctx.send(f"Hey! This server isn't premium! Please purchase TTS Bot Premium via Patreon! (`{ctx.prefix}donate`)\n*If this is an error, please contact Gnome!#6669.*")
 
 @bot.event
 async def on_ready():
@@ -130,7 +144,7 @@ async def on_ready():
         bot.starting_message = await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
 
         await bot.supportserver.chunk(cache=True)
-        bot.patreon_role = discord.utils.get(bot.supportserver.roles, name="Patreon!")
+        bot.patreon_role = discord.utils.get(bot.supportserver.roles, name="Patreon")
 
 print("\nLogging into Discord...")
 bot.run(t)

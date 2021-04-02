@@ -41,7 +41,7 @@ config["PostgreSQL Info"] = {
     "ip": psql_ip,
     "db": psql_db
 }
-with open("premium_users.json", "w") as f:
+with open("patreon_users.json", "w") as f:
     f.write("{}")
 
 @bot.event
@@ -66,7 +66,7 @@ async def on_ready():
             auto_join      bool DEFAULT False,
             msg_length     text DEFAULT 30,
             repeated_chars text DEFAULT 0,
-            prefix         text DEFAULT '-'
+            prefix         text DEFAULT 'p-'
         );
         CREATE TABLE nicknames (
             guild_id text,
@@ -76,6 +76,7 @@ async def on_ready():
         CREATE TABLE userinfo (
             user_id  text PRIMARY KEY,
             lang     text DEFAULT 'en-us',
+            variant  text DEFAULT 'a',
             blocked  bool DEFAULT False
         );
         CREATE TABLE cache_lookup (

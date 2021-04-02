@@ -1,4 +1,5 @@
 from configparser import ConfigParser
+from json import dump
 from typing import Union
 
 import discord
@@ -92,3 +93,15 @@ class common_owner(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.is_owner()
     async def leaveguild(self, ctx, guild: int):
         await self.bot.get_guild(guild).leave()
+
+    @commands.command()
+    @commands.is_owner()
+    async def add_premium(self, ctx, guild: int, user: discord.User):
+        if user.id in tuple(self.bot.patreon_json.values()):
+            return await ctx.send(f"{user} is already linked to a guild, check json for more details.")
+
+        self.bot.patreon_json[str(guild)] = user.id
+        with open("patreon_users.json", "w") as f:
+            dump(self.bot.patreon_json, f)
+
+        await ctx.send(f"Linked {user.mention} ({user} | {user.id}) to {self.bot.get_guild(guild).name}")

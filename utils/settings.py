@@ -1,6 +1,6 @@
-from asyncio import Lock
+from asyncio import Lock, gather
 
-default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "prefix": "-"}
+default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "prefix": "p-"}
 
 
 class settings_class():
@@ -131,34 +131,29 @@ class setlangs_class():
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", str(user.id))
 
-        if row is None or dict(row)["lang"] is None:
-            return "en-us"
+        if row is None:
+            return ("en-us", "a")
 
-        return dict(row)["lang"]
+        row = dict(row)
+        return row["lang"], row["variant"]
 
-    async def set(self, user, lang):
+    async def set(self, user, lang, variant):
         user = str(user.id)
         lang = lang.lower()
+        variant = variant.lower()
+
         async with self.pool.acquire() as conn:
             userinfo = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user)
             existing = userinfo is not None
 
-            if lang == "en-us" and existing and not dict(userinfo)["blocked"]:
-                await conn.execute("""
-                    DELETE FROM userinfo
-                    WHERE user_id = $1;
-                    """, user)
-            elif existing:
-                await conn.execute("""
-                    UPDATE userinfo
-                    SET lang = $1
-                    WHERE user_id = $2;
-                    """, lang, user)
+            if existing:
+                await conn.execute("UPDATE userinfo SET lang = $1 WHERE user_id = $2;", lang, user)
+                await conn.execute("UPDATE userinfo SET variant = $1 WHERE user_id = $2;", variant, user)
             else:
                 await conn.execute("""
-                    INSERT INTO userinfo(user_id, lang)
-                    VALUES ($1, $2);
-                    """, user, lang)
+                    INSERT INTO userinfo(user_id, lang, variant)
+                    VALUES ($1, $2, $3);
+                    """, user, lang, variant)
 
 
 class blocked_users_class():

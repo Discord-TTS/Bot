@@ -1,20 +1,32 @@
 import asyncio
+import re
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import Optional
-import re
+from typing import Optional, Tuple
 
 import discord
-from discord.ext import commands
-from gtts.lang import tts_langs
-
+from discord.ext import commands, menus
 from utils import basic
 
-tts_langs = tts_langs()
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 def setup(bot):
     bot.add_cog(Settings(bot))
+
+class Paginator(menus.ListPageSource):
+    def __init__(self, current_lang, *args, **kwargs):
+        self.current_lang = current_lang
+        super().__init__(*args, **kwargs)
+
+    async def format_page(self, menu, entries):
+        entries = "\n".join(v for v in entries)
+
+        embed = discord.Embed(title=f"{menu.ctx.bot.user.name} Languages", description=f"**Currently Supported Languages**\n{entries}")
+        embed.add_field(name="Current Language used", value=self.current_lang)
+
+        embed.set_author(name=menu.ctx.author.name, icon_url=menu.ctx.author.avatar_url)
+        embed.set_footer(text=pick_random(basic.footer_messages))
+        return embed
 
 class Settings(commands.Cog):
     def __init__(self, bot):
@@ -149,9 +161,9 @@ class Settings(commands.Cog):
         await self.setup(ctx, channel)
 
     @set.command(aliases=("voice", "lang"))
-    async def language(self, ctx, voicecode):
+    async def language(self, ctx, lang, variant = ""):
         "Alias of `-voice`"
-        await self.voice(ctx, voicecode)
+        await self.voice(ctx, lang, variant)
 
     @set.group()
     @commands.has_permissions(administrator=True)
@@ -226,30 +238,104 @@ class Settings(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    async def _get_voices(self):
+        if not getattr(self, "_gtts_voices", False):
+            self._gtts_voices = await self.bot.gtts.get_voices()
+
+        return self._gtts_voices
+
+    async def _parse_voice_data(self):
+        if getattr(self, "_parsed_voice_data", False):
+            return self._parsed_voice_data
+
+        parsed_data = dict()
+        voice_data = await self._get_voices()
+
+        for voice in voice_data:
+            if "Standard" not in voice["name"]:
+                continue
+
+            lang = voice["languageCodes"][0].lower()
+            variant = voice["name"][-1].lower()
+
+            if not parsed_data.get(lang):
+                parsed_data[lang] = dict()
+
+            parsed_data[lang][variant] = voice["ssmlGender"].capitalize()
+
+        self._parsed_voice_data = parsed_data
+        return self._parsed_voice_data
+
+    async def _format_voice_data(self) -> str:
+        formatted_data = str()
+        voice_data = await self._get_voices()
+
+        for i, voice in enumerate(voice_data):
+            if "Standard" in voice["name"]:
+                formatted_data += f'{await self._format_voice(voice["languageCodes"][0], voice["name"][-1], voice["ssmlGender"])}\n'
+
+        return formatted_data
+
+    async def _format_voice(self, lang: str, variant: str, gender: Optional[str] = None) -> str:
+        if not gender:
+            voice_data = await self._parse_voice_data()
+            gender = voice_data[lang][variant]
+
+        return f"{lang} - {variant} ({gender.capitalize()})"
+
+    def _make_lang_tuple(self, lang: str, variant: str) -> Tuple[str]:
+        split_lang = lang.split("-")
+        first_lang = f"{split_lang[0]}-{split_lang[-1].upper()}"
+
+        return f"{first_lang}-Standard-{variant}", lang
+
+
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(hidden=True)
-    async def voice(self, ctx, lang: str):
+    async def voice(self, ctx, lang: str, variant = ""):
         "Changes the voice your messages are read in, full list in `-voices`"
-        if lang in tts_langs:
-            await self.bot.setlangs.set(ctx.author, lang)
-            await ctx.send(f"Changed your voice to: {tts_langs[lang]}")
-        else:
-            await ctx.send("Invalid voice, do `-voices`")
+        lang, variant = lang.lower(), variant.lower()
+
+        # Get possible variants of lang
+        voice_data = await self._parse_voice_data()
+        variants_to_genders = voice_data.get(lang, {})
+
+        if not variants_to_genders:
+            return await ctx.send(f"Invalid language, do `{ctx.prefix}voices` for a full list")
+
+        # Get first variant if wanted variant isn't given
+        variant = variant or next(iter(variants_to_genders))
+
+        # Get gender with lang and variant pair
+        gender = variants_to_genders.get(variant, None)
+
+        # If gender is falsy, lang/variant isn't in voice_data so isn't input data isn't valid
+        if not gender:
+            return await ctx.send(f"Invalid variant, do `{ctx.prefix}voices`")
+
+        # Save into database and return success message
+        await self.bot.setlangs.set(ctx.author, lang, variant)
+        await ctx.send(f"Changed your voice to: {await self._format_voice(lang, variant, variants_to_genders[variant])}")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
-    async def voices(self, ctx, lang=None):
+    async def voices(self, ctx):
         "Lists all the language codes that TTS bot accepts"
-        if lang in tts_langs:
-            return await self.voice(ctx, lang)
+        lang, variant = await self.bot.setlangs.get(ctx.author)
+        langs_string = await self._format_voice_data()
 
-        lang = await self.bot.setlangs.get(ctx.author)
-        langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
+        variants = (await self._parse_voice_data()).get(lang, {})
+        variant = variant if variant in variants else tuple(variants.keys())[0]
+        current_voice = await self._format_voice(lang, variant)
 
-        embed = discord.Embed(title="TTS Bot Languages")
-        embed.set_footer(text=pick_random(basic.footer_messages))
-        embed.add_field(name="Currently Supported Languages", value=langs_string)
-        embed.add_field(name="Current Language used", value=f"{tts_langs[lang]} | {lang}")
-        embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+        pages = list()
+        current_lang = None
+        for line in langs_string.split("\n"):
+            if line.split(" ")[0] != current_lang:
+                current_lang = line.split(" ")[0]
+                pages.append([line])
+            else:
+                pages[-1].append(line)
 
-        await ctx.send(embed=embed)
+        menu = menus.MenuPages(source=Paginator(current_voice, pages, per_page=1), clear_reactions_after=True)
+        await menu.start(ctx)

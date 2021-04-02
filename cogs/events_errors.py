@@ -83,6 +83,9 @@ class events_errors(commands.Cog):
             await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}")
             return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `-suggest *what command you just run*`")
 
+        elif isinstance(error, commands.errors.CheckFailure):
+            return
+
         first_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
         second_part = ''.join(format_exception(type(error), error, error.__traceback__))
         temp = f"{first_part}\n```{second_part}```"
