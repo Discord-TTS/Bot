@@ -33,9 +33,7 @@ status = getattr(discord.Status, config["Activity"]["status"])
 
 
 async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
-    """
-    gets the prefix for a guild based on the passed message object
-    """
+    "Gets the prefix for a guild based on the passed message object"
     return await bot.settings.get(message.guild, "prefix") if message.guild else "p-"
 
 
