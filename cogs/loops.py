@@ -21,7 +21,7 @@ class loops(commands.Cog):
     async def cache_cleanup(self):
         try:
             cache_size = basic.get_size("cache")
-            if cache_size >= 2000000000:
+            if cache_size >= 1000000000:
                 cache_folder = listdir("cache")
                 cache_folder.sort(reverse=False, key=lambda x: int(''.join(filter(str.isdigit, x))))
                 cache_folder = cache_folder[:1000]
