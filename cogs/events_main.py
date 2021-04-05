@@ -7,83 +7,103 @@ from itertools import groupby
 from random import choice as pick_random
 
 import discord
-import easygTTS
-import gtts as gTTS
 from discord.ext import commands
-from mutagen.mp3 import MP3, HeaderNotFoundError
+from easygTTS import gtts
+from mutagen import mp3 as mutagen
+from pydub import AudioSegment
+from voxpopuli import Voice
 
 from utils import basic
 from patched_FFmpegPCM import FFmpegPCMAudio
 
 
 def setup(bot):
-    bot.add_cog(Main(bot))
+    bot.add_cog(events_main(bot))
 
 
-class Main(commands.Cog):
+class events_main(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.proxy = False
+        self.blocked = False
+        self.gtts = gtts(session=self.bot.session)
 
     async def get_tts(self, message, text, lang, max_length):
         lang = lang.split("-")[0]
-        mp3 = await self.bot.cache.get(text, lang, message.id)
+        cached_mp3 = await self.bot.cache.get(text, lang, message.id)
 
-        if not mp3:
-            temp_store_for_mp3 = None
-            if not self.proxy:
-                make_tts_func = make_func(self.make_tts, text, lang)
-                temp_store_for_mp3, file_length = await self.bot.loop.run_in_executor(None, make_tts_func)
+        if cached_mp3:
+            self.bot.queue[message.guild.id][message.id] = cached_mp3
+            return
 
-            if temp_store_for_mp3 == "Rate limited":
-                self.proxy = True
-                self.bot.loop.create_task(self.clear_rate_limit())
+        if self.blocked:
+            make_espeak_func = make_func(self.make_espeak, text, lang, max_length)
+            wav = await self.bot.loop.run_in_executor(None, make_espeak_func)
 
-            if self.proxy:
-                if not getattr(self, "gtts", False):
-                    self.gtts = easygTTS.gtts(session=self.bot.session)
+            if wav:
+                self.bot.queue[message.guild.id][message.id] = wav
 
-                try:
-                    temp_store_for_mp3 = BytesIO(await self.gtts.get(text=text, lang=lang))
-                    temp_store_for_mp3.seek(0)
+            return
 
-                    file_length = int(MP3(temp_store_for_mp3).info.length)
-                except HeaderNotFoundError:
-                    return
+        gtts_resp = await self.gtts.get(text=text, lang=lang)
+        if gtts_resp == b"Internal Server Error":
+            self.blocked = True
+            self.bot.loop.create_task(self.rate_limit_handler())
 
-            # Discard if over max length seconds
-            if file_length > int(max_length):
-                return
-
-            temp_store_for_mp3.seek(0)
-            mp3 = temp_store_for_mp3.read()
-
-            await self.bot.cache.set(text, lang, message.id, mp3)
-
-        self.bot.queue[message.guild.id][message.id] = mp3
-
-    def make_tts(self, text, lang) -> BytesIO:
-        temp_store_for_mp3 = BytesIO()
+            await self.send_fallback_messages()
+            return
 
         try:
-            gTTS.gTTS(text=text, lang=lang).write_to_fp(temp_store_for_mp3)
-        except gTTS.tts.gTTSError as e:
-            if e.rsp.status_code == 429:
-                return "Rate limited"
-            raise
+            temp_store_for_mp3 = BytesIO(gtts_resp)
+            temp_store_for_mp3.seek(0)
 
-        return temp_store_for_mp3, int(MP3(temp_store_for_mp3).info.length)
+            file_length = int(mutagen.MP3(temp_store_for_mp3).info.length)
+        except mutagen.HeaderNotFoundError:
+            return
 
-    def finish_future(self, fut, *args):
-        if not fut.done():
-            self.bot.loop.call_soon_threadsafe(fut.set_result, "done")
+        # Discard if over max length seconds
+        if file_length > int(max_length):
+            return
 
-    async def clear_rate_limit(self):
-        print("Swapped to easygTTS")
-        await asyncio.sleep(3601)
+        temp_store_for_mp3.seek(0)
+        mp3 = temp_store_for_mp3.read()
 
-        print("Retrying normal gTTS")
-        self.proxy = False
+        await self.bot.cache.set(text, lang, message.id, mp3)
+        self.bot.queue[message.guild.id][message.id] = mp3
+
+    def make_espeak(self, text, lang, max_length):
+        voice = Voice(lang=basic.gtts_to_espeak[lang], speed=130, volume=2) if lang in basic.gtts_to_espeak else Voice(lang="en",speed=130)
+        wav = voice.to_audio(text)
+
+        pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
+        if len(pydub_wav)/1000 > int(max_length):
+            return
+
+        return wav
+
+    async def send_fallback_messages(self):
+        embed = discord.Embed(title="TTS Bot has been blocked by Google")
+        embed.description = cleandoc("""
+            During this temporary block, voice has been swapped to a worse quality voice.
+            If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `-donate`
+            """)
+        embed.footer = "You can join the support server for more info: discord.gg/zWPWwQC"
+
+        for voice_client in self.bot.voice_clients:
+            channel_id = await self.bot.settings.get(voice_client.guild, setting="channel")
+            channel = voice_client.guild.get_channel(int(channel_id))
+            self.bot.loop.create_task(channel.send(embed=embed))
+
+
+    async def rate_limit_handler(self):
+        await self.bot.channels["logs"].send("Swapped to espeak")
+
+        while await self.gtts.get(text="Rate limit test", lang="en") == b"Internal Server Error":
+            await asyncio.sleep(3601)
+
+        await self.bot.channels["logs"].send("Swapping back to easygTTS")
+
+
+
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -257,12 +277,7 @@ class Main(commands.Cog):
                 saythis = "".join(saythis_list)
 
             # Adds filtered message to queue
-            try:
-                await self.get_tts(message, saythis, lang, msg_length)
-            except ValueError:
-                return print(f"Run out of attempts generating {saythis}.")
-            except AssertionError:
-                return print(f"Skipped {saythis}, apparently blank message.")
+            await self.get_tts(message, saythis, lang, msg_length)
 
             async with self.bot.message_locks[message.guild.id]:
                 if self.bot.should_return[message.guild.id]:
@@ -343,6 +358,10 @@ class Main(commands.Cog):
 
                 await self.bot.channels["logs"].send(f"{message.author} just got the 'Welcome to Support DMs' message")
                 await dm_message.pin()
+
+    def finish_future(self, fut, *args):
+        if not fut.done():
+            self.bot.loop.call_soon_threadsafe(fut.set_result, "done")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):

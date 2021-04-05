@@ -28,6 +28,43 @@ footer_messages = (
     "There are loads of customizable settings, check out -settings help",
 )
 
+gtts_to_espeak = {
+    "af":"af",
+    "ar":"ar",
+    "cs":"cz",
+    "de":"de",
+    "en":"en",
+    "el":"gr",
+    "es":"es",
+    "et":"ee",
+    "fr":"fr",
+    "hi":"in",
+    "hr":"cr",
+    "hu":"hu",
+    "id":"id",
+    "is":"ic",
+    "it":"it",
+    "ja":"jp",
+    "ko":"hn",
+    "la":"la",
+    "nl":"nl",
+    "pl":"pl",
+    "pt":"pt",
+    "ro":"ro",
+    "sw":"sw",
+    "te":"tl",
+    "tr":"tr",
+    "uk":"en",
+    "en-us":"us",
+    "en-ca":"us",
+    "en-uk":"en",
+    "en-gb":"en",
+    "fr-ca":"fr",
+    "fr-fr":"fr",
+    "es-es":"es",
+    "es-us":"es"
+    }
+
 
 async def ensure_webhook(channel, name="TTS-Webhook"):
     webhooks = await channel.webhooks()
