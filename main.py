@@ -1,7 +1,7 @@
 import asyncio
 import json
+import os
 from configparser import ConfigParser
-from os import listdir
 from subprocess import PIPE, run
 from time import monotonic
 
@@ -23,8 +23,6 @@ config_channels = config["Channels"]
 
 cache_key_str = config["Main"]["key"][2:-1]
 cache_key_bytes = cache_key_str.encode()
-
-GOOGLE_API_KEY = run(['gcloud', 'auth', 'application-default', 'print-access-token'], stdout=PIPE).stdout.decode().replace("\n", "")
 
 # Define bot and remove overwritten commands
 activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
@@ -61,7 +59,7 @@ bot.gtts = bot.loop.run_until_complete(
     asyncgTTS.setup(
         premium=True,
         session=ClientSession(),
-        auth_token=GOOGLE_API_KEY
+        service_account_json_location=os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     )
 )
 
@@ -80,7 +78,7 @@ bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").s
 with open("patreon_users.json") as f:
     bot.patreon_json = json.load(f)
 
-for cog in listdir("cogs"):
+for cog in os.listdir("cogs"):
     if cog.endswith(".py"):
         bot.load_extension(f"cogs.{cog[:-3]}")
         print(f"Successfully loaded: {cog}")
@@ -102,6 +100,8 @@ async def premium_check(ctx):
     premium_user_for_guild = bot.patreon_json.get(str(ctx.guild.id))
     if premium_user_for_guild in (member.id for member in bot.patreon_role.members):
         return True
+
+    print(f"{ctx.author} | {ctx.author.id} failed premium check in {ctx.guild.name} | {ctx.guild.id}")
 
     permissions = ctx.channel.permissions_for(ctx.guild.me)
     if permissions.send_messages:
@@ -142,7 +142,7 @@ async def on_ready():
         bot.starting_message = await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
 
         await bot.supportserver.chunk(cache=True)
-        bot.patreon_role = discord.utils.get(bot.supportserver.roles, name="Patreon")
+        bot.patreon_role = discord.utils.get(bot.supportserver.roles, name="Patreon!")
 
 print("\nLogging into Discord...")
 bot.run(t)
