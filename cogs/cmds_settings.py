@@ -16,7 +16,7 @@ to_enabled = {True: "Enabled", False: "Disabled"}
 def setup(bot):
     bot.add_cog(cmds_settings(bot))
 
-class cmds_settings(commands.Cog):
+class cmds_settings(commands.Cog, name="Settings"):
     def __init__(self, bot):
         self.bot = bot
 
