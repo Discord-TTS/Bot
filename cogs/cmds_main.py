@@ -58,13 +58,13 @@ class cmds_main(commands.Cog, name="Main Commands"):
         if ctx.guild.voice_client and ctx.guild.voice_client != channel:
             return await ctx.send("Error: I am already in a voice channel!")
 
-        embed = discord.Embed(
+        join_embed = discord.Embed(
             title="Joined your voice channel!",
             description="Just type normally and TTS Bot will say your messages!"
         )
-        embed.set_thumbnail(url=str(self.bot.user.avatar_url))
-        embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
-        embed.set_footer(text=pick_random(basic.footer_messages))
+        join_embed.set_thumbnail(url=str(self.bot.user.avatar_url))
+        join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+        join_embed.set_footer(text=pick_random(basic.footer_messages))
 
         self.bot.should_return[ctx.guild.id] = True
         self.bot.queue[ctx.guild.id] = dict()
@@ -72,7 +72,18 @@ class cmds_main(commands.Cog, name="Main Commands"):
         await channel.connect()
         self.bot.should_return[ctx.guild.id] = False
 
-        await ctx.send(embed=embed)
+        await ctx.send(embed=join_embed)
+        if self.bot.blocked:
+            blocked_embed = discord.Embed(title="TTS Bot is currently blocked by Google")
+            blocked_embed.description = cleandoc(f"""
+                During this temporary block, voice has been swapped to a worse quality voice.
+                If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `{ctx.prefix}donate`
+                """)
+            blocked_embed.set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
+
+            await ctx.send(embed=blocked_embed)
+
+
 
     @commands.guild_only()
     @commands.cooldown(1, 10, commands.BucketType.guild)

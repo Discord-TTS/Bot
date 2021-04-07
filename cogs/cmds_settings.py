@@ -14,9 +14,9 @@ tts_langs = {lang: name for lang, name in tts_langs().items() if "-" not in lang
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 def setup(bot):
-    bot.add_cog(Settings(bot))
+    bot.add_cog(cmds_settings(bot))
 
-class Settings(commands.Cog):
+class cmds_settings(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
