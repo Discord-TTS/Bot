@@ -3,6 +3,7 @@ from configparser import ConfigParser
 from os import listdir
 from time import monotonic
 
+import asyncgTTS
 import asyncpg
 import discord
 from aiohttp import ClientSession
@@ -43,6 +44,14 @@ bot = commands.AutoShardedBot(
     allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
 )
 
+bot.session = ClientSession()
+bot.gtts = bot.loop.run_until_complete(
+    asyncgTTS.setup(
+        premium=False,
+        session=bot.session
+    )
+)
+
 pool = bot.loop.run_until_complete(
     asyncpg.create_pool(
         host=config["PostgreSQL Info"]["ip"],
@@ -57,7 +66,6 @@ bot.channels = dict()
 bot.should_return = dict()
 bot.message_locks = dict()
 bot.currently_playing = dict()
-bot.session = ClientSession()
 bot.settings = settings.settings_class(pool)
 bot.setlangs = settings.setlangs_class(pool)
 bot.nicknames = settings.nickname_class(pool)

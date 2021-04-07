@@ -1,7 +1,7 @@
+git+https://github.com/Gnome-py/asyncgTTS.git
 discord.py[voice]
 cryptography
 voxpopuli
-easygTTS
 asyncpg
 mutagen
 psutil

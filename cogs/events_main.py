@@ -6,9 +6,9 @@ from io import BytesIO
 from itertools import groupby
 from random import choice as pick_random
 
+import asyncgTTS
 import discord
 from discord.ext import commands
-from easygTTS import gtts
 from mutagen import mp3 as mutagen
 from pydub import AudioSegment
 from voxpopuli import Voice
@@ -25,8 +25,6 @@ class events_main(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.blocked = False
-
-        self.gtts = gtts(session=self.bot.session)
 
     async def get_tts(self, message, text, lang, max_length, prefix):
         lang = lang.split("-")[0]
@@ -45,11 +43,12 @@ class events_main(commands.Cog):
 
             return
 
-        gtts_resp = await self.gtts.get(text=text, lang=lang)
-        if gtts_resp == b"Internal Server Error":
+        try:
+            gtts_resp = await self.bot.gtts.get(text=text, lang=lang)
+        except asyncgTTS.RatelimitException:
             self.bot.loop.create_task(self.rate_limit_handler())
-            await self.send_fallback_messages(prefix)
 
+            await self.send_fallback_messages(prefix)
             return
 
         try:
@@ -107,7 +106,7 @@ class events_main(commands.Cog):
         # I know this code isn't pretty
         while True:
             try:
-                if await self.gtts.get(text="Rate limit test", lang="en") != b"Internal Server Error":
+                if await self.bot.gtts.get(text="Rate limit test", lang="en") != b"Internal Server Error":
                     break
             except:
                 pass
@@ -116,7 +115,6 @@ class events_main(commands.Cog):
 
         await self.bot.channels["logs"].send("**Swapping back to easygTTS**")
         self.bot.blocked = False
-
 
 
 
