@@ -24,10 +24,11 @@ def setup(bot):
 class events_main(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.blocked = False
+        self.bot.blocked = False
+
         self.gtts = gtts(session=self.bot.session)
 
-    async def get_tts(self, message, text, lang, max_length):
+    async def get_tts(self, message, text, lang, max_length, prefix):
         lang = lang.split("-")[0]
         cached_mp3 = await self.bot.cache.get(text, lang, message.id)
 
@@ -35,7 +36,7 @@ class events_main(commands.Cog):
             self.bot.queue[message.guild.id][message.id] = cached_mp3
             return
 
-        if self.blocked:
+        if self.bot.blocked:
             make_espeak_func = make_func(self.make_espeak, text, lang, max_length)
             wav = await self.bot.loop.run_in_executor(None, make_espeak_func)
 
@@ -46,10 +47,10 @@ class events_main(commands.Cog):
 
         gtts_resp = await self.gtts.get(text=text, lang=lang)
         if gtts_resp == b"Internal Server Error":
-            self.blocked = True
+            self.bot.blocked = True
             self.bot.loop.create_task(self.rate_limit_handler())
 
-            await self.send_fallback_messages()
+            await self.send_fallback_messages(prefix)
             return
 
         try:
@@ -80,27 +81,40 @@ class events_main(commands.Cog):
 
         return wav
 
-    async def send_fallback_messages(self):
+    async def send_fallback_messages(self, prefix):
         embed = discord.Embed(title="TTS Bot has been blocked by Google")
-        embed.description = cleandoc("""
+        embed.description = cleandoc(f"""
             During this temporary block, voice has been swapped to a worse quality voice.
-            If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `-donate`
+            If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `{prefix}donate`
             """)
-        embed.footer = "You can join the support server for more info: discord.gg/zWPWwQC"
+        embed.set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
 
         for voice_client in self.bot.voice_clients:
             channel_id = await self.bot.settings.get(voice_client.guild, setting="channel")
             channel = voice_client.guild.get_channel(int(channel_id))
-            self.bot.loop.create_task(channel.send(embed=embed))
+
+            if not channel:
+                continue
+
+            permissions = channel.permissions_for(voice_client.guild.me)
+            if permissions.send_messages and permissions.embed_links:
+                self.bot.loop.create_task(channel.send(embed=embed))
 
 
     async def rate_limit_handler(self):
-        await self.bot.channels["logs"].send("Swapped to espeak")
+        await self.bot.channels["logs"].send("**Swapped to espeak**")
 
-        while await self.gtts.get(text="Rate limit test", lang="en") == b"Internal Server Error":
+        # I know this code isn't pretty
+        while True:
+            try:
+                if await self.gtts.get(text="Rate limit test", lang="en") != b"Internal Server Error":
+                    break
+            except:
+                pass
+
             await asyncio.sleep(3601)
 
-        await self.bot.channels["logs"].send("Swapping back to easygTTS")
+        await self.bot.channels["logs"].send("**Swapping back to easygTTS**")
 
 
 
@@ -277,7 +291,7 @@ class events_main(commands.Cog):
                 saythis = "".join(saythis_list)
 
             # Adds filtered message to queue
-            await self.get_tts(message, saythis, lang, msg_length)
+            await self.get_tts(message, saythis, lang, msg_length, prefix)
 
             async with self.bot.message_locks[message.guild.id]:
                 if self.bot.should_return[message.guild.id]:
