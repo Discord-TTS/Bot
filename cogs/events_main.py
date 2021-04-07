@@ -47,10 +47,9 @@ class events_main(commands.Cog):
 
         gtts_resp = await self.gtts.get(text=text, lang=lang)
         if gtts_resp == b"Internal Server Error":
-            self.bot.blocked = True
             self.bot.loop.create_task(self.rate_limit_handler())
-
             await self.send_fallback_messages(prefix)
+
             return
 
         try:
@@ -102,6 +101,7 @@ class events_main(commands.Cog):
 
 
     async def rate_limit_handler(self):
+        self.bot.blocked = True
         await self.bot.channels["logs"].send("**Swapped to espeak**")
 
         # I know this code isn't pretty
@@ -115,6 +115,7 @@ class events_main(commands.Cog):
             await asyncio.sleep(3601)
 
         await self.bot.channels["logs"].send("**Swapping back to easygTTS**")
+        self.bot.blocked = False
 
 
 
