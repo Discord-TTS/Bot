@@ -85,19 +85,14 @@ async def on_ready():
     botcategory = await guild.create_category("TTS Bot")
     overwrites = {guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False)}
 
-    errors = await guild.create_text_channel("errors", category=botcategory, overwrites=overwrites)
-    dm_logs = await guild.create_text_channel("dm-logs", category=botcategory, overwrites=overwrites)
-    servers = await guild.create_text_channel("servers", category=botcategory, overwrites=overwrites)
-    suggestions = await guild.create_text_channel("suggestions", category=botcategory, overwrites=overwrites)
-    logs = await guild.create_text_channel("logs", category=botcategory, overwrites=overwrites)
+    config["Channels"] = {}
+    avatar_bytes = await bot.user.avatar_url.read()
 
-    config["Channels"] = {
-        "errors": errors.id,
-        "dm_logs": dm_logs.id,
-        "servers": servers.id,
-        "suggestions": suggestions.id,
-        "logs": logs.id
-    }
+    for channel_name in ("errors", "dm-logs", "servers", "suggestions", "logs"):
+        channel = await guild.create_text_channel(channel_name, category=botcategory, overwrites=overwrites)
+        webhook = await channel.create_webhook(name=bot.user.name, avatar=avatar_bytes).url
+
+        config["Channels"][channel_name] = webhook
 
     await logs.send(f"Are you sure you want {[str(bot.get_user(int(trusted_id))) for trusted_id in trusted_ids]} to be trusted? (do -yes to accept)")
 

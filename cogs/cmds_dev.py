@@ -15,7 +15,6 @@ class cmds_dev(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.command()
     @commands.is_owner()
     async def end(self, ctx):
-        await self.bot.session.close()
         await self.bot.close()
 
     @commands.command()
