@@ -60,6 +60,8 @@ async def main(bot):
     )
 
     # Setup all bot.vars in one place
+    bot.supportserver = None
+
     bot.queue = dict()
     bot.channels = dict()
     bot.should_return = dict()
