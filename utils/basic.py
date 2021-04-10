@@ -28,26 +28,6 @@ footer_messages = (
 )
 
 
-async def ensure_webhook(channel, name="TTS-Webhook"):
-    webhooks = await channel.webhooks()
-    if webhooks:
-        webhook = webhooks[0]
-    else:
-        webhook = await channel.create_webhook(name)
-
-    return webhook
-
-
-def get_value(dictionary, *nested_values, default_value=None):
-    try:
-        for value in nested_values:
-            dictionary = dictionary[value]
-    except (TypeError, AttributeError, KeyError):
-        return default_value
-
-    return dictionary
-
-
 def remove_chars(remove_from, *chars):
     input_string = str(remove_from)
     for char in chars:

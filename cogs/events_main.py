@@ -280,12 +280,16 @@ class Main(commands.Cog):
                     await self.bot.channels["logs"].send(f"{message.author} just got the 'dont ask to ask' message")
 
                 elif not await self.bot.blocked_users.check(message.author):
-                    files = [await attachment.to_file() for attachment in message.attachments]
-                    if not files and not message.content:
+                    if not message.attachments and not message.content:
                         return
 
-                    webhook = await basic.ensure_webhook(self.bot.channels["dm_logs"], name="TTS-DM-LOGS")
-                    await webhook.send(message.content, username=str(message.author), avatar_url=message.author.avatar_url, files=files)
+                    files = (await attachment.to_file() for attachment in message.attachments)
+                    await self.bot.channels["dm_logs"].send(
+                        message.content,
+                        files=files,
+                        username=str(message.author),
+                        avatar_url=message.author.avatar_url
+                    )
 
             else:
                 if len(pins) >= 49:
