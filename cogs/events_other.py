@@ -18,16 +18,18 @@ class events_other(commands.Cog):
         if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
             await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
 
-        if message.channel in (self.bot.channels["dm_logs"],self.bot.channels["suggestions"]) and not message.author.bot and message.reference:
-            referenced_message = await message.channel.fetch_message(message.reference.message_id)
-            reference_author = referenced_message.author
-            if reference_author.discriminator == "0000":
-                todm= reference_author.name
-                converter = commands.UserConverter()
-                todm = await converter.convert(message.channel, todm)
-                dm = self.bot.get_command("dm")
-                ctx = await self.bot.get_context(message)
-                await dm(ctx, todm, message=message.content)
+        if message.reference and message.guild == bot.supportserver and message.channel.name in ("dm_logs", "suggestions") and not message.author.bot:
+            dm_message = message.reference.resolved or await message.channel.fetch_message(message.reference.message_id)
+            dm_sender = dm_message.author
+            if dm_sender.discriminator != "0000":
+                return
+
+            dm_command = self.bot.get_command("dm")
+            ctx = await self.bot.get_context(message)
+
+            todm = await commands.UserConverter().convert(ctx, dm_sender.name)
+            await dm_command(ctx, todm, message=message.content)
+
         if message.channel.id == 749971061843558440 and message.embeds and str(message.author) == "GitHub#0000":
             if " new commit" in message.embeds[0].title:
                 update_for_main = message.embeds[0].title.startswith("[Discord-TTS-Bot:master]") and self.bot.user.id == 513423712582762502

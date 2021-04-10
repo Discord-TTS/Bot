@@ -6,8 +6,6 @@ import discord
 from discord.ext import commands
 from psutil import Process
 
-from utils.basic import ensure_webhook
-
 start_time = monotonic()
 
 def setup(bot):
@@ -102,10 +100,13 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
             return await ctx.send("Hey! You are meant to replace `*suggestion*` with your actual suggestion!")
 
         if not await self.bot.blocked_users.check(ctx.message.author):
-            webhook = await ensure_webhook(self.bot.channels["suggestions"], "SUGGESTIONS")
-            files = [await attachment.to_file() for attachment in ctx.message.attachments]
-
-            await webhook.send(suggestion, username=str(ctx.author), avatar_url=ctx.author.avatar_url, files=files)
+            files = (await attachment.to_file() for attachment in ctx.message.attachments)
+            await self.bot.channels["suggestions"].send(
+                suggestion,
+                files=files,
+                username=str(ctx.author),
+                avatar_url=ctx.author.avatar_url
+            )
 
         await ctx.send("Suggestion noted")
 

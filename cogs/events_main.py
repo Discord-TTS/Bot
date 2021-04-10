@@ -47,9 +47,15 @@ class events_main(commands.Cog):
             gtts_resp = await self.bot.gtts.get(text=text, lang=lang)
         except asyncgTTS.RatelimitException:
             self.bot.loop.create_task(self.rate_limit_handler())
-
             await self.send_fallback_messages(prefix)
+
             return
+        except asyncgTTS.easygttsException as e:
+            status_code = str(e)[3:]
+            if status_code == 400:
+                return
+
+            raise
 
         try:
             temp_store_for_mp3 = BytesIO(gtts_resp)
@@ -344,12 +350,16 @@ class events_main(commands.Cog):
                     await self.bot.channels["logs"].send(f"{message.author} just got the 'dont ask to ask' message")
 
                 elif not await self.bot.blocked_users.check(message.author):
-                    files = [await attachment.to_file() for attachment in message.attachments]
-                    if not files and not message.content:
+                    if not message.attachments and not message.content:
                         return
 
-                    webhook = await basic.ensure_webhook(self.bot.channels["dm_logs"], name="TTS-DM-LOGS")
-                    await webhook.send(message.content, username=str(message.author), avatar_url=message.author.avatar_url, files=files)
+                    files = (await attachment.to_file() for attachment in message.attachments)
+                    await self.bot.channels["dm_logs"].send(
+                        message.content,
+                        files=files,
+                        username=str(message.author),
+                        avatar_url=message.author.avatar_url
+                    )
 
             else:
                 if len(pins) >= 49:

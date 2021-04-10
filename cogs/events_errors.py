@@ -74,14 +74,19 @@ class events_errors(commands.Cog):
             return await ctx.send(f"**Error:** You are missing {', '.join(error.missing_perms)} to run this command!")
 
         elif isinstance(error, commands.BotMissingPermissions):
-            if "send_messages" in error.missing_perms:
-                return await ctx.author.send("**Error:** I could not complete this command as I don't have send messages permissions!")
+            if "send_messages" not in error.missing_perms:
+                return await ctx.send(f"**Error:** I am missing the permissions: {', '.join(error.missing_perms)}")
 
-            return await ctx.send(f"**Error:** I am missing the permissions: {', '.join(error.missing_perms)}")
+            try:
+                await ctx.author.send("**Error:** I could not complete this command as I don't have send messages permissions!")
+            except discord.errors.Forbidden:
+                pass
+            finally:
+                return
 
         elif isinstance(error, discord.errors.Forbidden):
-            await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}")
-            return await ctx.author.send(f"Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `{ctx.prefix}suggest *what command you just run*`")
+            self.bot.loop.create_task(self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}"))
+            return await ctx.author.send(f"Unknown Permission Error, please give TTS Bot the required permissions.")
 
         first_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
         second_part = ''.join(format_exception(type(error), error, error.__traceback__))
