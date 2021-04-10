@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 from configparser import ConfigParser
-from subprocess import PIPE, run
 from time import monotonic
 
 import asyncgTTS
@@ -47,7 +46,7 @@ bot = commands.AutoShardedBot(
 
 @bot.check
 async def premium_check(ctx):
-    if not getattr(bot, "patreon_role"):
+    if not getattr(bot, "patreon_role", None):
         return
 
     if not ctx.guild:
@@ -108,12 +107,12 @@ async def main(bot):
     bot.cache = cache.cache(cache_key_bytes, pool)
     bot.blocked_users = settings.blocked_users_class(pool)
     bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
-    
+
     with open("patreon_users.json") as f:
         bot.patreon_json = json.load(f)
 
     # Load all the cogs, now bot.vars are ready
-    for cog in listdir("cogs"):
+    for cog in os.listdir("cogs"):
         if cog.endswith(".py"):
             bot.load_extension(f"cogs.{cog[:-3]}")
             print(f"Successfully loaded: {cog}")
@@ -153,6 +152,9 @@ async def main(bot):
         print("Waiting 5 seconds")
         await asyncio.sleep(5)
         bot.supportserver = bot.get_guild(support_server_id)
+
+    await bot.supportserver.chunk(cache=True)
+    bot.patreon_role = discord.utils.get(bot.supportserver.roles, name="Patreon!")
 
 try:
     bot.loop.run_until_complete(main(bot))
