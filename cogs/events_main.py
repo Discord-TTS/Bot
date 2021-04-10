@@ -47,9 +47,15 @@ class events_main(commands.Cog):
             gtts_resp = await self.bot.gtts.get(text=text, lang=lang)
         except asyncgTTS.RatelimitException:
             self.bot.loop.create_task(self.rate_limit_handler())
-
             await self.send_fallback_messages(prefix)
+
             return
+        except asyncgTTS.easygttsException as e:
+            status_code = str(e)[3:]
+            if status_code == 400:
+                return
+
+            raise
 
         try:
             temp_store_for_mp3 = BytesIO(gtts_resp)
