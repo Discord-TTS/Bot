@@ -51,8 +51,10 @@ class events_main(commands.Cog):
 
             return
         except asyncgTTS.easygttsException as e:
-            status_code = str(e)[3:]
-            if status_code == 400:
+            error_message = str(e)
+            status_code = error_message[:3]
+
+            if status_code == "400":
                 return
 
             raise
@@ -353,7 +355,7 @@ class events_main(commands.Cog):
                     if not message.attachments and not message.content:
                         return
 
-                    files = (await attachment.to_file() for attachment in message.attachments)
+                    files = [await attachment.to_file() for attachment in message.attachments]
                     await self.bot.channels["dm_logs"].send(
                         message.content,
                         files=files,
