@@ -18,7 +18,7 @@ class events_other(commands.Cog):
         if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
             await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
 
-        if message.reference and message.guild == bot.supportserver and message.channel.name in ("dm_logs", "suggestions") and not message.author.bot:
+        if message.reference and message.guild == self.bot.supportserver and message.channel.name in ("premium-dm-logs", "suggestions") and not message.author.bot:
             dm_message = message.reference.resolved or await message.channel.fetch_message(message.reference.message_id)
             dm_sender = dm_message.author
             if dm_sender.discriminator != "0000":
