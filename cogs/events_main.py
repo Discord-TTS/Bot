@@ -283,7 +283,7 @@ class Main(commands.Cog):
                     if not message.attachments and not message.content:
                         return
 
-                    files = (await attachment.to_file() for attachment in message.attachments)
+                    files = [await attachment.to_file() for attachment in message.attachments]
                     await self.bot.channels["dm_logs"].send(
                         message.content,
                         files=files,
