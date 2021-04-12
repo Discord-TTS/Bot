@@ -114,9 +114,9 @@ class events_main(commands.Cog):
         # I know this code isn't pretty
         while True:
             try:
-                if await self.bot.gtts.get(text="Rate limit test", lang="en") != b"Internal Server Error":
-                    break
-            except:
+                await self.bot.gtts.get(text="Rate limit test", lang="en"):
+                break
+            except asyncgTTS.RatelimitException:
                 pass
 
             await asyncio.sleep(3601)

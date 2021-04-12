@@ -96,8 +96,11 @@ async def main(bot):
             await bot.close()
 
         # Cleanup before asyncio loop shutdown
-        await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
-        await bot.session.close()
+        try:
+            await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
+            await bot.session.close()
+        except:
+            pass
 
     # Queue bot to start in background, then wait for bot to start.
     bot_runner = bot.loop.create_task(run_bot())
