@@ -17,6 +17,8 @@ def setup(bot):
     bot.add_cog(cmds_settings(bot))
 
 class cmds_settings(commands.Cog, name="Settings"):
+    "TTS Bot settings commands, configuration is done here."
+
     def __init__(self, bot):
         self.bot = bot
 

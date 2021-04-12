@@ -12,6 +12,8 @@ def setup(bot):
     bot.add_cog(cmds_extra(bot))
 
 class cmds_extra(commands.Cog, name="Extra Commands"):
+    "TTS Bot extra commands, not required but useful."
+
     def __init__(self, bot):
         self.bot = bot
 

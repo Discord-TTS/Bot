@@ -29,7 +29,7 @@ class events_errors(commands.Cog):
             if message.guild is None:
                 info = f"DM support | Sent by {message.author}"
             else:
-                info = f"General TTS | Sent by {message.author} in {message.guild}|{message.guild.id}"
+                info = f"General TTS | Sent by {message.author} in {message.guild} | {message.guild.id}"
 
         elif event in ("on_guild_join", "on_guild_remove"):
             guild = args[0]
@@ -86,7 +86,7 @@ class events_errors(commands.Cog):
 
         elif isinstance(error, discord.errors.Forbidden):
             self.bot.loop.create_task(self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}"))
-            return await ctx.author.send(f"Unknown Permission Error, please give TTS Bot the required permissions.")
+            return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions.")
 
         first_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
         second_part = ''.join(format_exception(type(error), error, error.__traceback__))

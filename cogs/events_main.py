@@ -258,7 +258,7 @@ class events_main(commands.Cog):
             # Toggleable xsaid and attachment + links detection
             if xsaid:
                 said_name = await self.bot.nicknames.get(message.guild, message.author)
-                format = basic.exts_to_format(message.attachments)
+                file_format = basic.exts_to_format(message.attachments)
 
                 if contained_url:
                     if saythis:
@@ -268,9 +268,9 @@ class events_main(commands.Cog):
 
                 if message.attachments:
                     if not saythis:
-                        saythis = f"{said_name} sent {format}"
+                        saythis = f"{said_name} sent {file_format}"
                     else:
-                        saythis = f"{said_name} sent {format} and said {saythis}"
+                        saythis = f"{said_name} sent {file_format} and said {saythis}"
                 else:
                     saythis = f"{said_name} said: {saythis}"
 

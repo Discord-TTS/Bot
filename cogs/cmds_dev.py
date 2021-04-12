@@ -1,5 +1,4 @@
 from inspect import cleandoc
-from io import StringIO
 from asyncio import Lock
 
 import discord
@@ -9,6 +8,9 @@ def setup(bot):
     bot.add_cog(cmds_dev(bot))
 
 class cmds_dev(commands.Cog, command_attrs=dict(hidden=True)):
+    """TTS Bot hidden commands for development
+    New commands added and removed often from this cog."""
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -16,12 +18,6 @@ class cmds_dev(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.is_owner()
     async def end(self, ctx):
         await self.bot.close()
-
-    @commands.command()
-    @commands.is_owner()
-    async def channellist(self, ctx):
-        channellist = "\n".join(f"{voice_client.channel} in {voice_client.channel.guild.name}" for voice_client in self.bot.voice_clients)
-        await ctx.send(f"TTS Bot Voice Channels:```{channellist}```")
 
     @commands.command()
     async def debug(self, ctx, reset="nope"):

@@ -1,6 +1,5 @@
 from configparser import ConfigParser
 from io import StringIO
-from os.path import exists
 
 import discord
 from discord.ext import commands
@@ -9,9 +8,11 @@ config = ConfigParser()
 config.read("config.ini")
 
 def setup(bot):
-    bot.add_cog(common_trusted(bot))
+    bot.add_cog(cmds_trusted(bot))
 
-class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
+class cmds_trusted(commands.Cog, command_attrs=dict(hidden=True)):
+    "TTS Bot commands meant only for trusted users."
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -89,17 +90,19 @@ class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
         async for message in user.history(limit=amount):
             if message.embeds:
                 if message.embeds[0].author:
-                    messages.append(f"``{message.embeds[0].author.name}⚙️``:{message.embeds[0].description}")
+                    messages.append(f"`{message.embeds[0].author.name} ⚙️`: {message.embeds[0].description}")
                 else:
-                    messages.append(f"``{message.author}⚙️``:{message.embeds[0].description}")
+                    messages.append(f"`{message.author} ⚙️`: {message.embeds[0].description}")
 
             else:
-                messages.append(f"``{message.author}``:{message.content}")
-        tosend=""
+                messages.append(f"`{message.author}`: {message.content}")
+
         messages.reverse()
-        for message in messages:
-            tosend+=f"\n{message}"
-        embed = discord.Embed(title=f"Message history of {user.name}",description=tosend)
+        embed = discord.Embed(
+            title=f"Message history of {user.name}",
+            description="\n".join(messages)
+            )
+
         await ctx.send(embed=embed)
 
     @commands.command()
@@ -191,12 +194,9 @@ class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
     async def serverlist(self, ctx):
         servers = [guild.name for guild in self.bot.guilds]
 
-        if len(str(servers)) >= 2000:
-            return await ctx.send(
-                file=discord.File(
-                    StringIO(str(servers)),
-                    filename="servers.txt"
-                )
+        await ctx.send(
+            file=discord.File(
+                StringIO(str(servers)),
+                filename="servers.txt"
             )
-
-        await ctx.send(servers)
+        )

@@ -1,4 +1,3 @@
-import asyncio
 from inspect import cleandoc
 from random import choice as pick_random
 
@@ -13,6 +12,8 @@ def setup(bot):
 
 
 class cmds_main(commands.Cog, name="Main Commands"):
+    "TTS Bot main commands, required for the bot to work."
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -94,19 +95,19 @@ class cmds_main(commands.Cog, name="Main Commands"):
         if not await self.channel_check(ctx):
             return
 
-        elif not ctx.author.voice:
+        if not ctx.author.voice:
             return await ctx.send("Error: You need to be in a voice channel to make me leave!")
 
-        elif not ctx.guild.voice_client:
+        if not ctx.guild.voice_client:
             return await ctx.send("Error: How do I leave a voice channel if I am not in one?")
 
-        elif ctx.author.voice.channel != ctx.guild.voice_client.channel:
+        if ctx.author.voice.channel != ctx.guild.voice_client.channel:
             return await ctx.send("Error: You need to be in the same voice channel as me to make me leave!")
 
         self.bot.should_return[ctx.guild.id] = True
         self.bot.queue[ctx.guild.id] = dict()
-        await ctx.guild.voice_client.disconnect(force=True)
 
+        await ctx.guild.voice_client.disconnect(force=True)
         await ctx.send("Left voice channel!")
 
     @commands.guild_only()
