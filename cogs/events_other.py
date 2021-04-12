@@ -1,4 +1,4 @@
-from asyncio import sleep
+import asyncio
 from inspect import cleandoc
 from subprocess import call
 
@@ -45,14 +45,16 @@ class events_other(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
         self.bot.queue[guild.id] = dict()
+        _, prefix, owner = await asyncio.gather(
+            self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!"),
+            self.bot.settings.get(guild, setting="prefix"),
+            guild.fetch_member(guild.owner_id)
+        )
 
-        await self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!".replace("@", "@ "))
-
-        owner = await guild.fetch_member(guild.owner_id)
         try:
             await owner.send(cleandoc(f"""
             Hello, I am {self.bot.user.name} and I have just joined your server {guild}
-            If you want me to start working do `-setup <#text-channel>` and everything will work in there
+            If you want me to start working do `{prefix}setup <#text-channel>` and everything will work in there
             If you want to get support for {self.bot.user.name}, join the support server!
             https://discord.gg/zWPWwQC
             """))
@@ -75,7 +77,7 @@ class events_other(commands.Cog):
     async def on_guild_remove(self, guild):
         await self.bot.settings.remove(guild)
         self.bot.should_return[guild.id] = True
-        await sleep(0)
+        await asyncio.sleep(0)
 
         if guild.id in self.bot.queue:
             self.bot.queue.pop(guild.id, None)
