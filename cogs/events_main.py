@@ -114,7 +114,7 @@ class events_main(commands.Cog):
         # I know this code isn't pretty
         while True:
             try:
-                await self.bot.gtts.get(text="Rate limit test", lang="en"):
+                await self.bot.gtts.get(text="Rate limit test", lang="en")
                 break
             except asyncgTTS.RatelimitException:
                 pass
