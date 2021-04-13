@@ -117,7 +117,9 @@ class events_main(commands.Cog):
                 await self.bot.gtts.get(text="Rate limit test", lang="en")
                 break
             except asyncgTTS.RatelimitException:
-                pass
+                await self.bot.channels["logs"].send("**Rate limit still in place, waiting another hour.**")
+            except:
+                await self.bot.channels["logs"].send("**Failed to connect to easygTTS for unknown reason.**")
 
             await asyncio.sleep(3601)
 
