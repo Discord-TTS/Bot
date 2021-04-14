@@ -46,10 +46,14 @@ class events_main(commands.Cog):
         try:
             gtts_resp = await self.bot.gtts.get(text=text, lang=lang)
         except asyncgTTS.RatelimitException:
-            self.bot.loop.create_task(self.rate_limit_handler())
-            await self.send_fallback_messages(prefix)
+            if self.bot.blocked:
+                return
 
-            return
+            self.bot.blocked = True
+            return await asyncio.gather(
+                self.rate_limit_handler(),
+                self.send_fallback_messages(prefix),
+            )
         except asyncgTTS.easygttsException as e:
             error_message = str(e)
             status_code = error_message[:3]
@@ -104,11 +108,15 @@ class events_main(commands.Cog):
 
             permissions = channel.permissions_for(voice_client.guild.me)
             if permissions.send_messages and permissions.embed_links:
-                self.bot.loop.create_task(channel.send(embed=embed))
+                try:
+                    await channel.send(embed=embed)
+                    await asyncio.sleep(1)
+                except:
+                    pass
 
+        await self.bot.channels["logs"].send("**Fallback/RL messages have been sent.**")
 
     async def rate_limit_handler(self):
-        self.bot.blocked = True
         await self.bot.channels["logs"].send("**Swapped to espeak**")
 
         # I know this code isn't pretty
