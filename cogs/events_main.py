@@ -139,7 +139,7 @@ class events_main(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.guild is not None:
-            saythis = message.clean_content.lower()
+            message_clean = message.clean_content.lower()
 
             # Get settings
             repeated_chars_limit, bot_ignore, msg_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
@@ -155,7 +155,7 @@ class events_main(commands.Cog):
                 )
             )
 
-            starts_with_tts = saythis.startswith(f"{prefix}tts")
+            starts_with_tts = message_clean.startswith(f"{prefix}tts")
 
             # if author is a bot and bot ignore is on
             if bot_ignore and message.author.bot:
@@ -178,11 +178,11 @@ class events_main(commands.Cog):
                 return
 
             # If message is empty and there is no attachments
-            if not saythis and not message.attachments:
+            if not message_clean and not message.attachments:
                 return
 
             # Ignore messages starting with -
-            if saythis.startswith(prefix) and not starts_with_tts:
+            if message_clean.startswith(prefix) and not starts_with_tts:
                 return
 
             # if not autojoin and message doesn't start with tts and the author isn't a bot and the author is in the wrong voice channel
@@ -212,10 +212,10 @@ class events_main(commands.Cog):
             lang = await self.bot.setlangs.get(message.author)
 
             # Emoji filter
-            saythis = basic.emojitoword(saythis)
+            message_clean = basic.emojitoword(message_clean)
 
             # Acronyms and removing -tts
-            saythis = f" {saythis} "
+            message_clean = f" {message_clean} "
             acronyms = {
                 "iirc": "if I recall correctly",
                 "afaik": "as far as I know",
@@ -242,11 +242,11 @@ class events_main(commands.Cog):
                 acronyms[f"{prefix}tts"] = ""
 
             for toreplace, replacewith in acronyms.items():
-                saythis = saythis.replace(f" {toreplace} ", f" {replacewith} ")
+                message_clean = message_clean.replace(f" {toreplace} ", f" {replacewith} ")
 
-            saythis = saythis[1:-1]
-            if saythis == "?":
-                saythis = "what"
+            message_clean = message_clean[1:-1]
+            if message_clean == "?":
+                message_clean = "what"
 
             # Regex replacements
             regex_replacements = {
@@ -256,14 +256,11 @@ class events_main(commands.Cog):
             }
 
             for regex, replacewith in regex_replacements.items():
-                saythis = re.sub(regex, replacewith, saythis, flags=re.DOTALL)
+                message_clean = re.sub(regex, replacewith, message_clean, flags=re.DOTALL)
 
             # Url filter
-            contained_url = False
-            for word in saythis.split(" "):
-                if word.startswith(("https://", "http://", "www.")):
-                    saythis = saythis.replace(word, "")
-                    contained_url = True
+            link_starters = ("https://", "http://", "www.")
+            contained_url = any(map(lambda w: w.startswith(link_starters), message_clean.split()))
 
             # Toggleable xsaid and attachment + links detection
             if xsaid:
@@ -271,44 +268,43 @@ class events_main(commands.Cog):
                 file_format = basic.exts_to_format(message.attachments)
 
                 if contained_url:
-                    if saythis:
-                        saythis += " and sent a link."
+                    if message_clean:
+                        message_clean += " and sent a link."
                     else:
-                        saythis = "a link."
+                        message_clean = "a link."
 
                 if message.attachments:
-                    if not saythis:
-                        saythis = f"{said_name} sent {file_format}"
+                    if not message_clean:
+                        message_clean = f"{said_name} sent {file_format}"
                     else:
-                        saythis = f"{said_name} sent {file_format} and said {saythis}"
+                        message_clean = f"{said_name} sent {file_format} and said {message_clean}"
                 else:
-                    saythis = f"{said_name} said: {saythis}"
+                    message_clean = f"{said_name} said: {message_clean}"
 
             elif contained_url:
-                if saythis:
-                    saythis += ". This message contained a link"
+                if message_clean:
+                    message_clean += ". This message contained a link"
                 else:
-                    saythis = "a link."
+                    message_clean = "a link."
 
-            if basic.remove_chars(saythis, " ", "?", ".", ")", "'", "!", '"') == "":
+            if basic.remove_chars(message_clean, " ", "?", ".", ")", "'", "!", '"') == "":
                 return
 
             # Repeated chars removal if setting is not 0
             repeated_chars_limit = int(repeated_chars_limit)
-            if saythis.isprintable() and repeated_chars_limit != 0:
-                saythis_chars = ["".join(grp) for num, grp in groupby(saythis)]
-                saythis_list = list()
+            if message_clean.isprintable() and repeated_chars_limit != 0:
+                message_clean_chars = ["".join(grp) for num, grp in groupby(message_clean)]
 
-                for char in saythis_chars:
+                for char in message_clean_chars:
                     if len(char) > repeated_chars_limit:
-                        saythis_list.append(char[0] * repeated_chars_limit)
+                        message_clean_list.append(char[0] * repeated_chars_limit)
                     else:
-                        saythis_list.append(char)
+                        message_clean_list.append(char)
 
-                saythis = "".join(saythis_list)
+                message_clean = "".join(message_clean_list)
 
             # Adds filtered message to queue
-            await self.get_tts(message, saythis, lang, msg_length, prefix)
+            await self.get_tts(message, message_clean, lang, msg_length, prefix)
 
             async with self.bot.message_locks[message.guild.id]:
                 if self.bot.should_return[message.guild.id]:
