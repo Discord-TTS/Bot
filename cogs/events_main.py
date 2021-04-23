@@ -125,9 +125,8 @@ class Main(commands.Cog):
                 await channel.connect()
                 self.bot.should_return[message.guild.id] = False
 
-            # Get lang and parse it into a useable format
-            partial_lang_tuple = await self.bot.setlangs.get(message.author)
-            lang = self.bot.get_cog("Settings")._make_lang_tuple(*partial_lang_tuple)
+            # Get voice and parse it into a useable format
+            voice = self.bot.get_cog("Settings").get_voice(*(await self.bot.setlangs.get(message.author))).tuple
 
             # Emoji filter
             saythis = basic.emojitoword(saythis)
@@ -226,7 +225,7 @@ class Main(commands.Cog):
                 saythis = "".join(saythis_list)
 
             # Adds filtered message to queue
-            await self.get_tts(message, saythis, lang, msg_length)
+            await self.get_tts(message, saythis, voice, msg_length)
 
             async with self.bot.message_locks[message.guild.id]:
                 if self.bot.should_return[message.guild.id]:
