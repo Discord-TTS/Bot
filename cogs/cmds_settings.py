@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import re
 from inspect import cleandoc
 from random import choice as pick_random
@@ -6,12 +7,33 @@ from typing import Optional, Tuple
 
 import discord
 from discord.ext import commands, menus
+from discord.utils import maybe_coroutine
+
 from utils import basic
 
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 def setup(bot):
     bot.add_cog(Settings(bot))
+
+def require_voices(func):
+    @functools.wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        if not getattr(self, "_voice_data", None):
+            self._voice_data = [
+                Voice(
+                    voice_name=v["name"],
+
+                    variant=v["name"][-1].lower(),
+                    lang=v["languageCodes"][0].lower(),
+                    gender=v["ssmlGender"].capitalize()
+                )
+                for v in await self.bot.gtts.get_voices()
+                if "Standard" in v["name"]
+            ]
+
+        return await maybe_coroutine(func, self, *args, **kwargs)
+    return wrapper
 
 class VoiceNotFound(Exception): pass
 
@@ -47,19 +69,6 @@ class Paginator(menus.ListPageSource):
 class Settings(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-
-        gvoices = bot.run_until_complete(bot.gtts.get_voices())
-        self._voice_data = [
-            Voice(
-                voice_name=v["name"],
-
-                variant=v["name"][-1].lower(),
-                lang=v["languageCodes"][0].lower(),
-                gender=v["ssmlGender"].capitalize()
-            )
-            for v in gvoices
-            if "Standard" in v["name"]
-        ]
 
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
@@ -267,6 +276,7 @@ class Settings(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    @require_voices
     def get_voice(self, lang: str, variant: Optional[str] = None) -> Voice:
         generator = {
             True:  (voice for voice in self._voice_data if voice.lang == lang and voice.variant == variant),
@@ -286,11 +296,11 @@ class Settings(commands.Cog):
         lang, variant = lang.lower(), variant.lower()
 
         try:
-            voice = self.get_voice(lang, variant)
+            voice = await self.get_voice(lang, variant)
         except VoiceNotFound:
             embed = discord.Embed(title=f"Cannot find voice with language `{lang}` and variant `{variant}` combo!")
-            embed.set_author(name=_ctx.author, icon_url=_ctx.author.avatar_url)
-            embed.set_footer(title=f"Try {ctx.prefix}voices for a full list!")
+            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+            embed.set_footer(text=f"Try {ctx.prefix}voices for a full list!")
 
             return await ctx.send(embed=embed)
 
@@ -299,6 +309,7 @@ class Settings(commands.Cog):
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
+    @require_voices
     async def voices(self, ctx):
         "Lists all the language codes that TTS bot accepts"
         lang, variant = await self.bot.setlangs.get(ctx.author)
@@ -306,5 +317,5 @@ class Settings(commands.Cog):
         langs = {voice.lang for voice in self._voice_data}
         pages = sorted("\n".join(v.formatted for v in self._voice_data if v.lang == lang) for lang in langs)
 
-        menu = menus.MenuPages(source=Paginator(self.get_voice(lang, variant), pages, per_page=1), clear_reactions_after=True)
+        menu = menus.MenuPages(source=Paginator(await self.get_voice(lang, variant), pages, per_page=1), clear_reactions_after=True)
         await menu.start(ctx)
