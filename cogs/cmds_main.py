@@ -119,11 +119,13 @@ class cmds_main(commands.Cog, name="Main Commands"):
         if not await self.channel_check(ctx):
             return
 
-        if self.bot.queue.get(ctx.guild.id) in (None, dict()) or self.bot.currently_playing[ctx.guild.id].done():
+        if self.bot.queue.get(ctx.guild.id, {}) == {} or self.bot.currently_playing[ctx.guild.id].is_set():
             return await ctx.send("**Error:** Nothing in message queue to skip!")
 
         ctx.guild.voice_client.stop()
-        self.bot.currently_playing[ctx.guild.id].set_result("skipped")
+        self.bot.queue[ctx.guild.id] = {}
+        self.bot.currently_playing[ctx.guild.id].set()
+
         return await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
 
     @skip.after_invoke

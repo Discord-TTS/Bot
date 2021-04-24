@@ -194,6 +194,8 @@ class events_main(commands.Cog):
                 self.bot.queue[message.guild.id] = dict()
             if message.guild.id not in self.bot.message_locks:
                 self.bot.message_locks[message.guild.id] = asyncio.Lock()
+            if message.guild.id not in self.bot.currently_playing:
+                self.bot.currently_playing[message.guild.id] = asyncio.Event()
 
             should_return = self.bot.should_return.get(message.guild.id)
 
@@ -320,32 +322,33 @@ class events_main(commands.Cog):
                     message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
                     selected = self.bot.queue[message.guild.id][message_id_to_read]
 
-                    # Play selected audio
+                    # If not in a voice channel anymore, clear the queue and quit
                     vc = message.guild.voice_client
                     if not vc:
-                        # If not in a voice channel anymore, clear the queue
                         self.bot.queue[message.guild.id] = dict()
-                        continue
+                        return
 
-                    self.bot.currently_playing[message.guild.id] = self.bot.loop.create_future()
-                    finish_future = make_func(self.finish_future, self.bot.currently_playing[message.guild.id])
-
+                    # Play audio to voice channel
+                    self.bot.currently_playing[message.guild.id].clear()
                     try:
-                        vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'), after=finish_future)
+                        vc.play(
+                            FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'),
+                            after=lambda e: self.bot.currently_playing[message.guild.id].set()
+                        )
                     except discord.errors.ClientException:
-                        self.bot.currently_playing[message.guild.id].set_result("done")
+                        self.bot.currently_playing[message.guild.id].set()
 
+                    # Wait for vc to finish playing
                     try:
-                        result = await asyncio.wait_for(self.bot.currently_playing[message.guild.id], timeout=int(msg_length) + 5)
+                        await asyncio.wait_for(self.bot.currently_playing[message.guild.id].wait(), timeout=int(msg_length) + 5)
                     except asyncio.TimeoutError:
-                        await self.bot.channels["errors"].send(f"```asyncio.TimeoutError``` Future Failed to be finished in guild: `{message.guild.id}`")
-                        result = "failed"
-
-                    if result == "skipped":
-                        self.bot.queue[message.guild.id] = dict()
+                        await self.bot.channels["errors"].send(cleandoc(f"""
+                            ```asyncio.TimeoutError```
+                            `{message.guild.id}`'s vc.play didn't finish audio!
+                        """))
 
                     # Delete said message from queue
-                    elif message_id_to_read in self.bot.queue.get(message.guild.id, ()):
+                    if message_id_to_read in self.bot.queue.get(message.guild.id, ()):
                         del self.bot.queue[message.guild.id][message_id_to_read]
 
         elif not message.author.bot:
@@ -391,10 +394,6 @@ class events_main(commands.Cog):
 
                 await self.bot.channels["logs"].send(f"{message.author} just got the 'Welcome to Support DMs' message")
                 await dm_message.pin()
-
-    def finish_future(self, fut, *args):
-        if not fut.done():
-            self.bot.loop.call_soon_threadsafe(fut.set_result, "done")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
