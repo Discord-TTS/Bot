@@ -1,12 +1,13 @@
 import asyncio
 from configparser import ConfigParser
+from functools import wraps
 from os import listdir
 from time import monotonic
 
+import aiohttp
 import asyncgTTS
 import asyncpg
 import discord
-from aiohttp import ClientSession
 from discord.ext import commands
 
 from utils import basic, cache, settings
@@ -32,95 +33,101 @@ async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
     "Gets the prefix for a guild based on the passed message object"
     return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
 
-bot = commands.AutoShardedBot(
-    status=status,
-    intents=intents,
-    help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
-    activity=activity,
-    command_prefix=prefix,
-    case_insensitive=True,
-    chunk_guilds_at_startup=False,
-    allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
-)
+class TTSBot(commands.AutoShardedBot):
+    def __init__(self, config, *args, **kwargs):
+        self.config = config
+        super().__init__(*args, **kwargs)
 
-async def main(bot):
-    # Setup async objects, such as aiohttp session and database pool
-    bot.session = ClientSession()
-    bot.gtts, pool = await asyncio.gather(
-        asyncgTTS.setup(
-            premium=False,
-            session=bot.session
-        ),
-        asyncpg.create_pool(
-            host=config["PostgreSQL Info"]["ip"],
-            user=config["PostgreSQL Info"]["name"],
-            database=config["PostgreSQL Info"]["db"],
-            password=config["PostgreSQL Info"]["pass"]
+    @property
+    def support_server(self):
+        return self.get_guild(self.config["Main"]["main_server"])
+
+    def load_extensions(self, exts):
+        filered_exts = filter(lambda e: e.endswith(".py"), exts)
+        for ext in filered_exts:
+            self.load_extension(f"cogs.{ext[:-3]}")
+
+    async def start(self, session, *args, **kwargs):
+        config = self.config
+        self.session = session
+
+        self.gtts, pool = await asyncio.gather(
+            asyncgTTS.setup(
+                premium=False,
+                session=self.session
+            ),
+            asyncpg.create_pool(
+                host=config["PostgreSQL Info"]["ip"],
+                user=config["PostgreSQL Info"]["name"],
+                database=config["PostgreSQL Info"]["db"],
+                password=config["PostgreSQL Info"]["pass"]
+            )
         )
+
+        # Setup all bot.vars in one place
+        self.settings = settings.settings_class(pool)
+        self.setlangs = settings.setlangs_class(pool)
+        self.nicknames = settings.nickname_class(pool)
+        self.cache = cache.cache(cache_key_bytes, pool)
+        self.blocked_users = settings.blocked_users_class(pool)
+        self.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
+        self.queue = self.channels = self.should_return = self.message_locks = self.currently_playing = dict()
+
+        for channel_name, webhook_url in config["Channels"].items():
+            self.channels[channel_name] = discord.Webhook.from_url(
+                url=webhook_url,
+                adapter=discord.AsyncWebhookAdapter(session=self.session)
+            )
+
+        self.load_extensions(listdir("cogs"))
+        await self.channels["logs"].send("Starting TTS Bot!")
+        await super().start(*args, **kwargs)
+
+def wrap_session(func):
+    @wraps(func)
+    async def wrapper():
+        async with aiohttp.ClientSession() as session:
+            return await func(session)
+
+    return wrapper
+
+async def run_bot(bot, session, token):
+    try:
+        await bot.start(session, token)
+    except Exception as e:
+        print(f"{repr(e)}\nWhile starting bot, force killing to prevent deadlock.")
+        bot.loop.stop()
+
+@wrap_session
+async def main(session):
+    bot = TTSBot(
+        config=config,
+        status=status,
+        intents=intents,
+        help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
+        activity=activity,
+        command_prefix=prefix,
+        case_insensitive=True,
+        chunk_guilds_at_startup=False,
+        allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
     )
 
-    # Setup all bot.vars in one place
-    bot.supportserver = None
-
-    bot.queue = dict()
-    bot.channels = dict()
-    bot.should_return = dict()
-    bot.message_locks = dict()
-    bot.currently_playing = dict()
-    bot.settings = settings.settings_class(pool)
-    bot.setlangs = settings.setlangs_class(pool)
-    bot.nicknames = settings.nickname_class(pool)
-    bot.cache = cache.cache(cache_key_bytes, pool)
-    bot.blocked_users = settings.blocked_users_class(pool)
-    bot.trusted = basic.remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
-
-    # Load all the cogs, now bot.vars are ready
-    for cog in listdir("cogs"):
-        if cog.endswith(".py"):
-            bot.load_extension(f"cogs.{cog[:-3]}")
-            print(f"Successfully loaded: {cog}")
-
-    # Setup bot.channels, as partial webhooks detatched from bot object
-    for channel_name, webhook_url in config["Channels"].items():
-        bot.channels[channel_name] = discord.Webhook.from_url(
-            url=webhook_url,
-            adapter=discord.AsyncWebhookAdapter(session=bot.session)
-        )
-
-    async def run_bot():
-        # Background task to run bot
+    try:
         print("\nLogging into Discord...")
+        bot_task = asyncio.create_task(run_bot(bot, session, config["Main"]["Token"]))
+        await bot.wait_until_ready()
 
-        await bot.start(config["Main"]["Token"])
-        if not bot.is_closed():
-            await bot.close()
-
-        # Cleanup before asyncio loop shutdown
-        try:
-            await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
-            await bot.session.close()
-        except:
-            pass
-
-    # Queue bot to start in background, then wait for bot to start.
-    bot_runner = bot.loop.create_task(run_bot())
-    bot_runner.add_done_callback(lambda fut: bot.loop.stop())
-    await bot.wait_until_ready()
-
-    # on_ready but only firing once, get bot.supportserver then return
-    print(f"Logged in as {bot.user} and ready!")
-    await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
-
-    support_server_id = int(config["Main"]["main_server"])
-    bot.supportserver = bot.get_guild(support_server_id)
-
-    while bot.supportserver is None:
-        print("Waiting 5 seconds")
-        await asyncio.sleep(5)
-        bot.supportserver = bot.get_guild(support_server_id)
+        print(f"Logged in as {bot.user} and ready!")
+        await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
+        await bot_task
+    except Exception as e:
+        print(repr(e))
+    finally:
+        await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
+        await bot.session.close()
+        await bot.close()
 
 try:
-    bot.loop.run_until_complete(main(bot))
-    bot.loop.run_forever()
-except KeyboardInterrupt:
-    print("KeyboardInterrupt: Killing bot")
+    asyncio.run(main())
+except (KeyboardInterrupt, RuntimeError) as e:
+    print(f"Shutdown forcefully: {type(e).__name__}: {e}")

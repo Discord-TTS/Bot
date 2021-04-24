@@ -109,20 +109,21 @@ class cmds_trusted(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.check(is_trusted)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def refreshroles(self, ctx):
-        if not self.bot.supportserver.chunked:
-            await self.bot.supportserver.chunk(cache=True)
+        support_server = self.bot.support_server
+        if not support_server.chunked:
+            await support_server.chunk(cache=True)
 
-        ofs_role = self.bot.supportserver.get_role(738009431052386304)
-        highlighted_ofs = self.bot.supportserver.get_role(703307566654160969)
+        ofs_role = support_server.get_role(738009431052386304)
+        highlighted_ofs = support_server.get_role(703307566654160969)
 
         people_with_owner_of_server = [member.id for member in ofs_role.members]
         people_with_highlighted_ofs = [member.id for member in highlighted_ofs.members]
-        supportserver_members = [member.id for member in self.bot.supportserver.members]
+        support_server_members = [member.id for member in support_server.members]
 
         owner_list = [guild.owner_id for guild in self.bot.guilds]
         ofs_roles = list()
         for role in (738009431052386304, 738009620601241651, 738009624443224195):
-            ofs_roles.append(self.bot.supportserver.get_role(role))
+            ofs_roles.append(support_server.get_role(role))
 
         for ofs_person in people_with_owner_of_server:
             if ofs_person not in owner_list:
@@ -131,14 +132,14 @@ class cmds_trusted(commands.Cog, command_attrs=dict(hidden=True)):
                 if ofs_person in people_with_highlighted_ofs:
                     roles.append(highlighted_ofs)
 
-                await self.bot.supportserver.get_member(ofs_person).remove_roles(*roles)
+                await support_server.get_member(ofs_person).remove_roles(*roles)
                 await self.bot.channels["logs"].send(embed=embed)
 
         for guild_owner in owner_list:
-            if guild_owner not in supportserver_members:
+            if guild_owner not in support_server_members:
                 continue
 
-            guild_owner = self.bot.supportserver.get_member(guild_owner)
+            guild_owner = support_server.get_member(guild_owner)
             additional_message = None
             embed = None
 

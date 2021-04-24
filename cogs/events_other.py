@@ -61,10 +61,11 @@ class events_other(commands.Cog):
         except discord.errors.HTTPException:
             pass
 
+        support_server = self.bot.supportserver
         try:
-            if owner.id in [member.id for member in self.bot.supportserver.members if member is not None]:
-                role = self.bot.supportserver.get_role(738009431052386304)
-                await self.bot.supportserver.get_member(owner.id).add_roles(role)
+            if owner.id in [member.id for member in support_server.members if member is not None]:
+                role = support_server.get_role(738009431052386304)
+                await support_server.get_member(owner.id).add_roles(role)
 
                 embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild}")
                 embed.set_author(name=f"{owner} (ID {owner.id})", icon_url=owner.avatar_url)

@@ -116,7 +116,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def invite(self, ctx):
         "Sends the instructions to invite TTS Bot and join the support server!"
-        if ctx.guild == self.bot.supportserver:
+        if ctx.guild == self.bot.support_server:
             await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
         else:
             await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{self.bot.get_channel(694127922801410119).name} to invite {self.bot.user.mention}!")
