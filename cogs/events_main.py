@@ -259,9 +259,11 @@ class events_main(commands.Cog):
                 message_clean = re.sub(regex, replacewith, message_clean, flags=re.DOTALL)
 
             # Url filter
+            with_urls = message_clean
             link_starters = ("https://", "http://", "www.")
-            contained_url = any(map(lambda w: w.startswith(link_starters), message_clean.split()))
+            message_clean = " ".join(w if not w.startswith(link_starters) else "" for w in with_urls.split())
 
+            contained_url = message_clean != with_urls
             # Toggleable xsaid and attachment + links detection
             if xsaid:
                 said_name = await self.bot.nicknames.get(message.guild, message.author)
@@ -320,31 +322,31 @@ class events_main(commands.Cog):
 
                     # Play selected audio
                     vc = message.guild.voice_client
-                    if vc:
-                        self.bot.currently_playing[message.guild.id] = self.bot.loop.create_future()
-                        finish_future = make_func(self.finish_future, self.bot.currently_playing[message.guild.id])
-
-                        try:
-                            vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'), after=finish_future)
-                        except discord.errors.ClientException:
-                            self.bot.currently_playing[message.guild.id].set_result("done")
-
-                        try:
-                            result = await asyncio.wait_for(self.bot.currently_playing[message.guild.id], timeout=int(msg_length) + 1)
-                        except asyncio.TimeoutError:
-                            await self.bot.channels["errors"].send(f"```asyncio.TimeoutError``` Future Failed to be finished in guild: `{message.guild.id}`")
-                            result = "failed"
-
-                        if result == "skipped":
-                            self.bot.queue[message.guild.id] = dict()
-
-                        # Delete said message from queue
-                        elif message_id_to_read in self.bot.queue.get(message.guild.id, ()):
-                            del self.bot.queue[message.guild.id][message_id_to_read]
-
-                    else:
+                    if not vc:
                         # If not in a voice channel anymore, clear the queue
                         self.bot.queue[message.guild.id] = dict()
+                        continue
+
+                    self.bot.currently_playing[message.guild.id] = self.bot.loop.create_future()
+                    finish_future = make_func(self.finish_future, self.bot.currently_playing[message.guild.id])
+
+                    try:
+                        vc.play(FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'), after=finish_future)
+                    except discord.errors.ClientException:
+                        self.bot.currently_playing[message.guild.id].set_result("done")
+
+                    try:
+                        result = await asyncio.wait_for(self.bot.currently_playing[message.guild.id], timeout=int(msg_length) + 5)
+                    except asyncio.TimeoutError:
+                        await self.bot.channels["errors"].send(f"```asyncio.TimeoutError``` Future Failed to be finished in guild: `{message.guild.id}`")
+                        result = "failed"
+
+                    if result == "skipped":
+                        self.bot.queue[message.guild.id] = dict()
+
+                    # Delete said message from queue
+                    elif message_id_to_read in self.bot.queue.get(message.guild.id, ()):
+                        del self.bot.queue[message.guild.id][message_id_to_read]
 
         elif not message.author.bot:
             pins = await message.author.pins()
