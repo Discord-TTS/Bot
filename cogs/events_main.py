@@ -10,10 +10,9 @@ import asyncgTTS
 import discord
 from discord.ext import commands
 from mutagen import mp3 as mutagen
-from pydub import AudioSegment
-from voxpopuli import Voice
 
 from utils import basic
+from espeak_process import make_espeak
 from patched_FFmpegPCM import FFmpegPCMAudio
 
 
@@ -35,8 +34,8 @@ class events_main(commands.Cog):
             return
 
         if self.bot.blocked:
-            make_espeak_func = make_func(self.make_espeak, text, lang, max_length)
-            wav = await self.bot.loop.run_in_executor(None, make_espeak_func)
+            make_espeak_func = make_func(make_espeak, text, lang, max_length)
+            wav = await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
 
             if wav:
                 self.bot.queue[message.guild.id][message.id] = wav
@@ -81,15 +80,7 @@ class events_main(commands.Cog):
         await self.bot.cache.set(text, lang, message.id, mp3)
         self.bot.queue[message.guild.id][message.id] = mp3
 
-    def make_espeak(self, text, lang, max_length):
-        voice = Voice(lang=basic.gtts_to_espeak[lang], speed=130, volume=2) if lang in basic.gtts_to_espeak else Voice(lang="en",speed=130)
-        wav = voice.to_audio(text)
 
-        pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
-        if len(pydub_wav)/1000 > int(max_length):
-            return
-
-        return wav
 
     async def send_fallback_messages(self, prefix):
         embed = discord.Embed(title="TTS Bot has been blocked by Google")
