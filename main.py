@@ -9,6 +9,7 @@ import aiohttp
 import asyncgTTS
 import asyncpg
 import discord
+from discord.backoff import ExponentialBackoff
 from discord.ext import commands
 
 from utils import basic, cache, settings
@@ -35,6 +36,7 @@ async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
     return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
 
 class TTSBot(commands.AutoShardedBot):
+    queue, channels, should_return, message_locks, currently_playing = {}, {}, {}, {}, {}
     def __init__(self, config, session, executor, *args, **kwargs):
         self.config = config
         self.session = session
@@ -44,7 +46,7 @@ class TTSBot(commands.AutoShardedBot):
 
     @property
     def support_server(self):
-        return self.get_guild(self.config["Main"]["main_server"])
+        return self.get_guild(int(self.config["Main"]["main_server"]))
 
 
     def load_extensions(self, exts):
@@ -73,7 +75,6 @@ class TTSBot(commands.AutoShardedBot):
         self.cache = cache.cache(cache_key_bytes, pool)
         self.blocked_users = settings.blocked_users_class(pool)
         self.trusted = basic.remove_chars(self.config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
-        self.channels, self.queue, self.should_return, self.message_locks, self.currently_playing = {}, {}, {}, {}, {}
 
         for channel_name, webhook_url in self.config["Channels"].items():
             self.channels[channel_name] = discord.Webhook.from_url(
@@ -84,6 +85,10 @@ class TTSBot(commands.AutoShardedBot):
         self.load_extensions(listdir("cogs"))
         await self.channels["logs"].send("Starting TTS Bot!")
         await super().start(token, *args, **kwargs)
+
+
+def get_error_string(e: BaseException) -> str:
+    return f"{type(e).__name__}: {e}"
 
 def wrap_with(enterable, aenter):
     def deco_wrap(func):
@@ -97,14 +102,6 @@ def wrap_with(enterable, aenter):
 
         return wraps(func)(async_wrapper if aenter else normal_wrapper)
     return deco_wrap
-
-
-async def run_bot(bot, *args, **kwargs):
-    try:
-        await bot.start(*args, **kwargs)
-    except Exception as e:
-        print(f"{repr(e)}\nWhile starting bot, force killing to prevent deadlock.")
-        bot.loop.stop()
 
 @wrap_with(ProcessPoolExecutor,   aenter=False)
 @wrap_with(aiohttp.ClientSession, aenter=True)
@@ -125,14 +122,16 @@ async def main(session, executor):
 
     try:
         print("\nLogging into Discord...")
-        bot_task = asyncio.create_task(run_bot(bot, token=config["Main"]["Token"]))
-        await bot.wait_until_ready()
+        ready_task = asyncio.create_task(bot.wait_until_ready())
+        bot_task = asyncio.create_task(bot.start(token=config["Main"]["Token"]))
+
+        done, pending = await asyncio.wait((bot_task, ready_task), return_when=asyncio.FIRST_COMPLETED)
+        if bot_task in done:
+            raise RuntimeError(f"Bot Shutdown before ready: {get_error_string(bot_task.exception())}")
 
         print(f"Logged in as {bot.user} and ready!")
         await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
         await bot_task
-    except Exception as e:
-        print(repr(e))
     finally:
         if not bot.user:
             return
@@ -143,4 +142,4 @@ async def main(session, executor):
 try:
     asyncio.run(main())
 except (KeyboardInterrupt, RuntimeError) as e:
-    print(f"Shutdown forcefully: {type(e).__name__}: {e}")
+    print(f"Shutdown forcefully: {get_error_string(e)}")

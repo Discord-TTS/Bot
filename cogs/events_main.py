@@ -342,7 +342,7 @@ class events_main(commands.Cog):
                     if message_id_to_read in self.bot.queue.get(message.guild.id, ()):
                         del self.bot.queue[message.guild.id][message_id_to_read]
 
-        elif not message.author.bot:
+        elif not (message.author.bot or message.content.startswith("-")):
             pins = await message.author.pins()
 
             if [True for pinned_message in pins if pinned_message.embeds and pinned_message.embeds[0].title == f"Welcome to {self.bot.user.name} Support DMs!"]:
