@@ -36,6 +36,7 @@ async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
     return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
 
 class TTSBot(commands.AutoShardedBot):
+    queue, channels, should_return, message_locks, currently_playing = {}, {}, {}, {}, {}
     def __init__(self, config, session, executor, *args, **kwargs):
         self.config = config
         self.session = session
@@ -75,7 +76,6 @@ class TTSBot(commands.AutoShardedBot):
         self.blocked_users = settings.blocked_users_class(pool)
         self.trusted = basic.remove_chars(self.config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
 
-        self.channels = {}
         for channel_name, webhook_url in self.config["Channels"].items():
             self.channels[channel_name] = discord.Webhook.from_url(
                 url=webhook_url,
@@ -132,8 +132,6 @@ async def main(session, executor):
         print(f"Logged in as {bot.user} and ready!")
         await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
         await bot_task
-    except Exception as e:
-        print(get_error_string(e))
     finally:
         if not bot.user:
             return

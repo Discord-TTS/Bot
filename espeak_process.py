@@ -12,9 +12,10 @@ def make_espeak(text, lang, max_length):
     wav = voice.to_audio(text)
 
     pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
-    audio_length = len(pydub_wav)/1000
+    if len(pydub_wav)/1000 > int(max_length):
+        return
 
-    return wav, audio_length
+    return wav
 
 if __name__ == "__main__":
     print("Not for running directly, this file handles making espeak")
