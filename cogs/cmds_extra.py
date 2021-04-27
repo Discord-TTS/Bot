@@ -79,7 +79,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
 
         await ctx.send(cleandoc(f"""
             To donate to support the development and hosting of {self.bot.user.mention}, you can donate via Patreon (Fees) or directly via DonateBot.io!
-            <https://donatebot.io/checkout/693901918342217758?buyer={ctx.author.id}>
+            <https://donatebot.io/checkout/693901918342217758>
             https://www.patreon.com/Gnome_the_Bot_Maker
         """))
 
