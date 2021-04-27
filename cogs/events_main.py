@@ -9,12 +9,10 @@ from random import choice as pick_random
 import asyncgTTS
 import discord
 from discord.ext import commands
-from mutagen import mp3 as mutagen
 
 from utils import basic
 from espeak_process import make_espeak
-from patched_FFmpegPCM import FFmpegPCMAudio
-
+from player import TTSVoicePlayer
 
 def setup(bot):
     bot.add_cog(events_main(bot))
@@ -25,115 +23,13 @@ class events_main(commands.Cog):
         self.bot = bot
         self.bot.blocked = False
 
-    async def get_tts(self, message, text, lang, max_length, prefix):
-        lang = lang.split("-")[0]
-        cached_mp3 = await self.bot.cache.get(text, lang, message.id)
-
-        if cached_mp3:
-            self.bot.queue[message.guild.id][message.id] = cached_mp3
-            return
-
-        if self.bot.blocked:
-            make_espeak_func = make_func(make_espeak, text, lang, max_length)
-            wav = await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
-
-            if wav:
-                self.bot.queue[message.guild.id][message.id] = wav
-
-            return
-
-        try:
-            gtts_resp = await self.bot.gtts.get(text=text, lang=lang)
-        except asyncgTTS.RatelimitException:
-            if self.bot.blocked:
-                return
-
-            self.bot.blocked = True
-            return await asyncio.gather(
-                self.rate_limit_handler(),
-                self.send_fallback_messages(prefix),
-            )
-        except asyncgTTS.easygttsException as e:
-            error_message = str(e)
-            status_code = error_message[:3]
-
-            if status_code == "400":
-                return
-
-            raise
-
-        try:
-            temp_store_for_mp3 = BytesIO(gtts_resp)
-            temp_store_for_mp3.seek(0)
-
-            file_length = int(mutagen.MP3(temp_store_for_mp3).info.length)
-        except mutagen.HeaderNotFoundError:
-            return
-
-        # Discard if over max length seconds
-        if file_length > int(max_length):
-            return
-
-        temp_store_for_mp3.seek(0)
-        mp3 = temp_store_for_mp3.read()
-
-        await self.bot.cache.set(text, lang, message.id, mp3)
-        self.bot.queue[message.guild.id][message.id] = mp3
-
-
-
-    async def send_fallback_messages(self, prefix):
-        embed = discord.Embed(title="TTS Bot has been blocked by Google")
-        embed.description = cleandoc(f"""
-            During this temporary block, voice has been swapped to a worse quality voice.
-            If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `{prefix}donate`
-            """)
-        embed.set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
-
-        for voice_client in self.bot.voice_clients:
-            channel_id = await self.bot.settings.get(voice_client.guild, setting="channel")
-            channel = voice_client.guild.get_channel(int(channel_id))
-
-            if not channel:
-                continue
-
-            permissions = channel.permissions_for(voice_client.guild.me)
-            if permissions.send_messages and permissions.embed_links:
-                try:
-                    await channel.send(embed=embed)
-                    await asyncio.sleep(1)
-                except:
-                    pass
-
-        await self.bot.channels["logs"].send("**Fallback/RL messages have been sent.**")
-
-    async def rate_limit_handler(self):
-        await self.bot.channels["logs"].send("**Swapped to espeak**")
-
-        # I know this code isn't pretty
-        while True:
-            try:
-                await self.bot.gtts.get(text="Rate limit test", lang="en")
-                break
-            except asyncgTTS.RatelimitException:
-                await self.bot.channels["logs"].send("**Rate limit still in place, waiting another hour.**")
-            except:
-                await self.bot.channels["logs"].send("**Failed to connect to easygTTS for unknown reason.**")
-
-            await asyncio.sleep(3601)
-
-        await self.bot.channels["logs"].send("**Swapping back to easygTTS**")
-        self.bot.blocked = False
-
-
-
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.guild is not None:
             message_clean = message.clean_content.lower()
 
             # Get settings
-            repeated_chars_limit, bot_ignore, msg_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
+            repeated_chars_limit, bot_ignore, max_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
                 message.guild,
                 settings=(
                     "repeated_chars",
@@ -180,26 +76,14 @@ class events_main(commands.Cog):
             if not autojoin and not starts_with_tts and not message.author.bot and message.author.voice.channel != message.guild.voice_client.channel:
                 return
 
-            # Fix values
-            if message.guild.id not in self.bot.queue:
-                self.bot.queue[message.guild.id] = dict()
-            if message.guild.id not in self.bot.message_locks:
-                self.bot.message_locks[message.guild.id] = asyncio.Lock()
-            if message.guild.id not in self.bot.currently_playing:
-                self.bot.currently_playing[message.guild.id] = asyncio.Event()
-
-            should_return = self.bot.should_return.get(message.guild.id)
-
             # Auto Join
-            if message.guild.voice_client is None and autojoin and not should_return:
+            if message.guild.voice_client is None and autojoin:
                 try:
                     channel = message.author.voice.channel
                 except AttributeError:
                     return
 
-                self.bot.should_return[message.guild.id] = True
-                await channel.connect()
-                self.bot.should_return[message.guild.id] = False
+                await channel.connect(cls=TTSVoicePlayer)
 
             # Get lang
             lang = await self.bot.setlangs.get(message.author)
@@ -282,12 +166,13 @@ class events_main(commands.Cog):
                 else:
                     message_clean = "a link."
 
-            if basic.remove_chars(message_clean, " ", "?", ".", ")", "'", "!", '"') == "":
+            if basic.remove_chars(message_clean, " ", "?", ".", ")", "'", "!", '"', ":") == "":
                 return
 
             # Repeated chars removal if setting is not 0
             repeated_chars_limit = int(repeated_chars_limit)
             if message_clean.isprintable() and repeated_chars_limit != 0:
+                message_clean_list = list()
                 message_clean_chars = ["".join(grp) for num, grp in groupby(message_clean)]
 
                 for char in message_clean_chars:
@@ -299,48 +184,8 @@ class events_main(commands.Cog):
                 message_clean = "".join(message_clean_list)
 
             # Adds filtered message to queue
-            await self.get_tts(message, message_clean, lang, msg_length, prefix)
+            await message.guild.voice_client.queue(message, message_clean, lang, max_length)
 
-            async with self.bot.message_locks[message.guild.id]:
-                if self.bot.should_return[message.guild.id]:
-                    return
-
-                while self.bot.queue.get(message.guild.id) not in (dict(), None):
-                    # Sort Queue
-                    self.bot.queue[message.guild.id] = basic.sort_dict(self.bot.queue[message.guild.id])
-
-                    # Select first in queue
-                    message_id_to_read = next(iter(self.bot.queue[message.guild.id]))
-                    selected = self.bot.queue[message.guild.id][message_id_to_read]
-
-                    # If not in a voice channel anymore, clear the queue and quit
-                    vc = message.guild.voice_client
-                    if not vc:
-                        self.bot.queue[message.guild.id] = dict()
-                        return
-
-                    # Play audio to voice channel
-                    self.bot.currently_playing[message.guild.id].clear()
-                    try:
-                        vc.play(
-                            FFmpegPCMAudio(selected, pipe=True, options='-loglevel "quiet"'),
-                            after=lambda e: self.bot.currently_playing[message.guild.id].set()
-                        )
-                    except discord.errors.ClientException:
-                        self.bot.currently_playing[message.guild.id].set()
-
-                    # Wait for vc to finish playing
-                    try:
-                        await asyncio.wait_for(self.bot.currently_playing[message.guild.id].wait(), timeout=int(msg_length) + 5)
-                    except asyncio.TimeoutError:
-                        await self.bot.channels["errors"].send(cleandoc(f"""
-                            ```asyncio.TimeoutError```
-                            `{message.guild.id}`'s vc.play didn't finish audio!
-                        """))
-
-                    # Delete said message from queue
-                    if message_id_to_read in self.bot.queue.get(message.guild.id, ()):
-                        del self.bot.queue[message.guild.id][message_id_to_read]
 
         elif not (message.author.bot or message.content.startswith("-")):
             pins = await message.author.pins()
@@ -390,7 +235,6 @@ class events_main(commands.Cog):
     async def on_voice_state_update(self, member, before, after):
         guild = member.guild
         vc = guild.voice_client
-        no_speak = self.bot.should_return.get(guild.id)
 
         if member == self.bot.user:
             return  # someone other than bot left vc
@@ -404,5 +248,4 @@ class events_main(commands.Cog):
         if no_speak:
             return  # bot not already joining/leaving a voice channel
 
-        self.bot.should_return[guild.id] = True
         await vc.disconnect(force=True)
