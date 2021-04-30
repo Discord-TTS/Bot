@@ -77,7 +77,7 @@ class events_main(commands.Cog):
                 return
 
             # Auto Join
-            if message.guild.voice_client is None and autojoin:
+            if not message.guild.voice_client and autojoin:
                 try:
                     channel = message.author.voice.channel
                 except AttributeError:
@@ -170,7 +170,6 @@ class events_main(commands.Cog):
                 return
 
             # Repeated chars removal if setting is not 0
-            repeated_chars_limit = int(repeated_chars_limit)
             if message_clean.isprintable() and repeated_chars_limit != 0:
                 message_clean_list = list()
                 message_clean_chars = ["".join(grp) for num, grp in groupby(message_clean)]

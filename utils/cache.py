@@ -1,14 +1,24 @@
+import asyncio
+from functools import partial
 from hashlib import sha256
+from os import rename
 from os.path import exists
+from typing import List
 
 from cryptography.fernet import Fernet
 
+from utils.decos import wrap_with
 
-class cache():
-    def __init__(self, key, pool):
+
+class cache:
+    def __init__(self, key, bot):
         self.key = key
-        self.pool = pool
+        self.bot = bot
+        self.pool = bot.pool
+
         self.fernet = Fernet(self.key)
+        self.get = wrap_with(self.pool.acquire, True)(self.get)
+
 
     def get_hash(self, to_hash: bytes) -> bytes:
         to_hash = sha256(to_hash)
@@ -17,53 +27,56 @@ class cache():
 
         return to_hash.digest()
 
-    async def get(self, text, lang, message_id):
-        message_id = str(message_id)
+    def read_from_cache(self, old_filename: str, new_filename: str) -> bytes:
+        rename(old_filename, new_filename)
+        with open(new_filename, "rb") as mp3:
+            return self.fernet.decrypt(mp3.read())
+
+    def write_to_cache(self, filename: str, data: bytes) -> bytes:
+        with open(filename, "wb") as mp3:
+            mp3.write(self.fernet.encrypt(data))
+
+
+    async def get(self, conn, text, lang, message_id):
         search_for = self.get_hash(str([text, lang]).encode())
+        row = await conn.fetchrow("SELECT * FROM cache_lookup WHERE message = $1", search_for)
+        if row is None:
+            return
 
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM cache_lookup WHERE message = $1", search_for)
+        old_message_id = row["message_id"]
+        old_filename = f"cache/{old_message_id}.mp3.enc"
+        new_filename = f"cache/{message_id}.mp3.enc"
 
-            if row is not None and dict(row)["message_id"] is not None:
-                og_message_id = dict(row)["message_id"]
-                filename = f"cache/{og_message_id}.mp3.enc"
+        if not exists(old_filename):
+            return await self.remove(old_message_id)
 
-                if not exists(filename):
-                    await self.remove(og_message_id)
-                else:
-                    with open(filename, "rb") as mp3:
-                        decrypted_mp3 = self.fernet.decrypt(mp3.read())
+        read_cache = partial(self.read_from_cache, old_filename, new_filename)
+        read_cache_fut = self.bot.loop.run_in_executor(None, read_cache)
 
-                    return decrypted_mp3
+        await conn.execute("UPDATE cache_lookup SET message_id = $1 WHERE message_id = $2", message_id, old_message_id)
+        return await read_cache_fut
 
     async def set(self, text, lang, message_id, file_bytes):
-        message_id = str(message_id)
-        with open(f"cache/{message_id}.mp3.enc", "wb") as mp3:
-            mp3.write(self.fernet.encrypt(file_bytes))
-
         search_for = self.get_hash(str([text, lang]).encode())
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM cache_lookup WHERE message = $1", search_for)
-            if row is None or dict(row)["message_id"] is None:
-                await conn.execute("""
-                    INSERT INTO cache_lookup(message, message_id)
-                    VALUES ($1, $2);
-                    """, search_for, message_id,
-                                   )
-            else:
-                await conn.execute("""
-                    UPDATE cache_lookup
-                    SET message_id = $1
-                    WHERE message = $2;
-                    """, message_id, search_for
-                                   )
 
-    async def remove(self, message_id):
-        message_id = str(message_id)
-        async with self.pool.acquire() as conn:
-            await conn.execute("DELETE FROM cache_lookup WHERE message_id = $1;", message_id)
+        write_cache = partial(self.write_to_cache, f"cache/{message_id}.mp3.enc", file_bytes)
+        write_cache_fut = self.bot.loop.run_in_executor(None, write_cache)
+        await asyncio.gather(
+            write_cache_fut,
+            self.pool.execute("""
+                INSERT INTO cache_lookup(message, message_id)
+                VALUES ($1, $2)
 
-    async def bulk_remove(self, message_ids):
+                ON CONFLICT (message)
+                DO UPDATE SET message_id = EXCLUDED.message_id;""",
+                search_for, message_id
+            )
+        )
+
+    async def remove(self, message_id: int) -> None:
+        await self.pool.execute("DELETE FROM cache_lookup WHERE message_id = $1;", message_id)
+
+    async def bulk_remove(self, message_ids: List[int]) -> None:
         async with self.pool.acquire() as conn:
             for message in message_ids:
-                await conn.execute("DELETE FROM cache_lookup WHERE message_id = $1;", str(message))
+                await conn.execute("DELETE FROM cache_lookup WHERE message_id = $1;", message)

@@ -13,6 +13,7 @@ from discord.backoff import ExponentialBackoff
 from discord.ext import commands
 
 from utils import basic, cache, settings
+from utils.decos import wrap_with
 
 print("Starting TTS Bot!")
 start_time = monotonic()
@@ -55,7 +56,7 @@ class TTSBot(commands.AutoShardedBot):
 
     async def start(self, *args, token, **kwargs):
         db_info = self.config["PostgreSQL Info"]
-        self.gtts, pool = await asyncio.gather(
+        self.gtts, self.pool = await asyncio.gather(
             asyncgTTS.setup(
                 premium=False,
                 session=self.session
@@ -68,11 +69,11 @@ class TTSBot(commands.AutoShardedBot):
             )
         )
 
-        self.settings = settings.settings_class(pool)
-        self.setlangs = settings.setlangs_class(pool)
-        self.nicknames = settings.nickname_class(pool)
-        self.cache = cache.cache(cache_key_bytes, pool)
-        self.blocked_users = settings.blocked_users_class(pool)
+        self.cache = cache.cache(cache_key_bytes, self)
+        self.settings = settings.settings_class(self.pool)
+        self.setlangs = settings.setlangs_class(self.pool)
+        self.nicknames = settings.nickname_class(self.pool)
+        self.blocked_users = settings.blocked_users_class(self.pool)
         self.trusted = basic.remove_chars(self.config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
 
         self.channels = {}
@@ -89,19 +90,6 @@ class TTSBot(commands.AutoShardedBot):
 
 def get_error_string(e: BaseException) -> str:
     return f"{type(e).__name__}: {e}"
-
-def wrap_with(enterable, aenter):
-    def deco_wrap(func):
-        async def async_wrapper(*args, **kwargs):
-            async with enterable() as entered:
-                return await func(entered, *args, **kwargs)
-
-        async def normal_wrapper(*args, **kwargs):
-            with enterable() as entered:
-                return await func(entered, *args, **kwargs)
-
-        return wraps(func)(async_wrapper if aenter else normal_wrapper)
-    return deco_wrap
 
 @wrap_with(ProcessPoolExecutor,   aenter=False)
 @wrap_with(aiohttp.ClientSession, aenter=True)

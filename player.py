@@ -69,14 +69,15 @@ class TTSVoicePlayer(discord.VoiceClient):
         self.message_queue = asyncio.Queue()
         self.audio_buffer = asyncio.Queue(maxsize=5)
 
+        self.fill_audio_buffer.add_exception_type(Exception)
         self.fill_audio_buffer.start()
 
     def __repr__(self):
         return f"<TTSVoicePlayer: c={self.channel.id} playing={not self.currently_playing.is_set()} mqueuelen={self.message_queue.qsize()} abufferlen={self.audio_buffer.qsize()}>"
 
 
-    async def queue(self, message: discord.Message, text: str, lang: str, max_length: str):
-        self.max_length = int(max_length)
+    async def queue(self, message: discord.Message, text: str, lang: str, max_length: int) -> None:
+        self.max_length = max_length
         await self.message_queue.put((message, text, lang))
 
     def skip(self):
@@ -89,6 +90,7 @@ class TTSVoicePlayer(discord.VoiceClient):
 
 
     @tasks.loop()
+    @handle_errors
     async def play_audio(self):
         self.currently_playing.clear()
         audio, length = await self.audio_buffer.get()
@@ -110,6 +112,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             """))
 
     @tasks.loop()
+    @handle_errors
     async def fill_audio_buffer(self):
         message, text, lang = await self.message_queue.get()
         audio, file_length = await self.get_tts(message, text, lang)
@@ -120,16 +123,6 @@ class TTSVoicePlayer(discord.VoiceClient):
         await self.audio_buffer.put((audio, file_length))
         if not self.play_audio.is_running():
             self.play_audio.start()
-
-    @play_audio.error
-    async def audio_play_error(self, error):
-        await self.bot.on_error("audio_play", error)
-        self.play_audio.start()
-
-    @fill_audio_buffer.error
-    async def message_to_tts_error(self, error):
-        await self.bot.on_error("fill_buffer", error)
-        self.fill_audio_buffer.start()
 
 
     async def get_tts(self, message: discord.Message, text: str, lang: str):

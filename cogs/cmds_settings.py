@@ -51,28 +51,26 @@ class cmds_settings(commands.Cog, name="Settings"):
             )
         )
 
-        channel = ctx.guild.get_channel(int(channel))
-
-        if channel is None:
-            channel = "has not been setup yet"
-        else:
-            channel = channel.name
+        channel = ctx.guild.get_channel(channel)
+        channel_name = channel.name if channel else "has not been setup yet"
 
         if nickname == ctx.author.display_name:
             nickname = "has not been set yet"
 
         # Show settings embed
         message1 = cleandoc(f"""
-            :small_orange_diamond: Channel: `#{channel}`
+            :small_orange_diamond: Channel: `#{channel_name}`
             :small_orange_diamond: XSaid: `{say}`
             :small_orange_diamond: Auto Join: `{join}`
             :small_orange_diamond: Ignore Bots: `{bot_ignore}`
             :small_orange_diamond: Prefix: `{prefix}`
-            :star: Limits: Do `{ctx.prefix}settings limits` to check!""")
+            :star: Limits: Do `{ctx.prefix}settings limits` to check!
+        """)
 
         message2 = cleandoc(f"""
             :small_blue_diamond: Language: `{lang}`
-            :small_blue_diamond: Nickname: `{nickname}`""")
+            :small_blue_diamond: Nickname: `{nickname}`
+        """)
 
         embed = discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.add_field(name="**Server Wide**", value=message1, inline=False)
@@ -213,7 +211,7 @@ class cmds_settings(commands.Cog, name="Settings"):
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
         "Setup the bot to read messages from `<channel>`"
-        await self.bot.settings.set(ctx.guild, "channel", str(channel.id))
+        await self.bot.settings.set(ctx.guild, "channel", channel.id)
 
         embed = discord.Embed(
             title="TTS Bot has been setup!",

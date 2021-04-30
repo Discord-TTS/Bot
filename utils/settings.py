@@ -1,206 +1,99 @@
 from asyncio import Event
+from typing import Optional
+
+import discord
 
 default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "prefix": "-"}
 
-
-class settings_class():
+class handles_db:
     def __init__(self, pool):
         self.pool = pool
+
+class settings_class(handles_db):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._cache = dict()
-        self._cache_lock = Event()
-        self._cache_lock.set()
 
-    async def remove(self, guild):
-        async with self.pool.acquire() as conn:
-            await conn.execute(f"""
-                DELETE FROM guilds WHERE guild_id = '{guild.id}';
-                DELETE FROM nicknames WHERE guild_id = '{guild.id}';
-                """)
+    async def remove(self, guild: discord.Guild):
+        await self.pool.execute(f"DELETE FROM guilds WHERE guild_id = $1;", guild.id)
 
-    async def get(self, guild, setting=None, settings=None):
-        await self._cache_lock.wait()
+    async def get(self, guild: discord.Guild, setting: Optional[str] = None, settings: Optional[list] = None):
         row = self._cache.get(guild.id)
-
         if not row:
-            async with self.pool.acquire() as conn:
-                row = await conn.fetchrow("SELECT * FROM guilds WHERE guild_id = $1", str(guild.id))
-
+            row = await self.pool.fetchrow("SELECT * FROM guilds WHERE guild_id = $1", guild.id)
             self._cache[guild.id] = row
 
-        if not settings:
-            if row is None or dict(row)[setting] is None:
-                return default_settings[setting]
+        if setting:
+            # Could be cleaned up with `settings=[]` in func define then
+            # just settings.append(setting) however that causes weirdness
+            settings = settings + setting if settings else [setting]
 
-            return dict(row)[setting]
+        rets = [row[current_setting] for current_setting in settings] if row else \
+               [default_settings[setting] for setting in settings]
 
-        if row is None:
-            return [default_settings[setting] for setting in settings]
+        return rets[0] if len(rets) == 1 else rets
 
-        row_dict = dict(row)
-        settings_values = list()
+    async def set(self, guild: discord.Guild, setting: str, value):
+        self._cache.pop(guild.id, None)
+        await self.pool.execute(f"""
+            INSERT INTO guilds(guild_id, {setting}) VALUES($1, $2)
 
-        for setting in settings:
-            if not setting:
-                setting = default_settings[setting]
-
-            settings_values.append(row_dict[setting])
-
-        return settings_values
-
-    async def set(self, guild, setting, value):
-        guild_id = str(guild.id)
-
-        await self._cache_lock.wait()
-        self._cache_lock.clear()
-
-        row = self._cache.pop(guild.id, None)
-        async with self.pool.acquire() as conn:
-            if row is None:
-                await conn.execute(f"""
-                    INSERT INTO guilds(guild_id, {setting})
-                    VALUES ($1, $2);""", guild_id, value
-                )
-                self._cache_lock.set()
-                return
-
-            self._cache_lock.set()
-            if value == default_settings[setting] and setting in dict(row):
-                return await conn.execute(f"""
-                    UPDATE guilds
-                    SET {setting} = $1
-                    WHERE guild_id = $2;""",
-                    default_settings[setting], guild_id
-                )
-
-            if dict(row) == dict():
-                return await conn.execute(
-                    "DELETE * FROM guilds WHERE guild_id = $1;",
-                    guild_id
-                )
-
-            await conn.execute(f"""
-                    UPDATE guilds
-                    SET {setting} = $1
-                    WHERE guild_id = $2;""",
-                    value, guild_id
-            )
-
-class nickname_class():
-    def __init__(self, pool):
-        self.pool = pool
-
-    async def get(self, guild, user):
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM nicknames WHERE guild_id = $1 AND user_id = $2", str(guild.id), str(user.id))
-
-        if row is None or dict(row)["name"] is None:
-            return user.display_name
-
-        return dict(row)["name"]
-
-    async def set(self, guild, user, nickname):
-        guild = str(guild.id)
-        user_id = str(user.id)
-
-        async with self.pool.acquire() as conn:
-            existing = await conn.fetchrow("""
-                SELECT * FROM nicknames
-                WHERE guild_id = $1 AND user_id = $2""",
-                guild, user_id
-                ) is not None
-
-            if not nickname or nickname == user.display_name:
-                await conn.execute("""
-                    DELETE FROM nicknames
-                    WHERE guild_id = $1 AND user_id = $2;
-                    """, guild, user_id
-                                   )
-            elif existing:
-                await conn.execute("""
-                    UPDATE nicknames
-                    SET name = $1
-                    WHERE guild_id = $2 AND user_id = $3;
-                    """, nickname, guild, user_id
-                                   )
-            else:
-                await conn.execute("""
-                    INSERT INTO nicknames(guild_id, user_id, name)
-                    VALUES ($1, $2, $3);
-                    """, guild, user_id, nickname
-                                   )
+            ON CONFLICT (guild_id)
+            DO UPDATE SET {setting} = EXCLUDED.{setting};""",
+            guild.id, value
+        )
 
 
-class setlangs_class():
-    def __init__(self, pool):
-        self.pool = pool
+class nickname_class(handles_db):
+    async def get(self, guild: discord.Guild, user: discord.User) -> str:
+        row = await self.pool.fetchrow("SELECT name FROM nicknames WHERE guild_id = $1 AND user_id = $2", guild.id, user.id)
+        return row["name"] if row else user.display_name
 
-    async def get(self, user):
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", str(user.id))
+    async def set(self, guild: discord.Guild, user: discord.User, nickname: str) -> str:
+        await self.pool.execute(f"""
+            INSERT INTO nicknames(guild_id, user_id, name)
+            VALUES($1, $2, $3)
 
-        if row is None or dict(row)["lang"] is None:
-            return "en"
+            ON CONFLICT (guild_id, user_id)
+            DO UPDATE SET name = EXCLUDED.name;""",
+            guild.id, user.id, nickname
+        )
 
-        return dict(row)["lang"].split("-")[0]
 
-    async def set(self, user, lang):
-        user = str(user.id)
+class setlangs_class(handles_db):
+    async def get(self, user: discord.User) -> str:
+        row = await self.pool.fetchrow("SELECT lang FROM userinfo WHERE user_id = $1", user.id)
+        return row["lang"].split("-")[0] if row else "en"
+
+    async def set(self, user: discord.User, lang: str) -> None:
         lang = lang.lower().split("-")[0]
+        await self.pool.execute("""
+            INSERT INTO userinfo(user_id, lang)
+            VALUES($1, $2)
 
-        async with self.pool.acquire() as conn:
-            userinfo = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user)
-            existing = userinfo is not None
-
-            if lang == "en" and existing and not dict(userinfo)["blocked"]:
-                await conn.execute("""
-                    DELETE FROM userinfo
-                    WHERE user_id = $1;
-                    """, user)
-            elif existing:
-                await conn.execute("""
-                    UPDATE userinfo
-                    SET lang = $1
-                    WHERE user_id = $2;
-                    """, lang, user)
-            else:
-                await conn.execute("""
-                    INSERT INTO userinfo(user_id, lang)
-                    VALUES ($1, $2);
-                    """, user, lang)
+            ON CONFLICT (user_id)
+            DO UPDATE SET lang = EXCLUDED.lang;""",
+            user.id, lang
+        )
 
 
-class blocked_users_class():
-    def __init__(self, pool):
-        self.pool = pool
+class blocked_users_class(handles_db):
+    async def change(self, user: discord.User, value: bool) -> None:
+        await self.pool.execute("""
+            INSERT INTO userinfo(user_id, blocked)
+            VALUES($1, $2)
 
-    async def change(self, user, value):
-        user = str(user.id)
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user)
+            ON CONFLICT (user_id)
+            DO UPDATE SET blocked = EXCLUDED.blocked;""",
+            user.id, value
+        )
 
-            if row is None:
-                await conn.execute("""
-                    INSERT INTO userinfo(user_id, blocked)
-                    VALUES ($1, $2);
-                    """, user, value)
-            else:
-                await conn.execute("""
-                    UPDATE userinfo
-                    SET blocked = $1
-                    WHERE user_id = $2
-                    """, value, user)
+    async def check(self, user: discord.User) -> bool:
+        row = await self.pool.fetchrow("SELECT blocked FROM userinfo WHERE user_id = $1", user.id)
+        return row["blocked"] if row else False
 
-    async def check(self, user):
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", str(user.id))
-
-        if row is None:
-            return False
-
-        return dict(row)["blocked"]
-
-    async def add(self, user):
+    async def add(self, user: discord.User) -> None:
         await self.change(user, True)
 
-    async def remove(self, user):
+    async def remove(self, user: discord.User) -> None:
         await self.change(user, False)
