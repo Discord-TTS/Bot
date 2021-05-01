@@ -19,5 +19,5 @@ def handle_errors(func):
             return await func(self, *args, **kwargs)
         except Exception as error:
             return await self.bot.on_error(func.__name__, error)
-    
+
     return wrapper

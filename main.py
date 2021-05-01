@@ -1,15 +1,14 @@
 import asyncio
 from concurrent.futures import ProcessPoolExecutor
 from configparser import ConfigParser
-from functools import wraps
 from os import listdir
 from time import monotonic
+from typing import Union
 
 import aiohttp
 import asyncgTTS
 import asyncpg
 import discord
-from discord.backoff import ExponentialBackoff
 from discord.ext import commands
 
 from utils import basic, cache, settings
@@ -49,6 +48,16 @@ class TTSBot(commands.AutoShardedBot):
         return self.get_guild(int(self.config["Main"]["main_server"]))
 
 
+    async def check_gtts(self) -> Union[bool, Exception]:
+        try:
+            await self.gtts.get(text="RL Test", lang="en")
+            return True
+        except asyncgTTS.RatelimitException:
+            return False
+        except Exception as e:
+            return e
+
+
     def load_extensions(self, exts):
         filered_exts = filter(lambda e: e.endswith(".py"), exts)
         for ext in filered_exts:
@@ -69,6 +78,7 @@ class TTSBot(commands.AutoShardedBot):
             )
         )
 
+        self.sent_fallback = False
         self.cache = cache.cache(cache_key_bytes, self)
         self.settings = settings.settings_class(self.pool)
         self.setlangs = settings.setlangs_class(self.pool)

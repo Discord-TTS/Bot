@@ -1,14 +1,19 @@
 import asyncio
+from functools import partial as make_func
 from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import Optional
+from typing import Optional, Tuple
 
+import asyncgTTS
 import discord
 from discord.ext import tasks
 from discord.opus import Encoder
 from mutagen import mp3 as mutagen
+
+from espeak_process import make_espeak
+from utils.decos import handle_errors
 
 
 class FFmpegPCMAudio(discord.AudioSource):
@@ -64,20 +69,38 @@ class TTSVoicePlayer(discord.VoiceClient):
     def __init__(self, client, channel):
         super().__init__(client, channel)
         self.bot = client
+        self.prefix = None
 
         self.currently_playing = asyncio.Event()
         self.message_queue = asyncio.Queue()
         self.audio_buffer = asyncio.Queue(maxsize=5)
 
-        self.fill_audio_buffer.add_exception_type(Exception)
         self.fill_audio_buffer.start()
 
     def __repr__(self):
-        return f"<TTSVoicePlayer: c={self.channel.id} playing={not self.currently_playing.is_set()} mqueuelen={self.message_queue.qsize()} abufferlen={self.audio_buffer.qsize()}>"
+        c = self.channel.id
+        abufferlen = self.audio_buffer.qsize()
+        mqueuelen = self.message_queue.qsize()
+        playing_audio = not self.currently_playing.is_set()
+
+        return f"<TTSVoicePlayer: {c=} {playing_audio=} {mqueuelen=} {abufferlen=}>"
 
 
-    async def queue(self, message: discord.Message, text: str, lang: str, max_length: int) -> None:
+    async def get_embed(self):
+        prefix = self.prefix or await self.bot.settings.get(self.guild, "prefix")
+        return discord.Embed(
+            title="TTS Bot has been blocked by Google",
+            description=cleandoc(f"""
+            During this temporary block, voice has been swapped to a worse quality voice.
+            If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `{prefix}donate`
+            """)
+        ).set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
+
+    async def queue(self, message: discord.Message, text: str, lang: str, linked_channel: int, prefix: str, max_length: int = 30) -> None:
+        self.prefix = prefix
         self.max_length = max_length
+        self.linked_channel = linked_channel
+
         await self.message_queue.put((message, text, lang))
 
     def skip(self):
@@ -125,7 +148,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.play_audio.start()
 
 
-    async def get_tts(self, message: discord.Message, text: str, lang: str):
+    async def get_tts(self, message: discord.Message, text: str, lang: str) -> Tuple[Optional[bytes], Optional[int]]:
         lang = lang.split("-")[0]
 
         cached_mp3 = await self.bot.cache.get(text, lang, message.id)
@@ -133,75 +156,53 @@ class TTSVoicePlayer(discord.VoiceClient):
             return cached_mp3, int(mutagen.MP3(BytesIO(cached_mp3)).info.length)
 
         if self.bot.blocked:
-            make_espeak_func = make_func(make_espeak, text, lang, max_length)
-            audio, file_length = await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
-        else:
-            try:
-                audio = await self.bot.gtts.get(text=text, lang=lang)
-            except asyncgTTS.RatelimitException:
-                if self.bot.blocked:
-                    return
+            make_espeak_func = make_func(make_espeak, text, lang, self.max_length)
+            return await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
 
-                self.bot.blocked = True
-                if await self.check_gtts() is True:
-                    self.bot.blocked = False
-                    return self.get_tts(message, text, lang)
+        try:
+            raise asyncgTTS.RatelimitException("shut", {"up": "bro"})
+            audio = await self.bot.gtts.get(text=text, lang=lang)
+        except asyncgTTS.RatelimitException:
+            if self.bot.blocked:
+                return
 
-                await self.handle_rl(prefix)
-            except asyncgTTS.easygttsException as e:
-                if str(e)[:3] == "400":
-                    return
+            self.bot.blocked = True
+            if await self.bot.check_gtts() is not True:
+                await self.handle_rl()
+            else:
+                self.bot.blocked = False
+
+            return await self.get_tts(message, text, lang)
+
+        except asyncgTTS.easygttsException as e:
+            if str(e)[:3] != "400":
                 raise
 
-            file_length = int(mutagen.MP3(BytesIO(audio)).info.length)
-            await self.bot.cache.set(text, lang, message.id, audio)
+        file_length = int(mutagen.MP3(BytesIO(audio)).info.length)
 
+        await self.bot.cache.set(text, lang, message.id, audio)
         return audio, file_length
 
+
     # easygTTS -> espeak handling
-    async def check_gtts(self):
-        try:
-            await self.bot.gtts.get(text="RL Test", lang="en")
-            return True
-        except asyncgTTS.RatelimitException:
-            return False
-        except Exception as e:
-            return e
-
-    async def handle_rl(self, prefix):
+    async def handle_rl(self):
         await self.bot.channels["logs"].send("**Swapping to espeak**")
+
         asyncio.create_task(self.handle_rl_reset())
+        if not self.bot.sent_fallback:
+            self.bot.sent_fallback = True
 
-        embed = discord.Embed(title="TTS Bot has been blocked by Google")
-        embed.description = cleandoc(f"""
-            During this temporary block, voice has been swapped to a worse quality voice.
-            If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `{prefix}donate`
-            """)
-        embed.set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
+            send_fallback_coros = [vc.send_fallback() for vc in self.bot.voice_clients]
+            await asyncio.gather(*(send_fallback_coros))
 
-        for voice_client in self.bot.voice_clients:
-            channel_id = await self.bot.settings.get(voice_client.guild, setting="channel")
-            channel = voice_client.guild.get_channel(int(channel_id))
-
-            if not channel:
-                continue
-
-            permissions = channel.permissions_for(voice_client.guild.me)
-            if permissions.send_messages and permissions.embed_links:
-                try:
-                    await channel.send(embed=embed)
-                    await asyncio.sleep(1)
-                except:
-                    pass
-
-        await self.bot.channels["logs"].send("**Fallback/RL messages have been sent.**")
+        await self.bot.channels["logs"].send(cleandoc(f"**Fallback/RL messages have been sent.**"))
 
     async def handle_rl_reset(self):
         while True:
-            ret = await self.check_gtts()
+            ret = await self.bot.check_gtts()
             if ret:
                 break
-            elif isinstance(e, Exception):
+            elif isinstance(ret, Exception):
                 await self.bot.channels["logs"].send("**Failed to connect to easygTTS for unknown reason.**")
             else:
                 await self.bot.channels["logs"].send("**Rate limit still in place, waiting another hour.**")
@@ -210,3 +211,17 @@ class TTSVoicePlayer(discord.VoiceClient):
 
         await self.bot.channels["logs"].send("**Swapping back to easygTTS**")
         self.bot.blocked = False
+
+    @handle_errors
+    async def send_fallback(self):
+        guild = self.guild
+        if not guild or guild.unavailable:
+            return
+
+        channel = guild.get_channel(self.linked_channel)
+        if not channel:
+            return
+
+        permissions = channel.permissions_for(guild.me)
+        if permissions.send_messages and permissions.embed_links:
+            await channel.send(embed=await self.get_embed())

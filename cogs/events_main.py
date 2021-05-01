@@ -1,17 +1,12 @@
-import asyncio
 import re
-from functools import partial as make_func
 from inspect import cleandoc
-from io import BytesIO
 from itertools import groupby
 from random import choice as pick_random
 
-import asyncgTTS
 import discord
 from discord.ext import commands
 
 from utils import basic
-from espeak_process import make_espeak
 from player import TTSVoicePlayer
 
 def setup(bot):
@@ -61,7 +56,7 @@ class events_main(commands.Cog):
                 return
 
             # Check if a setup channel
-            if message.channel.id != int(channel):
+            if message.channel.id != channel:
                 return
 
             # If message is empty and there is no attachments
@@ -79,11 +74,11 @@ class events_main(commands.Cog):
             # Auto Join
             if not message.guild.voice_client and autojoin:
                 try:
-                    channel = message.author.voice.channel
+                    voice_channel = message.author.voice.channel
                 except AttributeError:
                     return
 
-                await channel.connect(cls=TTSVoicePlayer)
+                await voice_channel.connect(cls=TTSVoicePlayer)
 
             # Get lang
             lang = await self.bot.setlangs.get(message.author)
@@ -183,7 +178,7 @@ class events_main(commands.Cog):
                 message_clean = "".join(message_clean_list)
 
             # Adds filtered message to queue
-            await message.guild.voice_client.queue(message, message_clean, lang, max_length)
+            await message.guild.voice_client.queue(message, message_clean, lang, channel, prefix, max_length)
 
 
         elif not (message.author.bot or message.content.startswith("-")):
@@ -232,19 +227,16 @@ class events_main(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        guild = member.guild
-        vc = guild.voice_client
+        vc = member.guild.voice_client
 
         if member == self.bot.user:
-            return  # someone other than bot left vc
+            return  # ignore bot leaving vc
         if not (before.channel and not after.channel):
-            return  # user left voice channel
+            return  # ignore everything but vc leaves
         if not vc:
-            return  # bot in a voice channel
+            return  # ignore if bot isn't in the vc
 
-        if len([member for member in vc.channel.members if not member.bot]) != 0:
-            return  # bot is only one left
-        if no_speak:
-            return  # bot not already joining/leaving a voice channel
+        if len([member for member in vc.channel.members if not member.bot]):
+            return  # ignore if bot isn't lonely
 
         await vc.disconnect(force=True)
