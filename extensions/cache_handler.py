@@ -10,13 +10,13 @@ from utils.decos import wrap_with, run_in_executor
 
 
 class cache:
-    def __init__(self, key, bot):
-        self.key = key
+    def __init__(self, bot):
         self.bot = bot
         self.pool = bot.pool
 
-        self.fernet = Fernet(self.key)
         self.get = wrap_with(self.pool.acquire, True)(self.get)
+        self.key = bot.config["Main"]["key"][2:-1].encode()
+        self.fernet = Fernet(self.key)        
 
 
     def get_hash(self, to_hash: bytes) -> bytes:
@@ -77,3 +77,6 @@ class cache:
         async with self.pool.acquire() as conn:
             for message in message_ids:
                 await conn.execute("DELETE FROM cache_lookup WHERE message_id = $1;", message)
+
+# Setup function is called with bot, so we can just do this
+setup = cache

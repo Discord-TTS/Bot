@@ -5,11 +5,18 @@ import discord
 
 default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "prefix": "-"}
 
+
+def setup(bot):
+    bot.settings = GeneralSettings(bot.pool)
+    bot.setlangs = LanguageHandler(bot.pool)
+    bot.nicknames = NicknameHandler(bot.pool)
+    bot.blocked_users = DMBlockHandler(bot.pool)        
+
 class handles_db:
     def __init__(self, pool):
         self.pool = pool
 
-class settings_class(handles_db):
+class GeneralSettings(handles_db):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._cache = dict()
@@ -44,7 +51,7 @@ class settings_class(handles_db):
         )
 
 
-class nickname_class(handles_db):
+class NicknameHandler(handles_db):
     async def get(self, guild: discord.Guild, user: discord.User) -> str:
         row = await self.pool.fetchrow("SELECT name FROM nicknames WHERE guild_id = $1 AND user_id = $2", guild.id, user.id)
         return row["name"] if row else user.display_name
@@ -60,7 +67,7 @@ class nickname_class(handles_db):
         )
 
 
-class setlangs_class(handles_db):
+class LanguageHandler(handles_db):
     async def get(self, user: discord.User) -> str:
         row = await self.pool.fetchrow("SELECT lang FROM userinfo WHERE user_id = $1", user.id)
         return row["lang"].split("-")[0] if row else "en"
@@ -77,7 +84,7 @@ class setlangs_class(handles_db):
         )
 
 
-class blocked_users_class(handles_db):
+class DMBlockHandler(handles_db):
     async def change(self, user: discord.User, value: bool) -> None:
         await self.pool.execute("""
             INSERT INTO userinfo(user_id, blocked)

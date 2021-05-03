@@ -21,6 +21,8 @@ class events_errors(commands.Cog):
 
     async def on_error(self, event, error=None, *args, **kwargs):
         info = "No Info"
+        args = list(args)
+
         if isinstance(error, BaseException):
             etype, value, tb = type(error), error, error.__traceback__
         else:

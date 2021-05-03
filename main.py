@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from concurrent.futures import ProcessPoolExecutor
 from configparser import ConfigParser
 from os import listdir
@@ -11,7 +12,7 @@ import asyncpg
 import discord
 from discord.ext import commands
 
-from utils import basic, cache, settings
+from utils.basic import remove_chars
 from utils.decos import wrap_with
 
 print("Starting TTS Bot!")
@@ -20,10 +21,6 @@ start_time = monotonic()
 # Read config file
 config = ConfigParser()
 config.read("config.ini")
-
-# Get cache mp3 decryption key
-cache_key_str = config["Main"]["key"][2:-1]
-cache_key_bytes = cache_key_str.encode()
 
 # Setup activity and intents for logging in
 activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
@@ -37,9 +34,13 @@ async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
 
 class TTSBot(commands.AutoShardedBot):
     def __init__(self, config, session, executor, *args, **kwargs):
+        self.channels = {}
         self.config = config
         self.session = session
         self.executor = executor
+        self.sent_fallback = False
+
+        self.trusted = remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
 
         super().__init__(*args, **kwargs)
 
@@ -58,12 +59,13 @@ class TTSBot(commands.AutoShardedBot):
             return e
 
 
-    def load_extensions(self, exts):
-        filered_exts = filter(lambda e: e.endswith(".py"), exts)
+    def load_extensions(self, folder):
+        filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
         for ext in filered_exts:
-            self.load_extension(f"cogs.{ext[:-3]}")
+            self.load_extension(f"{folder}.{ext[:-3]}")
 
     async def start(self, *args, token, **kwargs):
+        # Get everything ready in async env
         db_info = self.config["PostgreSQL Info"]
         self.gtts, self.pool = await asyncio.gather(
             asyncgTTS.setup(
@@ -78,22 +80,18 @@ class TTSBot(commands.AutoShardedBot):
             )
         )
 
-        self.sent_fallback = False
-        self.cache = cache.cache(cache_key_bytes, self)
-        self.settings = settings.settings_class(self.pool)
-        self.setlangs = settings.setlangs_class(self.pool)
-        self.nicknames = settings.nickname_class(self.pool)
-        self.blocked_users = settings.blocked_users_class(self.pool)
-        self.trusted = basic.remove_chars(self.config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
-
-        self.channels = {}
+        # Fill up bot.channels, as a load of webhooks
         for channel_name, webhook_url in self.config["Channels"].items():
             self.channels[channel_name] = discord.Webhook.from_url(
                 url=webhook_url,
                 adapter=discord.AsyncWebhookAdapter(session=self.session)
             )
 
-        self.load_extensions(listdir("cogs"))
+        # Load all of /cogs and /extensions
+        self.load_extensions("cogs")
+        self.load_extensions("extensions")
+
+        # Send starting message and actually start the bot
         await self.channels["logs"].send("Starting TTS Bot!")
         await super().start(token, *args, **kwargs)
 
