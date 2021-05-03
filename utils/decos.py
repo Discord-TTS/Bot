@@ -1,4 +1,4 @@
-from functools import wraps
+from functools import wraps, partial
 
 def wrap_with(enterable, aenter):
     def deco_wrap(func):
@@ -14,10 +14,19 @@ def wrap_with(enterable, aenter):
     return deco_wrap
 
 def handle_errors(func):
+    @wraps(func)
     async def wrapper(self, *args, **kwargs):
         try:
             return await func(self, *args, **kwargs)
         except Exception as error:
             return await self.bot.on_error(func.__name__, error)
+
+    return wrapper
+
+def run_in_executor(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        callable_func = partial(func, self, *args, **kwargs)
+        return self.bot.loop.run_in_executor(None, callable_func)
 
     return wrapper

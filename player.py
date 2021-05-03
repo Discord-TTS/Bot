@@ -68,12 +68,15 @@ class FFmpegPCMAudio(discord.AudioSource):
 class TTSVoicePlayer(discord.VoiceClient):
     def __init__(self, client, channel):
         super().__init__(client, channel)
+
         self.bot = client
         self.prefix = None
 
         self.currently_playing = asyncio.Event()
-        self.message_queue = asyncio.Queue()
+        self.currently_playing.set()
+
         self.audio_buffer = asyncio.Queue(maxsize=5)
+        self.message_queue = asyncio.Queue()
 
         self.fill_audio_buffer.start()
 
@@ -102,6 +105,8 @@ class TTSVoicePlayer(discord.VoiceClient):
         self.linked_channel = linked_channel
 
         await self.message_queue.put((message, text, lang))
+        if not self.fill_audio_buffer.is_running:
+            self.fill_audio_buffer.start()
 
     def skip(self):
         self.message_queue = asyncio.Queue()
@@ -150,17 +155,15 @@ class TTSVoicePlayer(discord.VoiceClient):
 
     async def get_tts(self, message: discord.Message, text: str, lang: str) -> Tuple[Optional[bytes], Optional[int]]:
         lang = lang.split("-")[0]
+        if self.bot.blocked:
+            make_espeak_func = make_func(make_espeak, text, lang, self.max_length)
+            return await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
 
         cached_mp3 = await self.bot.cache.get(text, lang, message.id)
         if cached_mp3:
             return cached_mp3, int(mutagen.MP3(BytesIO(cached_mp3)).info.length)
 
-        if self.bot.blocked:
-            make_espeak_func = make_func(make_espeak, text, lang, self.max_length)
-            return await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
-
         try:
-            raise asyncgTTS.RatelimitException("shut", {"up": "bro"})
             audio = await self.bot.gtts.get(text=text, lang=lang)
         except asyncgTTS.RatelimitException:
             if self.bot.blocked:

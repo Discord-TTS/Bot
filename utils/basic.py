@@ -86,16 +86,6 @@ def get_size(start_path: str = '.') -> int:
     return total_size
 
 
-def sort_dict(dict_to_sort: dict) -> dict:
-    keys = list(dict_to_sort.keys())
-    keys.sort()
-    newdict = {}
-    for x in keys:
-        newdict[x] = dict_to_sort[x]
-
-    return newdict
-
-
 def emojitoword(text: str) -> str:
     emojiAniRegex = compile(r'<a\:.+:\d+>')
     emojiRegex = compile(r'<:.+:\d+\d+>')

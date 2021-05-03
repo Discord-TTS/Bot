@@ -1,5 +1,4 @@
 import asyncio
-from functools import partial
 from hashlib import sha256
 from os import rename
 from os.path import exists
@@ -7,7 +6,7 @@ from typing import List
 
 from cryptography.fernet import Fernet
 
-from utils.decos import wrap_with
+from utils.decos import wrap_with, run_in_executor
 
 
 class cache:
@@ -27,19 +26,22 @@ class cache:
 
         return to_hash.digest()
 
+    @run_in_executor
     def read_from_cache(self, old_filename: str, new_filename: str) -> bytes:
         rename(old_filename, new_filename)
         with open(new_filename, "rb") as mp3:
             return self.fernet.decrypt(mp3.read())
 
+    @run_in_executor
     def write_to_cache(self, filename: str, data: bytes) -> bytes:
         with open(filename, "wb") as mp3:
             mp3.write(self.fernet.encrypt(data))
 
 
-    async def get(self, conn, text, lang, message_id):
+    async def get(self, conn, text: str, lang: str, message_id: int):
         search_for = self.get_hash(str([text, lang]).encode())
         row = await conn.fetchrow("SELECT * FROM cache_lookup WHERE message = $1", search_for)
+
         if row is None:
             return
 
@@ -50,19 +52,14 @@ class cache:
         if not exists(old_filename):
             return await self.remove(old_message_id)
 
-        read_cache = partial(self.read_from_cache, old_filename, new_filename)
-        read_cache_fut = self.bot.loop.run_in_executor(None, read_cache)
-
+        read_cache_fut = self.read_from_cache(old_filename, new_filename)
         await conn.execute("UPDATE cache_lookup SET message_id = $1 WHERE message_id = $2", message_id, old_message_id)
         return await read_cache_fut
 
     async def set(self, text, lang, message_id, file_bytes):
         search_for = self.get_hash(str([text, lang]).encode())
-
-        write_cache = partial(self.write_to_cache, f"cache/{message_id}.mp3.enc", file_bytes)
-        write_cache_fut = self.bot.loop.run_in_executor(None, write_cache)
         await asyncio.gather(
-            write_cache_fut,
+            self.write_to_cache(f"cache/{message_id}.mp3.enc", file_bytes),
             self.pool.execute("""
                 INSERT INTO cache_lookup(message, message_id)
                 VALUES ($1, $2)
