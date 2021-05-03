@@ -9,6 +9,9 @@ from cryptography.fernet import Fernet
 from utils.decos import wrap_with, run_in_executor
 
 
+def setup(bot):
+    bot.cache = cache(bot)
+
 class cache:
     def __init__(self, bot):
         self.bot = bot
@@ -16,7 +19,7 @@ class cache:
 
         self.get = wrap_with(self.pool.acquire, True)(self.get)
         self.key = bot.config["Main"]["key"][2:-1].encode()
-        self.fernet = Fernet(self.key)        
+        self.fernet = Fernet(self.key)
 
 
     def get_hash(self, to_hash: bytes) -> bytes:
@@ -77,6 +80,3 @@ class cache:
         async with self.pool.acquire() as conn:
             for message in message_ids:
                 await conn.execute("DELETE FROM cache_lookup WHERE message_id = $1;", message)
-
-# Setup function is called with bot, so we can just do this
-setup = cache

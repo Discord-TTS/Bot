@@ -81,7 +81,7 @@ class events_main(commands.Cog):
                 await voice_channel.connect(cls=TTSVoicePlayer)
 
             # Get lang
-            lang = await self.bot.setlangs.get(message.author)
+            lang = await self.bot.userinfo.get("lang", message.author, default="en")
 
             # Emoji filter
             message_clean = basic.emojitoword(message_clean)
@@ -192,7 +192,7 @@ class events_main(commands.Cog):
                     await message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
                     await self.bot.channels["logs"].send(f"{message.author} just got the 'dont ask to ask' message")
 
-                elif not await self.bot.blocked_users.check(message.author):
+                elif not await self.bot.userinfo.get("blocked", message.author, default=False):
                     if not message.attachments and not message.content:
                         return
 

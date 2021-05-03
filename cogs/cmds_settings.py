@@ -36,11 +36,11 @@ class cmds_settings(commands.Cog, name="Settings"):
                 return await ctx.send_help("set limits")
 
         lang, nickname = await asyncio.gather(
-            self.bot.setlangs.get(ctx.author),
+            self.bot.userinfo.get("lang", ctx.author, default="en"),
             self.bot.nicknames.get(ctx.guild, ctx.author)
         )
 
-        say, channel, join, bot_ignore, prefix = await self.bot.settings.get(
+        xsaid, channel, auto_join, bot_ignore, prefix = await self.bot.settings.get(
             ctx.guild,
             settings=(
                 "xsaid",
@@ -60,8 +60,8 @@ class cmds_settings(commands.Cog, name="Settings"):
         # Show settings embed
         message1 = cleandoc(f"""
             :small_orange_diamond: Channel: `#{channel_name}`
-            :small_orange_diamond: XSaid: `{say}`
-            :small_orange_diamond: Auto Join: `{join}`
+            :small_orange_diamond: XSaid: `{xsaid}`
+            :small_orange_diamond: Auto Join: `{auto_join}`
             :small_orange_diamond: Ignore Bots: `{bot_ignore}`
             :small_orange_diamond: Prefix: `{prefix}`
             :star: Limits: Do `{ctx.prefix}settings limits` to check!
@@ -231,7 +231,7 @@ class cmds_settings(commands.Cog, name="Settings"):
     async def voice(self, ctx, lang: str):
         "Changes the voice your messages are read in, full list in `-voices`"
         if lang in tts_langs:
-            await self.bot.setlangs.set(ctx.author, lang)
+            await self.bot.userinfo.set("lang", ctx.author, lang)
             await ctx.send(f"Changed your voice to: {tts_langs[lang]}")
         else:
             await ctx.send(f"Invalid voice, do `{ctx.prefix}voices`")
@@ -243,7 +243,7 @@ class cmds_settings(commands.Cog, name="Settings"):
         if lang in tts_langs:
             return await self.voice(ctx, lang)
 
-        lang = await self.bot.setlangs.get(ctx.author)
+        lang = await self.bot.userinfo.get("lang", ctx.author)
         langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
 
         embed = discord.Embed(title="TTS Bot Languages")

@@ -101,7 +101,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
         if suggestion.lower().replace("*", "") == "suggestion":
             return await ctx.send("Hey! You are meant to replace `*suggestion*` with your actual suggestion!")
 
-        if not await self.bot.blocked_users.check(ctx.message.author):
+        if not await self.bot.userinfo.get("blocked", ctx.message.author, default=False):
             files = [await attachment.to_file() for attachment in ctx.message.attachments]
             await self.bot.channels["suggestions"].send(
                 suggestion,
