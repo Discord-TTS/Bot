@@ -30,7 +30,7 @@ class loops(commands.Cog):
             for file in cache_folder:
                 remove(f"cache/{file}")
 
-            await self.bot.cache.bulk_remove(cache_folder)
+            await self.bot.cache.bulk_remove(int(cache_file[:-8]) for cache_file in cache_folder)
 
     @cache_cleanup.before_loop
     async def before_loops(self):

@@ -49,8 +49,8 @@ class events_other(commands.Cog):
             if " new commit" not in embed_title:
                 return
 
-            correct_title = embed_title.startswith(("[Discord-TTS-Bot:master]", "[Discord-TTS-Bot:dev]"))
-            correct_id = self.bot.user.id in (513423712582762502, 698218518335848538)
+            correct_id = self.bot.user.id == 698218518335848538
+            correct_title = embed_title.startswith("[Discord-TTS-Bot:dev]")
             if correct_title and correct_id:
                 await self.bot.channels['logs'].send("Detected new bot commit! Pulling changes")
                 call(['git', 'pull'])
@@ -83,5 +83,7 @@ class events_other(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
-        await self.bot.settings.remove(guild)
-        await self.bot.channels["servers"].send(f"Just left/got kicked from {guild}. I am now in {len(self.bot.guilds)} servers".replace("@", "@ "))
+        await asyncio.gather(
+            self.bot.settings.remove(guild),
+            self.bot.channels["servers"].send(f"Just got kicked from {guild}. I am now in {len(self.bot.guilds)} servers")
+        )
