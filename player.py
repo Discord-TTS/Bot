@@ -167,7 +167,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             audio = await self.bot.gtts.get(text=text, lang=lang)
         except asyncgTTS.RatelimitException:
             if self.bot.blocked:
-                return
+                return None, None
 
             self.bot.blocked = True
             if await self.bot.check_gtts() is not True:
@@ -181,8 +181,9 @@ class TTSVoicePlayer(discord.VoiceClient):
             if str(e)[:3] != "400":
                 raise
 
-        file_length = int(mutagen.MP3(BytesIO(audio)).info.length)
+            return
 
+        file_length = int(mutagen.MP3(BytesIO(audio)).info.length)
         await self.bot.cache.set(text, lang, message.id, audio)
         return audio, file_length
 

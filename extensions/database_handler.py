@@ -61,6 +61,7 @@ class UserInfoHandler(handles_db):
         return row[value] if row else default
 
     async def set(self, setting: str, user: discord.User, value: Union[str, bool]) -> None:
+        self._cache.pop(user.id, None)
         if isinstance(value, str):
             value = value.lower().split("-")[0]
 
