@@ -22,27 +22,11 @@ class cmds_dev(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.command()
     async def debug(self, ctx, reset="nope"):
         if reset.lower() == "reset":
-            self.bot.queue[ctx.guild.id] = dict()
-            self.bot.message_locks[ctx.guild.id] = Lock()
-            self.bot.currently_playing[ctx.guild.id] = asyncio.Event()
-
-            return await ctx.send("All internal guild values reset, try doing whatever you were doing again!")
-
-        currently_playing = self.bot.currently_playing.get(message.guild.id, False)
-        lock = self.bot.message_locks.get(ctx.guild.id, False)
-        if currently_playing:
-            currently_playing = not event.is_set()
-        if lock:
-            lock = lock.locked()
+            return await ctx.send("Not currently implemented.")
 
         embed = discord.Embed(
             title="TTS Bot debug info!",
-            description=cleandoc(f"""
-                Reading messages is currently locked: {lock}
-                Currently speaking a message: {currently_playing}
-                Shouldn't read messages: {self.bot.should_return.get(ctx.guild.id)}
-                Queue has {len(self.bot.queue.get(ctx.guild.id, ()))} message(s) in it
-            """)
+            description=f"Voice Client: {ctx.guild.voice_client!r}"
         )
 
         await ctx.send(embed=embed)

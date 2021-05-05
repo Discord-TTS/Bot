@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 
 from utils import basic
-
+from player import TTSVoicePlayer
 
 def setup(bot):
     bot.add_cog(cmds_main(bot))
@@ -67,13 +67,9 @@ class cmds_main(commands.Cog, name="Main Commands"):
         join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
         join_embed.set_footer(text=pick_random(basic.footer_messages))
 
-        self.bot.should_return[ctx.guild.id] = True
-        self.bot.queue[ctx.guild.id] = dict()
-
-        await channel.connect()
-        self.bot.should_return[ctx.guild.id] = False
-
+        await channel.connect(cls=TTSVoicePlayer)
         await ctx.send(embed=join_embed)
+
         if self.bot.blocked:
             blocked_embed = discord.Embed(title="TTS Bot is currently blocked by Google")
             blocked_embed.description = cleandoc(f"""
@@ -104,9 +100,6 @@ class cmds_main(commands.Cog, name="Main Commands"):
         if ctx.author.voice.channel != ctx.guild.voice_client.channel:
             return await ctx.send("Error: You need to be in the same voice channel as me to make me leave!")
 
-        self.bot.should_return[ctx.guild.id] = True
-        self.bot.queue[ctx.guild.id] = dict()
-
         await ctx.guild.voice_client.disconnect(force=True)
         await ctx.send("Left voice channel!")
 
@@ -119,13 +112,11 @@ class cmds_main(commands.Cog, name="Main Commands"):
         if not await self.channel_check(ctx):
             return
 
-        if self.bot.queue.get(ctx.guild.id, {}) == {} or self.bot.currently_playing[ctx.guild.id].is_set():
+        vc = ctx.guild.voice_client
+        if not vc or (vc.message_queue.empty() and vc.audio_buffer.empty()):
             return await ctx.send("**Error:** Nothing in message queue to skip!")
 
-        ctx.guild.voice_client.stop()
-        self.bot.queue[ctx.guild.id] = {}
-        self.bot.currently_playing[ctx.guild.id].set()
-
+        ctx.guild.voice_client.skip()
         return await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
 
     @skip.after_invoke

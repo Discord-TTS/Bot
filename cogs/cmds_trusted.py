@@ -25,10 +25,10 @@ class cmds_trusted(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.command()
     @commands.check(is_trusted)
     async def block(self, ctx, user: discord.User, notify: bool = False):
-        if await self.bot.blocked_users.check(user):
+        if await self.bot.userinfo.get("blocked", user, default=False):
             return await ctx.send(f"{user} | {user.id} is already blocked!")
 
-        await self.bot.blocked_users.add(user)
+        await self.bot.userinfo.block(user)
 
         await ctx.send(f"Blocked {user} | {user.id}")
         if notify:
@@ -37,10 +37,10 @@ class cmds_trusted(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.command()
     @commands.check(is_trusted)
     async def unblock(self, ctx, user: discord.User, notify: bool = False):
-        if not await self.bot.blocked_users.check(user):
+        if not await self.bot.userinfo.get("blocked", user, default=False):
             return await ctx.send(f"{user} | {user.id} isn't blocked!")
 
-        await self.bot.blocked_users.remove(user)
+        await self.bot.userinfo.unblock(user)
 
         await ctx.send(f"Unblocked {user} | {user.id}")
         if notify:

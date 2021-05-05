@@ -1,18 +1,19 @@
 import asyncio
+import traceback
 from concurrent.futures import ProcessPoolExecutor
 from configparser import ConfigParser
-from functools import wraps
 from os import listdir
 from time import monotonic
+from typing import Union
 
 import aiohttp
 import asyncgTTS
 import asyncpg
 import discord
-from discord.backoff import ExponentialBackoff
 from discord.ext import commands
 
-from utils import basic, cache, settings
+from utils.basic import remove_chars
+from utils.decos import wrap_with
 
 print("Starting TTS Bot!")
 start_time = monotonic()
@@ -20,10 +21,6 @@ start_time = monotonic()
 # Read config file
 config = ConfigParser()
 config.read("config.ini")
-
-# Get cache mp3 decryption key
-cache_key_str = config["Main"]["key"][2:-1]
-cache_key_bytes = cache_key_str.encode()
 
 # Setup activity and intents for logging in
 activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
@@ -36,11 +33,14 @@ async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
     return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
 
 class TTSBot(commands.AutoShardedBot):
-    queue, channels, should_return, message_locks, currently_playing = {}, {}, {}, {}, {}
     def __init__(self, config, session, executor, *args, **kwargs):
+        self.channels = {}
         self.config = config
         self.session = session
         self.executor = executor
+        self.sent_fallback = False
+
+        self.trusted = remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
 
         super().__init__(*args, **kwargs)
 
@@ -49,14 +49,25 @@ class TTSBot(commands.AutoShardedBot):
         return self.get_guild(int(self.config["Main"]["main_server"]))
 
 
-    def load_extensions(self, exts):
-        filered_exts = filter(lambda e: e.endswith(".py"), exts)
+    async def check_gtts(self) -> Union[bool, Exception]:
+        try:
+            await self.gtts.get(text="RL Test", lang="en")
+            return True
+        except asyncgTTS.RatelimitException:
+            return False
+        except Exception as e:
+            return e
+
+
+    def load_extensions(self, folder):
+        filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
         for ext in filered_exts:
-            self.load_extension(f"cogs.{ext[:-3]}")
+            self.load_extension(f"{folder}.{ext[:-3]}")
 
     async def start(self, *args, token, **kwargs):
+        # Get everything ready in async env
         db_info = self.config["PostgreSQL Info"]
-        self.gtts, pool = await asyncio.gather(
+        self.gtts, self.pool = await asyncio.gather(
             asyncgTTS.setup(
                 premium=False,
                 session=self.session
@@ -69,39 +80,24 @@ class TTSBot(commands.AutoShardedBot):
             )
         )
 
-        self.settings = settings.settings_class(pool)
-        self.setlangs = settings.setlangs_class(pool)
-        self.nicknames = settings.nickname_class(pool)
-        self.cache = cache.cache(cache_key_bytes, pool)
-        self.blocked_users = settings.blocked_users_class(pool)
-        self.trusted = basic.remove_chars(self.config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
-
+        # Fill up bot.channels, as a load of webhooks
         for channel_name, webhook_url in self.config["Channels"].items():
             self.channels[channel_name] = discord.Webhook.from_url(
                 url=webhook_url,
                 adapter=discord.AsyncWebhookAdapter(session=self.session)
             )
 
-        self.load_extensions(listdir("cogs"))
+        # Load all of /cogs and /extensions
+        self.load_extensions("cogs")
+        self.load_extensions("extensions")
+
+        # Send starting message and actually start the bot
         await self.channels["logs"].send("Starting TTS Bot!")
         await super().start(token, *args, **kwargs)
 
 
 def get_error_string(e: BaseException) -> str:
     return f"{type(e).__name__}: {e}"
-
-def wrap_with(enterable, aenter):
-    def deco_wrap(func):
-        async def async_wrapper(*args, **kwargs):
-            async with enterable() as entered:
-                return await func(entered, *args, **kwargs)
-
-        async def normal_wrapper(*args, **kwargs):
-            with enterable() as entered:
-                return await func(entered, *args, **kwargs)
-
-        return wraps(func)(async_wrapper if aenter else normal_wrapper)
-    return deco_wrap
 
 @wrap_with(ProcessPoolExecutor,   aenter=False)
 @wrap_with(aiohttp.ClientSession, aenter=True)
@@ -132,6 +128,8 @@ async def main(session, executor):
         print(f"Logged in as {bot.user} and ready!")
         await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
         await bot_task
+    except Exception as e:
+        print(get_error_string(e))
     finally:
         if not bot.user:
             return

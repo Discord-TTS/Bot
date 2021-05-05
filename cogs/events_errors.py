@@ -19,9 +19,15 @@ class events_errors(commands.Cog):
         self.bot = bot
         self.bot.on_error = self.on_error
 
-    async def on_error(self, event, *args, **kwargs):
-        errors = exc_info()
+    async def on_error(self, event, error=None, *args, **kwargs):
         info = "No Info"
+        args = list(args)
+
+        if isinstance(error, BaseException):
+            etype, value, tb = type(error), error, error.__traceback__
+        else:
+            args.insert(0, error)
+            etype, value, tb = exc_info()
 
         if event == "on_message":
             message = args[0]
@@ -36,9 +42,9 @@ class events_errors(commands.Cog):
             info = f"Guild = {guild} | {guild.id}"
 
         try:
-            error_message = f"Event: `{event}`\nInfo: `{info}`\n```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
+            error_message = f"Event: `{event}`\nInfo: `{info}`\n```{''.join(format_exception(etype, value, tb))}```"
         except:
-            error_message = f"```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
+            error_message = f"```{''.join(format_exception(etype, value, tb))}```"
 
         await self.bot.channels["errors"].send(cleandoc(error_message))
 

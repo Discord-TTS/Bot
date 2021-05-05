@@ -63,7 +63,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
     @commands.command()
     async def channel(self, ctx):
         "Shows the current setup channel!"
-        channel = int(await self.bot.settings.get(ctx.guild, "channel"))
+        channel = await self.bot.settings.get(ctx.guild, "channel")
 
         if channel == ctx.channel.id:
             await ctx.send("You are in the right channel already!")
@@ -79,7 +79,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
 
         await ctx.send(cleandoc(f"""
             To donate to support the development and hosting of {self.bot.user.mention}, you can donate via Patreon (Fees) or directly via DonateBot.io!
-            <https://donatebot.io/checkout/693901918342217758?buyer={ctx.author.id}>
+            <https://donatebot.io/checkout/693901918342217758>
             https://www.patreon.com/Gnome_the_Bot_Maker
         """))
 
@@ -101,7 +101,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
         if suggestion.lower().replace("*", "") == "suggestion":
             return await ctx.send("Hey! You are meant to replace `*suggestion*` with your actual suggestion!")
 
-        if not await self.bot.blocked_users.check(ctx.message.author):
+        if not await self.bot.userinfo.get("blocked", ctx.message.author, default=False):
             files = [await attachment.to_file() for attachment in ctx.message.attachments]
             await self.bot.channels["suggestions"].send(
                 suggestion,
