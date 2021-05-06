@@ -191,7 +191,7 @@ class cmds_settings(commands.Cog, name="Settings"):
         if length < 20:
             return await ctx.send("Hey! You can't set max message length below 20 seconds!")
 
-        await self.bot.settings.set(ctx.guild, "msg_length", str(length))
+        await self.bot.settings.set(ctx.guild, "msg_length", length)
         await ctx.send(f"Max message length (in seconds) is now: {length}")
 
     @limits.command(aliases=("repeated_characters", "repeated_letters", "chars"))
@@ -202,7 +202,7 @@ class cmds_settings(commands.Cog, name="Settings"):
         if chars < 5 and chars != 0:
             return await ctx.send("Hey! You can't set max repeated chars below 5!")
 
-        await self.bot.settings.set(ctx.guild, "repeated_chars", str(chars))
+        await self.bot.settings.set(ctx.guild, "repeated_chars", chars)
         await ctx.send(f"Max repeated characters is now: {chars}")
 
     @commands.guild_only()
@@ -243,7 +243,7 @@ class cmds_settings(commands.Cog, name="Settings"):
         if lang in tts_langs:
             return await self.voice(ctx, lang)
 
-        lang = await self.bot.userinfo.get("lang", ctx.author)
+        lang = await self.bot.userinfo.get("lang", ctx.author).split("-")[0]
         langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
 
         embed = discord.Embed(title="TTS Bot Languages")

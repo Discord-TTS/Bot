@@ -143,8 +143,11 @@ class TTSVoicePlayer(discord.VoiceClient):
     @handle_errors
     async def fill_audio_buffer(self):
         message, text, lang = await self.message_queue.get()
-        audio, file_length = await self.get_tts(message, text, lang)
+        ret_values = await self.get_tts(message, text, lang)
+        if not ret_values or len(ret_values) == 1:
+            return
 
+        audio, file_length = ret_values
         if not audio or file_length > self.max_length:
             return
 
@@ -153,7 +156,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.play_audio.start()
 
 
-    async def get_tts(self, message: discord.Message, text: str, lang: str) -> Tuple[Optional[bytes], Optional[int]]:
+    async def get_tts(self, message: discord.Message, text: str, lang: str) -> Optional[Tuple[bytes, int]]:
         lang = lang.split("-")[0]
         if self.bot.blocked:
             make_espeak_func = make_func(make_espeak, text, lang, self.max_length)
@@ -167,7 +170,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             audio = await self.bot.gtts.get(text=text, lang=lang)
         except asyncgTTS.RatelimitException:
             if self.bot.blocked:
-                return None, None
+                return
 
             self.bot.blocked = True
             if await self.bot.check_gtts() is not True:
@@ -199,7 +202,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             send_fallback_coros = [vc.send_fallback() for vc in self.bot.voice_clients]
             await asyncio.gather(*(send_fallback_coros))
 
-        await self.bot.channels["logs"].send(cleandoc(f"**Fallback/RL messages have been sent.**"))
+        await self.bot.channels["logs"].send(cleandoc("**Fallback/RL messages have been sent.**"))
 
     async def handle_rl_reset(self):
         while True:

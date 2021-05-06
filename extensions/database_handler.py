@@ -18,7 +18,11 @@ class handles_db:
         self.pool = pool
         self._cache = dict()
 
+        self._cache_lock = Event()
+        self._cache_lock.set()
+
     async def fetchrow(self, query: str, id: Union[int, Tuple[int]], *args) -> asyncpg.Record:
+        await self._cache_lock.wait()
         if id not in self._cache:
             if "nicknames" in query:
                 self._cache[id] = await self.pool.fetchrow(query, *id)
@@ -30,7 +34,7 @@ class handles_db:
 
 class GeneralSettings(handles_db):
     async def remove(self, guild: discord.Guild):
-        await self.pool.execute(f"DELETE FROM guilds WHERE guild_id = $1;", guild.id)
+        await self.pool.execute("DELETE FROM guilds WHERE guild_id = $1;", guild.id)
 
     async def get(self, guild: discord.Guild, setting: Optional[str] = None, settings: Optional[list] = None):
         row = await self.fetchrow("SELECT * from guilds WHERE guild_id = $1", guild.id)
@@ -46,14 +50,20 @@ class GeneralSettings(handles_db):
         return rets[0] if len(rets) == 1 else rets
 
     async def set(self, guild: discord.Guild, setting: str, value):
-        self._cache.pop(guild.id, None)
-        await self.pool.execute(f"""
-            INSERT INTO guilds(guild_id, {setting}) VALUES($1, $2)
+        await self._cache_lock.wait()
+        self._cache_lock.clear()
 
-            ON CONFLICT (guild_id)
-            DO UPDATE SET {setting} = EXCLUDED.{setting};""",
-            guild.id, value
-        )
+        try:
+            self._cache.pop(guild.id, None)
+            await self.pool.execute(f"""
+                INSERT INTO guilds(guild_id, {setting}) VALUES($1, $2)
+
+                ON CONFLICT (guild_id)
+                DO UPDATE SET {setting} = EXCLUDED.{setting};""",
+                guild.id, value
+            )
+        finally:
+            self._cache_lock.set()
 
 class UserInfoHandler(handles_db):
     async def get(self, value: str, user: discord.User, default: Union[str, bool] = "en") -> Union[str, bool]:
@@ -61,18 +71,23 @@ class UserInfoHandler(handles_db):
         return row[value] if row else default
 
     async def set(self, setting: str, user: discord.User, value: Union[str, bool]) -> None:
-        self._cache.pop(user.id, None)
+        await self._cache_lock.wait()
+        self._cache_lock.clear()
         if isinstance(value, str):
             value = value.lower().split("-")[0]
 
-        await self.pool.execute(f"""
-            INSERT INTO userinfo(user_id, {setting})
-            VALUES($1, $2)
+        try:
+            self._cache.pop(user.id, None)
+            await self.pool.execute(f"""
+                INSERT INTO userinfo(user_id, {setting})
+                VALUES($1, $2)
 
-            ON CONFLICT (user_id)
-            DO UPDATE SET {setting} = EXCLUDED.{setting};""",
-            user.id, value
-        )
+                ON CONFLICT (user_id)
+                DO UPDATE SET {setting} = EXCLUDED.{setting};""",
+                user.id, value
+            )
+        finally:
+            self._cache_lock.set()
 
     async def block(self, user: discord.User) -> None:
         await self.set("blocked", user, True)
@@ -86,10 +101,12 @@ class NicknameHandler(handles_db):
         return row["name"] if row else user.display_name
 
     async def set(self, guild: discord.Guild, user: discord.User, nickname: str) -> None:
-        self._cache.pop((guild.id, user.id), None)
+        await self._cache_lock.wait()
+        self._cache_lock.clear()
 
         try:
-            await self.pool.execute(f"""
+            self._cache.pop((guild.id, user.id), None)
+            await self.pool.execute("""
                 INSERT INTO nicknames(guild_id, user_id, name)
                 VALUES($1, $2, $3)
 
@@ -101,4 +118,8 @@ class NicknameHandler(handles_db):
             # Fixes non-existing userinfo and retries inserting into nicknames.
             # Avoids recursion due to user_id being a pkey, so userinfo insert will error if the foreign key error happens twice.
             await self.pool.execute("INSERT INTO userinfo(user_id) VALUES($1);", user.id)
+            self._cache_lock.set()
+
             return await self.set(guild, user, nickname)
+        finally:
+            self._cache_lock.set()
