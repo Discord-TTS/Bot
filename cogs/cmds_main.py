@@ -18,19 +18,12 @@ class cmds_main(commands.Cog, name="Main Commands"):
         self.bot = bot
 
     async def channel_check(self, ctx):
-        channel, prefix = await self.bot.settings.get(
-            ctx.guild,
-            settings=(
-                "channel",
-                "prefix"
-            )
-        )
-
-        if ctx.channel.id != int(channel):
-            await ctx.send(f"Error: Wrong channel, do {prefix}channel get the channel that has been setup.")
+        if ctx.channel.id != await self.bot.settings.get(ctx.guild, "channel"):
+            await ctx.send(f"Error: Wrong channel, do {ctx.prefix}channel get the channel that has been setup.")
             return False
 
         return True
+
 
     @commands.guild_only()
     @commands.cooldown(1, 10, commands.BucketType.guild)
@@ -44,8 +37,9 @@ class cmds_main(commands.Cog, name="Main Commands"):
         if not ctx.author.voice:
             return await ctx.send("Error: You need to be in a voice channel to make me join your voice channel!")
 
-        channel = ctx.author.voice.channel
-        permissions = channel.permissions_for(ctx.guild.me)
+        voice_client = ctx.guild.voice_client
+        voice_channel = ctx.author.voice.channel
+        permissions = voice_channel.permissions_for(ctx.guild.me)
 
         if not permissions.view_channel:
             return await ctx.send("Error: Missing Permission to view your voice channel!")
@@ -53,11 +47,12 @@ class cmds_main(commands.Cog, name="Main Commands"):
         if not permissions.speak or not permissions.use_voice_activation:
             return await ctx.send("Error: I do not have permssion to speak!")
 
-        if ctx.guild.voice_client and ctx.guild.voice_client == channel:
-            return await ctx.send("Error: I am already in your voice channel!")
-
-        if ctx.guild.voice_client and ctx.guild.voice_client != channel:
-            return await ctx.send("Error: I am already in a voice channel!")
+        if voice_client:
+            if voice_client == voice_channel:
+                await ctx.send("Error: I am already in your voice channel!")
+            else:
+                await ctx.send(f"Error: I am in {voice_client.channel.mention}!")
+            return
 
         join_embed = discord.Embed(
             title="Joined your voice channel!",
@@ -67,7 +62,7 @@ class cmds_main(commands.Cog, name="Main Commands"):
         join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
         join_embed.set_footer(text=pick_random(basic.footer_messages))
 
-        await channel.connect(cls=TTSVoicePlayer)
+        await voice_channel.connect(cls=TTSVoicePlayer)
         await ctx.send(embed=join_embed)
 
         if self.bot.blocked:
@@ -79,8 +74,6 @@ class cmds_main(commands.Cog, name="Main Commands"):
             blocked_embed.set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
 
             await ctx.send(embed=blocked_embed)
-
-
 
     @commands.guild_only()
     @commands.cooldown(1, 10, commands.BucketType.guild)
@@ -103,6 +96,7 @@ class cmds_main(commands.Cog, name="Main Commands"):
         await ctx.guild.voice_client.disconnect(force=True)
         await ctx.send("Left voice channel!")
 
+
     @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, add_reactions=True)
     @commands.cooldown(1, 60, commands.BucketType.member)
@@ -113,7 +107,7 @@ class cmds_main(commands.Cog, name="Main Commands"):
             return
 
         vc = ctx.guild.voice_client
-        if not vc or (vc.message_queue.empty() and vc.audio_buffer.empty()):
+        if not vc or (not vc.is_playing() and vc.message_queue.empty() and vc.audio_buffer.empty()):
             return await ctx.send("**Error:** Nothing in message queue to skip!")
 
         ctx.guild.voice_client.skip()

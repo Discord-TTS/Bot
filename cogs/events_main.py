@@ -1,3 +1,4 @@
+import asyncio
 import re
 from inspect import cleandoc
 from itertools import groupby
@@ -6,8 +7,18 @@ from random import choice as pick_random
 import discord
 from discord.ext import commands
 
-from utils import basic
 from player import TTSVoicePlayer
+from utils import basic
+
+
+DM_WELCOME_MESSAGE = cleandoc("""
+    **All messages after this will be sent to a private channel where we can assist you.**
+    Please keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day repeat your message.
+    There are some basic rules if you want to get help though:
+    `1.` Ask your question, don't just ask for help
+    `2.` Don't spam, troll, or send random stuff (including server invites)
+    `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
+""")
 
 def setup(bot):
     bot.add_cog(events_main(bot))
@@ -16,13 +27,20 @@ def setup(bot):
 class events_main(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.dm_pins = dict()
         self.bot.blocked = False
+
+
+    def is_welcome_message(self, message):
+        if not message.embeds:
+            return False
+
+        return message.embeds[0].title == f"Welcome to {self.bot.user.name} Support DMs!"
+
 
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.guild is not None:
-            message_clean = message.clean_content.lower()
-
             # Get settings
             repeated_chars_limit, bot_ignore, max_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
                 message.guild,
@@ -37,6 +55,7 @@ class events_main(commands.Cog):
                 )
             )
 
+            message_clean = message.clean_content.lower()
             starts_with_tts = message_clean.startswith(f"{prefix}tts")
 
             # if author is a bot and bot ignore is on
@@ -182,15 +201,19 @@ class events_main(commands.Cog):
 
 
         elif not (message.author.bot or message.content.startswith("-")):
-            pins = await message.author.pins()
+            pins = self.dm_pins.get(message.author.id, None)
+            if not pins:
+                self.dm_pins[message.author.id] = pins = await message.author.pins()
 
-            if [True for pinned_message in pins if pinned_message.embeds and pinned_message.embeds[0].title == f"Welcome to {self.bot.user.name} Support DMs!"]:
+            if any(map(self.is_welcome_message, pins)):
                 if "https://discord.gg/" in message.content.lower():
                     await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
 
                 elif message.content.lower() == "help":
-                    await message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
-                    await self.bot.channels["logs"].send(f"{message.author} just got the 'dont ask to ask' message")
+                    await asyncio.gather(
+                        self.bot.channels["logs"].send(f"{message.author} just got the 'dont ask to ask' message"),
+                        message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
+                    )
 
                 elif not await self.bot.userinfo.get("blocked", message.author, default=False):
                     if not message.attachments and not message.content:
@@ -208,22 +231,17 @@ class events_main(commands.Cog):
                 if len(pins) >= 49:
                     return await message.channel.send("Error: Pinned messages are full, cannot pin the Welcome to Support DMs message!")
 
-                embed_message = cleandoc("""
-                    **All messages after this will be sent to a private channel where we can assist you.**
-                    Please keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day repeat your message.
-                    There are some basic rules if you want to get help though:
-                    `1.` Ask your question, don't just ask for help
-                    `2.` Don't spam, troll, or send random stuff (including server invites)
-                    `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
-                """)
-
-                embed = discord.Embed(title=f"Welcome to {self.bot.user.name} Support DMs!", description=embed_message)
-                embed.set_footer(text=pick_random(basic.footer_messages))
+                embed = discord.Embed(
+                    title=f"Welcome to {self.bot.user.name} Support DMs!",
+                    description=DM_WELCOME_MESSAGE
+                ).set_footer(text=pick_random(basic.footer_messages))
 
                 dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=embed)
 
-                await self.bot.channels["logs"].send(f"{message.author} just got the 'Welcome to Support DMs' message")
-                await dm_message.pin()
+                await asyncio.gather(
+                    self.bot.channels["logs"].send(f"{message.author} just got the 'Welcome to Support DMs' message"),
+                    dm_message.pin()
+                )
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -240,3 +258,7 @@ class events_main(commands.Cog):
             return  # ignore if bot isn't lonely
 
         await vc.disconnect(force=True)
+
+    @commands.Cog.listener()
+    async def on_private_channel_pins_update(self, channel, last_pin):
+        self.dm_pins.pop(channel.recipient.id, None)
