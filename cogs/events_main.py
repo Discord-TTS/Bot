@@ -126,7 +126,7 @@ class Main(commands.Cog):
                 self.bot.should_return[message.guild.id] = False
 
             # Get voice and parse it into a useable format
-            voice = self.bot.get_cog("Settings").get_voice(*(await self.bot.setlangs.get(message.author))).tuple
+            voice = (await self.bot.get_cog("Settings").get_voice(*(await self.bot.setlangs.get(message.author)))).tuple
 
             # Emoji filter
             saythis = basic.emojitoword(saythis)

@@ -20,8 +20,8 @@ def require_voices(func):
     @functools.wraps(func)
     async def wrapper(self, *args, **kwargs):
         if not getattr(self, "_voice_data", None):
-            self._voice_data = [
-                Voice(
+            self._voice_data = sorted(
+                [Voice(
                     voice_name=v["name"],
 
                     variant=v["name"][-1].lower(),
@@ -29,8 +29,9 @@ def require_voices(func):
                     gender=v["ssmlGender"].capitalize()
                 )
                 for v in await self.bot.gtts.get_voices()
-                if "Standard" in v["name"]
-            ]
+                if "Standard" in v["name"]],
+                key=lambda v: v.formatted
+            )
 
         return await maybe_coroutine(func, self, *args, **kwargs)
     return wrapper
