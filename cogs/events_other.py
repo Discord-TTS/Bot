@@ -1,10 +1,24 @@
-from asyncio import sleep
+import asyncio
 from inspect import cleandoc
 from subprocess import call
 
 import discord
 from discord.ext import commands
 
+
+WELCOME_MESSAGE = cleandoc("""
+    Hello! Someone invited me to your server `{guild}`!
+    TTS Bot Premium is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
+
+    **Most commands need to be done on your server, such as `{prefix}setup` and `{prefix}join`**
+
+    I need someone with the administrator permission to do `{prefix}setup #channel`
+    You can then do `{prefix}join` in that channel and I will join your voice channel!
+    Then, you can just type normal messages and I will say them, like magic!
+
+    You can view all the commands with `{prefix}help`
+    Ask questions by either responding here or asking on the support server!
+""")
 
 def setup(bot):
     bot.add_cog(events_other(bot))
@@ -31,55 +45,45 @@ class events_other(commands.Cog):
             await dm_command(ctx, todm, message=message.content)
 
         if message.channel.id == 749971061843558440 and message.embeds and str(message.author) == "GitHub#0000":
-            if " new commit" in message.embeds[0].title:
-                update_for_main = message.embeds[0].title.startswith("[Discord-TTS-Bot:master]") and self.bot.user.id == 513423712582762502
-                update_for_dev = message.embeds[0].title.startswith("[Discord-TTS-Bot:dev]") and self.bot.user.id == 698218518335848538
+            embed_title = message.embeds[0].title
+            if " new commit" not in embed_title:
+                return
 
-                if update_for_main or update_for_dev:
-                    await self.bot.channels['logs'].send("Detected new bot commit! Pulling changes")
-                    call(['git', 'pull'])
-                    print("===============================================")
-                    await self.bot.channels['logs'].send("Restarting bot...")
-                    await self.bot.close()
+            correct_id = self.bot.user.id == 698218518335848538
+            correct_title = embed_title.startswith("[Discord-TTS-Bot:dev]")
+            if correct_title and correct_id:
+                await self.bot.channels['logs'].send("Detected new bot commit! Pulling changes")
+                call(['git', 'pull'])
+                await self.bot.close()
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        self.bot.queue[guild.id] = dict()
+        _, prefix, owner = await asyncio.gather(
+            self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!"),
+            self.bot.settings.get(guild, setting="prefix"),
+            guild.fetch_member(guild.owner_id)
+        )
 
-        await self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!".replace("@", "@ "))
+        embed = discord.Embed(title=f"Welcome to {self.bot.user.name}!", description=WELCOME_MESSAGE.format(guild=guild, prefix=prefix))
+        embed.set_footer(text=f"Support Server: https://discord.gg/zWPWwQC | Bot Invite: Ask Gnome!#6669")
+        embed.set_author(name=owner, icon_url=owner.avatar_url)
 
-        owner = await guild.fetch_member(guild.owner_id)
-        try:
-            await owner.send(cleandoc(f"""
-            Hello, I am {self.bot.user.name} and I have just joined your server {guild}
-            If you want me to start working do `-setup <#text-channel>` and everything will work in there
-            If you want to get support for {self.bot.user.name}, join the support server!
-            https://discord.gg/zWPWwQC
-            """))
-        except discord.errors.HTTPException:
-            pass
+        try: await owner.send(embed=embed)
+        except discord.errors.HTTPException: pass
 
-        try:
-            if owner.id in [member.id for member in self.bot.supportserver.members if member is not None]:
-                role = self.bot.supportserver.get_role(738009431052386304)
-                await self.bot.supportserver.get_member(owner.id).add_roles(role)
+        support_server = self.bot.support_server
+        if owner in support_server.members:
+            role = support_server.get_role(738009431052386304)
+            await support_server.get_member(owner.id).add_roles(role)
 
-                embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild}")
-                embed.set_author(name=f"{owner} (ID {owner.id})", icon_url=owner.avatar_url)
+            embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild}")
+            embed.set_author(name=f"{owner} (ID {owner.id})", icon_url=owner.avatar_url)
 
-                await self.bot.channels["logs"].send(embed=embed)
-        except AttributeError:
-            pass
+            await self.bot.channels["logs"].send(embed=embed)
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
-        await self.bot.settings.remove(guild)
-        self.bot.should_return[guild.id] = True
-        await sleep(0)
-
-        if guild.id in self.bot.queue:
-            self.bot.queue.pop(guild.id, None)
-        if guild.id in self.bot.should_return:
-            self.bot.should_return.pop(guild.id, None)
-
-        await self.bot.channels["servers"].send(f"Just left/got kicked from {guild}. I am now in {len(self.bot.guilds)} servers".replace("@", "@ "))
+        await asyncio.gather(
+            self.bot.settings.remove(guild),
+            self.bot.channels["servers"].send(f"Just got kicked from {guild}. I am now in {len(self.bot.guilds)} servers")
+        )

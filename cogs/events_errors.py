@@ -19,9 +19,15 @@ class events_errors(commands.Cog):
         self.bot = bot
         self.bot.on_error = self.on_error
 
-    async def on_error(self, event, *args, **kwargs):
-        errors = exc_info()
+    async def on_error(self, event, error=None, *args, **kwargs):
         info = "No Info"
+        args = list(args)
+
+        if isinstance(error, BaseException):
+            etype, value, tb = type(error), error, error.__traceback__
+        else:
+            args.insert(0, error)
+            etype, value, tb = exc_info()
 
         if event == "on_message":
             message = args[0]
@@ -29,16 +35,16 @@ class events_errors(commands.Cog):
             if message.guild is None:
                 info = f"DM support | Sent by {message.author}"
             else:
-                info = f"General TTS | Sent by {message.author} in {message.guild}|{message.guild.id}"
+                info = f"General TTS | Sent by {message.author} in {message.guild} | {message.guild.id}"
 
         elif event in ("on_guild_join", "on_guild_remove"):
             guild = args[0]
             info = f"Guild = {guild} | {guild.id}"
 
         try:
-            error_message = f"Event: `{event}`\nInfo: `{info}`\n```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
+            error_message = f"Event: `{event}`\nInfo: `{info}`\n```{''.join(format_exception(etype, value, tb))}```"
         except:
-            error_message = f"```{''.join(format_exception(errors[0], errors[1], errors[2]))}```"
+            error_message = f"```{''.join(format_exception(etype, value, tb))}```"
 
         await self.bot.channels["errors"].send(cleandoc(error_message))
 
@@ -50,7 +56,7 @@ class events_errors(commands.Cog):
         error = getattr(error, 'original', error)
 
         if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument, commands.UnexpectedQuoteError, commands.ExpectedClosingQuoteError)):
-            return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing -help!")
+            return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing {ctx.prefix}help!")
 
         elif isinstance(error, commands.CommandOnCooldown):
             cooldown_error = await ctx.send(f"**{ctx.prefix}{ctx.command} is on cooldown!** Please try again in {error.retry_after:.1f} seconds.")
@@ -74,14 +80,19 @@ class events_errors(commands.Cog):
             return await ctx.send(f"**Error:** You are missing {', '.join(error.missing_perms)} to run this command!")
 
         elif isinstance(error, commands.BotMissingPermissions):
-            if "send_messages" in error.missing_perms:
-                return await ctx.author.send("**Error:** I could not complete this command as I don't have send messages permissions!")
+            if "send_messages" not in error.missing_perms:
+                return await ctx.send(f"**Error:** I am missing the permissions: {', '.join(error.missing_perms)}")
 
-            return await ctx.send(f"**Error:** I am missing the permissions: {', '.join(error.missing_perms)}")
+            try:
+                await ctx.author.send("**Error:** I could not complete this command as I don't have send messages permissions!")
+            except discord.errors.Forbidden:
+                pass
+            finally:
+                return
 
         elif isinstance(error, discord.errors.Forbidden):
-            await self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}")
-            return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions. If you want this bug fixed, please do `-suggest *what command you just run*`")
+            self.bot.loop.create_task(self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}"))
+            return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions.")
 
         elif isinstance(error, commands.errors.CheckFailure):
             return

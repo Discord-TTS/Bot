@@ -1,6 +1,5 @@
 from configparser import ConfigParser
 from io import StringIO
-from os.path import exists
 
 import discord
 from discord.ext import commands
@@ -9,9 +8,11 @@ config = ConfigParser()
 config.read("config.ini")
 
 def setup(bot):
-    bot.add_cog(common_trusted(bot))
+    bot.add_cog(cmds_trusted(bot))
 
-class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
+class cmds_trusted(commands.Cog, command_attrs=dict(hidden=True)):
+    "TTS Bot commands meant only for trusted users."
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -24,10 +25,10 @@ class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.command()
     @commands.check(is_trusted)
     async def block(self, ctx, user: discord.User, notify: bool = False):
-        if await self.bot.blocked_users.check(user):
+        if await self.bot.userinfo.get("blocked", user, default=False):
             return await ctx.send(f"{user} | {user.id} is already blocked!")
 
-        await self.bot.blocked_users.add(user)
+        await self.bot.userinfo.block(user)
 
         await ctx.send(f"Blocked {user} | {user.id}")
         if notify:
@@ -36,10 +37,10 @@ class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
     @commands.command()
     @commands.check(is_trusted)
     async def unblock(self, ctx, user: discord.User, notify: bool = False):
-        if not await self.bot.blocked_users.check(user):
+        if not await self.bot.userinfo.get("blocked", user, default=False):
             return await ctx.send(f"{user} | {user.id} isn't blocked!")
 
-        await self.bot.blocked_users.remove(user)
+        await self.bot.userinfo.unblock(user)
 
         await ctx.send(f"Unblocked {user} | {user.id}")
         if notify:
@@ -89,37 +90,40 @@ class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
         async for message in user.history(limit=amount):
             if message.embeds:
                 if message.embeds[0].author:
-                    messages.append(f"``{message.embeds[0].author.name}⚙️``:{message.embeds[0].description}")
+                    messages.append(f"`{message.embeds[0].author.name} ⚙️`: {message.embeds[0].description}")
                 else:
-                    messages.append(f"``{message.author}⚙️``:{message.embeds[0].description}")
+                    messages.append(f"`{message.author} ⚙️`: {message.embeds[0].description}")
 
             else:
-                messages.append(f"``{message.author}``:{message.content}")
-        tosend=""
+                messages.append(f"`{message.author}`: {message.content}")
+
         messages.reverse()
-        for message in messages:
-            tosend+=f"\n{message}"
-        embed = discord.Embed(title=f"Message history of {user.name}",description=tosend)
+        embed = discord.Embed(
+            title=f"Message history of {user.name}",
+            description="\n".join(messages)
+            )
+
         await ctx.send(embed=embed)
 
     @commands.command()
     @commands.check(is_trusted)
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def refreshroles(self, ctx):
-        if not self.bot.supportserver.chunked:
-            await self.bot.supportserver.chunk(cache=True)
+        support_server = self.bot.support_server
+        if not support_server.chunked:
+            await support_server.chunk(cache=True)
 
-        ofs_role = self.bot.supportserver.get_role(738009431052386304)
-        highlighted_ofs = self.bot.supportserver.get_role(703307566654160969)
+        ofs_role = support_server.get_role(738009431052386304)
+        highlighted_ofs = support_server.get_role(703307566654160969)
 
         people_with_owner_of_server = [member.id for member in ofs_role.members]
         people_with_highlighted_ofs = [member.id for member in highlighted_ofs.members]
-        supportserver_members = [member.id for member in self.bot.supportserver.members]
+        support_server_members = [member.id for member in support_server.members]
 
         owner_list = [guild.owner_id for guild in self.bot.guilds]
         ofs_roles = list()
         for role in (738009431052386304, 738009620601241651, 738009624443224195):
-            ofs_roles.append(self.bot.supportserver.get_role(role))
+            ofs_roles.append(support_server.get_role(role))
 
         for ofs_person in people_with_owner_of_server:
             if ofs_person not in owner_list:
@@ -128,14 +132,14 @@ class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
                 if ofs_person in people_with_highlighted_ofs:
                     roles.append(highlighted_ofs)
 
-                await self.bot.supportserver.get_member(ofs_person).remove_roles(*roles)
+                await support_server.get_member(ofs_person).remove_roles(*roles)
                 await self.bot.channels["logs"].send(embed=embed)
 
         for guild_owner in owner_list:
-            if guild_owner not in supportserver_members:
+            if guild_owner not in support_server_members:
                 continue
 
-            guild_owner = self.bot.supportserver.get_member(guild_owner)
+            guild_owner = support_server.get_member(guild_owner)
             additional_message = None
             embed = None
 
@@ -191,12 +195,9 @@ class common_trusted(commands.Cog, command_attrs=dict(hidden=True)):
     async def serverlist(self, ctx):
         servers = [guild.name for guild in self.bot.guilds]
 
-        if len(str(servers)) >= 2000:
-            return await ctx.send(
-                file=discord.File(
-                    StringIO(str(servers)),
-                    filename="servers.txt"
-                )
+        await ctx.send(
+            file=discord.File(
+                StringIO(str(servers)),
+                filename="servers.txt"
             )
-
-        await ctx.send(servers)
+        )

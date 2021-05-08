@@ -9,9 +9,11 @@ config = ConfigParser()
 config.read("config.ini")
 
 def setup(bot):
-    bot.add_cog(common_owner(bot))
+    bot.add_cog(cmds_owner(bot))
 
-class common_owner(commands.Cog, command_attrs=dict(hidden=True)):
+class cmds_owner(commands.Cog, command_attrs=dict(hidden=True)):
+    "TTS Bot commands meant only for the bot owner."
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -88,11 +90,6 @@ class common_owner(commands.Cog, command_attrs=dict(hidden=True)):
             await ctx.send(f'**`ERROR:`** {type(e).__name__} - {e}')
         else:
             await ctx.send('**`SUCCESS`**')
-
-    @commands.command()
-    @commands.is_owner()
-    async def leaveguild(self, ctx, guild: int):
-        await self.bot.get_guild(guild).leave()
 
     @commands.command()
     @commands.is_owner()

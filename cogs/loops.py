@@ -3,6 +3,7 @@ from os import listdir, remove
 from discord.ext import commands, tasks
 
 from utils import basic
+from utils.decos import handle_errors
 
 
 def setup(bot):
@@ -18,21 +19,18 @@ class loops(commands.Cog):
         self.cache_cleanup.cancel()
 
     @tasks.loop(seconds=60)
+    @handle_errors
     async def cache_cleanup(self):
-        try:
-            cache_size = basic.get_size("cache")
-            if cache_size >= 1000000000:
-                cache_folder = listdir("cache")
-                cache_folder.sort(reverse=False, key=lambda x: int(''.join(filter(str.isdigit, x))))
-                cache_folder = cache_folder[:1000]
+        cache_size = basic.get_size("cache")
+        if cache_size >= 2000000000:
+            cache_folder = listdir("cache")
+            cache_folder.sort(reverse=False, key=lambda x: int(''.join(filter(str.isdigit, x))))
+            cache_folder = cache_folder[:1000]
 
-                for file in cache_folder:
-                    remove(f"cache/{file}")
+            for file in cache_folder:
+                remove(f"cache/{file}")
 
-                await self.bot.cache.bulk_remove(cache_folder)
-
-        except Exception as error:
-            await self.bot.on_error("cache_cleanup", error)
+            await self.bot.cache.bulk_remove(int(cache_file[:-8]) for cache_file in cache_folder)
 
     @cache_cleanup.before_loop
     async def before_loops(self):

@@ -12,6 +12,8 @@ def setup(bot):
     bot.add_cog(cmds_extra(bot))
 
 class cmds_extra(commands.Cog, name="Extra Commands"):
+    "TTS Bot extra commands, not required but useful."
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -23,7 +25,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command(hidden=True)
     async def tts(self, ctx):
-        prefix = await self.bot.settings(ctx.guild, "prefix")
+        prefix = await self.bot.settings.get(ctx.guild, "prefix")
 
         if ctx.message.content == f"{prefix}tts":
             await ctx.send(f"You don't need to do `{prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{prefix}`!")
@@ -61,14 +63,14 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
     @commands.command()
     async def channel(self, ctx):
         "Shows the current setup channel!"
-        channel = int(await self.bot.settings.get(ctx.guild, "channel"))
+        channel = await self.bot.settings.get(ctx.guild, "channel")
 
         if channel == ctx.channel.id:
             await ctx.send("You are in the right channel already!")
         elif channel != 0:
             await ctx.send(f"The current setup channel is: <#{channel}>")
         else:
-            await ctx.send("The channel hasn't been setup, do `-setup #textchannel`")
+            await ctx.send(f"The channel hasn't been setup, do `{ctx.prefix}setup #textchannel`")
 
     @commands.command()
     @commands.bot_has_permissions(send_messages=True, read_messages=True)
@@ -77,7 +79,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
 
         await ctx.send(cleandoc(f"""
             To donate to support the development and hosting of {self.bot.user.mention}, you can donate via Patreon (Fees) or directly via DonateBot.io!
-            <https://donatebot.io/checkout/693901918342217758?buyer={ctx.author.id}>
+            <https://donatebot.io/checkout/693901918342217758>
             https://www.patreon.com/Gnome_the_Bot_Maker
         """))
 
@@ -99,7 +101,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
         if suggestion.lower().replace("*", "") == "suggestion":
             return await ctx.send("Hey! You are meant to replace `*suggestion*` with your actual suggestion!")
 
-        if not await self.bot.blocked_users.check(ctx.message.author):
+        if not await self.bot.userinfo.get("blocked", ctx.message.author, default=False):
             files = [await attachment.to_file() for attachment in ctx.message.attachments]
             await self.bot.channels["suggestions"].send(
                 suggestion,
@@ -114,7 +116,7 @@ class cmds_extra(commands.Cog, name="Extra Commands"):
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
     async def invite(self, ctx):
         "Sends the instructions to invite TTS Bot and join the support server!"
-        if ctx.guild == self.bot.supportserver:
+        if ctx.guild == self.bot.support_server:
             await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
         else:
             await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{self.bot.get_channel(694127922801410119).name} to invite {self.bot.user.mention}!")
