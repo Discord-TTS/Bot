@@ -97,6 +97,10 @@ class events_main(commands.Cog):
                 except AttributeError:
                     return
 
+                permissions = voice_channel.permissions_for(ctx.guild.me)
+                if not (permissions.view_channel and permissions.speak):
+                    return
+
                 await voice_channel.connect(cls=TTSVoicePlayer)
 
             # Get lang

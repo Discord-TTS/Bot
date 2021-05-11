@@ -1,8 +1,8 @@
-from inspect import cleandoc
-from asyncio import Lock
+from typing import Union
 
 import discord
 from discord.ext import commands
+
 
 def setup(bot):
     bot.add_cog(cmds_dev(bot))
@@ -20,10 +20,7 @@ class cmds_dev(commands.Cog, command_attrs=dict(hidden=True)):
         await self.bot.close()
 
     @commands.command()
-    async def debug(self, ctx, reset="nope"):
-        if reset.lower() == "reset":
-            return await ctx.send("Not currently implemented.")
-
+    async def debug(self, ctx):
         embed = discord.Embed(
             title="TTS Bot debug info!",
             description=f"Voice Client: {ctx.guild.voice_client!r}"

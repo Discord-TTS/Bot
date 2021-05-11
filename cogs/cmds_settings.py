@@ -22,8 +22,8 @@ class cmds_settings(commands.Cog, name="Settings"):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.guild_only()
     @commands.command()
     async def settings(self, ctx, *, help=None):
         "Displays the current settings!"

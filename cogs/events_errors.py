@@ -1,10 +1,10 @@
 import asyncio
-from asyncio.exceptions import TimeoutError as asyncio_TimeoutError
-from concurrent.futures._base import TimeoutError as concurrent_TimeoutError
+import concurrent
 from inspect import cleandoc
 from io import StringIO
 from sys import exc_info
 from traceback import format_exception
+from typing import Optional
 
 import discord
 from discord.ext import commands
@@ -18,6 +18,31 @@ class events_errors(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.on_error = self.on_error
+
+
+    async def send_error(self, ctx: commands.Context, error: str, fix: str, dm: bool = False) -> Optional[discord.Message]:
+        if not dm:
+            permissions = ctx.channel.permissions_for(ctx.guild.me)
+
+            if not permissions.send_messages:
+                return
+
+            if not permissions.embed_links:
+                return await ctx.reply("An Error Occurred! Please give me embed links permissions so I can tell you more!")
+
+        error_embed = discord.Embed(
+            title="An Error Occurred!",
+            colour=discord.Colour.from_rgb(255, 0, 0),
+            description=f"Sorry but {error}, to fix this, please {fix}!"
+        ).set_author(
+            name=ctx.author.display_name,
+            icon_url=ctx.author.avatar_url
+        ).set_footer(
+            text="Support Server: https://discord.gg/zWPWwQC"
+        )
+
+        return await ctx.reply(embed=error_embed)
+
 
     async def on_error(self, event, error=None, *args, **kwargs):
         info = "No Info"
@@ -53,56 +78,69 @@ class events_errors(commands.Cog):
         if hasattr(ctx.command, 'on_error') or isinstance(error, (commands.CommandNotFound, commands.NotOwner)):
             return
 
+        command = f"`{ctx.prefix}{ctx.command}`"
         error = getattr(error, 'original', error)
 
-        if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument, commands.UnexpectedQuoteError, commands.ExpectedClosingQuoteError)):
-            return await ctx.send(f"Did you type the command right, {ctx.author.mention}? Try doing {ctx.prefix}help!")
+        if isinstance(error, commands.UserInputError):
+            error_name = type(error).__name__
+            fix = f"check out `{ctx.prefix}help {ctx.command}`"
+
+            if error_name.endswith("NotFound"):
+                reason = f"I cannot convert `{error.argument.replace('`', '')}` into a {error_name.replace('NotFound', '').lower()}"
+            elif isinstance(error, commands.BadBoolArgument):
+                reason = f"I cannot convert `{error.argument.replace('`', '')}` to True/False"
+            elif isinstance(error, commands.BadUnionArgument):
+                types = [converter.__name__.replace("Converter", "") for converter in error.converters]
+                reason = f"I cannot convert your argument into {' or '.join(types)}"
+            elif isinstance(error, commands.ArgumentParsingError):
+                reason = "I cannot parse your message into multiple arguments"
+                fix = "try removing quote marks or adding some in"
+            else:
+                reason = "you typed the command wrong"
+
+            await self.send_error(ctx, reason, fix)
 
         elif isinstance(error, commands.CommandOnCooldown):
-            cooldown_error = await ctx.send(f"**{ctx.prefix}{ctx.command} is on cooldown!** Please try again in {error.retry_after:.1f} seconds.")
+            cooldown_error = await self.send_error(ctx, f"{command} is on cooldown", f"try again in {error.retry_after:.1f} seconds")
             await asyncio.sleep(error.retry_after)
 
-            try:
+            if cooldown_error:
                 await cooldown_error.delete()
+            if ctx.channel.permissions_for(ctx.guild.me).manage_messages:
                 await ctx.message.delete()
-            except discord.errors.Forbidden:
-                pass
-            finally:
-                return
-
-        elif isinstance(error, (concurrent_TimeoutError, asyncio_TimeoutError)):
-            return await ctx.send("**Timeout Error!** Do I have perms to see the channel you are in? (if yes, join https://discord.gg/zWPWwQC and ping Gnome!#6669)")
 
         elif isinstance(error, commands.NoPrivateMessage):
-            return await ctx.author.send("**Error:** This command cannot be used in private messages!")
+            await self.send_error(ctx, f"{command} cannot be used in private messages", f"try running it on a server with {self.bot.user} in", dm=True)
 
         elif isinstance(error, commands.MissingPermissions):
-            return await ctx.send(f"**Error:** You are missing {', '.join(error.missing_perms)} to run this command!")
+            await self.send_error(ctx, "you cannot run this command", f"you are missing the permissions: {', '.join(error.missing_perms)}")
 
         elif isinstance(error, commands.BotMissingPermissions):
-            if "send_messages" not in error.missing_perms:
-                return await ctx.send(f"**Error:** I am missing the permissions: {', '.join(error.missing_perms)}")
-
-            try:
-                await ctx.author.send("**Error:** I could not complete this command as I don't have send messages permissions!")
-            except discord.errors.Forbidden:
-                pass
-            finally:
-                return
+            await self.send_error(ctx,
+                f"I cannot run {command} as I am missing permissions",
+                f"give me {', '.join(error.missing_perms)}",
+                dm="send_messages" not in error.missing_perms
+            )
 
         elif isinstance(error, discord.errors.Forbidden):
-            self.bot.loop.create_task(self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}"))
-            return await ctx.author.send("Unknown Permission Error, please give TTS Bot the required permissions.")
+            await asyncio.gather(
+                self.send_error(ctx, "I encountered an unknown permission error", "please give TTS Bot the required permissions"),
+                self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}")
+            )
 
-        first_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
-        second_part = ''.join(format_exception(type(error), error, error.__traceback__))
-        temp = f"{first_part}\n```{second_part}```"
-
-        if len(temp) >= 2000:
-            await self.bot.channels["errors"].send(
-                file=discord.File(
-                    StringIO(f"{first_part}\n{second_part}"),
-                    filename="long error.txt"
-                ))
         else:
-            await self.bot.channels["errors"].send(temp)
+            await self.send_error(ctx, "an unknown error occured", "get in contact with us via the support server for help")
+
+            context_part    = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
+            error_traceback =  "".join(format_exception(type(error), error, error.__traceback__))
+            full_error = f"{context_part}\n```{error_traceback}```"
+
+            if len(full_error) < 2000:
+                await self.bot.channels["errors"].send(full_error)
+            else:
+                await self.bot.channels["errors"].send(
+                    file=discord.File(
+                        StringIO(full_error),
+                        filename="long error.txt"
+                    )
+                )
