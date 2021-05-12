@@ -110,6 +110,7 @@ class events_main(commands.Cog):
             acronyms = {
                 "iirc": "if I recall correctly",
                 "afaik": "as far as I know",
+                "hyd": "how are you doing",
                 "wdym": "what do you mean",
                 "imo": "in my opinion",
                 "brb": "be right back",
@@ -125,6 +126,7 @@ class events_main(commands.Cog):
                 "cya": "see ya",
                 "ik": "i know",
                 "uwu": "oowoo",
+                "w/": "with",
                 "@": "at",
                 "™️": "tm"
             }
