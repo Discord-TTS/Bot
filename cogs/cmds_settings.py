@@ -10,13 +10,15 @@ from gtts.lang import tts_langs
 
 from utils import basic
 
-tts_langs = tts_langs()
+tts_langs = {lang: name for lang, name in tts_langs().items() if "-" not in lang}
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 def setup(bot):
-    bot.add_cog(Settings(bot))
+    bot.add_cog(cmds_settings(bot))
 
-class Settings(commands.Cog):
+class cmds_settings(commands.Cog, name="Settings"):
+    "TTS Bot settings commands, configuration is done here."
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -26,51 +28,55 @@ class Settings(commands.Cog):
     async def settings(self, ctx, *, help=None):
         "Displays the current settings!"
 
-        if help and help.lower() == "help":
-            return await ctx.send_help("set")
+        if help:
+            help = help.lower()
+            if help == "help":
+                return await ctx.send_help("set")
+            elif help == "limits":
+                return await ctx.send_help("set limits")
 
         lang, nickname = await asyncio.gather(
-            self.bot.setlangs.get(ctx.author),
+            self.bot.userinfo.get("lang", ctx.author, default="en"),
             self.bot.nicknames.get(ctx.guild, ctx.author)
         )
 
-        say, channel, join, bot_ignore = await self.bot.settings.get(
+        xsaid, channel, auto_join, bot_ignore, prefix = await self.bot.settings.get(
             ctx.guild,
             settings=(
                 "xsaid",
                 "channel",
                 "auto_join",
-                "bot_ignore"
+                "bot_ignore",
+                "prefix"
             )
         )
 
-        channel = ctx.guild.get_channel(int(channel))
-
-        if channel is None:
-            channel = "has not been setup yet"
-        else:
-            channel = channel.name
+        channel = ctx.guild.get_channel(channel)
+        channel_name = channel.name if channel else "has not been setup yet"
 
         if nickname == ctx.author.display_name:
             nickname = "has not been set yet"
 
         # Show settings embed
         message1 = cleandoc(f"""
-            :small_orange_diamond: Channel: `#{channel}`
-            :small_orange_diamond: XSaid: `{say}`
-            :small_orange_diamond: Auto Join: `{join}`
+            :small_orange_diamond: Channel: `#{channel_name}`
+            :small_orange_diamond: XSaid: `{xsaid}`
+            :small_orange_diamond: Auto Join: `{auto_join}`
             :small_orange_diamond: Ignore Bots: `{bot_ignore}`
-            :star: Limits: Do `-settings limits` to check!""")
+            :small_orange_diamond: Prefix: `{prefix}`
+            :star: Limits: Do `{ctx.prefix}settings limits` to check!
+        """)
 
         message2 = cleandoc(f"""
             :small_blue_diamond: Language: `{lang}`
-            :small_blue_diamond: Nickname: `{nickname}`""")
+            :small_blue_diamond: Nickname: `{nickname}`
+        """)
 
         embed = discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
         embed.add_field(name="**Server Wide**", value=message1, inline=False)
         embed.add_field(name="**User Specific**", value=message2, inline=False)
 
-        embed.set_footer(text="Change these settings with -set property value!")
+        embed.set_footer(text=f"Change these settings with {ctx.prefix}set property value!")
         await ctx.send(embed=embed)
 
     @commands.guild_only()
@@ -101,6 +107,16 @@ class Settings(commands.Cog):
         "Messages sent by bots and webhooks are not read"
         await self.bot.settings.set(ctx.guild, "bot_ignore", value)
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
+
+    @set.command()
+    @commands.has_permissions(administrator=True)
+    async def prefix(self, ctx: commands.Context, *, prefix: str) -> Optional[discord.Message]:
+        """The prefix used before commands"""
+        if len(prefix) > 5 or prefix.count(" ") > 1:
+            return await ctx.send("**Error**: Invalid Prefix! Please use 5 or less characters with maximum 1 space.")
+
+        await self.bot.settings.set(ctx.guild, "prefix", prefix)
+        await ctx.send(f"Command Prefix is now: {prefix}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
     @commands.bot_has_permissions(embed_links=True)
@@ -142,9 +158,12 @@ class Settings(commands.Cog):
     async def limits(self, ctx):
         "A group of settings to modify the limits of what the bot reads"
         additional_message = None
+        prefix = await self.bot.settings.get(ctx.guild, "prefix")
+
         if ctx.invoked_subcommand is not None:
             return
-        if ctx.message.content != f"{self.bot.command_prefix}set limits":
+
+        if ctx.message.content != f"{prefix}set limits":
             return await ctx.send_help(ctx.command)
 
         msg_length, repeated_chars = await self.bot.settings.get(
@@ -161,7 +180,7 @@ class Settings(commands.Cog):
             """)
 
         embed = discord.Embed(title="Current Limits", description=message1, url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.set_footer(text="Change these settings with -set limits property value!")
+        embed.set_footer(text=f"Change these settings with {ctx.prefix}set limits property value!")
         await ctx.send(additional_message, embed=embed)
 
     @limits.command(aliases=("length", "max_length", "max_msg_length", "msglength", "maxlength"))
@@ -172,7 +191,7 @@ class Settings(commands.Cog):
         if length < 20:
             return await ctx.send("Hey! You can't set max message length below 20 seconds!")
 
-        await self.bot.settings.set(ctx.guild, "msg_length", str(length))
+        await self.bot.settings.set(ctx.guild, "msg_length", length)
         await ctx.send(f"Max message length (in seconds) is now: {length}")
 
     @limits.command(aliases=("repeated_characters", "repeated_letters", "chars"))
@@ -183,7 +202,7 @@ class Settings(commands.Cog):
         if chars < 5 and chars != 0:
             return await ctx.send("Hey! You can't set max repeated chars below 5!")
 
-        await self.bot.settings.set(ctx.guild, "repeated_chars", str(chars))
+        await self.bot.settings.set(ctx.guild, "repeated_chars", chars)
         await ctx.send(f"Max repeated characters is now: {chars}")
 
     @commands.guild_only()
@@ -192,13 +211,13 @@ class Settings(commands.Cog):
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
         "Setup the bot to read messages from `<channel>`"
-        await self.bot.settings.set(ctx.guild, "channel", str(channel.id))
+        await self.bot.settings.set(ctx.guild, "channel", channel.id)
 
         embed = discord.Embed(
             title="TTS Bot has been setup!",
             description=cleandoc(f"""
                 TTS Bot will now accept commands and read from {channel.mention}.
-                Just do `-join` and start talking!
+                Just do `{ctx.prefix}join` and start talking!
                 """)
         )
         embed.set_footer(text=pick_random(basic.footer_messages))
@@ -212,10 +231,10 @@ class Settings(commands.Cog):
     async def voice(self, ctx, lang: str):
         "Changes the voice your messages are read in, full list in `-voices`"
         if lang in tts_langs:
-            await self.bot.setlangs.set(ctx.author, lang)
+            await self.bot.userinfo.set("lang", ctx.author, lang)
             await ctx.send(f"Changed your voice to: {tts_langs[lang]}")
         else:
-            await ctx.send("Invalid voice, do `-voices`")
+            await ctx.send(f"Invalid voice, do `{ctx.prefix}voices`")
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
@@ -224,7 +243,7 @@ class Settings(commands.Cog):
         if lang in tts_langs:
             return await self.voice(ctx, lang)
 
-        lang = await self.bot.setlangs.get(ctx.author)
+        lang = await self.bot.userinfo.get("lang", ctx.author).split("-")[0]
         langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
 
         embed = discord.Embed(title="TTS Bot Languages")
