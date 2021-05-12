@@ -6,16 +6,15 @@ import discord
 from discord.ext import commands
 from psutil import Process
 
+import utils
+
 start_time = monotonic()
 
 def setup(bot):
     bot.add_cog(cmds_extra(bot))
 
-class cmds_extra(commands.Cog, name="Extra Commands"):
+class cmds_extra(utils.CommonCog, name="Extra Commands"):
     "TTS Bot extra commands, not required but useful."
-
-    def __init__(self, bot):
-        self.bot = bot
 
     @commands.command()
     async def uptime(self, ctx):

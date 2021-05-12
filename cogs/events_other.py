@@ -5,6 +5,8 @@ from subprocess import call
 import discord
 from discord.ext import commands
 
+import utils
+
 
 WELCOME_MESSAGE = cleandoc("""
     Hello! Someone invited me to your server `{guild}`!
@@ -23,9 +25,7 @@ WELCOME_MESSAGE = cleandoc("""
 def setup(bot):
     bot.add_cog(events_other(bot))
 
-class events_other(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
+class events_other(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_message(self, message):

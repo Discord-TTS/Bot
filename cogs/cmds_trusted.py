@@ -4,17 +4,17 @@ from io import StringIO
 import discord
 from discord.ext import commands
 
+import utils
+
+
 config = ConfigParser()
 config.read("config.ini")
 
 def setup(bot):
     bot.add_cog(cmds_trusted(bot))
 
-class cmds_trusted(commands.Cog, command_attrs=dict(hidden=True)):
+class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
     "TTS Bot commands meant only for trusted users."
-
-    def __init__(self, bot):
-        self.bot = bot
 
     def is_trusted(ctx):
         if str(ctx.author.id) in config["Main"]["trusted_ids"]:

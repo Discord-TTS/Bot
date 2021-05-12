@@ -4,11 +4,11 @@ from functools import wraps
 from pydub import AudioSegment
 from voxpopuli import Voice
 
-from utils.basic import gtts_to_espeak
+from utils import GTTS_ESPEAK_DICT
 
 
 def make_espeak(text, lang, max_length):
-    voice = Voice(lang=gtts_to_espeak[lang], speed=130, volume=2) if lang in gtts_to_espeak else Voice(lang="en",speed=130)
+    voice = Voice(lang=GTTS_ESPEAK_DICT[lang], speed=130, volume=2) if lang in GTTS_ESPEAK_DICT else Voice(lang="en",speed=130)
     wav = voice.to_audio(text)
 
     pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))

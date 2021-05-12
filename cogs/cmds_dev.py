@@ -3,16 +3,15 @@ from typing import Union
 import discord
 from discord.ext import commands
 
+import utils
+
 
 def setup(bot):
     bot.add_cog(cmds_dev(bot))
 
-class cmds_dev(commands.Cog, command_attrs=dict(hidden=True)):
+class cmds_dev(utils.CommonCog, command_attrs={"hidden": True}):
     """TTS Bot hidden commands for development
     New commands added and removed often from this cog."""
-
-    def __init__(self, bot):
-        self.bot = bot
 
     @commands.command()
     @commands.is_owner()

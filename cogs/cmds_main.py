@@ -4,18 +4,15 @@ from random import choice as pick_random
 import discord
 from discord.ext import commands
 
-from utils import basic
+import utils
 from player import TTSVoicePlayer
+
 
 def setup(bot):
     bot.add_cog(cmds_main(bot))
 
-
-class cmds_main(commands.Cog, name="Main Commands"):
+class cmds_main(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
-
-    def __init__(self, bot):
-        self.bot = bot
 
     async def channel_check(self, ctx):
         if ctx.channel.id != await self.bot.settings.get(ctx.guild, "channel"):
@@ -25,9 +22,9 @@ class cmds_main(commands.Cog, name="Main Commands"):
         return True
 
 
-    @commands.guild_only()
-    @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.cooldown(1, 10, commands.BucketType.guild)
+    @commands.guild_only()
     @commands.command()
     async def join(self, ctx):
         "Joins the voice channel you're in!"
@@ -60,7 +57,7 @@ class cmds_main(commands.Cog, name="Main Commands"):
         )
         join_embed.set_thumbnail(url=str(self.bot.user.avatar_url))
         join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
-        join_embed.set_footer(text=pick_random(basic.footer_messages))
+        join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
         await voice_channel.connect(cls=TTSVoicePlayer)
         await ctx.send(embed=join_embed)
@@ -75,9 +72,9 @@ class cmds_main(commands.Cog, name="Main Commands"):
 
             await ctx.send(embed=blocked_embed)
 
-    @commands.guild_only()
     @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.bot_has_permissions(send_messages=True)
+    @commands.guild_only()
     @commands.command()
     async def leave(self, ctx):
         "Leaves voice channel TTS Bot is in!"
@@ -97,10 +94,10 @@ class cmds_main(commands.Cog, name="Main Commands"):
         await ctx.send("Left voice channel!")
 
 
-    @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True, add_reactions=True)
     @commands.cooldown(1, 60, commands.BucketType.member)
     @commands.command(aliases=("clear", "leaveandjoin"))
+    @commands.guild_only()
     async def skip(self, ctx):
         "Clears the message queue!"
         if not await self.channel_check(ctx):

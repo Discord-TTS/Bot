@@ -9,14 +9,16 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
+import utils
+
 
 def setup(bot):
     bot.add_cog(events_errors(bot))
 
+class events_errors(utils.CommonCog):
+    def __init__(self, bot, *args, **kwargs):
+        super().__init__(bot, *args, **kwargs)
 
-class events_errors(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
         self.bot.on_error = self.on_error
 
 

@@ -7,8 +7,8 @@ from random import choice as pick_random
 import discord
 from discord.ext import commands
 
+import utils
 from player import TTSVoicePlayer
-from utils import basic
 
 
 DM_WELCOME_MESSAGE = cleandoc("""
@@ -23,10 +23,10 @@ DM_WELCOME_MESSAGE = cleandoc("""
 def setup(bot):
     bot.add_cog(events_main(bot))
 
+class events_main(utils.CommonCog):
+    def __init__(self, bot, *args, **kwargs):
+        super().__init__(bot, *args, **kwargs)
 
-class events_main(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
         self.dm_pins = dict()
         self.bot.blocked = False
 
@@ -107,7 +107,7 @@ class events_main(commands.Cog):
             lang = await self.bot.userinfo.get("lang", message.author, default="en")
 
             # Emoji filter
-            message_clean = basic.emojitoword(message_clean)
+            message_clean = funcs.emojitoword(message_clean)
 
             # Acronyms and removing -tts
             message_clean = f" {message_clean} "
@@ -162,7 +162,7 @@ class events_main(commands.Cog):
             # Toggleable xsaid and attachment + links detection
             if xsaid:
                 said_name = await self.bot.nicknames.get(message.guild, message.author)
-                file_format = basic.exts_to_format(message.attachments)
+                file_format = utils.exts_to_format(message.attachments)
 
                 if contained_url:
                     if message_clean:
@@ -184,7 +184,7 @@ class events_main(commands.Cog):
                 else:
                     message_clean = "a link."
 
-            if basic.remove_chars(message_clean, " ", "?", ".", ")", "'", "!", '"', ":") == "":
+            if utils.remove_chars(message_clean, " ", "?", ".", ")", "'", "!", '"', ":") == "":
                 return
 
             # Repeated chars removal if setting is not 0
@@ -238,7 +238,7 @@ class events_main(commands.Cog):
                 embed = discord.Embed(
                     title=f"Welcome to {self.bot.user.name} Support DMs!",
                     description=DM_WELCOME_MESSAGE
-                ).set_footer(text=pick_random(basic.footer_messages))
+                ).set_footer(text=pick_random(utils.FOOTER_MSGS))
 
                 dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=embed)
 

@@ -12,7 +12,7 @@ import asyncpg
 import discord
 from discord.ext import commands
 
-from utils.basic import remove_chars
+from utils import remove_chars
 from utils.decos import wrap_with
 
 print("Starting TTS Bot!")

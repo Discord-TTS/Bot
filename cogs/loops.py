@@ -1,27 +1,26 @@
 from os import listdir, remove
 
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
-from utils import basic
-from utils.decos import handle_errors
+import utils
 
 
 def setup(bot):
     bot.add_cog(loops(bot))
 
+class loops(utils.CommonCog):
+    def __init__(self, bot, *args, **kwargs):
+        super().__init__(bot, *args, **kwargs)
 
-class loops(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
         self.cache_cleanup.start()
 
     def cog_unload(self):
         self.cache_cleanup.cancel()
 
     @tasks.loop(seconds=60)
-    @handle_errors
+    @utils.decos.handle_errors
     async def cache_cleanup(self):
-        cache_size = basic.get_size("cache")
+        cache_size = utils.get_size("cache")
         if cache_size >= 2000000000:
             cache_folder = listdir("cache")
             cache_folder.sort(reverse=False, key=lambda x: int(''.join(filter(str.isdigit, x))))

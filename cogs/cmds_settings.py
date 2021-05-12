@@ -8,7 +8,8 @@ import discord
 from discord.ext import commands
 from gtts.lang import tts_langs
 
-from utils import basic
+import utils
+
 
 tts_langs = {lang: name for lang, name in tts_langs().items() if "-" not in lang}
 to_enabled = {True: "Enabled", False: "Disabled"}
@@ -16,11 +17,8 @@ to_enabled = {True: "Enabled", False: "Disabled"}
 def setup(bot):
     bot.add_cog(cmds_settings(bot))
 
-class cmds_settings(commands.Cog, name="Settings"):
+class cmds_settings(utils.CommonCog, name="Settings"):
     "TTS Bot settings commands, configuration is done here."
-
-    def __init__(self, bot):
-        self.bot = bot
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.guild_only()
@@ -79,8 +77,8 @@ class cmds_settings(commands.Cog, name="Settings"):
         embed.set_footer(text=f"Change these settings with {ctx.prefix}set property value!")
         await ctx.send(embed=embed)
 
-    @commands.guild_only()
     @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.guild_only()
     @commands.group()
     async def set(self, ctx):
         "Changes a setting!"
@@ -205,9 +203,9 @@ class cmds_settings(commands.Cog, name="Settings"):
         await self.bot.settings.set(ctx.guild, "repeated_chars", chars)
         await ctx.send(f"Max repeated characters is now: {chars}")
 
-    @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.guild_only()
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
         "Setup the bot to read messages from `<channel>`"
@@ -220,7 +218,7 @@ class cmds_settings(commands.Cog, name="Settings"):
                 Just do `{ctx.prefix}join` and start talking!
                 """)
         )
-        embed.set_footer(text=pick_random(basic.footer_messages))
+        embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
         embed.set_thumbnail(url=str(self.bot.user.avatar_url))
         embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
 
@@ -244,10 +242,10 @@ class cmds_settings(commands.Cog, name="Settings"):
             return await self.voice(ctx, lang)
 
         lang = await self.bot.userinfo.get("lang", ctx.author).split("-")[0]
-        langs_string = basic.remove_chars(list(tts_langs.keys()), "[", "]")
+        langs_string = utils.remove_chars(list(tts_langs.keys()), "[", "]")
 
         embed = discord.Embed(title="TTS Bot Languages")
-        embed.set_footer(text=pick_random(basic.footer_messages))
+        embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
         embed.add_field(name="Currently Supported Languages", value=langs_string)
         embed.add_field(name="Current Language used", value=f"{tts_langs[lang]} | {lang}")
         embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))

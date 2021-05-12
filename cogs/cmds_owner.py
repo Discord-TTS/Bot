@@ -4,17 +4,17 @@ from typing import Union
 import discord
 from discord.ext import commands
 
+import utils
+
+
 config = ConfigParser()
 config.read("config.ini")
 
 def setup(bot):
     bot.add_cog(cmds_owner(bot))
 
-class cmds_owner(commands.Cog, command_attrs=dict(hidden=True)):
+class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
     "TTS Bot commands meant only for the bot owner."
-
-    def __init__(self, bot):
-        self.bot = bot
 
     @commands.command()
     @commands.is_owner()
