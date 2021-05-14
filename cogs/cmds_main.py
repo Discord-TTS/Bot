@@ -22,7 +22,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
         return True
 
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.guild_only()
     @commands.command()
@@ -94,7 +94,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
         await ctx.send("Left voice channel!")
 
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, add_reactions=True)
+    @commands.bot_has_permissions(send_messages=True, add_reactions=True)
     @commands.cooldown(1, 60, commands.BucketType.member)
     @commands.command(aliases=("clear", "leaveandjoin"))
     @commands.guild_only()

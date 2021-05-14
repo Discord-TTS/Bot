@@ -19,7 +19,7 @@ class FancyHelpCommandCog(commands.Cog, name="Uncategoried"):
         bot.help_command.cog = self
         bot.help_command.add_check(
             commands.bot_has_permissions(
-                read_messages=True, send_messages=True, embed_links=True
+                send_messages=True, embed_links=True
             ).predicate
         )
 

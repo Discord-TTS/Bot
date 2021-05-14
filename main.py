@@ -1,10 +1,9 @@
 import asyncio
-import traceback
 from concurrent.futures import ProcessPoolExecutor
 from configparser import ConfigParser
 from os import listdir
 from time import monotonic
-from typing import Union
+from typing import Optional, Union
 
 import aiohttp
 import asyncgTTS
@@ -45,7 +44,7 @@ class TTSBot(commands.AutoShardedBot):
         super().__init__(*args, **kwargs)
 
     @property
-    def support_server(self):
+    def support_server(self) -> Optional[discord.Guild]:
         return self.get_guild(int(self.config["Main"]["main_server"]))
 
 

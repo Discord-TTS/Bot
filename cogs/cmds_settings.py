@@ -20,7 +20,7 @@ def setup(bot):
 class cmds_settings(utils.CommonCog, name="Settings"):
     "TTS Bot settings commands, configuration is done here."
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.guild_only()
     @commands.command()
     async def settings(self, ctx, *, help=None):
@@ -77,7 +77,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         embed.set_footer(text=f"Change these settings with {ctx.prefix}set property value!")
         await ctx.send(embed=embed)
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     @commands.guild_only()
     @commands.group()
     async def set(self, ctx):
@@ -204,7 +204,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         await ctx.send(f"Max repeated characters is now: {chars}")
 
     @commands.has_permissions(administrator=True)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.guild_only()
     @commands.command()
     async def setup(self, ctx, channel: discord.TextChannel):
@@ -224,7 +224,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
         await ctx.send(embed=embed)
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     @commands.command(hidden=True)
     async def voice(self, ctx, lang: str):
         "Changes the voice your messages are read in, full list in `-voices`"
@@ -234,7 +234,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         else:
             await ctx.send(f"Invalid voice, do `{ctx.prefix}voices`")
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.command(aliases=["languages", "list_languages", "getlangs", "list_voices"])
     async def voices(self, ctx, lang=None):
         "Lists all the language codes that TTS bot accepts"

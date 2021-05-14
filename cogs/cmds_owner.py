@@ -18,7 +18,7 @@ class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.is_owner()
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, manage_messages=True, manage_webhooks=True)
+    @commands.bot_has_permissions(send_messages=True, manage_messages=True, manage_webhooks=True)
     async def sudo(self, ctx, user: Union[discord.Member, discord.User, int, str], *, message):
         """mimics another user"""
         await ctx.message.delete()
@@ -73,7 +73,7 @@ class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.is_owner()
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     async def say(self, ctx, channel: discord.TextChannel, *, tosay):
         if ctx.channel.permissions_for(ctx.guild.me).manage_messages:
             await ctx.message.delete()

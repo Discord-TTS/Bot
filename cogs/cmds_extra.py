@@ -21,15 +21,13 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
         "Shows how long TTS Bot has been online"
         await ctx.send(f"{self.bot.user.mention} has been up for {(monotonic() - start_time) / 60:.2f} minutes")
 
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     @commands.command(hidden=True)
     async def tts(self, ctx):
-        prefix = await self.bot.settings.get(ctx.guild, "prefix")
+        if ctx.message.content == f"{ctx.prefix}tts":
+            await ctx.send(f"You don't need to do `{ctx.prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{ctx.prefix}`!")
 
-        if ctx.message.content == f"{prefix}tts":
-            await ctx.send(f"You don't need to do `{prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{prefix}`!")
-
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.command(aliases=["info", "stats"])
     async def botstats(self, ctx):
         "Shows various different stats"
@@ -52,13 +50,13 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
         """)
 
         embed = discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section, url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.set_footer(text=footer)
         embed.set_thumbnail(url=str(self.bot.user.avatar_url))
+        embed.set_footer(text=footer)
 
         await ctx.send(embed=embed)
 
+    @commands.bot_has_permissions(send_messages=True)
     @commands.guild_only()
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
     @commands.command()
     async def channel(self, ctx):
         "Shows the current setup channel!"
@@ -72,7 +70,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
             await ctx.send(f"The channel hasn't been setup, do `{ctx.prefix}setup #textchannel`")
 
     @commands.command()
-    @commands.bot_has_permissions(send_messages=True, read_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     async def donate(self, ctx):
         "Shows how you can help support TTS Bot's development and hosting!"
 
@@ -83,7 +81,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
         """))
 
     @commands.command(aliases=["lag"], hidden=True)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     async def ping(self, ctx):
         "Gets current ping to discord!"
 
@@ -93,7 +91,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
         await ping_message.edit(content=f"Current Latency: `{ping:.0f}ms`")
 
     @commands.command()
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     async def suggest(self, ctx, *, suggestion):
         "Suggests a new feature!"
 
@@ -112,7 +110,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
         await ctx.send("Suggestion noted")
 
     @commands.command()
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     async def invite(self, ctx):
         "Sends the instructions to invite TTS Bot and join the support server!"
         if ctx.guild == self.bot.support_server:

@@ -48,7 +48,7 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.check(is_trusted)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     async def getinvite(self, ctx, guild: int):
         guild = self.bot.get_guild(guild)
 
@@ -64,7 +64,7 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.check(is_trusted)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def dm(self, ctx, todm: discord.User, *, message):
         embed = discord.Embed(title="Message from the developers:", description=message)
         embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
@@ -74,7 +74,7 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.check(is_trusted)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def r(self, ctx, *, message):
         async for history_message in ctx.channel.history(limit=10):
             if history_message.author.discriminator == "0000":
@@ -107,7 +107,7 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.check(is_trusted)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True)
+    @commands.bot_has_permissions(send_messages=True)
     async def refreshroles(self, ctx):
         support_server = self.bot.support_server
         if not support_server.chunked:
@@ -162,7 +162,7 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.check(is_trusted)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def lookupinfo(self, ctx, mode, *, guild):
         mode = mode.lower()
         guild_object = False
@@ -191,7 +191,7 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.check(is_trusted)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, attach_files=True)
+    @commands.bot_has_permissions(send_messages=True, attach_files=True)
     async def serverlist(self, ctx):
         servers = [guild.name for guild in self.bot.guilds]
 
