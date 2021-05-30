@@ -1,19 +1,25 @@
+from __future__ import annotations
+
 import asyncio
 from hashlib import sha256
 from os import rename
 from os.path import exists
-from typing import List
+from typing import List, TYPE_CHECKING
 
 from cryptography.fernet import Fernet
 
 from utils.decos import wrap_with, run_in_executor
 
 
-def setup(bot):
+if TYPE_CHECKING:
+    from main import TTSBot
+
+
+def setup(bot: TTSBot):
     bot.cache = cache(bot)
 
 class cache:
-    def __init__(self, bot):
+    def __init__(self, bot: TTSBot):
         self.bot = bot
         self.pool = bot.pool
 

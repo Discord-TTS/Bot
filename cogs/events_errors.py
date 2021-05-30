@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import asyncio
-import concurrent
 from inspect import cleandoc
 from io import StringIO
 from sys import exc_info
 from traceback import format_exception
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -12,11 +13,15 @@ from discord.ext import commands
 import utils
 
 
-def setup(bot):
+if TYPE_CHECKING:
+    from main import TTSBot
+
+
+def setup(bot: TTSBot):
     bot.add_cog(events_errors(bot))
 
-class events_errors(utils.CommonCog):
-    def __init__(self, bot, *args, **kwargs):
+class events_errors(utils.CommonCog): # type: ignore
+    def __init__(self, bot: TTSBot, *args, **kwargs):
         super().__init__(bot, *args, **kwargs)
 
         self.bot.on_error = self.on_error
@@ -46,7 +51,7 @@ class events_errors(utils.CommonCog):
         return await ctx.reply(embed=error_embed)
 
 
-    async def on_error(self, event, error=None, *args, **kwargs):
+    async def on_error(self, event: str, error: Optional[BaseException] = None, *args, **_):
         info = "No Info"
         args = list(args)
 
@@ -57,7 +62,7 @@ class events_errors(utils.CommonCog):
             etype, value, tb = exc_info()
 
         if event == "on_message":
-            message = args[0]
+            message: discord.Message = args[0]
 
             if message.guild is None:
                 info = f"DM support | Sent by {message.author}"
@@ -65,7 +70,7 @@ class events_errors(utils.CommonCog):
                 info = f"General TTS | Sent by {message.author} in {message.guild} | {message.guild.id}"
 
         elif event in ("on_guild_join", "on_guild_remove"):
-            guild = args[0]
+            guild: discord.Guild = args[0]
             info = f"Guild = {guild} | {guild.id}"
 
         try:
@@ -76,7 +81,7 @@ class events_errors(utils.CommonCog):
         await self.bot.channels["errors"].send(cleandoc(error_message))
 
     @commands.Cog.listener()
-    async def on_command_error(self, ctx, error):
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if hasattr(ctx.command, 'on_error') or isinstance(error, (commands.CommandNotFound, commands.NotOwner)):
             return
 
@@ -133,8 +138,8 @@ class events_errors(utils.CommonCog):
         else:
             await self.send_error(ctx, "an unknown error occured", "get in contact with us via the support server for help")
 
-            context_part    = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
-            error_traceback =  "".join(format_exception(type(error), error, error.__traceback__))
+            context_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
+            error_traceback = "".join(format_exception(type(error), error, error.__traceback__))
             full_error = f"{context_part}\n```{error_traceback}```"
 
             if len(full_error) < 2000:

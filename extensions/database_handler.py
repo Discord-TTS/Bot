@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 from asyncio import Event
-from typing import Optional, Tuple, Union
+from typing import Any, List, TYPE_CHECKING, Optional, Tuple, Union
 
 import asyncpg
 import discord
 
 
+if TYPE_CHECKING:
+    from main import TTSBot
+
+
 default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "prefix": "-"}
 
-def setup(bot):
+def setup(bot: TTSBot):
     bot.settings = GeneralSettings(bot.pool)
     bot.userinfo = UserInfoHandler(bot.pool)
     bot.nicknames = NicknameHandler(bot.pool)
@@ -36,7 +42,7 @@ class GeneralSettings(handles_db):
     async def remove(self, guild: discord.Guild):
         await self.pool.execute("DELETE FROM guilds WHERE guild_id = $1;", guild.id)
 
-    async def get(self, guild: discord.Guild, setting: Optional[str] = None, settings: Optional[list] = None):
+    async def get(self, guild: discord.Guild, setting: Optional[str] = None, settings: Optional[list] = None) -> Union[Any, List[Any]]:
         row = await self.fetchrow("SELECT * from guilds WHERE guild_id = $1", guild.id)
 
         if setting:

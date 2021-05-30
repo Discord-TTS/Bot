@@ -1,5 +1,7 @@
 import os
-from typing import Optional, Generator
+from typing import List, Optional
+
+import discord
 
 from utils.constants import *
 
@@ -14,11 +16,10 @@ def remove_chars(remove_from, *chars) -> str:
 
 def get_size(start_path: str = '.') -> int:
     total_size = 0
-    for dirpath, dirnames, filenames in os.walk(start_path):
+    for dirpath, _, filenames in os.walk(start_path):
         for f in filenames:
             fp = os.path.join(dirpath, f)
-            if not os.path.islink(fp):
-                total_size += os.path.getsize(fp)
+            total_size += os.path.getsize(fp)
 
     return total_size
 
@@ -38,7 +39,7 @@ def emojitoword(text: str) -> str:
     return " ".join(output)
 
 
-def exts_to_format(attachments) -> Optional[str]:
+def exts_to_format(attachments: List[discord.Attachment]) -> Optional[str]:
     if not attachments:
         return None
 

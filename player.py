@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 from functools import partial as make_func
 from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import Optional, Tuple
+from typing import Optional, TYPE_CHECKING, Tuple
 
 import asyncgTTS
 import discord
@@ -14,6 +16,10 @@ from mutagen import mp3 as mutagen
 
 from espeak_process import make_espeak
 from utils.decos import handle_errors
+
+
+if TYPE_CHECKING:
+    from main import TTSBot
 
 
 class FFmpegPCMAudio(discord.AudioSource):
@@ -66,10 +72,12 @@ class FFmpegPCMAudio(discord.AudioSource):
 
 
 class TTSVoicePlayer(discord.VoiceClient):
-    def __init__(self, client, channel):
-        super().__init__(client, channel)
+    channel: discord.VoiceChannel
 
-        self.bot = client
+    def __init__(self, bot: TTSBot, channel: discord.VoiceChannel):
+        super().__init__(bot, channel)
+
+        self.bot = bot
         self.prefix = None
 
         self.currently_playing = asyncio.Event()
@@ -126,7 +134,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         try:
             self.play(
                 FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"'),
-                after=lambda error: self.currently_playing.set()
+                after=lambda _: self.currently_playing.set()
             )
         except discord.ClientException:
             self.currently_playing.set()
@@ -159,7 +167,7 @@ class TTSVoicePlayer(discord.VoiceClient):
     async def get_tts(self, message: discord.Message, text: str, lang: str) -> Optional[Tuple[bytes, int]]:
         lang = lang.split("-")[0]
         if self.bot.blocked:
-            make_espeak_func = make_func(make_espeak, text, lang, self.max_length)
+            make_espeak_func = make_func(make_espeak, text, lang)
             return await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
 
         cached_mp3 = await self.bot.cache.get(text, lang, message.id)
@@ -201,10 +209,10 @@ class TTSVoicePlayer(discord.VoiceClient):
 
             send_fallback_coros = [vc.send_fallback() for vc in self.bot.voice_clients]
             await asyncio.gather(*(send_fallback_coros))
-
-        await self.bot.channels["logs"].send(cleandoc("**Fallback/RL messages have been sent.**"))
+            await self.bot.channels["logs"].send("**Fallback/RL messages have been sent.**")
 
     async def handle_rl_reset(self):
+        await asyncio.sleep(3601)
         while True:
             ret = await self.bot.check_gtts()
             if ret:

@@ -1,15 +1,22 @@
+from __future__ import annotations
+
 from os import listdir, remove
+from typing import TYPE_CHECKING
 
 from discord.ext import tasks
 
 import utils
 
 
-def setup(bot):
+if TYPE_CHECKING:
+    from main import TTSBot
+
+
+def setup(bot: TTSBot):
     bot.add_cog(loops(bot))
 
 class loops(utils.CommonCog):
-    def __init__(self, bot, *args, **kwargs):
+    def __init__(self, bot: TTSBot, *args, **kwargs):
         super().__init__(bot, *args, **kwargs)
 
         self.cache_cleanup.start()

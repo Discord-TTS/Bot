@@ -1,14 +1,20 @@
+from __future__ import annotations
+
 import asyncio
 import re
 from inspect import cleandoc
 from itertools import groupby
 from random import choice as pick_random
+from typing import TYPE_CHECKING
 
 import discord
-from discord.ext import commands
-
 import utils
+from discord.ext import commands
 from player import TTSVoicePlayer
+
+
+if TYPE_CHECKING:
+    from main import TTSBot
 
 
 DM_WELCOME_MESSAGE = cleandoc("""
@@ -20,18 +26,18 @@ DM_WELCOME_MESSAGE = cleandoc("""
     `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
 """)
 
-def setup(bot):
+def setup(bot: TTSBot):
     bot.add_cog(events_main(bot))
 
 class events_main(utils.CommonCog):
-    def __init__(self, bot, *args, **kwargs):
+    def __init__(self, bot: TTSBot, *args, **kwargs):
         super().__init__(bot, *args, **kwargs)
 
         self.dm_pins = dict()
         self.bot.blocked = False
 
 
-    def is_welcome_message(self, message):
+    def is_welcome_message(self, message: discord.Message) -> bool:
         if not message.embeds:
             return False
 
@@ -39,7 +45,7 @@ class events_main(utils.CommonCog):
 
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         if message.guild is not None:
             # Get settings
             repeated_chars_limit, bot_ignore, max_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
@@ -97,7 +103,7 @@ class events_main(utils.CommonCog):
                 except AttributeError:
                     return
 
-                permissions = voice_channel.permissions_for(ctx.guild.me)
+                permissions = voice_channel.permissions_for(message.guild.me)
                 if not (permissions.view_channel and permissions.speak):
                     return
 
@@ -107,7 +113,7 @@ class events_main(utils.CommonCog):
             lang = await self.bot.userinfo.get("lang", message.author, default="en")
 
             # Emoji filter
-            message_clean = funcs.emojitoword(message_clean)
+            message_clean = utils.emojitoword(message_clean)
 
             # Acronyms and removing -tts
             message_clean = f" {message_clean} "
@@ -189,7 +195,7 @@ class events_main(utils.CommonCog):
 
             # Repeated chars removal if setting is not 0
             if message_clean.isprintable() and repeated_chars_limit != 0:
-                message_clean_list = list()
+                message_clean_list = []
                 message_clean_chars = ["".join(grp) for num, grp in groupby(message_clean)]
 
                 for char in message_clean_chars:
@@ -248,7 +254,7 @@ class events_main(utils.CommonCog):
                 )
 
     @commands.Cog.listener()
-    async def on_voice_state_update(self, member, before, after):
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         vc = member.guild.voice_client
 
         if member == self.bot.user:
@@ -264,5 +270,5 @@ class events_main(utils.CommonCog):
         await vc.disconnect(force=True)
 
     @commands.Cog.listener()
-    async def on_private_channel_pins_update(self, channel, last_pin):
+    async def on_private_channel_pins_update(self, channel: discord.DMChannel, _):
         self.dm_pins.pop(channel.recipient.id, None)

@@ -13,23 +13,23 @@ start_time = monotonic()
 def setup(bot):
     bot.add_cog(cmds_extra(bot))
 
-class cmds_extra(utils.CommonCog, name="Extra Commands"):
+class cmds_extra(utils.CommonCog, name="Extra Commands"): # type: ignore
     "TTS Bot extra commands, not required but useful."
 
     @commands.command()
-    async def uptime(self, ctx):
+    async def uptime(self, ctx: commands.Context):
         "Shows how long TTS Bot has been online"
         await ctx.send(f"{self.bot.user.mention} has been up for {(monotonic() - start_time) / 60:.2f} minutes")
 
     @commands.bot_has_permissions(send_messages=True)
     @commands.command(hidden=True)
-    async def tts(self, ctx):
+    async def tts(self, ctx: commands.Context):
         if ctx.message.content == f"{ctx.prefix}tts":
             await ctx.send(f"You don't need to do `{ctx.prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{ctx.prefix}`!")
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.command(aliases=["info", "stats"])
-    async def botstats(self, ctx):
+    async def botstats(self, ctx: commands.Context):
         "Shows various different stats"
 
         channels = len(self.bot.voice_clients)
@@ -58,7 +58,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
     @commands.bot_has_permissions(send_messages=True)
     @commands.guild_only()
     @commands.command()
-    async def channel(self, ctx):
+    async def channel(self, ctx: commands.Context):
         "Shows the current setup channel!"
         channel = await self.bot.settings.get(ctx.guild, "channel")
 
@@ -71,7 +71,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
 
     @commands.command()
     @commands.bot_has_permissions(send_messages=True)
-    async def donate(self, ctx):
+    async def donate(self, ctx: commands.Context):
         "Shows how you can help support TTS Bot's development and hosting!"
 
         await ctx.send(cleandoc(f"""
@@ -82,7 +82,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
 
     @commands.command(aliases=["lag"], hidden=True)
     @commands.bot_has_permissions(send_messages=True)
-    async def ping(self, ctx):
+    async def ping(self, ctx: commands.Context):
         "Gets current ping to discord!"
 
         ping_before = monotonic()
@@ -92,7 +92,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
 
     @commands.command()
     @commands.bot_has_permissions(send_messages=True)
-    async def suggest(self, ctx, *, suggestion):
+    async def suggest(self, ctx: commands.Context, *, suggestion: str):
         "Suggests a new feature!"
 
         if suggestion.lower().replace("*", "") == "suggestion":
@@ -111,7 +111,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
 
     @commands.command()
     @commands.bot_has_permissions(send_messages=True)
-    async def invite(self, ctx):
+    async def invite(self, ctx: commands.Context):
         "Sends the instructions to invite TTS Bot and join the support server!"
         if ctx.guild == self.bot.support_server:
             await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")

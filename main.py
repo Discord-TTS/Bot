@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 from concurrent.futures import ProcessPoolExecutor
 from configparser import ConfigParser
 from os import listdir
 from time import monotonic
-from typing import Optional, Union
+import traceback
+from typing import TYPE_CHECKING, Dict, Optional, Union
 
 import aiohttp
 import asyncgTTS
@@ -11,8 +14,9 @@ import asyncpg
 import discord
 from discord.ext import commands
 
-from utils import remove_chars
 from utils.decos import wrap_with
+from utils.funcs import remove_chars
+
 
 print("Starting TTS Bot!")
 start_time = monotonic()
@@ -27,17 +31,29 @@ intents = discord.Intents(voice_states=True, messages=True, guilds=True, members
 status = getattr(discord.Status, config["Activity"]["status"])
 
 # Custom prefix support
-async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
+async def prefix(bot: TTSBot, message: discord.Message) -> str:
     "Gets the prefix for a guild based on the passed message object"
     return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
 
 class TTSBot(commands.AutoShardedBot):
-    def __init__(self, config, session, executor, *args, **kwargs):
-        self.channels = {}
+    if TYPE_CHECKING:
+        from extensions import cache_handler, database_handler
+
+        settings: database_handler.GeneralSettings
+        userinfo: database_handler.UserInfoHandler
+        nicknames: database_handler.NicknameHandler
+        cache: cache_handler.cache
+
+        blocked: bool # Handles if to be on gtts or espeak
+
+        del cache_handler, database_handler
+
+    def __init__(self, config: ConfigParser, session: aiohttp.ClientSession, executor: ProcessPoolExecutor, *args, **kwargs):
         self.config = config
         self.session = session
         self.executor = executor
         self.sent_fallback = False
+        self.channels: Dict[str, discord.Webhook] = {}
 
         self.trusted = remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
 
@@ -58,7 +74,7 @@ class TTSBot(commands.AutoShardedBot):
             return e
 
 
-    def load_extensions(self, folder):
+    def load_extensions(self, folder: str):
         filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
         for ext in filered_exts:
             self.load_extension(f"{folder}.{ext[:-3]}")
@@ -80,13 +96,11 @@ class TTSBot(commands.AutoShardedBot):
         )
 
         # Fill up bot.channels, as a load of webhooks
+        adapter = discord.AsyncWebhookAdapter(session=self.session)
         for channel_name, webhook_url in self.config["Channels"].items():
-            self.channels[channel_name] = discord.Webhook.from_url(
-                url=webhook_url,
-                adapter=discord.AsyncWebhookAdapter(session=self.session)
-            )
+            self.channels[channel_name] = discord.Webhook.from_url(url=webhook_url, adapter=adapter)
 
-        # Load all of /cogs and /extensions
+        # Load all of /cogs
         self.load_extensions("cogs")
         self.load_extensions("extensions")
 
@@ -100,7 +114,7 @@ def get_error_string(e: BaseException) -> str:
 
 @wrap_with(ProcessPoolExecutor,   aenter=False)
 @wrap_with(aiohttp.ClientSession, aenter=True)
-async def main(session, executor):
+async def main(session: aiohttp.ClientSession, executor: ProcessPoolExecutor) -> None:
     bot = TTSBot(
         config=config,
         status=status,
@@ -120,9 +134,12 @@ async def main(session, executor):
         ready_task = asyncio.create_task(bot.wait_until_ready())
         bot_task = asyncio.create_task(bot.start(token=config["Main"]["Token"]))
 
-        done, pending = await asyncio.wait((bot_task, ready_task), return_when=asyncio.FIRST_COMPLETED)
+        done, _ = await asyncio.wait((bot_task, ready_task), return_when=asyncio.FIRST_COMPLETED)
         if bot_task in done:
-            raise RuntimeError(f"Bot Shutdown before ready: {get_error_string(bot_task.exception())}")
+            error = bot_task.exception()
+            print("Bot shutdown before ready!")
+            traceback.print_exception(type(error), error, error.__traceback__)
+            return
 
         print(f"Logged in as {bot.user} and ready!")
         await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")

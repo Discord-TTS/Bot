@@ -6,8 +6,8 @@ def setup(bot):
     bot.add_cog(FancyHelpCommandCog(bot))
 
 
-class FakeCog():
-    def __init__(self, name):
+class FakeCog:
+    def __init__(self, name: str):
         self.qualified_name = name
 
 

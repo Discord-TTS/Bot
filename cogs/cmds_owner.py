@@ -1,5 +1,6 @@
-from configparser import ConfigParser
-from typing import Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Union
 
 import discord
 from discord.ext import commands
@@ -7,47 +8,41 @@ from discord.ext import commands
 import utils
 
 
-config = ConfigParser()
-config.read("config.ini")
+if TYPE_CHECKING:
+    from main import TTSBot
 
-def setup(bot):
+
+def setup(bot: TTSBot):
     bot.add_cog(cmds_owner(bot))
 
-class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
+class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}): # type: ignore
     "TTS Bot commands meant only for the bot owner."
 
     @commands.command()
     @commands.is_owner()
     @commands.bot_has_permissions(send_messages=True, manage_messages=True, manage_webhooks=True)
-    async def sudo(self, ctx, user: Union[discord.Member, discord.User, int, str], *, message):
+    async def sudo(self, ctx: commands.Context, user: Union[discord.User, str], *, message):
         """mimics another user"""
         await ctx.message.delete()
 
-        if isinstance(user, int):
-            try:
-                user = await self.bot.fetch_user(user)
-            except:
-                user = str(user)
-
         if isinstance(user, str):
-            name = user
             avatar = "https://cdn.discordapp.com/avatars/689564772512825363/f05524fd9e011108fd227b85c53e3d87.png"
         else:
-            name = user.display_name
-            avatar = user.avatar_url
+            avatar = str(user.avatar_url)
+            user = user.display_name
 
         webhooks = await ctx.channel.webhooks()
         if len(webhooks) == 0:
             webhook = await ctx.channel.create_webhook(name="Temp Webhook For -sudo")
-            await webhook.send(message, username=name, avatar_url=avatar)
+            await webhook.send(message, username=user, avatar_url=avatar)
             await webhook.delete()
         else:
             webhook = webhooks[0]
-            await webhook.send(message, username=name, avatar_url=avatar)
+            await webhook.send(message, username=user, avatar_url=avatar)
 
     @commands.command()
     @commands.is_owner()
-    async def trust(self, ctx, mode, user: Union[discord.User, str] = ""):
+    async def trust(self, ctx: commands.Context, mode: str, user: Union[discord.User, str] = ""):
         if mode == "list":
             await ctx.send("\n".join(self.bot.trusted))
 
@@ -56,36 +51,35 @@ class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
 
         elif mode == "add":
             self.bot.trusted.append(str(user.id))
-            config["Main"]["trusted_ids"] = str(self.bot.trusted)
-            with open("config.ini", "w") as configfile:
-                config.write(configfile)
+            self.bot.config["Main"]["trusted_ids"] = str(self.bot.trusted)
+            with open("self.bot.config.ini", "w") as configfile:
+                self.bot.config.write(configfile)
 
             await ctx.send(f"Added {user} | {user.id} to the trusted members")
 
-        elif mode == "del":
-            if str(user.id) in self.bot.trusted:
-                self.bot.trusted.remove(str(user.id))
-                config["Main"]["trusted_ids"] = str(self.bot.trusted)
-                with open("config.ini", "w") as configfile:
-                    config.write(configfile)
+        elif mode == "del" and str(user.id) in self.bot.trusted:
+            self.bot.trusted.remove(str(user.id))
+            self.bot.config["Main"]["trusted_ids"] = str(self.bot.trusted)
+            with open("self.bot.config.ini", "w") as configfile:
+                self.bot.config.write(configfile)
 
-                await ctx.send(f"Removed {user} | {user.id} from the trusted members")
+            await ctx.send(f"Removed {user} | {user.id} from the trusted members")
 
     @commands.command()
     @commands.is_owner()
     @commands.bot_has_permissions(send_messages=True)
-    async def say(self, ctx, channel: discord.TextChannel, *, tosay):
+    async def say(self, ctx: commands.Context, channel: discord.TextChannel, *, to_say: str):
         if ctx.channel.permissions_for(ctx.guild.me).manage_messages:
             await ctx.message.delete()
 
-        await channel.send(tosay)
+        await channel.send(to_say)
 
     @commands.command(aliases=("rc", "reload"))
     @commands.is_owner()
-    async def reload_cog(self, ctx, *, toreload: str):
+    async def reload_cog(self, ctx: commands.Context, *, to_reload: str):
         try:
-            self.bot.reload_extension(f"cogs.{toreload}")
+            self.bot.reload_extension(f"cogs.{to_reload}")
         except Exception as e:
-            await ctx.send(f'**`ERROR:`** {type(e).__name__} - {e}')
+            await ctx.send(f"**`ERROR:`** {type(e).__name__} - {e}")
         else:
-            await ctx.send('**`SUCCESS`**')
+            await ctx.send("**`SUCCESS`**")

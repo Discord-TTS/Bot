@@ -1,11 +1,18 @@
+from __future__ import annotations
+
 import asyncio
 from inspect import cleandoc
 from subprocess import call
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
 import utils
+
+
+if TYPE_CHECKING:
+    from main import TTSBot
 
 
 WELCOME_MESSAGE = cleandoc("""
@@ -22,13 +29,13 @@ WELCOME_MESSAGE = cleandoc("""
     Ask questions by either responding here or asking on the support server!
 """)
 
-def setup(bot):
+def setup(bot: TTSBot):
     bot.add_cog(events_other(bot))
 
-class events_other(utils.CommonCog):
+class events_other(utils.CommonCog): # type: ignore
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
             await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
 
@@ -57,7 +64,7 @@ class events_other(utils.CommonCog):
                 await self.bot.close()
 
     @commands.Cog.listener()
-    async def on_guild_join(self, guild):
+    async def on_guild_join(self, guild: discord.Guild):
         _, prefix, owner = await asyncio.gather(
             self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!"),
             self.bot.settings.get(guild, setting="prefix"),
@@ -82,7 +89,7 @@ class events_other(utils.CommonCog):
             await self.bot.channels["logs"].send(embed=embed)
 
     @commands.Cog.listener()
-    async def on_guild_remove(self, guild):
+    async def on_guild_remove(self, guild: discord.Guild):
         await asyncio.gather(
             self.bot.settings.remove(guild),
             self.bot.channels["servers"].send(f"Just got kicked from {guild}. I am now in {len(self.bot.guilds)} servers")

@@ -6,7 +6,6 @@ from getpass import getpass
 import asyncpg
 import discord
 from cryptography.fernet import Fernet
-from discord.ext import commands
 
 
 psql_name = input("What is the username to sign into your PostgreSQL DB: ")
@@ -97,24 +96,26 @@ async def setup_db():
 
 
 async def main():
+    global should_close
+
     intents = discord.Intents(guilds=True, members=True, messages=True)
     client = discord.Client(intents=intents, chunk_guilds_at_startup=False)
 
-    bot_runner = asyncio.create_task(bot.start(token))
+    asyncio.create_task(client.start(token))
     await asyncio.gather(client.wait_until_ready(), setup_db())
 
 
     logs_channel = None
-    guild = bot.get_guild(main_server)
+    guild = client.get_guild(main_server)
     botcategory = await guild.create_category("TTS Bot")
     overwrites = {guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False)}
 
     config["Channels"] = {}
-    avatar_bytes = await bot.user.avatar_url.read()
+    avatar_bytes = await client.user.avatar_url.read()
 
     for channel_name in ("errors", "dm-logs", "servers", "suggestions", "logs"):
         channel = await guild.create_text_channel(channel_name, category=botcategory, overwrites=overwrites)
-        webhook = await channel.create_webhook(name=bot.user.name, avatar=avatar_bytes).url
+        webhook = (await channel.create_webhook(name=client.user.name, avatar=avatar_bytes)).url
 
         if channel_name == "logs":
             logs_channel = channel
@@ -122,18 +123,18 @@ async def main():
         config["Channels"][channel_name] = webhook
 
 
-    trusted_users = ", ".join(str(await bot.fetch_user(int(trusted_id))) for trusted_id in trusted_ids)
+    trusted_users = ", ".join(str(await client.fetch_user(int(trusted_id))) for trusted_id in trusted_ids)
     await logs_channel.send(f"Are you sure you want {trusted_users} to be trusted? (do -yes to accept)")
 
     should_close = asyncio.Event()
     await client.wait_for("message", check=yay_or_nae)
     if should_close.is_set():
-        return await bot.close()
+        return await client.close()
 
     with open("config.ini", "x") as configfile:
         config.write(configfile)
 
     await logs_channel.send("Finished and written to config.ini, change the names of the channels all you want and now TTS Bot should be startable!")
-    await bot.close()
+    await client.close()
 
 asyncio.run(main())

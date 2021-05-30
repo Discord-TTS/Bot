@@ -1,4 +1,6 @@
-from typing import Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Union
 
 import discord
 from discord.ext import commands
@@ -6,20 +8,24 @@ from discord.ext import commands
 import utils
 
 
-def setup(bot):
+if TYPE_CHECKING:
+    from main import TTSBot
+
+
+def setup(bot: TTSBot):
     bot.add_cog(cmds_dev(bot))
 
-class cmds_dev(utils.CommonCog, command_attrs={"hidden": True}):
+class cmds_dev(utils.CommonCog, command_attrs={"hidden": True}): # type: ignore
     """TTS Bot hidden commands for development
     New commands added and removed often from this cog."""
 
     @commands.command()
     @commands.is_owner()
-    async def end(self, ctx):
+    async def end(self, _):
         await self.bot.close()
 
     @commands.command()
-    async def debug(self, ctx):
+    async def debug(self, ctx: commands.Context):
         embed = discord.Embed(
             title="TTS Bot debug info!",
             description=f"Voice Client: {ctx.guild.voice_client!r}"

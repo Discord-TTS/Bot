@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from inspect import cleandoc
 from random import choice as pick_random
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -8,13 +11,17 @@ import utils
 from player import TTSVoicePlayer
 
 
-def setup(bot):
+if TYPE_CHECKING:
+    from main import TTSBot
+
+
+def setup(bot: TTSBot):
     bot.add_cog(cmds_main(bot))
 
-class cmds_main(utils.CommonCog, name="Main Commands"):
+class cmds_main(utils.CommonCog, name="Main Commands"): # type: ignore
     "TTS Bot main commands, required for the bot to work."
 
-    async def channel_check(self, ctx):
+    async def channel_check(self, ctx: commands.Context):
         if ctx.channel.id != await self.bot.settings.get(ctx.guild, "channel"):
             await ctx.send(f"Error: Wrong channel, do {ctx.prefix}channel get the channel that has been setup.")
             return False
@@ -26,7 +33,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
     @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.guild_only()
     @commands.command()
-    async def join(self, ctx):
+    async def join(self, ctx: commands.Context):
         "Joins the voice channel you're in!"
         if not await self.channel_check(ctx):
             return
@@ -76,7 +83,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
     @commands.bot_has_permissions(send_messages=True)
     @commands.guild_only()
     @commands.command()
-    async def leave(self, ctx):
+    async def leave(self, ctx: commands.Context):
         "Leaves voice channel TTS Bot is in!"
         if not await self.channel_check(ctx):
             return
@@ -98,7 +105,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
     @commands.cooldown(1, 60, commands.BucketType.member)
     @commands.command(aliases=("clear", "leaveandjoin"))
     @commands.guild_only()
-    async def skip(self, ctx):
+    async def skip(self, ctx: commands.Context):
         "Clears the message queue!"
         if not await self.channel_check(ctx):
             return
@@ -111,6 +118,6 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
         return await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
 
     @skip.after_invoke
-    async def reset_cooldown(self, ctx):
+    async def reset_cooldown(self, ctx: commands.Context):
         if ctx.channel.permissions_for(ctx.author).administrator:
             self.skip.reset_cooldown(ctx)
