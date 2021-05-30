@@ -264,7 +264,7 @@ class events_main(utils.CommonCog):
         if not vc:
             return  # ignore if bot isn't in the vc
 
-        if len([member for member in vc.channel.members if not member.bot]):
+        if any(not member.bot for member in vc.channel.members):
             return  # ignore if bot isn't lonely
 
         await vc.disconnect(force=True)
