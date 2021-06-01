@@ -13,7 +13,7 @@ start_time = monotonic()
 def setup(bot):
     bot.add_cog(cmds_extra(bot))
 
-class cmds_extra(utils.CommonCog, name="Extra Commands"): # type: ignore
+class cmds_extra(utils.CommonCog, name="Extra Commands"):
     "TTS Bot extra commands, not required but useful."
 
     @commands.command()
@@ -58,7 +58,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"): # type: ignore
     @commands.bot_has_permissions(send_messages=True)
     @commands.guild_only()
     @commands.command()
-    async def channel(self, ctx: commands.Context):
+    async def channel(self, ctx: utils.TypedGuildContext):
         "Shows the current setup channel!"
         channel = await self.bot.settings.get(ctx.guild, "channel")
 
@@ -116,4 +116,4 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"): # type: ignore
         if ctx.guild == self.bot.support_server:
             await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
         else:
-            await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{self.bot.get_channel(694127922801410119).name} to invite {self.bot.user.mention}!")
+            await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{self.bot.invite_channel.name} to invite {self.bot.user.mention}!")

@@ -1,17 +1,16 @@
 import os
-from typing import List, Optional
+from typing import Iterable, Optional, Sequence
 
 import discord
 
 from utils.constants import *
 
 
-def remove_chars(remove_from, *chars) -> str:
-    input_string = str(remove_from)
+def remove_chars(input: str, chars: Iterable[str]) -> str:
     for char in chars:
-        input_string = input_string.replace(char, "")
+        input = input.replace(char, "")
 
-    return input_string
+    return input
 
 
 def get_size(start_path: str = '.') -> int:
@@ -39,7 +38,7 @@ def emojitoword(text: str) -> str:
     return " ".join(output)
 
 
-def exts_to_format(attachments: List[discord.Attachment]) -> Optional[str]:
+def exts_to_format(attachments: Sequence[discord.Attachment]) -> Optional[str]:
     if not attachments:
         return None
 

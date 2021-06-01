@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def setup(bot: TTSBot):
     bot.add_cog(cmds_owner(bot))
 
-class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}): # type: ignore
+class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
     "TTS Bot commands meant only for the bot owner."
 
     @commands.command()
@@ -30,6 +30,9 @@ class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}): # type: ignor
         else:
             avatar = str(user.avatar_url)
             user = user.display_name
+
+        if not isinstance(ctx.channel, discord.TextChannel):
+            return
 
         webhooks = await ctx.channel.webhooks()
         if len(webhooks) == 0:
@@ -69,7 +72,7 @@ class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}): # type: ignor
     @commands.is_owner()
     @commands.bot_has_permissions(send_messages=True)
     async def say(self, ctx: commands.Context, channel: discord.TextChannel, *, to_say: str):
-        if ctx.channel.permissions_for(ctx.guild.me).manage_messages:
+        if ctx.channel.permissions_for(ctx.guild.me).manage_messages: # type: ignore
             await ctx.message.delete()
 
         await channel.send(to_say)

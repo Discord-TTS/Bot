@@ -38,6 +38,6 @@ class loops(utils.CommonCog):
 
             await self.bot.cache.bulk_remove(int(cache_file[:-8]) for cache_file in cache_folder)
 
-    @cache_cleanup.before_loop
+    @cache_cleanup.before_loop # type: ignore
     async def before_loops(self):
         await self.bot.wait_until_ready()

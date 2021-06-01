@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def setup(bot: TTSBot):
     bot.add_cog(cmds_dev(bot))
 
-class cmds_dev(utils.CommonCog, command_attrs={"hidden": True}): # type: ignore
+class cmds_dev(utils.CommonCog, command_attrs={"hidden": True}):
     """TTS Bot hidden commands for development
     New commands added and removed often from this cog."""
 

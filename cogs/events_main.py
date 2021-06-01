@@ -45,12 +45,12 @@ class events_main(utils.CommonCog):
 
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    async def on_message(self, message: utils.TypedMessage):
         if message.guild is not None:
             # Get settings
             repeated_chars_limit, bot_ignore, max_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
                 message.guild,
-                settings=(
+                settings=[
                     "repeated_chars",
                     "bot_ignore",
                     "msg_length",
@@ -58,7 +58,7 @@ class events_main(utils.CommonCog):
                     "channel",
                     "prefix",
                     "xsaid",
-                )
+                ]
             )
 
             message_clean = message.clean_content.lower()
@@ -69,7 +69,7 @@ class events_main(utils.CommonCog):
                 return
 
             # if not a webhook but still a user, return to fix errors
-            if message.author.discriminator != "0000" and isinstance(message.author, discord.User):
+            if isinstance(message.author, discord.User):
                 return
 
             # if author is not a bot, and is not in a voice channel, and doesn't start with -tts
@@ -190,13 +190,13 @@ class events_main(utils.CommonCog):
                 else:
                     message_clean = "a link."
 
-            if utils.remove_chars(message_clean, " ", "?", ".", ")", "'", "!", '"', ":") == "":
+            if utils.remove_chars(message_clean, " ?.)'!\":") == "":
                 return
 
             # Repeated chars removal if setting is not 0
             if message_clean.isprintable() and repeated_chars_limit != 0:
                 message_clean_list = []
-                message_clean_chars = ["".join(grp) for num, grp in groupby(message_clean)]
+                message_clean_chars = ["".join(grp) for _, grp in groupby(message_clean)]
 
                 for char in message_clean_chars:
                     if len(char) > repeated_chars_limit:
@@ -254,7 +254,7 @@ class events_main(utils.CommonCog):
                 )
 
     @commands.Cog.listener()
-    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+    async def on_voice_state_update(self, member: utils.TypedMember, before: discord.VoiceState, after: discord.VoiceState):
         vc = member.guild.voice_client
 
         if member == self.bot.user:

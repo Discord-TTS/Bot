@@ -72,6 +72,8 @@ class FFmpegPCMAudio(discord.AudioSource):
 
 
 class TTSVoicePlayer(discord.VoiceClient):
+    bot: TTSBot
+    guild: discord.Guild
     channel: discord.VoiceChannel
 
     def __init__(self, bot: TTSBot, channel: discord.VoiceChannel):
@@ -170,7 +172,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             make_espeak_func = make_func(make_espeak, text, lang)
             return await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
 
-        cached_mp3 = await self.bot.cache.get(text, lang, message.id)
+        cached_mp3 = await self.bot.cache.get(text, lang, message.id) # type: ignore
         if cached_mp3:
             return cached_mp3, int(mutagen.MP3(BytesIO(cached_mp3)).info.length)
 

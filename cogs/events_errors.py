@@ -20,16 +20,16 @@ if TYPE_CHECKING:
 def setup(bot: TTSBot):
     bot.add_cog(events_errors(bot))
 
-class events_errors(utils.CommonCog): # type: ignore
+class events_errors(utils.CommonCog):
     def __init__(self, bot: TTSBot, *args, **kwargs):
         super().__init__(bot, *args, **kwargs)
 
         self.bot.on_error = self.on_error
 
 
-    async def send_error(self, ctx: commands.Context, error: str, fix: str, dm: bool = False) -> Optional[discord.Message]:
-        if not dm:
-            permissions = ctx.channel.permissions_for(ctx.guild.me)
+    async def send_error(self, ctx: utils.TypedContext, error: str, fix: str) -> Optional[discord.Message]:
+        if ctx.guild:
+            permissions = ctx.channel.permissions_for(ctx.guild.me) # type: ignore
 
             if not permissions.send_messages:
                 return
@@ -43,7 +43,7 @@ class events_errors(utils.CommonCog): # type: ignore
             description=f"Sorry but {error}, to fix this, please {fix}!"
         ).set_author(
             name=ctx.author.display_name,
-            icon_url=ctx.author.avatar_url
+            icon_url=str(ctx.author.avatar_url)
         ).set_footer(
             text="Support Server: https://discord.gg/zWPWwQC"
         )
@@ -51,9 +51,10 @@ class events_errors(utils.CommonCog): # type: ignore
         return await ctx.reply(embed=error_embed)
 
 
-    async def on_error(self, event: str, error: Optional[BaseException] = None, *args, **_):
+    async def on_error(self, event_method: str, error: Optional[BaseException] = None, *args, **_):
         info = "No Info"
         args = list(args)
+        event = event_method
 
         if isinstance(error, BaseException):
             etype, value, tb = type(error), error, error.__traceback__
@@ -81,7 +82,7 @@ class events_errors(utils.CommonCog): # type: ignore
         await self.bot.channels["errors"].send(cleandoc(error_message))
 
     @commands.Cog.listener()
-    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+    async def on_command_error(self, ctx: utils.TypedContext, error: commands.CommandError):
         if hasattr(ctx.command, 'on_error') or isinstance(error, (commands.CommandNotFound, commands.NotOwner)):
             return
 
@@ -93,7 +94,7 @@ class events_errors(utils.CommonCog): # type: ignore
             fix = f"check out `{ctx.prefix}help {ctx.command}`"
 
             if error_name.endswith("NotFound"):
-                reason = f"I cannot convert `{error.argument.replace('`', '')}` into a {error_name.replace('NotFound', '').lower()}"
+                reason = f"I cannot convert `{error.argument.replace('`', '')}` into a {error_name.replace('NotFound', '').lower()}" # type: ignore
             elif isinstance(error, commands.BadBoolArgument):
                 reason = f"I cannot convert `{error.argument.replace('`', '')}` to True/False"
             elif isinstance(error, commands.BadUnionArgument):
@@ -113,20 +114,19 @@ class events_errors(utils.CommonCog): # type: ignore
 
             if cooldown_error:
                 await cooldown_error.delete()
-            if ctx.channel.permissions_for(ctx.guild.me).manage_messages:
+            if ctx.channel.permissions_for(ctx.guild.me).manage_messages: # type: ignore
                 await ctx.message.delete()
 
         elif isinstance(error, commands.NoPrivateMessage):
-            await self.send_error(ctx, f"{command} cannot be used in private messages", f"try running it on a server with {self.bot.user} in", dm=True)
+            await self.send_error(ctx, f"{command} cannot be used in private messages", f"try running it on a server with {self.bot.user} in")
 
         elif isinstance(error, commands.MissingPermissions):
-            await self.send_error(ctx, "you cannot run this command", f"you are missing the permissions: {', '.join(error.missing_perms)}")
+            await self.send_error(ctx, "you cannot run this command", f"you are missing the permissions: {', '.join(error.missing_perms)}") # type: ignore (Stubs bug, actually list[str])
 
         elif isinstance(error, commands.BotMissingPermissions):
             await self.send_error(ctx,
                 f"I cannot run {command} as I am missing permissions",
-                f"give me {', '.join(error.missing_perms)}",
-                dm="send_messages" not in error.missing_perms
+                f"give me {', '.join(error.missing_perms)}" # type: ignore (Stubs bug, actually list[str])
             )
 
         elif isinstance(error, discord.errors.Forbidden):
@@ -147,7 +147,7 @@ class events_errors(utils.CommonCog): # type: ignore
             else:
                 await self.bot.channels["errors"].send(
                     file=discord.File(
-                        StringIO(full_error),
+                        StringIO(full_error), # type: ignore
                         filename="long error.txt"
                     )
                 )

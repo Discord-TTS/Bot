@@ -2,6 +2,7 @@ import asyncio
 import configparser
 from os import mkdir
 from getpass import getpass
+from typing import Literal, Optional, Union
 
 import asyncpg
 import discord
@@ -44,13 +45,13 @@ config["PostgreSQL Info"] = {
 }
 
 
-def yay_or_nae(message):
+def yay_or_nae(message: discord.Message) -> Optional[bool]:
     if message.content == "-no":
         should_close.set()
     else:
         return message.content == "-yes" and message.author.id == owner_id
 
-async def setup_db():
+async def setup_db() -> str:
     conn = await asyncpg.connect(
         user=psql_name,
         password=psql_pass,
@@ -95,7 +96,7 @@ async def setup_db():
         );""")
 
 
-async def main():
+async def main() -> None:
     global should_close
 
     intents = discord.Intents(guilds=True, members=True, messages=True)
@@ -108,13 +109,13 @@ async def main():
     logs_channel = None
     guild = client.get_guild(main_server)
     botcategory = await guild.create_category("TTS Bot")
-    overwrites = {guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False)}
+    overwrites = {guild.default_role: discord.PermissionOverwrite(read_messages=False)}
 
     config["Channels"] = {}
     avatar_bytes = await client.user.avatar_url.read()
 
     for channel_name in ("errors", "dm-logs", "servers", "suggestions", "logs"):
-        channel = await guild.create_text_channel(channel_name, category=botcategory, overwrites=overwrites)
+        channel = await guild.create_text_channel(channel_name, category=botcategory, overwrites=overwrites) # type: ignore
         webhook = (await channel.create_webhook(name=client.user.name, avatar=avatar_bytes)).url
 
         if channel_name == "logs":
@@ -127,7 +128,7 @@ async def main():
     await logs_channel.send(f"Are you sure you want {trusted_users} to be trusted? (do -yes to accept)")
 
     should_close = asyncio.Event()
-    await client.wait_for("message", check=yay_or_nae)
+    await client.wait_for("message", check=yay_or_nae) # type: ignore
     if should_close.is_set():
         return await client.close()
 

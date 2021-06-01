@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import traceback
 from concurrent.futures import ProcessPoolExecutor
 from configparser import ConfigParser
 from os import listdir
 from time import monotonic
-import traceback
-from typing import TYPE_CHECKING, Dict, Optional, Union
+from typing import Any, Callable, Coroutine, List, TYPE_CHECKING, Dict, Optional, Union
 
 import aiohttp
 import asyncgTTS
@@ -14,9 +14,7 @@ import asyncpg
 import discord
 from discord.ext import commands
 
-from utils.decos import wrap_with
-from utils.funcs import remove_chars
-
+import utils
 
 print("Starting TTS Bot!")
 start_time = monotonic()
@@ -38,15 +36,18 @@ async def prefix(bot: TTSBot, message: discord.Message) -> str:
 class TTSBot(commands.AutoShardedBot):
     if TYPE_CHECKING:
         from extensions import cache_handler, database_handler
+        from player import TTSVoicePlayer
 
         settings: database_handler.GeneralSettings
         userinfo: database_handler.UserInfoHandler
         nicknames: database_handler.NicknameHandler
         cache: cache_handler.cache
 
+        command_prefix: Callable[[TTSBot, discord.Message], Coroutine[Any, Any, str]]
+        voice_clients: List[TTSVoicePlayer]
         blocked: bool # Handles if to be on gtts or espeak
 
-        del cache_handler, database_handler
+        del cache_handler, database_handler, TTSVoicePlayer
 
     def __init__(self, config: ConfigParser, session: aiohttp.ClientSession, executor: ProcessPoolExecutor, *args, **kwargs):
         self.config = config
@@ -55,13 +56,19 @@ class TTSBot(commands.AutoShardedBot):
         self.sent_fallback = False
         self.channels: Dict[str, discord.Webhook] = {}
 
-        self.trusted = remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
+        self.trusted = utils.remove_chars(config["Main"]["trusted_ids"], "[]'").split(", ")
 
         super().__init__(*args, **kwargs)
+
 
     @property
     def support_server(self) -> Optional[discord.Guild]:
         return self.get_guild(int(self.config["Main"]["main_server"]))
+
+    @property
+    def invite_channel(self) -> Optional[discord.TextChannel]:
+        support_server = self.support_server
+        return support_server.get_channel(694127922801410119) if support_server else None # type: ignore
 
 
     async def check_gtts(self) -> Union[bool, Exception]:
@@ -72,6 +79,13 @@ class TTSBot(commands.AutoShardedBot):
             return False
         except Exception as e:
             return e
+
+    async def process_commands(self, message: discord.Message) -> None:
+        if message.author.bot:
+            return
+
+        ctx = await self.get_context(message, cls=utils.TypedContext)
+        await self.invoke(ctx)
 
 
     def load_extensions(self, folder: str):
@@ -112,8 +126,8 @@ class TTSBot(commands.AutoShardedBot):
 def get_error_string(e: BaseException) -> str:
     return f"{type(e).__name__}: {e}"
 
-@wrap_with(ProcessPoolExecutor,   aenter=False)
-@wrap_with(aiohttp.ClientSession, aenter=True)
+@utils.decos.wrap_with(ProcessPoolExecutor,   aenter=False)
+@utils.decos.wrap_with(aiohttp.ClientSession, aenter=True)
 async def main(session: aiohttp.ClientSession, executor: ProcessPoolExecutor) -> None:
     bot = TTSBot(
         config=config,
