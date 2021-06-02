@@ -1,23 +1,27 @@
+from __future__ import annotations
+
 from inspect import cleandoc
 from random import choice as pick_random
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
-from utils import basic
+import utils
 from player import TTSVoicePlayer
 
-def setup(bot):
+
+if TYPE_CHECKING:
+    from main import TTSBot
+
+
+def setup(bot: TTSBot):
     bot.add_cog(cmds_main(bot))
 
-
-class cmds_main(commands.Cog, name="Main Commands"):
+class cmds_main(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
 
-    def __init__(self, bot):
-        self.bot = bot
-
-    async def channel_check(self, ctx):
+    async def channel_check(self, ctx: utils.TypedGuildContext):
         if ctx.channel.id != await self.bot.settings.get(ctx.guild, "channel"):
             await ctx.send(f"Error: Wrong channel, do {ctx.prefix}channel get the channel that has been setup.")
             return False
@@ -25,13 +29,16 @@ class cmds_main(commands.Cog, name="Main Commands"):
         return True
 
 
-    @commands.guild_only()
+    @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.cooldown(1, 10, commands.BucketType.guild)
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
+    @commands.guild_only()
     @commands.command()
-    async def join(self, ctx):
+    async def join(self, ctx: utils.TypedGuildContext):
         "Joins the voice channel you're in!"
         if not await self.channel_check(ctx):
+            return
+
+        if not isinstance(ctx.author, discord.Member):
             return
 
         if not ctx.author.voice:
@@ -60,7 +67,7 @@ class cmds_main(commands.Cog, name="Main Commands"):
         )
         join_embed.set_thumbnail(url=str(self.bot.user.avatar_url))
         join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
-        join_embed.set_footer(text=pick_random(basic.footer_messages))
+        join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
         await voice_channel.connect(cls=TTSVoicePlayer)
         await ctx.send(embed=join_embed)
@@ -75,13 +82,16 @@ class cmds_main(commands.Cog, name="Main Commands"):
 
             await ctx.send(embed=blocked_embed)
 
-    @commands.guild_only()
     @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.bot_has_permissions(send_messages=True)
+    @commands.guild_only()
     @commands.command()
-    async def leave(self, ctx):
+    async def leave(self, ctx: utils.TypedGuildContext):
         "Leaves voice channel TTS Bot is in!"
         if not await self.channel_check(ctx):
+            return
+
+        if not isinstance(ctx.author, discord.Member):
             return
 
         if not ctx.author.voice:
@@ -97,11 +107,11 @@ class cmds_main(commands.Cog, name="Main Commands"):
         await ctx.send("Left voice channel!")
 
 
-    @commands.guild_only()
-    @commands.bot_has_permissions(read_messages=True, send_messages=True, add_reactions=True)
+    @commands.bot_has_permissions(send_messages=True, add_reactions=True)
     @commands.cooldown(1, 60, commands.BucketType.member)
     @commands.command(aliases=("clear", "leaveandjoin"))
-    async def skip(self, ctx):
+    @commands.guild_only()
+    async def skip(self, ctx: utils.TypedGuildContext):
         "Clears the message queue!"
         if not await self.channel_check(ctx):
             return
@@ -114,6 +124,6 @@ class cmds_main(commands.Cog, name="Main Commands"):
         return await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
 
     @skip.after_invoke
-    async def reset_cooldown(self, ctx):
-        if ctx.channel.permissions_for(ctx.author).administrator:
+    async def reset_cooldown(self, ctx: utils.TypedGuildContext):
+        if ctx.channel.permissions_for(ctx.author).administrator: # type: ignore
             self.skip.reset_cooldown(ctx)
