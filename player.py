@@ -6,7 +6,7 @@ from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import Optional, TYPE_CHECKING, Tuple
+from typing import Optional, TYPE_CHECKING, Tuple, cast
 
 import asyncgTTS
 import discord
@@ -29,7 +29,7 @@ class FFmpegPCMAudio(discord.AudioSource):
     If this bug is fixed, notify me via Discord (Gnome!#6669) or PR to remove this file with a link to the discord.py commit that fixes this.
     """
     def __init__(self, source, *, executable='ffmpeg', pipe=False, stderr=None, before_options=None, options=None):
-        stdin = None if not pipe else source
+        stdin = source if pipe else None
         args = [executable]
 
         if isinstance(before_options, str):
@@ -46,13 +46,11 @@ class FFmpegPCMAudio(discord.AudioSource):
         self._process = None
         try:
             self._process = Popen(args, stdin=PIPE, stdout=PIPE, stderr=stderr)
-            self._stdout = BytesIO(
-                self._process.communicate(input=stdin)[0]
-            )
+            self._stdout = BytesIO(self._process.communicate(input=stdin)[0])
         except FileNotFoundError:
-            raise discord.ClientException(executable + ' was not found.') from None
+            raise discord.ClientException(f"{executable} was not found.") from None
         except SubprocessError as exc:
-            raise discord.ClientException('Popen failed: {0.__class__.__name__}: {0}'.format(exc)) from exc
+            raise discord.ClientException(f"Popen failed: {exc.__class__.__name__}: {exc}") from exc
 
     def read(self):
         ret = self._stdout.read(Encoder.FRAME_SIZE)
@@ -97,6 +95,12 @@ class TTSVoicePlayer(discord.VoiceClient):
         playing_audio = not self.currently_playing.is_set()
 
         return f"<TTSVoicePlayer: {c=} {playing_audio=} {mqueuelen=} {abufferlen=}>"
+
+
+    async def disconnect(self, *, force: bool) -> None:
+        await super().disconnect(force=force)
+        self.fill_audio_buffer.cancel()
+        self.play_audio.cancel()
 
 
     async def get_embed(self):
@@ -235,7 +239,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         if not guild or guild.unavailable:
             return
 
-        channel = guild.get_channel(self.linked_channel)
+        channel = cast(discord.TextChannel, guild.get_channel(self.linked_channel))
         if not channel:
             return
 

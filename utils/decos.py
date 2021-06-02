@@ -1,3 +1,4 @@
+import asyncio
 from functools import wraps, partial
 
 def wrap_with(enterable, aenter):
@@ -19,6 +20,9 @@ def handle_errors(func):
         try:
             return await func(self, *args, **kwargs)
         except Exception as error:
+            if isinstance(error, asyncio.CancelledError):
+                raise
+
             return await self.bot.on_error(func.__name__, error)
 
     return wrapper
