@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from asyncio import Event
-from typing import Any, List, TYPE_CHECKING, Tuple, Union, overload
+from typing import TYPE_CHECKING, Any, List, Tuple, Union, overload
 
 import asyncpg
 import discord
@@ -11,7 +11,11 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
-default_settings = {"channel": 0, "msg_length": 30, "repeated_chars": 0, "xsaid": True, "auto_join": False, "bot_ignore": True, "prefix": "-"}
+default_settings = {
+    "channel": 0, "msg_length": 30, "repeated_chars": 0,
+    "xsaid": True, "auto_join": False, "bot_ignore": True,
+    "prefix": "-", "default_lang": "en"
+}
 
 def setup(bot: TTSBot):
     bot.settings = GeneralSettings(bot.pool)
@@ -20,7 +24,7 @@ def setup(bot: TTSBot):
 
 
 class handles_db:
-    def __init__(self, pool):
+    def __init__(self, pool: asyncpg.Pool):
         self.pool = pool
         self._cache = dict()
 
@@ -30,7 +34,7 @@ class handles_db:
     async def fetchrow(self, query: str, id: Union[int, Tuple[int, ...]], *args) -> asyncpg.Record:
         await self._cache_lock.wait()
         if id not in self._cache:
-            if "nicknames" in query:
+            if isinstance(id, tuple):
                 self._cache[id] = await self.pool.fetchrow(query, *id)
             else:
                 self._cache[id] = await self.pool.fetchrow(query, id, *args)
@@ -89,7 +93,7 @@ class UserInfoHandler(handles_db):
 
     async def get(self, value, user, default):
         row = await self.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user.id)
-        return row[value] if row else default
+        return row.get(value, default) if row else default
 
     async def set(self, setting: str, user: discord.abc.User, value: Union[str, bool]) -> None:
         await self._cache_lock.wait()

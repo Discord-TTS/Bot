@@ -8,8 +8,9 @@ from random import choice as pick_random
 from typing import TYPE_CHECKING
 
 import discord
-import utils
 from discord.ext import commands
+
+import utils
 from player import TTSVoicePlayer
 
 
@@ -25,6 +26,7 @@ DM_WELCOME_MESSAGE = cleandoc("""
     `2.` Don't spam, troll, or send random stuff (including server invites)
     `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
 """)
+
 
 def setup(bot: TTSBot):
     bot.add_cog(events_main(bot))
@@ -110,7 +112,13 @@ class events_main(utils.CommonCog):
                 await voice_channel.connect(cls=TTSVoicePlayer)
 
             # Get lang
-            lang = await self.bot.userinfo.get("lang", message.author, default="en")
+            guild_lang = None
+            user_lang = await self.bot.userinfo.get("lang", message.author, default=None) # type: ignore
+            if not user_lang:
+                guild_lang = await self.bot.settings.get(message.guild, "default_lang")
+
+            lang = user_lang or guild_lang or "en"
+
 
             # Emoji filter
             message_clean = utils.emojitoword(message_clean)

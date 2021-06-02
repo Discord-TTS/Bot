@@ -68,12 +68,13 @@ async def setup_db() -> str:
             auto_join      bool       DEFAULT False,
             msg_length     smallint   DEFAULT 30,
             repeated_chars smallint   DEFAULT 0,
-            prefix         varchar(6) DEFAULT '-'
+            prefix         varchar(6) DEFAULT '-',
+            default_lang   varchar(3)
         );
         CREATE TABLE userinfo (
             user_id  bigint     PRIMARY KEY,
             blocked  bool       DEFAULT False,
-            lang     varchar(4) DEFAULT 'en'
+            lang     varchar(4)
         );
         CREATE TABLE nicknames (
             guild_id bigint,
