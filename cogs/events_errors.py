@@ -21,8 +21,8 @@ def setup(bot: TTSBot):
     bot.add_cog(events_errors(bot))
 
 class events_errors(utils.CommonCog):
-    def __init__(self, bot: TTSBot, *args, **kwargs):
-        super().__init__(bot, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.bot.on_error = self.on_error
 

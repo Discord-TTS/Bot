@@ -6,7 +6,7 @@ from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import Optional, TYPE_CHECKING, Tuple, cast
+from typing import Optional, TYPE_CHECKING, Tuple, Union, cast
 
 import asyncgTTS
 import discord
@@ -72,7 +72,7 @@ class FFmpegPCMAudio(discord.AudioSource):
 class TTSVoicePlayer(discord.VoiceClient):
     bot: TTSBot
     guild: discord.Guild
-    channel: discord.VoiceChannel
+    channel: Union[discord.VoiceChannel, discord.StageChannel]
 
     def __init__(self, bot: TTSBot, channel: discord.VoiceChannel):
         super().__init__(bot, channel)
@@ -83,8 +83,8 @@ class TTSVoicePlayer(discord.VoiceClient):
         self.currently_playing = asyncio.Event()
         self.currently_playing.set()
 
-        self.audio_buffer = asyncio.Queue(maxsize=5)
-        self.message_queue = asyncio.Queue()
+        self.audio_buffer: asyncio.Queue[Tuple[bytes, int]] = asyncio.Queue(maxsize=5)
+        self.message_queue: asyncio.Queue[Tuple[discord.Message, str, str]] = asyncio.Queue()
 
         self.fill_audio_buffer.start()
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from inspect import cleandoc
 from random import choice as pick_random
@@ -21,7 +22,7 @@ def setup(bot: TTSBot):
 class cmds_main(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
 
-    async def channel_check(self, ctx: utils.TypedGuildContext):
+    async def channel_check(self, ctx: utils.TypedGuildContext) -> bool:
         if ctx.channel.id != await self.bot.settings.get(ctx.guild, "channel"):
             await ctx.send(f"Error: Wrong channel, do {ctx.prefix}channel get the channel that has been setup.")
             return False
@@ -51,7 +52,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
         if not permissions.view_channel:
             return await ctx.send("Error: Missing Permission to view your voice channel!")
 
-        if not permissions.speak or not permissions.use_voice_activation:
+        if not permissions.speak:
             return await ctx.send("Error: I do not have permssion to speak!")
 
         if voice_client:
@@ -69,7 +70,11 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
         join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
         join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
-        await voice_channel.connect(cls=TTSVoicePlayer)
+        try:
+            await voice_channel.connect(cls=TTSVoicePlayer)
+        except asyncio.TimeoutError:
+            return await ctx.send("Error: Timed out when trying to join your voice channel!")
+
         await ctx.send(embed=join_embed)
 
         if self.bot.blocked:
