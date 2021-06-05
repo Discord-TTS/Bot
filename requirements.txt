@@ -1,4 +1,5 @@
 git+https://github.com/Gnome-py/asyncgTTS.git
+typing_extensions
 discord.py[voice]
 cryptography
 voxpopuli

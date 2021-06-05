@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import Optional, TYPE_CHECKING, Union
 from attr import dataclass
 
+import discord
 from discord.ext import commands
 
 
 if TYPE_CHECKING:
-    import discord
     from main import TTSBot
     from player import TTSVoicePlayer
 

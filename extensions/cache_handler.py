@@ -6,10 +6,9 @@ from os import rename
 from os.path import exists
 from typing import TYPE_CHECKING, Iterable, Optional
 
-import asyncpg
 from cryptography.fernet import Fernet
 
-from utils.decos import run_in_executor, wrap_with
+from utils.decos import run_in_executor
 
 
 if TYPE_CHECKING:
@@ -24,7 +23,6 @@ class cache:
         self.bot = bot
         self.pool = bot.pool
 
-        self.get = wrap_with(self.pool.acquire, True)(self.get) # type: ignore
         self.key = bot.config["Main"]["key"][2:-1].encode()
         self.fernet = Fernet(self.key)
 
@@ -47,10 +45,9 @@ class cache:
         with open(filename, "wb") as mp3:
             mp3.write(self.fernet.encrypt(data))
 
-
-    async def get(self, conn: asyncpg.Connection, text: str, lang: str, message_id: int) -> Optional[bytes]:
+    async def get(self, text: str, lang: str, message_id: int) -> Optional[bytes]:
         search_for = self.get_hash(str([text, lang]).encode())
-        row = await conn.fetchrow("SELECT * FROM cache_lookup WHERE message = $1", search_for)
+        row = await self.pool.fetchrow("SELECT * FROM cache_lookup WHERE message = $1", search_for)
 
         if row is None:
             return
@@ -63,7 +60,7 @@ class cache:
             return await self.remove(old_message_id)
 
         read_cache_fut = self.read_from_cache(old_filename, new_filename)
-        await conn.execute("UPDATE cache_lookup SET message_id = $1 WHERE message_id = $2", message_id, old_message_id)
+        await self.pool.execute("UPDATE cache_lookup SET message_id = $1 WHERE message_id = $2", message_id, old_message_id)
         return await read_cache_fut
 
     async def set(self, text: str, lang: str, message_id: int, file: bytes) -> None:

@@ -168,7 +168,7 @@ class events_main(utils.CommonCog):
                 message_clean = re.sub(regex, replacewith, message_clean, flags=re.DOTALL)
 
             # Url filter
-            with_urls = message_clean
+            with_urls = " ".join(message_clean.split())
             link_starters = ("https://", "http://", "www.")
             message_clean = " ".join(w if not w.startswith(link_starters) else "" for w in with_urls.split())
 

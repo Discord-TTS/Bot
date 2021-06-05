@@ -1,36 +1,36 @@
+from __future__ import annotations
+
 import asyncio
-from functools import wraps, partial
+from functools import partial, wraps
+from typing import Awaitable, Callable, Optional, TypeVar, cast
 
-def wrap_with(enterable, aenter):
-    def deco_wrap(func):
-        async def async_wrapper(*args, **kwargs):
-            async with enterable() as entered:
-                return await func(entered, *args, **kwargs)
+from typing_extensions import ParamSpec
 
-        async def normal_wrapper(*args, **kwargs):
-            with enterable() as entered:
-                return await func(entered, *args, **kwargs)
+from .classes import CommonCog
 
-        return wraps(func)(async_wrapper if aenter else normal_wrapper)
-    return deco_wrap
 
-def handle_errors(func):
-    @wraps(func)
-    async def wrapper(self, *args, **kwargs):
+Return = TypeVar("Return")
+Params = ParamSpec("Params")
+
+def handle_errors(func: Callable[Params, Awaitable[Optional[Return]]]) -> Callable[Params, Awaitable[Optional[Return]]]:
+    async def wrapper(*args: Params.args, **kwargs: Params.kwargs) -> Optional[Return]:
         try:
-            return await func(self, *args, **kwargs)
+            return await func(*args, **kwargs)
         except Exception as error:
             if isinstance(error, asyncio.CancelledError):
                 raise
 
-            return await self.bot.on_error(func.__name__, error)
+            self = cast(CommonCog, args[0])
+            await self.bot.on_error(func.__name__, error)
 
-    return wrapper
+        return None
+    return wraps(func)(wrapper)
 
-def run_in_executor(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        callable_func = partial(func, self, *args, **kwargs)
+def run_in_executor(func: Callable[Params, Return]) -> Callable[Params, Awaitable[Return]]:
+    def wrapper(*args: Params.args, **kwargs: Params.kwargs) -> Awaitable[Return]:
+        self = cast(CommonCog, args[0])
+        callable_func = partial(func, *args, **kwargs)
+
         return self.bot.loop.run_in_executor(None, callable_func)
 
-    return wrapper
+    return wraps(func)(wrapper)
