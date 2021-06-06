@@ -1,14 +1,21 @@
+from __future__ import annotations
+
 import asyncio
 import re
 from inspect import cleandoc
 from itertools import groupby
 from random import choice as pick_random
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
+import utils
 from player import TTSVoicePlayer
-from utils import basic
+
+
+if TYPE_CHECKING:
+    from main import TTSBotPremium
 
 
 DM_WELCOME_MESSAGE = cleandoc("""
@@ -20,17 +27,18 @@ DM_WELCOME_MESSAGE = cleandoc("""
     `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
 """)
 
-def setup(bot):
+
+def setup(bot: TTSBotPremium):
     bot.add_cog(events_main(bot))
 
+class events_main(utils.CommonCog):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-class events_main(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
         self.dm_pins = dict()
 
 
-    def is_welcome_message(self, message):
+    def is_welcome_message(self, message: discord.Message) -> bool:
         if not message.embeds:
             return False
 
@@ -38,7 +46,7 @@ class events_main(commands.Cog):
 
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: utils.TypedMessage):
         if message.guild is not None:
             # Premium Check
             if not getattr(self.bot, "patreon_role", False):
@@ -52,7 +60,7 @@ class events_main(commands.Cog):
             # Get settings
             repeated_chars_limit, bot_ignore, max_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
                 message.guild,
-                settings=(
+                settings=[
                     "repeated_chars",
                     "bot_ignore",
                     "msg_length",
@@ -60,7 +68,7 @@ class events_main(commands.Cog):
                     "channel",
                     "prefix",
                     "xsaid",
-                )
+                ]
             )
 
             message_clean = message.clean_content.lower()
@@ -71,7 +79,7 @@ class events_main(commands.Cog):
                 return
 
             # if not a webhook but still a user, return to fix errors
-            if message.author.discriminator != "0000" and isinstance(message.author, discord.User):
+            if isinstance(message.author, discord.User):
                 return
 
             # if author is not a bot, and is not in a voice channel, and doesn't start with -tts
@@ -105,18 +113,27 @@ class events_main(commands.Cog):
                 except AttributeError:
                     return
 
+                permissions = voice_channel.permissions_for(message.guild.me)
+                if not (permissions.view_channel and permissions.speak):
+                    return
+
                 await voice_channel.connect(cls=TTSVoicePlayer)
 
             # Get voice and parse it into a useable format
             lang, variant = await asyncio.gather(
-                self.bot.userinfo.get("lang", message.author),
-                self.bot.userinfo.get("variant", message.author)
+                self.bot.userinfo.get("lang", message.author, default=None),
+                self.bot.userinfo.get("variant", message.author, default=None)
             )
 
-            voice = (await self.bot.get_cog("Settings").get_voice(lang, variant)).tuple
+            if None in (lang, variant):
+                database_voice = await self.bot.settings.get(message.guild, "default_voice")
+                lang, variant = database_voice.split()
+
+            voice = (await self.bot.get_cog("Settings").get_voice(lang, variant)).tuple # type: ignore
+
 
             # Emoji filter
-            message_clean = basic.emojitoword(message_clean)
+            message_clean = utils.emojitoword(message_clean)
 
             # Acronyms and removing -tts
             message_clean = f" {message_clean} "
@@ -163,7 +180,7 @@ class events_main(commands.Cog):
                 message_clean = re.sub(regex, replacewith, message_clean, flags=re.DOTALL)
 
             # Url filter
-            with_urls = message_clean
+            with_urls = " ".join(message_clean.split())
             link_starters = ("https://", "http://", "www.")
             message_clean = " ".join(w if not w.startswith(link_starters) else "" for w in with_urls.split())
 
@@ -171,7 +188,7 @@ class events_main(commands.Cog):
             # Toggleable xsaid and attachment + links detection
             if xsaid:
                 said_name = await self.bot.nicknames.get(message.guild, message.author)
-                file_format = basic.exts_to_format(message.attachments)
+                file_format = utils.exts_to_format(message.attachments)
 
                 if contained_url:
                     if message_clean:
@@ -193,13 +210,13 @@ class events_main(commands.Cog):
                 else:
                     message_clean = "a link."
 
-            if basic.remove_chars(message_clean, " ", "?", ".", ")", "'", "!", '"', ":") == "":
+            if utils.remove_chars(message_clean, " ?.)'!\":") == "":
                 return
 
             # Repeated chars removal if setting is not 0
             if message_clean.isprintable() and repeated_chars_limit != 0:
-                message_clean_list = list()
-                message_clean_chars = ["".join(grp) for num, grp in groupby(message_clean)]
+                message_clean_list = []
+                message_clean_chars = ["".join(grp) for _, grp in groupby(message_clean)]
 
                 for char in message_clean_chars:
                     if len(char) > repeated_chars_limit:
@@ -247,7 +264,7 @@ class events_main(commands.Cog):
                 embed = discord.Embed(
                     title=f"Welcome to {self.bot.user.name} Support DMs!",
                     description=DM_WELCOME_MESSAGE
-                ).set_footer(text=pick_random(basic.footer_messages))
+                ).set_footer(text=pick_random(utils.FOOTER_MSGS))
 
                 dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=embed)
 
@@ -257,7 +274,7 @@ class events_main(commands.Cog):
                 )
 
     @commands.Cog.listener()
-    async def on_voice_state_update(self, member, before, after):
+    async def on_voice_state_update(self, member: utils.TypedMember, before: discord.VoiceState, after: discord.VoiceState):
         vc = member.guild.voice_client
 
         if member == self.bot.user:
@@ -267,11 +284,11 @@ class events_main(commands.Cog):
         if not vc:
             return  # ignore if bot isn't in the vc
 
-        if len([member for member in vc.channel.members if not member.bot]):
+        if any(not member.bot for member in vc.channel.members):
             return  # ignore if bot isn't lonely
 
         await vc.disconnect(force=True)
 
     @commands.Cog.listener()
-    async def on_private_channel_pins_update(self, channel, last_pin):
+    async def on_private_channel_pins_update(self, channel: discord.DMChannel, _):
         self.dm_pins.pop(channel.recipient.id, None)

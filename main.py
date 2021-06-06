@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import json
-import os
+import traceback
 from configparser import ConfigParser
+from os import listdir
 from time import monotonic
-from typing import Union
+from typing import Any, Callable, Coroutine, List, TYPE_CHECKING, Dict, Optional
 
 import aiohttp
 import asyncgTTS
@@ -11,8 +14,7 @@ import asyncpg
 import discord
 from discord.ext import commands
 
-from utils.basic import remove_chars
-from utils.decos import wrap_with
+import utils
 
 print("Starting TTS Bot!")
 start_time = monotonic()
@@ -23,15 +25,15 @@ config.read("config.ini")
 
 # Setup activity and intents for logging in
 activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
-intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True, reactions=True)
+intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
 status = getattr(discord.Status, config["Activity"]["status"])
 
 # Custom prefix support
-async def prefix(bot: commands.AutoShardedBot, message: discord.Message) -> str:
+async def prefix(bot: TTSBotPremium, message: discord.Message) -> str:
     "Gets the prefix for a guild based on the passed message object"
-    return await bot.settings.get(message.guild, "prefix") if message.guild else "p-"
+    return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
 
-async def premium_check(ctx):
+async def premium_check(ctx: utils.TypedGuildContext):
     if not ctx.bot.patreon_role:
         return
 
@@ -45,12 +47,12 @@ async def premium_check(ctx):
         return True
 
     premium_user_for_guild = ctx.bot.patreon_json.get(str(ctx.guild.id))
-    if premium_user_for_guild in (member.id for member in ctx.bot.patreon_role.members):
+    if any(premium_user_for_guild == member.id for member in ctx.bot.patreon_role.members):
         return True
 
     print(f"{ctx.author} | {ctx.author.id} failed premium check in {ctx.guild.name} | {ctx.guild.id}")
 
-    permissions = ctx.channel.permissions_for(ctx.guild.me)
+    permissions = ctx.channel.permissions_for(ctx.guild.me) # type: ignore
     if permissions.send_messages:
         if permissions.embed_links:
             embed = discord.Embed(
@@ -58,7 +60,7 @@ async def premium_check(ctx):
                 description=f"Hey! This server isn't premium! Please purchase TTS Bot Premium via Patreon! (`{ctx.prefix}donate`)",
             )
             embed.set_footer(text="If this is an error, please contact Gnome!#6669.")
-            embed.set_thumbnail(url=ctx.bot.user.avatar_url)
+            embed.set_thumbnail(url=str(ctx.bot.user.avatar_url))
 
             await ctx.send(embed=embed)
         else:
@@ -66,12 +68,29 @@ async def premium_check(ctx):
 
 
 class TTSBotPremium(commands.AutoShardedBot):
-    def __init__(self, config, session, *args, **kwargs):
-        self.channels = {}
+    if TYPE_CHECKING:
+        from extensions import cache_handler, database_handler
+        from player import TTSVoicePlayer
+
+        settings: database_handler.GeneralSettings
+        userinfo: database_handler.UserInfoHandler
+        nicknames: database_handler.NicknameHandler
+        cache: cache_handler.cache
+
+        command_prefix: Callable[[TTSBotPremium, discord.Message], Coroutine[Any, Any, str]]
+        voice_clients: List[TTSVoicePlayer]
+        patreon_json: Dict[str, int]
+        gtts: asyncgTTS.asyncgTTS
+        pool: asyncpg.Pool
+
+        del cache_handler, database_handler, TTSVoicePlayer
+
+    def __init__(self, config: ConfigParser, session: aiohttp.ClientSession, *args, **kwargs):
         self.config = config
         self.session = session
+        self.channels: Dict[str, discord.Webhook] = {}
 
-        self.trusted = remove_chars(config["Main"]["trusted_ids"], "[", "]", "'").split(", ")
+        self.trusted = utils.remove_chars(config["Main"]["trusted_ids"], "[]'").split(", ")
 
         with open("patreon_users.json") as f:
             self.patreon_json = json.load(f)
@@ -80,31 +99,42 @@ class TTSBotPremium(commands.AutoShardedBot):
 
 
     @property
-    def support_server(self):
+    def support_server(self) -> Optional[discord.Guild]:
         return self.get_guild(int(self.config["Main"]["main_server"]))
 
     @property
-    def patreon_role(self):
+    def invite_channel(self) -> Optional[discord.TextChannel]:
+        support_server = self.support_server
+        return support_server.get_channel(694127922801410119) if support_server else None # type: ignore
+
+    @property
+    def patreon_role(self) -> Optional[discord.Role]:
         return discord.utils.get(self.support_server.roles, name="Patreon!")
+
+    def load_extensions(self, folder: str):
+        filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
+        for ext in filered_exts:
+            self.load_extension(f"{folder}.{ext[:-3]}")
+
 
     def add_check(self, *args, **kwargs):
         super().add_check(*args, **kwargs)
         return self
 
+    async def process_commands(self, message: discord.Message) -> None:
+        if message.author.bot:
+            return
 
-    def load_extensions(self, folder):
-        filered_exts = filter(lambda e: e.endswith(".py"), os.listdir(folder))
-        for ext in filered_exts:
-            self.load_extension(f"{folder}.{ext[:-3]}")
+        ctx = await self.get_context(message, cls=utils.TypedContext)
+        await self.invoke(ctx)
 
     async def start(self, *args, token, **kwargs):
         # Get everything ready in async env
         db_info = self.config["PostgreSQL Info"]
-        self.gtts, self.pool = await asyncio.gather(
+        self.gtts, self.pool = await asyncio.gather( # type: ignore
             asyncgTTS.setup(
-                premium=True,
-                session=self.session,
-                service_account_json_location=os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+                premium=False,
+                session=self.session
             ),
             asyncpg.create_pool(
                 host=db_info["ip"],
@@ -116,12 +146,10 @@ class TTSBotPremium(commands.AutoShardedBot):
 
         # Fill up bot.channels, as a load of webhooks
         for channel_name, webhook_url in self.config["Channels"].items():
-            self.channels[channel_name] = discord.Webhook.from_url(
-                url=webhook_url,
-                adapter=discord.AsyncWebhookAdapter(session=self.session)
-            )
+            adapter = discord.AsyncWebhookAdapter(session=self.session)
+            self.channels[channel_name] = discord.Webhook.from_url(url=webhook_url, adapter=adapter)
 
-        # Load all of /cogs and /extensions
+        # Load all of /cogs
         self.load_extensions("cogs")
         self.load_extensions("extensions")
 
@@ -133,8 +161,12 @@ class TTSBotPremium(commands.AutoShardedBot):
 def get_error_string(e: BaseException) -> str:
     return f"{type(e).__name__}: {e}"
 
-@wrap_with(aiohttp.ClientSession, aenter=True)
-async def main(session):
+
+async def main() -> None:
+    async with aiohttp.ClientSession() as session:
+        return await _real_main(session)
+
+async def _real_main(session: aiohttp.ClientSession) -> None:
     bot = TTSBotPremium(
         config=config,
         status=status,
@@ -153,14 +185,15 @@ async def main(session):
         ready_task = asyncio.create_task(bot.wait_until_ready())
         bot_task = asyncio.create_task(bot.start(token=config["Main"]["Token"]))
 
-        done, pending = await asyncio.wait((bot_task, ready_task), return_when=asyncio.FIRST_COMPLETED)
+        done, _ = await asyncio.wait((bot_task, ready_task), return_when=asyncio.FIRST_COMPLETED)
         if bot_task in done:
-            raise RuntimeError(f"Bot Shutdown before ready: {get_error_string(bot_task.exception())}")
+            error = bot_task.exception()
+            print("Bot shutdown before ready!")
+            traceback.print_exception(type(error), error, error.__traceback__)
+            return
 
         print(f"Logged in as {bot.user} and ready!")
         await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
-
-        await bot.support_server.chunk(cache=True)
         await bot_task
     except Exception as e:
         print(get_error_string(e))
