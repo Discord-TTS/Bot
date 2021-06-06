@@ -61,8 +61,8 @@ class FancyHelpCommand(commands.HelpCommand):
 
         known_cogs = [bot.get_cog(cog) for cog in known_cogs_names]
         unknown_cogs = [cog for cog in bot.cogs.values() if cog not in known_cogs]
+        cogs: List[Optional[commands.Cog]] = known_cogs + unknown_cogs # type: ignore
 
-        cogs = known_cogs + unknown_cogs # type: ignore
         mapping = {cog: cog.get_commands() for cog in cogs}
         mapping[None] = [c for c in bot.all_commands.values() if c.cog is None]
         return mapping

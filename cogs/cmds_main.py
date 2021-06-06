@@ -1,6 +1,6 @@
 from __future__ import annotations
-import asyncio
 
+import asyncio
 from inspect import cleandoc
 from random import choice as pick_random
 from typing import TYPE_CHECKING

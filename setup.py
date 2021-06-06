@@ -1,8 +1,8 @@
 import asyncio
 import configparser
-from os import mkdir
 from getpass import getpass
-from typing import Literal, Optional, Union
+from os import mkdir
+from typing import Optional
 
 import asyncpg
 import discord

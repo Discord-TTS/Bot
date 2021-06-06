@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING, Union
-from attr import dataclass
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional, Union
 
 import discord
 from discord.ext import commands

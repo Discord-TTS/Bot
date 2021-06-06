@@ -6,7 +6,7 @@ from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import Optional, TYPE_CHECKING, Tuple, Union, cast
+from typing import TYPE_CHECKING, Optional, Tuple, Union, cast
 
 import asyncgTTS
 import discord
@@ -176,7 +176,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             make_espeak_func = make_func(make_espeak, text, lang)
             return await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
 
-        cached_mp3 = await self.bot.cache.get(text, lang, message.id) # type: ignore
+        cached_mp3 = await self.bot.cache.get(text, lang, message.id)
         if cached_mp3:
             return cached_mp3, int(mutagen.MP3(BytesIO(cached_mp3)).info.length)
 
