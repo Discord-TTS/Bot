@@ -16,9 +16,8 @@ def setup(bot: TTSBot):
     bot.add_cog(loops(bot))
 
 class loops(utils.CommonCog):
-    def __init__(self, bot: TTSBot, *args, **kwargs):
-        super().__init__(bot, *args, **kwargs)
-
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.cache_cleanup.start()
 
     def cog_unload(self):

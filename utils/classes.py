@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING, Union
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional, Union
 
 import discord
 from discord.ext import commands
@@ -12,40 +13,42 @@ if TYPE_CHECKING:
 
 
 # Cleanup classes
+@dataclass
 class CommonCog(commands.Cog):
-    def __init__(self, bot: TTSBot, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.bot = bot
+    bot: TTSBot
 
 
 # Typed Classes for silencing type errors.
 class TypedContext(commands.Context):
     bot: TTSBot
-    author: Union[TypedMember, TypedUser]
+    author: Union[TypedMember, discord.User]
+
+    async def reply(self, *args, **kwargs) -> discord.Message:
+        if not self.guild or self.channel.permissions_for(self.guild.me).read_message_history: # type: ignore
+            return await super().reply(*args, **kwargs)
+        else:
+            return await super().send(*args, **kwargs)
 
 class TypedGuildContext(TypedContext):
     guild: TypedGuild
 
 
 class TypedMessage(discord.Message):
-    guild: TypedGuild
-    author: Union[TypedMember, TypedUser]
+    guild: Optional[TypedGuild]
+    author: Union[TypedMember, discord.User]
 
 class TypedGuildMessage(TypedMessage):
+    guild: TypedGuild
     channel: discord.TextChannel
 
 
-class TypedUser(discord.User):
-    guild: TypedGuild
-
 class TypedMember(discord.Member):
     guild: TypedGuild
-    voice: TypedVoiceState
+    voice: Optional[TypedVoiceState]
 
 
 class TypedGuild(discord.Guild):
-    voice_client: TTSVoicePlayer
+    voice_client: Optional[TTSVoicePlayer]
 
 class TypedVoiceState(discord.VoiceState):
     channel: Optional[Union[discord.VoiceChannel, discord.StageChannel]]

@@ -8,7 +8,7 @@ from utils import GTTS_ESPEAK_DICT
 
 
 def make_espeak(text: str, lang: str) -> Tuple[bytes, int]:
-    voice = Voice(lang=GTTS_ESPEAK_DICT[lang], speed=130, volume=2) if lang in GTTS_ESPEAK_DICT else Voice(lang="en",speed=130)
+    voice = Voice(lang=GTTS_ESPEAK_DICT.get(lang, "en"), speed=130, volume=2)
     wav = voice.to_audio(text)
 
     pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))

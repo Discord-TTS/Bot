@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import Dict, Optional, TYPE_CHECKING
-import re
+from typing import TYPE_CHECKING, Dict, Optional
 
 import discord
 from discord.ext import commands
@@ -40,14 +40,15 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             self.bot.nicknames.get(ctx.guild, ctx.author)
         )
 
-        xsaid, channel, auto_join, bot_ignore, prefix = await self.bot.settings.get(
+        xsaid, prefix, channel, auto_join, bot_ignore, default_lang = await self.bot.settings.get(
             ctx.guild,
             settings=[
                 "xsaid",
+                "prefix",
                 "channel",
                 "auto_join",
                 "bot_ignore",
-                "prefix"
+                "default_lang"
             ]
         )
 
@@ -58,26 +59,31 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             nickname = "has not been set yet"
 
         # Show settings embed
-        message1 = cleandoc(f"""
-            :small_orange_diamond: Channel: `#{channel_name}`
-            :small_orange_diamond: XSaid: `{xsaid}`
+        server_settings = cleandoc(f"""
+            :small_orange_diamond: Setup Channel: `#{channel_name}`
             :small_orange_diamond: Auto Join: `{auto_join}`
-            :small_orange_diamond: Ignore Bots: `{bot_ignore}`
-            :small_orange_diamond: Prefix: `{prefix}`
-            :star: Limits: Do `{ctx.prefix}settings limits` to check!
+            :small_orange_diamond: Command Prefix: `{prefix}`
         """)
 
-        message2 = cleandoc(f"""
-            :small_blue_diamond: Language: `{lang}`
-            :small_blue_diamond: Nickname: `{nickname}`
+        tts_settings = cleandoc(f"""
+            :small_blue_diamond: <User> said: message `{xsaid}`
+            :small_blue_diamond: Ignore bot's messages: `{bot_ignore}`
+            :small_blue_diamond: Default Server Language: `{default_lang}`
+        """)
+
+        user_settings = cleandoc(f"""
+            :small_red_triangle: Language: `{lang}`
+            :small_red_triangle: Nickname: `{nickname}`
         """)
 
         embed = discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.add_field(name="**Server Wide**", value=message1, inline=False)
-        embed.add_field(name="**User Specific**", value=message2, inline=False)
+        embed.add_field(name="**General Server Settings**", value=server_settings, inline=False)
+        embed.add_field(name="**TTS Settings**",            value=tts_settings, inline=False)
+        embed.add_field(name="**User Specific**",           value=user_settings, inline=False)
 
         embed.set_footer(text=f"Change these settings with {ctx.prefix}set property value!")
         await ctx.send(embed=embed)
+
 
     @commands.bot_has_permissions(send_messages=True)
     @commands.guild_only()
@@ -107,6 +113,17 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         "Messages sent by bots and webhooks are not read"
         await self.bot.settings.set(ctx.guild, "bot_ignore", value)
         await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
+
+
+    @set.command(aliases=["defaultlang", "default_lang", "defaultlanguage", "slang", "serverlanguage"])
+    @commands.has_permissions(administrator=True)
+    async def server_language(self, ctx: utils.TypedGuildContext, language: str):
+        "Changes the default language messages are read in"
+        if language not in tts_langs:
+            return await ctx.send(f"Invalid voice, do `{ctx.prefix}voices`")
+
+        await self.bot.settings.set(ctx.guild, "default_lang", language)
+        await ctx.send(f"Default language for this server is now: {language}")
 
     @set.command()
     @commands.has_permissions(administrator=True)
@@ -139,16 +156,18 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             await self.bot.nicknames.set(ctx.guild, user, nickname)
             await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {user.name}'s nickname to {nickname}"))
 
+
     @set.command()
     @commands.has_permissions(administrator=True)
     async def channel(self, ctx: commands.Context, channel: discord.TextChannel):
         "Alias of `-setup`"
         await self.setup(ctx, channel)
 
-    @set.command(aliases=("voice", "lang"))
-    async def language(self, ctx: commands.Context, voicecode: str):
-        "Alias of `-voice`"
+    @set.command(aliases=("voice", "lang", "language"))
+    async def _language(self, ctx: commands.Context, voicecode: str):
+        "Changes the language your messages are read in, full list in `-voices`"
         await self.voice(ctx, voicecode)
+
 
     @set.group()
     @commands.has_permissions(administrator=True)
@@ -225,7 +244,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
     @commands.bot_has_permissions(send_messages=True)
     @commands.command(hidden=True)
     async def voice(self, ctx: utils.TypedGuildContext, lang: str):
-        "Changes the voice your messages are read in, full list in `-voices`"
+        "Changes the language your messages are read in, full list in `-voices`"
         if lang in tts_langs:
             await self.bot.userinfo.set("lang", ctx.author, lang)
             await ctx.send(f"Changed your voice to: {tts_langs[lang]}")

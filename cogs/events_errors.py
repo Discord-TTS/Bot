@@ -5,7 +5,7 @@ from inspect import cleandoc
 from io import StringIO
 from sys import exc_info
 from traceback import format_exception
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import discord
 from discord.ext import commands
@@ -21,8 +21,8 @@ def setup(bot: TTSBot):
     bot.add_cog(events_errors(bot))
 
 class events_errors(utils.CommonCog):
-    def __init__(self, bot: TTSBot, *args, **kwargs):
-        super().__init__(bot, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.bot.on_error = self.on_error
 

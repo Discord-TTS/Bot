@@ -6,7 +6,8 @@ from concurrent.futures import ProcessPoolExecutor
 from configparser import ConfigParser
 from os import listdir
 from time import monotonic
-from typing import Any, Callable, Coroutine, List, TYPE_CHECKING, Dict, Optional, Union
+from typing import (TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional,
+                    Union)
 
 import aiohttp
 import asyncgTTS
@@ -43,8 +44,10 @@ class TTSBot(commands.AutoShardedBot):
         nicknames: database_handler.NicknameHandler
         cache: cache_handler.cache
 
-        command_prefix: Callable[[TTSBot, discord.Message], Coroutine[Any, Any, str]]
+        command_prefix: Callable[[TTSBot, discord.Message], Awaitable[str]]
         voice_clients: List[TTSVoicePlayer]
+        gtts: asyncgTTS.easygTTS
+        pool: asyncpg.Pool
         blocked: bool # Handles if to be on gtts or espeak
 
         del cache_handler, database_handler, TTSVoicePlayer
@@ -84,7 +87,9 @@ class TTSBot(commands.AutoShardedBot):
         if message.author.bot:
             return
 
-        ctx = await self.get_context(message, cls=utils.TypedContext)
+        ctx_class = utils.TypedGuildContext if message.guild else utils.TypedContext
+        ctx = await self.get_context(message=message, cls=ctx_class)
+
         await self.invoke(ctx)
 
 
@@ -93,10 +98,10 @@ class TTSBot(commands.AutoShardedBot):
         for ext in filered_exts:
             self.load_extension(f"{folder}.{ext[:-3]}")
 
-    async def start(self, *args, token, **kwargs):
+    async def start(self, token: str, *args, **kwargs):
         # Get everything ready in async env
         db_info = self.config["PostgreSQL Info"]
-        self.gtts, self.pool = await asyncio.gather(
+        self.gtts, self.pool = await asyncio.gather( # type: ignore
             asyncgTTS.setup(
                 premium=False,
                 session=self.session
@@ -110,11 +115,11 @@ class TTSBot(commands.AutoShardedBot):
         )
 
         # Fill up bot.channels, as a load of webhooks
-        adapter = discord.AsyncWebhookAdapter(session=self.session)
         for channel_name, webhook_url in self.config["Channels"].items():
+            adapter = discord.AsyncWebhookAdapter(session=self.session)
             self.channels[channel_name] = discord.Webhook.from_url(url=webhook_url, adapter=adapter)
 
-        # Load all of /cogs
+        # Load all of /cogs and /extensions
         self.load_extensions("cogs")
         self.load_extensions("extensions")
 
@@ -126,9 +131,13 @@ class TTSBot(commands.AutoShardedBot):
 def get_error_string(e: BaseException) -> str:
     return f"{type(e).__name__}: {e}"
 
-@utils.decos.wrap_with(ProcessPoolExecutor,   aenter=False)
-@utils.decos.wrap_with(aiohttp.ClientSession, aenter=True)
-async def main(session: aiohttp.ClientSession, executor: ProcessPoolExecutor) -> None:
+
+async def main() -> None:
+    async with aiohttp.ClientSession() as session:
+        with ProcessPoolExecutor() as executor:
+            return await _real_main(session, executor)
+
+async def _real_main(session: aiohttp.ClientSession, executor: ProcessPoolExecutor) -> None:
     bot = TTSBot(
         config=config,
         status=status,
