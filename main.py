@@ -46,6 +46,9 @@ async def premium_check(ctx: utils.TypedGuildContext):
     if str(ctx.command) in ("donate", "add_premium") or str(ctx.command).startswith(("jishaku"),):
         return True
 
+    if not ctx.bot.support_server.chunked:
+        await ctx.bot.support_server.chunk(cache=True)
+
     premium_user_for_guild = ctx.bot.patreon_json.get(str(ctx.guild.id))
     if any(premium_user_for_guild == member.id for member in ctx.bot.patreon_role.members):
         return True

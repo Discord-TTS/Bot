@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Union
 
 import discord
@@ -13,9 +12,9 @@ if TYPE_CHECKING:
 
 
 # Cleanup classes
-@dataclass
 class CommonCog(commands.Cog):
-    bot: TTSBotPremium
+    def __init__(self, bot: TTSBotPremium) -> None:
+        self.bot = bot
 
 
 # Typed Classes for silencing type errors.
