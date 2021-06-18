@@ -16,7 +16,7 @@ Return = TypeVar("Return")
 DEFAULT_SETTINGS: Dict[str, Union[int, bool, str]] = {
     "channel": 0, "msg_length": 30, "repeated_chars": 0,
     "xsaid": True, "auto_join": False, "bot_ignore": True,
-    "prefix": "-", "default_lang": "en"
+    "prefix": "-", "default_lang": "en-us a"
 }
 
 def setup(bot: TTSBotPremium):

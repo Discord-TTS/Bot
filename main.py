@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import traceback
 from configparser import ConfigParser
 from os import listdir
@@ -136,8 +137,9 @@ class TTSBotPremium(commands.AutoShardedBot):
         db_info = self.config["PostgreSQL Info"]
         self.gtts, self.pool = await asyncio.gather( # type: ignore
             asyncgTTS.setup(
-                premium=False,
-                session=self.session
+                premium=True,
+                session=self.session,
+                service_account_json_location=os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
             ),
             asyncpg.create_pool(
                 host=db_info["ip"],

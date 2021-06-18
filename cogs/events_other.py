@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from inspect import cleandoc
-from subprocess import call
 from typing import TYPE_CHECKING
 
 import discord

@@ -126,11 +126,10 @@ class events_main(utils.CommonCog):
             )
 
             if None in (lang, variant):
-                database_voice = await self.bot.settings.get(message.guild, "default_voice")
+                database_voice = await self.bot.settings.get(message.guild, "default_lang")
                 lang, variant = database_voice.split()
 
             voice = (await self.bot.get_cog("Settings").get_voice(lang, variant)).tuple # type: ignore
-
 
             # Emoji filter
             message_clean = utils.emojitoword(message_clean)

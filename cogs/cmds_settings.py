@@ -111,7 +111,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             self.bot.nicknames.get(ctx.guild, ctx.author)
         )
 
-        xsaid, prefix, channel, auto_join, bot_ignore, default_lang, default_variant = await self.bot.settings.get(
+        xsaid, prefix, channel, auto_join, bot_ignore, default_lang = await self.bot.settings.get(
             ctx.guild,
             settings=[
                 "xsaid",
@@ -120,14 +120,17 @@ class cmds_settings(utils.CommonCog, name="Settings"):
                 "auto_join",
                 "bot_ignore",
                 "default_lang",
-                "default_variant"
             ]
         )
 
         channel = ctx.guild.get_channel(channel)
-        voice = await self.get_voice(lang, variant)
-        default_voice = await self.get_voice(default_lang, default_variant)
         channel_name = channel.name if channel else "has not been setup yet"
+
+        voice = await self.safe_get_voice(ctx, lang, variant)
+        default_voice = await self.safe_get_voice(ctx, *default_lang.split()) if default_lang else None
+
+        voice = voice if isinstance(voice, Voice) else None
+        default_voice = voice if isinstance(default_voice, Voice) else None
 
         if nickname == ctx.author.display_name:
             nickname = "has not been set yet"
