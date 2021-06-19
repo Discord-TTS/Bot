@@ -5,7 +5,7 @@ import re
 from inspect import cleandoc
 from itertools import groupby
 from random import choice as pick_random
-from typing import TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, cast
 
 import discord
 from discord.ext import commands
@@ -120,16 +120,20 @@ class events_main(utils.CommonCog):
                 await voice_channel.connect(cls=TTSVoicePlayer)
 
             # Get voice and parse it into a useable format
-            lang, variant = await asyncio.gather(
+            user_voice = None
+            guild_voice = None
+            lang, variant = cast(List[Optional[str]], await asyncio.gather(
                 self.bot.userinfo.get("lang", message.author, default=None),
-                self.bot.userinfo.get("variant", message.author, default=None)
-            )
+                self.bot.userinfo.get("variant", message.author, default="")
+            ))
 
-            if None in (lang, variant):
-                database_voice = await self.bot.settings.get(message.guild, "default_lang")
-                lang, variant = database_voice.split()
+            if lang is not None:
+                user_voice = " ".join((lang, variant)) # type: ignore
+            else:
+                guild_voice = await self.bot.settings.get(message.guild, "default_lang")
 
-            voice = (await self.bot.get_cog("Settings").get_voice(lang, variant)).tuple # type: ignore
+            str_voice: str = user_voice or guild_voice or "en-us a"
+            voice = (await self.bot.get_cog("Settings").get_voice(*str_voice.split())).tuple # type: ignore
 
             # Emoji filter
             message_clean = utils.emojitoword(message_clean)

@@ -94,8 +94,6 @@ class UserInfoHandler(handles_db):
     async def set(self, setting: str, user: discord.abc.User, value: Union[str, bool]) -> None:
         await self._cache_lock.wait()
         self._cache_lock.clear()
-        if isinstance(value, str):
-            value = value.lower().split("-")[0]
 
         try:
             self._cache.pop(user.id, None)
