@@ -15,6 +15,7 @@ import asyncpg
 import discord
 from discord.ext import commands
 
+import automatic_update
 import utils
 
 print("Starting TTS Bot!")
@@ -99,7 +100,7 @@ class TTSBot(commands.AutoShardedBot):
             self.load_extension(f"{folder}.{ext[:-3]}")
 
     async def start(self, token: str, *args, **kwargs):
-        # Get everything ready in async env
+        "Get everything ready in async env"
         db_info = self.config["PostgreSQL Info"]
         self.gtts, self.pool = await asyncio.gather( # type: ignore
             asyncgTTS.setup(
@@ -125,6 +126,8 @@ class TTSBot(commands.AutoShardedBot):
 
         # Send starting message and actually start the bot
         await self.channels["logs"].send("Starting TTS Bot!")
+
+        await automatic_update.do_normal_updates(self)
         await super().start(token, *args, **kwargs)
 
 
@@ -157,6 +160,7 @@ async def _real_main(session: aiohttp.ClientSession, executor: ProcessPoolExecut
         ready_task = asyncio.create_task(bot.wait_until_ready())
         bot_task = asyncio.create_task(bot.start(token=config["Main"]["Token"]))
 
+        await automatic_update.do_early_updates(bot)
         done, _ = await asyncio.wait((bot_task, ready_task), return_when=asyncio.FIRST_COMPLETED)
         if bot_task in done:
             error = bot_task.exception()
