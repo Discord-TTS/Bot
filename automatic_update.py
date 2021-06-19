@@ -26,7 +26,7 @@ def add_to_updates(type: Literal["early", "normal"]) -> Callable[[UpdateFunction
             normal_updates.append(func)
         else:
             raise TypeError("Invalid update add type!")
-        
+
         return func
     return deco
 
@@ -52,7 +52,7 @@ async def add_default_column(bot: TTSBot) -> bool:
     if result is not None:
         # Default column already created
         return False
-    
+
     await bot.pool.execute("INSERT INTO guilds(guild_id) VALUES(0)")
     bot.settings.DEFAULT_SETTINGS = asyncio.create_task(
         bot.pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
