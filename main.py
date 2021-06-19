@@ -15,6 +15,7 @@ import asyncpg
 import discord
 from discord.ext import commands
 
+import automatic_update
 import utils
 
 print("Starting TTS Bot!")
@@ -129,11 +130,13 @@ class TTSBotPremium(commands.AutoShardedBot):
         if message.author.bot:
             return
 
-        ctx = await self.get_context(message, cls=utils.TypedContext)
+        ctx_class = utils.TypedGuildContext if message.guild else utils.TypedContext
+        ctx = await self.get_context(message=message, cls=ctx_class)
+
         await self.invoke(ctx)
 
-    async def start(self, *args, token, **kwargs):
-        # Get everything ready in async env
+    async def start(self, token, *args, **kwargs):
+        "Get everything ready in async env"
         db_info = self.config["PostgreSQL Info"]
         self.gtts, self.pool = await asyncio.gather( # type: ignore
             asyncgTTS.setup(
@@ -160,6 +163,8 @@ class TTSBotPremium(commands.AutoShardedBot):
 
         # Send starting message and actually start the bot
         await self.channels["logs"].send("Starting TTS Bot Premium!")
+
+        await automatic_update.do_normal_updates(self)
         await super().start(token, *args, **kwargs)
 
 
@@ -190,6 +195,7 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         ready_task = asyncio.create_task(bot.wait_until_ready())
         bot_task = asyncio.create_task(bot.start(token=config["Main"]["Token"]))
 
+        await automatic_update.do_early_updates(bot)
         done, _ = await asyncio.wait((bot_task, ready_task), return_when=asyncio.FIRST_COMPLETED)
         if bot_task in done:
             error = bot_task.exception()
@@ -208,6 +214,12 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
 
         await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
         await bot.close()
+
+try:
+    import uvloop
+    uvloop.install()
+except ModuleNotFoundError:
+    print("Failed to import uvloop, performance may be reduced")
 
 try:
     asyncio.run(main())
