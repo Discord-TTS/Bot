@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from os import getpid, listdir, remove
-from typing import TYPE_CHECKING, cast
+from typing import Generator, TYPE_CHECKING
 
 import psutil
 from discord.ext import tasks
@@ -23,7 +23,6 @@ class loops(utils.CommonCog):
         super().__init__(*args, **kwargs)
 
         self.cache_cleanup.start()
-        self.unblock_espeak.start()
 
     def cog_unload(self):
         self.cache_cleanup.cancel()
@@ -43,24 +42,7 @@ class loops(utils.CommonCog):
 
             await self.bot.cache.bulk_remove(int(cache_file[:-8]) for cache_file in cache_folder)
 
-    @tasks.loop(seconds=20)
-    @utils.decos.handle_errors
-    async def unblock_espeak(self):
-        """Task to kill espeak if it never completes, stopping all TTS
-        If you are worried about blocking, it takes around 5ms to run"""
-        for process in psutil.process_iter():
-            process = cast(psutil.Process, process)
-            with process.oneshot():
-                running_time = time.time() - process.create_time()
-                parent_pids = (p.ppid() for p in process.parents())
-                if process.name() == "espeak" and running_time > 20 and CURRENT_PID in parent_pids:
-                    # espeak process has been alive >20 seconds, kill it with fire!!!
-                    process.kill()
-
-                    await self.bot.channels["logs"].send("Just killed a blocked espeak!")
-
 
     @cache_cleanup.before_loop # type: ignore
-    @unblock_espeak.before_loop # type: ignore
     async def before_loops(self):
         await self.bot.wait_until_ready()

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import traceback
-from concurrent.futures import ProcessPoolExecutor
 from configparser import ConfigParser
 from os import listdir
 from time import monotonic
@@ -53,10 +52,9 @@ class TTSBot(commands.AutoShardedBot):
 
         del cache_handler, database_handler, TTSVoicePlayer
 
-    def __init__(self, config: ConfigParser, session: aiohttp.ClientSession, executor: ProcessPoolExecutor, *args, **kwargs):
+    def __init__(self, config: ConfigParser, session: aiohttp.ClientSession, *args, **kwargs):
         self.config = config
         self.session = session
-        self.executor = executor
         self.sent_fallback = False
         self.channels: Dict[str, discord.Webhook] = {}
 
@@ -137,16 +135,14 @@ def get_error_string(e: BaseException) -> str:
 
 async def main() -> None:
     async with aiohttp.ClientSession() as session:
-        with ProcessPoolExecutor() as executor:
-            return await _real_main(session, executor)
+        return await _real_main(session)
 
-async def _real_main(session: aiohttp.ClientSession, executor: ProcessPoolExecutor) -> None:
+async def _real_main(session: aiohttp.ClientSession) -> None:
     bot = TTSBot(
         config=config,
         status=status,
         intents=intents,
         session=session,
-        executor=executor,
         help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
         activity=activity,
         command_prefix=prefix,
@@ -179,6 +175,12 @@ async def _real_main(session: aiohttp.ClientSession, executor: ProcessPoolExecut
 
         await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
         await bot.close()
+
+try:
+    import uvloop
+    uvloop.install()
+except ModuleNotFoundError:
+    print("Failed to import uvloop, performance may be reduced")
 
 try:
     asyncio.run(main())

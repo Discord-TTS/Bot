@@ -9,12 +9,12 @@ do_normal_updates() is called just before the bot logs in"""
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal
+from typing import Optional, TYPE_CHECKING, Awaitable, Callable, List, Literal
 
 
 if TYPE_CHECKING:
     from main import TTSBot
-    UpdateFunction = Callable[[TTSBot], Awaitable[bool]]
+    UpdateFunction = Callable[[TTSBot], Awaitable[Optional[bool]]]
 
 
 def add_to_updates(type: Literal["early", "normal"]) -> Callable[[UpdateFunction], UpdateFunction]:
@@ -59,3 +59,18 @@ async def add_default_column(bot: TTSBot) -> bool:
     )
 
     return True
+
+@add_to_updates("early")
+async def make_voxpopuli_async(_: TTSBot) -> Optional[bool]:
+    import inspect
+    import voxpopuli
+
+    if inspect.iscoroutinefunction(voxpopuli.Voice.to_audio):
+        return False
+
+    async_branch = "git+https://github.com/hadware/voxpopuli.git@async-support"
+    command = ("python3", "-m", "pip", "install", "-U", async_branch)
+    process = await asyncio.create_subprocess_exec(*command)
+    await process.wait()
+
+    raise Exception("Tried to update voxpopuli, please restart the bot!")

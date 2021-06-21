@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 import asyncio
-from functools import partial as make_func
 from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import TYPE_CHECKING, Optional, Tuple, Union, cast
+from typing import Any, TYPE_CHECKING, Optional, Tuple, Union, cast
 
 import asyncgTTS
 import discord
+import voxpopuli
 from discord.ext import tasks
 from discord.opus import Encoder
 from mutagen import mp3 as mutagen
+from pydub import AudioSegment
 
-from espeak_process import make_espeak
-from utils.decos import handle_errors
+import utils
 
 
 if TYPE_CHECKING:
@@ -132,7 +132,7 @@ class TTSVoicePlayer(discord.VoiceClient):
 
 
     @tasks.loop()
-    @handle_errors
+    @utils.decos.handle_errors
     async def play_audio(self):
         self.currently_playing.clear()
         audio, length = await self.audio_buffer.get()
@@ -154,10 +154,14 @@ class TTSVoicePlayer(discord.VoiceClient):
             """))
 
     @tasks.loop()
-    @handle_errors
+    @utils.decos.handle_errors
     async def fill_audio_buffer(self):
         message, text, lang = await self.message_queue.get()
-        ret_values = await self.get_tts(message, text, lang)
+
+        lang = lang.split("-")[0]
+        get_tts = self.get_espeak if self.bot.blocked else self.get_gtts
+        ret_values = await asyncio.wait_for(get_tts(message, text, lang), timeout=10)
+
         if not ret_values or len(ret_values) == 1:
             return
 
@@ -170,12 +174,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.play_audio.start()
 
 
-    async def get_tts(self, message: discord.Message, text: str, lang: str) -> Optional[Tuple[bytes, int]]:
-        lang = lang.split("-")[0]
-        if self.bot.blocked:
-            make_espeak_func = make_func(make_espeak, text, lang)
-            return await self.bot.loop.run_in_executor(self.bot.executor, make_espeak_func)
-
+    async def get_gtts(self, message: discord.Message, text: str, lang: str) -> Optional[Tuple[bytes, int]]:
         cached_mp3 = await self.bot.cache.get(text, lang, message.id)
         if cached_mp3:
             return cached_mp3, int(mutagen.MP3(BytesIO(cached_mp3)).info.length)
@@ -192,7 +191,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             else:
                 self.bot.blocked = False
 
-            return await self.get_tts(message, text, lang)
+            return await self.get_gtts(message, text, lang)
 
         except asyncgTTS.easygttsException as e:
             if str(e)[:3] != "400":
@@ -203,6 +202,15 @@ class TTSVoicePlayer(discord.VoiceClient):
         file_length = int(mutagen.MP3(BytesIO(audio)).info.length)
         await self.bot.cache.set(text, lang, message.id, audio)
         return audio, file_length
+
+    async def get_espeak(self, _: Any, text: str, lang: str) -> Tuple[bytes, int]:
+        voice = voxpopuli.Voice(lang=utils.GTTS_ESPEAK_DICT.get(lang, "en"), speed=130, volume=2)
+        wav = await voice.to_audio(text)
+
+        pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
+        audio_length = len(pydub_wav)/1000 # type: ignore
+
+        return wav, int(audio_length)
 
 
     # easygTTS -> espeak handling
@@ -233,7 +241,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         await self.bot.channels["logs"].send("**Swapping back to easygTTS**")
         self.bot.blocked = False
 
-    @handle_errors
+    @utils.decos.handle_errors
     async def send_fallback(self):
         guild = self.guild
         if not guild or guild.unavailable:

@@ -1,8 +1,8 @@
+git+https://github.com/hadware/voxpopuli.git@async-support
 git+https://github.com/Gnome-py/asyncgTTS.git
 typing_extensions
 discord.py[voice]
 cryptography
-voxpopuli
 asyncpg
 mutagen
 psutil
