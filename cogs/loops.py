@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from os import listdir, remove
-from typing import TYPE_CHECKING
+import time
+from os import getpid, listdir, remove
+from typing import Generator, TYPE_CHECKING
 
+import psutil
 from discord.ext import tasks
 
 import utils
@@ -12,12 +14,14 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
+CURRENT_PID = getpid()
 def setup(bot: TTSBot):
     bot.add_cog(loops(bot))
 
 class loops(utils.CommonCog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.cache_cleanup.start()
 
     def cog_unload(self):
@@ -26,6 +30,7 @@ class loops(utils.CommonCog):
     @tasks.loop(seconds=60)
     @utils.decos.handle_errors
     async def cache_cleanup(self):
+        "Deletes old cache once past a certain size"
         cache_size = utils.get_size("cache")
         if cache_size >= 2000000000:
             cache_folder = listdir("cache")
@@ -36,6 +41,7 @@ class loops(utils.CommonCog):
                 remove(f"cache/{file}")
 
             await self.bot.cache.bulk_remove(int(cache_file[:-8]) for cache_file in cache_folder)
+
 
     @cache_cleanup.before_loop # type: ignore
     async def before_loops(self):
