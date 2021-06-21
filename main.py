@@ -27,13 +27,13 @@ config.read("config.ini")
 
 # Setup activity and intents for logging in
 activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
-intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
+intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True, reactions=True)
 status = getattr(discord.Status, config["Activity"]["status"])
 
 # Custom prefix support
 async def prefix(bot: TTSBotPremium, message: discord.Message) -> str:
     "Gets the prefix for a guild based on the passed message object"
-    return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
+    return await bot.settings.get(message.guild, "prefix") if message.guild else "p-"
 
 async def premium_check(ctx: utils.TypedGuildContext):
     if not ctx.bot.patreon_role:
@@ -57,19 +57,22 @@ async def premium_check(ctx: utils.TypedGuildContext):
 
     print(f"{ctx.author} | {ctx.author.id} failed premium check in {ctx.guild.name} | {ctx.guild.id}")
 
+    main_msg = f"Hey! This server isn't premium! Please purchase TTS Bot Premium via Patreon! (`{ctx.prefix}donate`)"
+    footer_msg = "If this is an error, please contact Gnome!#6669."
+
     permissions = ctx.channel.permissions_for(ctx.guild.me) # type: ignore
     if permissions.send_messages:
         if permissions.embed_links:
             embed = discord.Embed(
                 title="TTS Bot Premium",
-                description=f"Hey! This server isn't premium! Please purchase TTS Bot Premium via Patreon! (`{ctx.prefix}donate`)",
+                description=main_msg,
             )
-            embed.set_footer(text="If this is an error, please contact Gnome!#6669.")
+            embed.set_footer(text=footer_msg)
             embed.set_thumbnail(url=str(ctx.bot.user.avatar_url))
 
             await ctx.send(embed=embed)
         else:
-            await ctx.send(f"Hey! This server isn't premium! Please purchase TTS Bot Premium via Patreon! (`{ctx.prefix}donate`)\n*If this is an error, please contact Gnome!#6669.*")
+            await ctx.send(f"{main_msg}\n*{footer_msg}*")
 
 
 class TTSBotPremium(commands.AutoShardedBot):

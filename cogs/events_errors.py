@@ -135,6 +135,9 @@ class events_errors(utils.CommonCog):
                 self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}")
             )
 
+        elif isinstance(error, commands.CheckFailure) and "global check" in str(error):
+            return
+
         else:
             await self.send_error(ctx, "an unknown error occured", "get in contact with us via the support server for help")
 
