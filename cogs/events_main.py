@@ -102,14 +102,13 @@ class events_main(utils.CommonCog):
             if not message.guild.voice_client and autojoin:
                 try:
                     voice_channel = message.author.voice.channel
-                except AttributeError:
-                    return
+                    permissions = voice_channel.permissions_for(message.guild.me)
+                    if not (permissions.view_channel and permissions.speak):
+                        return
 
-                permissions = voice_channel.permissions_for(message.guild.me)
-                if not (permissions.view_channel and permissions.speak):
+                    await voice_channel.connect(cls=TTSVoicePlayer)
+                except (asyncio.TimeoutError, AttributeError):
                     return
-
-                await voice_channel.connect(cls=TTSVoicePlayer)
 
             # Get lang
             guild_lang = None

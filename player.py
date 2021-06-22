@@ -5,7 +5,7 @@ from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import Any, TYPE_CHECKING, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Tuple, Union, cast
 
 import asyncgTTS
 import discord
@@ -20,6 +20,7 @@ import utils
 
 if TYPE_CHECKING:
     from main import TTSBot
+
 
 
 class FFmpegPCMAudio(discord.AudioSource):
@@ -103,16 +104,6 @@ class TTSVoicePlayer(discord.VoiceClient):
         self.play_audio.cancel()
 
 
-    async def get_embed(self):
-        prefix = self.prefix or await self.bot.settings.get(self.guild, "prefix")
-        return discord.Embed(
-            title="TTS Bot has been blocked by Google",
-            description=cleandoc(f"""
-            During this temporary block, voice has been swapped to a worse quality voice.
-            If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `{prefix}donate`
-            """)
-        ).set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
-
     async def queue(self, message: discord.Message, text: str, lang: str, linked_channel: int, prefix: str, max_length: int = 30) -> None:
         self.prefix = prefix
         self.max_length = max_length
@@ -140,7 +131,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         try:
             self.play(
                 FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"'),
-                after=lambda _: self.currently_playing.set()
+                after=self._after_player
             )
         except discord.ClientException:
             self.currently_playing.set()
@@ -187,7 +178,7 @@ class TTSVoicePlayer(discord.VoiceClient):
 
             self.bot.blocked = True
             if await self.bot.check_gtts() is not True:
-                await self.handle_rl()
+                await self._handle_rl()
             else:
                 self.bot.blocked = False
 
@@ -214,18 +205,18 @@ class TTSVoicePlayer(discord.VoiceClient):
 
 
     # easygTTS -> espeak handling
-    async def handle_rl(self):
+    async def _handle_rl(self):
         await self.bot.channels["logs"].send("**Swapping to espeak**")
 
-        asyncio.create_task(self.handle_rl_reset())
+        asyncio.create_task(self._handle_rl_reset())
         if not self.bot.sent_fallback:
             self.bot.sent_fallback = True
 
-            send_fallback_coros = [vc.send_fallback() for vc in self.bot.voice_clients]
+            send_fallback_coros = [vc._send_fallback() for vc in self.bot.voice_clients]
             await asyncio.gather(*(send_fallback_coros))
             await self.bot.channels["logs"].send("**Fallback/RL messages have been sent.**")
 
-    async def handle_rl_reset(self):
+    async def _handle_rl_reset(self):
         await asyncio.sleep(3601)
         while True:
             ret = await self.bot.check_gtts()
@@ -242,7 +233,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         self.bot.blocked = False
 
     @utils.decos.handle_errors
-    async def send_fallback(self):
+    async def _send_fallback(self):
         guild = self.guild
         if not guild or guild.unavailable:
             return
@@ -253,4 +244,28 @@ class TTSVoicePlayer(discord.VoiceClient):
 
         permissions = channel.permissions_for(guild.me)
         if permissions.send_messages and permissions.embed_links:
-            await channel.send(embed=await self.get_embed())
+            await channel.send(embed=await self._get_embed())
+
+    async def _get_embed(self):
+        prefix = self.prefix or await self.bot.settings.get(self.guild, "prefix")
+        return discord.Embed(
+            title="TTS Bot has been blocked by Google",
+            description=cleandoc(f"""
+            During this temporary block, voice has been swapped to a worse quality voice.
+            If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `{prefix}donate`
+            """)
+        ).set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
+
+
+    # Helper functions
+    def _after_player(self, exception: Optional[Exception]) -> Any:
+        exceptions = [exception] if exception else []
+        try:
+            self.currently_playing.set()
+        except Exception as error:
+            exceptions.append(error)
+
+        for exception in exceptions:
+            callable_func = self.bot.on_error("play_audio", exception)
+            fut = asyncio.run_coroutine_threadsafe(callable_func, self.bot.loop)
+            return fut.result()
