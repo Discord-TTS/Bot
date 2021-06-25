@@ -9,7 +9,9 @@ do_normal_updates() is called just before the bot logs in"""
 from __future__ import annotations
 
 import asyncio
-from typing import Optional, TYPE_CHECKING, Awaitable, Callable, List, Literal
+import os
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal, Optional
+
 
 
 if TYPE_CHECKING:
@@ -61,7 +63,7 @@ async def add_default_column(bot: TTSBot) -> bool:
     return True
 
 @add_to_updates("early")
-async def make_voxpopuli_async(_: TTSBot) -> Optional[bool]:
+async def make_voxpopuli_async(_: TTSBot) -> bool:
     import inspect
     import voxpopuli
 
@@ -74,3 +76,43 @@ async def make_voxpopuli_async(_: TTSBot) -> Optional[bool]:
     await process.wait()
 
     raise Exception("Tried to update voxpopuli, please restart the bot!")
+
+@add_to_updates("early")
+async def update_config(bot: TTSBot) -> bool:
+    config = bot.config
+    if "Webhook URLs" in config:
+        return False
+
+    config["Webhook URLs"] = config["Channels"]
+    config["Main"].pop("cache_key", None) # old key, to remove
+    config["PostgreSQL Info"]["host"] = config["PostgreSQL Info"].pop("ip")
+    config["PostgreSQL Info"]["user"] = config["PostgreSQL Info"].pop("name")
+    config["PostgreSQL Info"]["database"] = config["PostgreSQL Info"].pop("db")
+    config["PostgreSQL Info"]["password"] = config["PostgreSQL Info"].pop("pass")
+
+    del config["Channels"]
+    bot.config = config
+    with open("config.ini", "w") as config_file:
+        config.write(config_file)
+        return True
+
+@add_to_updates("early")
+async def setup_bot(bot: TTSBot) -> bool:
+    if os.path.exists("cache"):
+        return False
+
+    import utils, asyncpg
+    from cryptography.fernet import Fernet
+
+    db_info = bot.config["PostgreSQL Info"]
+    bot.config["Main"]["key"] = str(Fernet.generate_key())
+
+    await asyncio.sleep(10) # wait for database to definitely be ready
+    conn: asyncpg.Connection = await asyncpg.connect(**db_info)
+    await conn.execute(utils.DB_SETUP_QUERY)
+    await conn.close()
+
+    os.mkdir("cache")
+    with open("config.ini", "w") as config_file:
+        bot.config.write(config_file)
+        return True

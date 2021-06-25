@@ -101,20 +101,12 @@ class TTSBot(commands.AutoShardedBot):
         "Get everything ready in async env"
         db_info = self.config["PostgreSQL Info"]
         self.gtts, self.pool = await asyncio.gather( # type: ignore
-            asyncgTTS.setup(
-                premium=False,
-                session=self.session
-            ),
-            asyncpg.create_pool(
-                host=db_info["ip"],
-                user=db_info["name"],
-                database=db_info["db"],
-                password=db_info["pass"]
-            )
+            asyncgTTS.setup(premium=False, session=self.session),
+            asyncpg.create_pool(**db_info)
         )
 
         # Fill up bot.channels, as a load of webhooks
-        for channel_name, webhook_url in self.config["Channels"].items():
+        for channel_name, webhook_url in self.config["Webhook URLs"].items():
             adapter = discord.AsyncWebhookAdapter(session=self.session)
             self.channels[channel_name] = discord.Webhook.from_url(url=webhook_url, adapter=adapter)
 
@@ -151,17 +143,18 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
     )
 
+    await automatic_update.do_early_updates(bot)
     try:
         print("\nLogging into Discord...")
         ready_task = asyncio.create_task(bot.wait_until_ready())
         bot_task = asyncio.create_task(bot.start(token=config["Main"]["Token"]))
 
-        await automatic_update.do_early_updates(bot)
         done, _ = await asyncio.wait((bot_task, ready_task), return_when=asyncio.FIRST_COMPLETED)
         if bot_task in done:
             error = bot_task.exception()
             print("Bot shutdown before ready!")
-            traceback.print_exception(type(error), error, error.__traceback__)
+            if error:
+                traceback.print_exception(type(error), error, error.__traceback__)
             return
 
         print(f"Logged in as {bot.user} and ready!")
@@ -174,6 +167,7 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
             return
 
         await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
+        await asyncio.wait_for(bot.pool.close(), timeout=5)
         await bot.close()
 
 try:

@@ -67,3 +67,40 @@ GTTS_ESPEAK_DICT = {
     "es-es":"es",
     "es-us":"es"
     }
+
+DB_SETUP_QUERY = """
+    CREATE TABLE guilds (
+        guild_id       bigint     PRIMARY KEY,
+        channel        bigint     DEFAULT 0,
+        xsaid          bool       DEFAULT True,
+        bot_ignore     bool       DEFAULT True,
+        auto_join      bool       DEFAULT False,
+        msg_length     smallint   DEFAULT 30,
+        repeated_chars smallint   DEFAULT 0,
+        prefix         varchar(6) DEFAULT '-',
+        default_lang   varchar(3)
+    );
+    CREATE TABLE userinfo (
+        user_id  bigint     PRIMARY KEY,
+        blocked  bool       DEFAULT False,
+        lang     varchar(4)
+    );
+    CREATE TABLE nicknames (
+        guild_id bigint,
+        user_id  bigint,
+        name     text,
+
+        PRIMARY KEY (guild_id, user_id),
+
+        FOREIGN KEY       (guild_id)
+        REFERENCES guilds (guild_id)
+        ON DELETE CASCADE,
+
+        FOREIGN KEY         (user_id)
+        REFERENCES userinfo (user_id)
+        ON DELETE CASCADE
+    );
+    CREATE TABLE cache_lookup (
+        message    BYTEA  PRIMARY KEY,
+        message_id bigint UNIQUE NOT NULL
+    );"""
