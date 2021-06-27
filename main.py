@@ -42,7 +42,7 @@ class TTSBot(commands.AutoShardedBot):
         settings: database_handler.GeneralSettings
         userinfo: database_handler.UserInfoHandler
         nicknames: database_handler.NicknameHandler
-        cache: cache_handler.cache
+        cache: cache_handler.CacheHandler
 
         command_prefix: Callable[[TTSBot, discord.Message], Awaitable[str]]
         voice_clients: List[TTSVoicePlayer]
@@ -58,7 +58,7 @@ class TTSBot(commands.AutoShardedBot):
         self.sent_fallback = False
         self.channels: Dict[str, discord.Webhook] = {}
 
-        self.trusted = utils.remove_chars(config["Main"]["trusted_ids"], "[]'").split(", ")
+        self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
 
         super().__init__(*args, **kwargs)
 

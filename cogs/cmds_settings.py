@@ -150,7 +150,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
         if "<" in nickname and ">" in nickname:
             await ctx.send("Hey! You can't have mentions/emotes in your nickname!")
-        elif not re.match(r'^(\w|\s)+$', nickname):
+        elif not re.match(r"^(\w|\s)+$", nickname):
             await ctx.send("Hey! Please keep your nickname to only letters, numbers, and spaces!")
         else:
             await self.bot.nicknames.set(ctx.guild, user, nickname)
@@ -259,7 +259,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             return await self.voice(ctx, lang)
 
         lang = (await self.bot.userinfo.get("lang", ctx.author, default="en")).split("-")[0]
-        langs_string = utils.remove_chars(str(list(tts_langs.keys())), "[]")
+        langs_string = str(list(tts_langs.keys())).strip("[]")
 
         embed = discord.Embed(title="TTS Bot Languages")
         embed.set_footer(text=pick_random(utils.FOOTER_MSGS))

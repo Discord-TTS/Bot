@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import time
-from os import getpid, listdir, remove
-from typing import Generator, TYPE_CHECKING
+from os import listdir, remove
+from typing import TYPE_CHECKING
 
-import psutil
 from discord.ext import tasks
 
 import utils
@@ -14,7 +12,6 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
-CURRENT_PID = getpid()
 def setup(bot: TTSBot):
     bot.add_cog(loops(bot))
 
@@ -34,7 +31,7 @@ class loops(utils.CommonCog):
         cache_size = utils.get_size("cache")
         if cache_size >= 2000000000:
             cache_folder = listdir("cache")
-            cache_folder.sort(reverse=False, key=lambda x: int(''.join(filter(str.isdigit, x))))
+            cache_folder.sort(reverse=False, key=lambda x: int("".join(filter(str.isdigit, x))))
             cache_folder = cache_folder[:1000]
 
             for file in cache_folder:

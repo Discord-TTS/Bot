@@ -5,7 +5,7 @@ import re
 from inspect import cleandoc
 from itertools import groupby
 from random import choice as pick_random
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import discord
 from discord.ext import commands
@@ -27,6 +27,17 @@ DM_WELCOME_MESSAGE = cleandoc("""
     `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
 """)
 
+async def do_autojoin(author: utils.TypedMember) -> bool:
+    try:
+        voice_channel = author.voice.channel # type: ignore
+        permissions = voice_channel.permissions_for(author.guild.me)
+        if not (permissions.view_channel and permissions.speak):
+            return False
+
+        return bool(await voice_channel.connect(cls=TTSVoicePlayer))
+    except (asyncio.TimeoutError, AttributeError):
+        return False
+
 
 def setup(bot: TTSBot):
     bot.add_cog(events_main(bot))
@@ -35,7 +46,7 @@ class events_main(utils.CommonCog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.dm_pins = dict()
+        self.dm_pins = {}
         self.bot.blocked = False
 
 
@@ -48,9 +59,12 @@ class events_main(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_message(self, message: utils.TypedMessage):
+        if not message.attachments and not message.content:
+            return
+
         if message.guild is not None:
             # Get settings
-            repeated_chars_limit, bot_ignore, max_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
+            repeated_limit, bot_ignore, max_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
                 message.guild,
                 settings=[
                     "repeated_chars",
@@ -63,66 +77,67 @@ class events_main(utils.CommonCog):
                 ]
             )
 
-            message_clean = message.clean_content.lower()
-            starts_with_tts = message_clean.startswith(f"{prefix}tts")
-
-            # if author is a bot and bot ignore is on
-            if bot_ignore and message.author.bot:
-                return
-
-            # if not a webhook but still a user, return to fix errors
-            if isinstance(message.author, discord.User):
-                return
-
-            # if author is not a bot, and is not in a voice channel, and doesn't start with -tts
-            if not message.author.bot and not message.author.voice and not starts_with_tts:
-                return
-
-            # if bot not in voice channel and autojoin is off
-            if not message.guild.voice_client and not autojoin:
-                return
+            message_clean = utils.removeprefix(
+                message.clean_content.lower(), f"{prefix}tts"
+            )
 
             # Check if a setup channel
             if message.channel.id != channel:
                 return
 
-            # If message is empty and there is no attachments
-            if not message_clean and not message.attachments:
+            if message_clean.startswith(prefix):
                 return
 
-            # Ignore messages starting with -
-            if message_clean.startswith(prefix) and not starts_with_tts:
+            if message.author.bot:
+                if bot_ignore:
+                    return
+            elif not isinstance(message.author, discord.Member):
                 return
-
-            # if not autojoin and message doesn't start with tts and the author isn't a bot and the author is in the wrong voice channel
-            if not autojoin and not starts_with_tts and not message.author.bot and message.author.voice.channel != message.guild.voice_client.channel:
+            elif not message.author.voice:
                 return
-
-            # Auto Join
-            if not message.guild.voice_client and autojoin:
-                try:
-                    voice_channel = message.author.voice.channel
-                    permissions = voice_channel.permissions_for(message.guild.me)
-                    if not (permissions.view_channel and permissions.speak):
+            else:
+                bot_voice_client = message.guild.voice_client
+                if not bot_voice_client:
+                    if not autojoin:
                         return
 
-                    await voice_channel.connect(cls=TTSVoicePlayer)
-                except (asyncio.TimeoutError, AttributeError):
+                    if not await do_autojoin(message.author):
+                        return
+
+                elif message.author.voice.channel != bot_voice_client.channel:
                     return
+
+            # Fix linter issues
+            if TYPE_CHECKING:
+                message.author = cast(utils.TypedMember, message.author)
+
+                message.guild.voice_client = cast(
+                    TTSVoicePlayer,
+                    message.guild.voice_client
+                )
+                message.author.voice = cast(
+                    utils.TypedVoiceState,
+                    message.author.voice
+                )
+                message.author.voice.channel = cast(
+                    utils.VoiceChannel,
+                    message.author.voice.channel
+                )
 
             # Get lang
             guild_lang = None
-            user_lang = await self.bot.userinfo.get("lang", message.author, default=None) # type: ignore
+            user_lang: str = await self.bot.userinfo.get( # type: ignore
+                "lang", message.author, default=None
+            )
             if not user_lang:
                 guild_lang = await self.bot.settings.get(message.guild, "default_lang")
 
             lang = user_lang or guild_lang or "en"
 
-
             # Emoji filter
             message_clean = utils.emojitoword(message_clean)
 
-            # Acronyms and removing -tts
+            # Acronyms
             message_clean = f" {message_clean} "
             acronyms = {
                 "iirc": "if I recall correctly",
@@ -146,9 +161,6 @@ class events_main(utils.CommonCog):
                 "™️": "tm"
             }
 
-            if starts_with_tts:
-                acronyms[f"{prefix}tts"] = ""
-
             for toreplace, replacewith in acronyms.items():
                 message_clean = message_clean.replace(f" {toreplace} ", f" {replacewith} ")
 
@@ -156,14 +168,8 @@ class events_main(utils.CommonCog):
             if message_clean == "?":
                 message_clean = "what"
 
-            # Regex replacements
-            regex_replacements = {
-                r"\|\|.*?\|\|": ". spoiler avoided.",
-                r"```.*?```": ". code block.",
-                r"`.*?`": ". code snippet.",
-            }
-
-            for regex, replacewith in regex_replacements.items():
+            # Do Regex replacements
+            for regex, replacewith in utils.REGEX_REPLACEMENTS.items():
                 message_clean = re.sub(regex, replacewith, message_clean, flags=re.DOTALL)
 
             # Url filter
@@ -197,24 +203,25 @@ class events_main(utils.CommonCog):
                 else:
                     message_clean = "a link."
 
-            if utils.remove_chars(message_clean, " ?.)'!\":") == "":
+            if message_clean.strip(" ?.)'!\":") == "":
                 return
 
             # Repeated chars removal if setting is not 0
-            if message_clean.isprintable() and repeated_chars_limit != 0:
+            if message_clean.isprintable() and repeated_limit != 0:
                 message_clean_list = []
-                message_clean_chars = ["".join(grp) for _, grp in groupby(message_clean)]
 
-                for char in message_clean_chars:
-                    if len(char) > repeated_chars_limit:
-                        message_clean_list.append(char[0] * repeated_chars_limit)
+                for char in ("".join(g) for _, g in groupby(message_clean)):
+                    if len(char) > repeated_limit:
+                        message_clean_list.append(char[0] * repeated_limit)
                     else:
                         message_clean_list.append(char)
 
                 message_clean = "".join(message_clean_list)
 
             # Adds filtered message to queue
-            await message.guild.voice_client.queue(message, message_clean, lang, channel, prefix, max_length)
+            await message.guild.voice_client.queue(
+                message, message_clean, lang, channel, prefix, max_length
+            )
 
 
         elif not (message.author.bot or message.content.startswith("-")):
@@ -233,9 +240,6 @@ class events_main(utils.CommonCog):
                     )
 
                 elif not await self.bot.userinfo.get("blocked", message.author, default=False):
-                    if not message.attachments and not message.content:
-                        return
-
                     files = [await attachment.to_file() for attachment in message.attachments]
                     await self.bot.channels["dm_logs"].send(
                         message.content,
@@ -261,12 +265,17 @@ class events_main(utils.CommonCog):
                 )
 
     @commands.Cog.listener()
-    async def on_voice_state_update(self, member: utils.TypedMember, before: discord.VoiceState, after: discord.VoiceState):
+    async def on_voice_state_update(
+        self, 
+        member: utils.TypedMember,
+        before: discord.VoiceState,
+        after: discord.VoiceState
+    ):
         vc = member.guild.voice_client
 
         if member == self.bot.user:
             return  # ignore bot leaving vc
-        if not (before.channel and not after.channel):
+        if not before.channel or after.channel:
             return  # ignore everything but vc leaves
         if not vc:
             return  # ignore if bot isn't in the vc

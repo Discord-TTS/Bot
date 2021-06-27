@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import Future
 from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import TYPE_CHECKING, Any, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union, cast
 
 import asyncgTTS
 import discord
@@ -29,21 +30,21 @@ class FFmpegPCMAudio(discord.AudioSource):
     Currently fixes `io.UnsupportedOperation: fileno` when piping a file-like object into FFmpegPCMAudio
     If this bug is fixed, notify me via Discord (Gnome!#6669) or PR to remove this file with a link to the discord.py commit that fixes this.
     """
-    def __init__(self, source, *, executable='ffmpeg', pipe=False, stderr=None, before_options=None, options=None):
+    def __init__(self, source, *, executable="ffmpeg", pipe=False, stderr=None, before_options=None, options=None):
         stdin = source if pipe else None
         args = [executable]
 
         if isinstance(before_options, str):
             args.extend(split(before_options))
 
-        args.append('-i')
-        args.append('-' if pipe else source)
-        args.extend(('-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'warning'))
+        args.append("-i")
+        args.append("-" if pipe else source)
+        args.extend(("-f", "s16le", "-ar", "48000", "-ac", "2", "-loglevel", "warning"))
 
         if isinstance(options, str):
             args.extend(split(options))
 
-        args.append('pipe:1')
+        args.append("pipe:1")
         self._process = None
         try:
             self._process = Popen(args, stdin=PIPE, stdout=PIPE, stderr=stderr)
@@ -56,7 +57,7 @@ class FFmpegPCMAudio(discord.AudioSource):
     def read(self):
         ret = self._stdout.read(Encoder.FRAME_SIZE)
         if len(ret) != Encoder.FRAME_SIZE:
-            return b''
+            return b""
         return ret
 
     def cleanup(self):
@@ -131,7 +132,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         try:
             self.play(
                 FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"'),
-                after=self._after_player
+                after=self._after_player # type: ignore
             )
         except discord.ClientException:
             self.currently_playing.set()
@@ -195,6 +196,9 @@ class TTSVoicePlayer(discord.VoiceClient):
         return audio, file_length
 
     async def get_espeak(self, _: Any, text: str, lang: str) -> Tuple[bytes, int]:
+        if text.startswith("-") and " " not in text:
+            text += " " # fix espeak hang
+
         voice = voxpopuli.Voice(lang=utils.GTTS_ESPEAK_DICT.get(lang, "en"), speed=130, volume=2)
         wav = await voice.to_audio(text)
 
@@ -258,14 +262,18 @@ class TTSVoicePlayer(discord.VoiceClient):
 
 
     # Helper functions
-    def _after_player(self, exception: Optional[Exception]) -> Any:
+    def _after_player(self, exception: Optional[Exception]) -> List[Any]:
         exceptions = [exception] if exception else []
         try:
             self.currently_playing.set()
         except Exception as error:
             exceptions.append(error)
 
+        futures: List[Future] = []
         for exception in exceptions:
             callable_func = self.bot.on_error("play_audio", exception)
-            fut = asyncio.run_coroutine_threadsafe(callable_func, self.bot.loop)
-            return fut.result()
+            futures.append(asyncio.run_coroutine_threadsafe(
+                callable_func, self.bot.loop
+            ))
+
+        return [future.result() for future in futures]

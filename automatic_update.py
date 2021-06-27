@@ -16,11 +16,11 @@ from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal, Optional
 
 if TYPE_CHECKING:
     from main import TTSBot
-    UpdateFunction = Callable[[TTSBot], Awaitable[Optional[bool]]]
+    _UF = Callable[[TTSBot], Awaitable[Optional[bool]]]
 
 
-def add_to_updates(type: Literal["early", "normal"]) -> Callable[[UpdateFunction], UpdateFunction]:
-    def deco(func: UpdateFunction) -> UpdateFunction:
+def add_to_updates(type: Literal["early", "normal"]) -> Callable[[_UF], _UF]:
+    def deco(func: _UF) -> _UF:
         global early_updates, normal_updates
         if type == "early":
             early_updates.append(func)
@@ -33,8 +33,8 @@ def add_to_updates(type: Literal["early", "normal"]) -> Callable[[UpdateFunction
     return deco
 
 
-early_updates: List[UpdateFunction] = []
-normal_updates: List[UpdateFunction] = []
+early_updates: List[_UF] = []
+normal_updates: List[_UF] = []
 
 async def do_early_updates(bot: TTSBot):
     for func in early_updates:
@@ -56,7 +56,7 @@ async def add_default_column(bot: TTSBot) -> bool:
         return False
 
     await bot.pool.execute("INSERT INTO guilds(guild_id) VALUES(0)")
-    bot.settings.DEFAULT_SETTINGS = asyncio.create_task(
+    bot.settings.DEFAULT_SETTINGS = asyncio.create_task( # type: ignore
         bot.pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
     )
 

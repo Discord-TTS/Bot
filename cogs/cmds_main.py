@@ -125,7 +125,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
         if not vc or (not vc.is_playing() and vc.message_queue.empty() and vc.audio_buffer.empty()):
             return await ctx.send("**Error:** Nothing in message queue to skip!")
 
-        ctx.guild.voice_client.skip()
+        vc.skip()
         return await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
 
     @skip.after_invoke

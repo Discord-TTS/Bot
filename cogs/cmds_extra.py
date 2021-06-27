@@ -117,4 +117,6 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
         if ctx.guild == self.bot.support_server:
             await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
         else:
-            await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{self.bot.invite_channel.name} to invite {self.bot.user.mention}!")
+            invite_channel = self.bot.invite_channel
+            invite_channel = invite_channel.name if invite_channel else "deleted-channel"
+            await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{invite_channel} to invite {self.bot.user.mention}!")

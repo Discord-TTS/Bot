@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 
 
 def setup(bot: TTSBot):
-    bot.cache = cache(bot)
+    bot.cache = CacheHandler(bot)
 
-class cache:
+class CacheHandler:
     def __init__(self, bot: TTSBot):
         self.bot = bot
         self.pool = bot.pool
@@ -59,9 +59,15 @@ class cache:
         if not exists(old_filename):
             return await self.remove(old_message_id)
 
-        read_cache_fut = self.read_from_cache(old_filename, new_filename)
-        await self.pool.execute("UPDATE cache_lookup SET message_id = $1 WHERE message_id = $2", message_id, old_message_id)
-        return await read_cache_fut
+        return (await asyncio.gather(
+            self.read_from_cache(old_filename, new_filename),
+            self.pool.execute("""
+                UPDATE cache_lookup
+                SET message_id = $1
+                WHERE message_id = $2
+                """, message_id, old_message_id
+            )
+        ))[0]
 
     async def set(self, text: str, lang: str, message_id: int, file: bytes) -> None:
         search_for = self.get_hash(str([text, lang]).encode())

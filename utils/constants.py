@@ -1,5 +1,4 @@
-from re import compile
-
+import re as _re
 
 _image_files = ("bmp", "gif", "ico", "png", "psd", "svg", "jpg")
 _audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")
@@ -10,8 +9,14 @@ _script_files = ("bat", "sh", "jar", "py", "php")
 _program_files = ("apk", "exe", "msi", "deb")
 _disk_images = ("dmg", "iso", "img", "ima")
 
-ANIMATED_EMOJI_REGEX = compile(r'<a\:.+:\d+>')
-EMOJI_REGEX = compile(r'<:.+:\d+\d+>')
+ANIMATED_EMOJI_REGEX = _re.compile(r"<a\:.+:\d+>")
+EMOJI_REGEX = _re.compile(r"<:.+:\d+\d+>")
+
+REGEX_REPLACEMENTS = {
+    _re.compile(r"\|\|.*?\|\|"): ". spoiler avoided.",
+    _re.compile(r"```.*?```"): ". code block.",
+    _re.compile(r"`.*?`"): ". code snippet.",
+}
 
 READABLE_TYPE = {
     _compressed_files: "a compressed file",

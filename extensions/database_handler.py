@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, List, Tuple, Union, overload
+from typing import (TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union,
+                    overload)
 
 import asyncpg
 import discord
@@ -20,15 +21,16 @@ def setup(bot: TTSBot):
     bot.nicknames = NicknameHandler(bot.pool)
 
 
+_DK = Union[int, Tuple[int, ...]]
 class handles_db:
     def __init__(self, pool: asyncpg.Pool):
         self.pool = pool
-        self._cache = dict()
+        self._cache: Dict[_DK, Optional[asyncpg.Record]] = {}
 
         self._cache_lock = asyncio.Event()
         self._cache_lock.set()
 
-    async def fetchrow(self, query: str, id: Union[int, Tuple[int, ...]], *args) -> asyncpg.Record:
+    async def fetchrow(self, query: str, id: _DK, *args) -> Optional[asyncpg.Record]:
         await self._cache_lock.wait()
         if id not in self._cache:
             if isinstance(id, tuple):
@@ -40,9 +42,12 @@ class handles_db:
 
 
 class GeneralSettings(handles_db):
+    DEFAULT_SETTINGS: asyncio.Task[asyncpg.Record]
     def __init__(self, pool: asyncpg.Pool, *args, **kwargs):
         super().__init__(pool, *args, **kwargs)
-        self.DEFAULT_SETTINGS = asyncio.create_task(pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;"))
+        self.DEFAULT_SETTINGS = asyncio.create_task( # type: ignore
+            pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
+        )
 
 
     async def remove(self, guild: discord.Guild):
