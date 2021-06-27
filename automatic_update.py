@@ -9,7 +9,7 @@ do_normal_updates() is called just before the bot logs in"""
 from __future__ import annotations
 
 import asyncio
-import os
+from configparser import ConfigParser
 from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal, Optional
 
 
@@ -17,6 +17,11 @@ from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal, Optional
 if TYPE_CHECKING:
     from main import TTSBot
     _UF = Callable[[TTSBot], Awaitable[Optional[bool]]]
+
+
+def _update_config(config: ConfigParser):
+    with open("config.ini", "w") as config_file:
+        config.write(config_file)
 
 
 def add_to_updates(type: Literal["early", "normal"]) -> Callable[[_UF], _UF]:
@@ -92,13 +97,13 @@ async def update_config(bot: TTSBot) -> bool:
 
     del config["Channels"]
     bot.config = config
-    with open("config.ini", "w") as config_file:
-        config.write(config_file)
-        return True
+
+    _update_config(config)
+    return True
 
 @add_to_updates("early")
 async def setup_bot(bot: TTSBot) -> bool:
-    if os.path.exists("cache"):
+    if "key" not in bot.config["Main"]:
         return False
 
     import utils, asyncpg
@@ -112,7 +117,14 @@ async def setup_bot(bot: TTSBot) -> bool:
     await conn.execute(utils.DB_SETUP_QUERY)
     await conn.close()
 
-    os.mkdir("cache")
-    with open("config.ini", "w") as config_file:
-        bot.config.write(config_file)
-        return True
+    _update_config(bot.config)
+    return True
+
+@add_to_updates("early")
+async def cache_to_redis(bot: TTSBot) -> bool:
+    if "Redis Info" not in bot.config:
+        return False
+
+    bot.config["Redis Info"] = {"url": "redis://cache"}
+    _update_config(bot.config)
+    return True

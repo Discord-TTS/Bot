@@ -1,0 +1,18 @@
+services:
+    bot:
+        build: .
+        volumes:
+          - type: bind
+            source: ./config.ini
+            target: /config.ini
+        depends_on: [database, cache]
+        restart: always
+    database:
+        image: postgres:13
+        expose: [5432]
+        environment: 
+            POSTGRES_USER: tts
+            POSTGRES_PASSWORD: tts_password
+    cache:
+        image: eqalpha/keydb:latest
+        expose: [6379]

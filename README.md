@@ -10,18 +10,19 @@ Text to speech Discord Bot using gTTS/voxpopuli and discord.py!
 - Type normally in the setup text channel!
 
 ### Normal (Docker):
-- Make sure docker, git, and postgresql are installed
+- Make sure docker, docker-compose, and git are installed
 - Run `git clone https://github.com/Gnome-py/Discord-TTS-Bot.git`
-- Rename `config-example.ini` to `config.ini` and fill it out
+- Rename `config-docker.ini` to `config.ini` and fill it out
+- Rename `docker-compose-example.yml` to `docker-compose.yml`
 
-- Build the docker container with `docker build -t ttsbot .`
-- Run the docker container with `docker run ttsbot` (add `-d` to run in background)
+- Build the docker containers with `docker-compose build`
+- Run the docker containers with `docker-compose up` (add `-d` to run in background)
 - Now the bot is running in the container, and you can use it!
 
 ### Hard (Self Host):
 - Make sure python 3.7+, git, postgresql, and ffmpeg are installed
 - Run `git clone https://github.com/Gnome-py/Discord-TTS-Bot.git`
-- Rename `config-example.ini` to `config.ini` and fill it out
+- Rename `config-selfhost.ini` to `config.ini` and fill it out
 
 - Run `python3 -m pip install -r requirements.txt` (`python3` may be `py` on windows)
 - Run `python3 main.py`

@@ -170,7 +170,7 @@ class events_main(utils.CommonCog):
 
             # Do Regex replacements
             for regex, replacewith in utils.REGEX_REPLACEMENTS.items():
-                message_clean = re.sub(regex, replacewith, message_clean, flags=re.DOTALL)
+                message_clean = re.sub(regex, replacewith, message_clean)
 
             # Url filter
             with_urls = " ".join(message_clean.split())
@@ -266,7 +266,7 @@ class events_main(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(
-        self, 
+        self,
         member: utils.TypedMember,
         before: discord.VoiceState,
         after: discord.VoiceState

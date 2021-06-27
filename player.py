@@ -71,6 +71,8 @@ class FFmpegPCMAudio(discord.AudioSource):
         self._process = None
 
 
+_AudioData = Tuple[bytes, Union[int, float]]
+_MessageQueue = Tuple[discord.Message, str, str]
 class TTSVoicePlayer(discord.VoiceClient):
     bot: TTSBot
     guild: discord.Guild
@@ -85,8 +87,8 @@ class TTSVoicePlayer(discord.VoiceClient):
         self.currently_playing = asyncio.Event()
         self.currently_playing.set()
 
-        self.audio_buffer: asyncio.Queue[Tuple[bytes, int]] = asyncio.Queue(maxsize=5)
-        self.message_queue: asyncio.Queue[Tuple[discord.Message, str, str]] = asyncio.Queue()
+        self.audio_buffer: asyncio.Queue[_AudioData] = asyncio.Queue(maxsize=5)
+        self.message_queue: asyncio.Queue[_MessageQueue] = asyncio.Queue()
 
         self.fill_audio_buffer.start()
 
@@ -99,7 +101,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         return f"<TTSVoicePlayer: {c=} {playing_audio=} {mqueuelen=} {abufferlen=}>"
 
 
-    async def disconnect(self, *, force: bool) -> None:
+    async def disconnect(self, *, force: bool = False) -> None:
         await super().disconnect(force=force)
         self.fill_audio_buffer.cancel()
         self.play_audio.cancel()
@@ -166,10 +168,10 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.play_audio.start()
 
 
-    async def get_gtts(self, message: discord.Message, text: str, lang: str) -> Optional[Tuple[bytes, int]]:
-        cached_mp3 = await self.bot.cache.get(text, lang, message.id)
+    async def get_gtts(self, message: discord.Message, text: str, lang: str) -> Optional[_AudioData]:
+        cached_mp3 = await self.bot.cache.get(text, lang)
         if cached_mp3:
-            return cached_mp3, int(mutagen.MP3(BytesIO(cached_mp3)).info.length)
+            return cached_mp3, mutagen.MP3(BytesIO(cached_mp3)).info.length
 
         try:
             audio = await self.bot.gtts.get(text=text, lang=lang)
@@ -186,16 +188,16 @@ class TTSVoicePlayer(discord.VoiceClient):
             return await self.get_gtts(message, text, lang)
 
         except asyncgTTS.easygttsException as e:
-            if str(e)[:3] != "400":
+            if str(e)[:3] not in {"400", "500"}:
                 raise
 
             return
 
-        file_length = int(mutagen.MP3(BytesIO(audio)).info.length)
-        await self.bot.cache.set(text, lang, message.id, audio)
+        file_length = mutagen.MP3(BytesIO(audio)).info.length
+        await self.bot.cache.set(text, lang, audio)
         return audio, file_length
 
-    async def get_espeak(self, _: Any, text: str, lang: str) -> Tuple[bytes, int]:
+    async def get_espeak(self, _: Any, text: str, lang: str) -> _AudioData:
         if text.startswith("-") and " " not in text:
             text += " " # fix espeak hang
 
@@ -205,7 +207,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
         audio_length = len(pydub_wav)/1000 # type: ignore
 
-        return wav, int(audio_length)
+        return wav, audio_length
 
 
     # easygTTS -> espeak handling

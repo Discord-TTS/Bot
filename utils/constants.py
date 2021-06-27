@@ -12,10 +12,14 @@ _disk_images = ("dmg", "iso", "img", "ima")
 ANIMATED_EMOJI_REGEX = _re.compile(r"<a\:.+:\d+>")
 EMOJI_REGEX = _re.compile(r"<:.+:\d+\d+>")
 
+_PRE_REGEX_REPLACEMENTS = {
+    r"\|\|.*?\|\|": ". spoiler avoided.",
+    r"```.*?```": ". code block.",
+    r"`.*?`": ". code snippet.",
+}
 REGEX_REPLACEMENTS = {
-    _re.compile(r"\|\|.*?\|\|"): ". spoiler avoided.",
-    _re.compile(r"```.*?```"): ". code block.",
-    _re.compile(r"`.*?`"): ". code snippet.",
+    _re.compile(key, _re.DOTALL): value
+    for key, value in _PRE_REGEX_REPLACEMENTS.items()
 }
 
 READABLE_TYPE = {
@@ -105,7 +109,4 @@ DB_SETUP_QUERY = """
         REFERENCES userinfo (user_id)
         ON DELETE CASCADE
     );
-    CREATE TABLE cache_lookup (
-        message    BYTEA  PRIMARY KEY,
-        message_id bigint UNIQUE NOT NULL
-    );"""
+"""

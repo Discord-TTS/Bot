@@ -6,9 +6,10 @@ from configparser import ConfigParser
 from os import listdir
 from time import monotonic
 from typing import (TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional,
-                    Union)
+                    Union, cast)
 
 import aiohttp
+import aioredis
 import asyncgTTS
 import asyncpg
 import discord
@@ -46,6 +47,7 @@ class TTSBot(commands.AutoShardedBot):
 
         command_prefix: Callable[[TTSBot, discord.Message], Awaitable[str]]
         voice_clients: List[TTSVoicePlayer]
+        cache_db: aioredis.Redis
         gtts: asyncgTTS.easygTTS
         pool: asyncpg.Pool
         blocked: bool # Handles if to be on gtts or espeak
@@ -99,16 +101,21 @@ class TTSBot(commands.AutoShardedBot):
 
     async def start(self, token: str, *args, **kwargs):
         "Get everything ready in async env"
+        cache_info = self.config["Redis Info"]
         db_info = self.config["PostgreSQL Info"]
-        self.gtts, self.pool = await asyncio.gather( # type: ignore
+
+        self.cache_db = aioredis.from_url(**cache_info)
+        self.pool, self.gtts = await asyncio.gather(
+            cast(Awaitable[asyncpg.Pool], asyncpg.create_pool(**db_info)),
             asyncgTTS.setup(premium=False, session=self.session),
-            asyncpg.create_pool(**db_info)
         )
 
         # Fill up bot.channels, as a load of webhooks
         for channel_name, webhook_url in self.config["Webhook URLs"].items():
             adapter = discord.AsyncWebhookAdapter(session=self.session)
-            self.channels[channel_name] = discord.Webhook.from_url(url=webhook_url, adapter=adapter)
+            self.channels[channel_name] = discord.Webhook.from_url(
+                url=webhook_url, adapter=adapter
+            )
 
         # Load all of /cogs and /extensions
         self.load_extensions("cogs")
@@ -167,8 +174,9 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
             return
 
         await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
-        await asyncio.wait_for(bot.pool.close(), timeout=5)
-        await bot.close()
+        await asyncio.wait_for(asyncio.gather(
+            bot.pool.close(), bot.cache_db.close(), bot.close()
+        ), timeout=5)
 
 try:
     import uvloop
