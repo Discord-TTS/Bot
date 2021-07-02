@@ -66,7 +66,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
             title="Joined your voice channel!",
             description="Just type normally and TTS Bot will say your messages!"
         )
-        join_embed.set_thumbnail(url=str(self.bot.user.avatar_url))
+        join_embed.set_thumbnail(url=self.bot.avatar_url)
         join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
         join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 

@@ -1,5 +1,6 @@
 import re as _re
 
+NETURAL_COLOUR = 0x3498db
 _image_files = ("bmp", "gif", "ico", "png", "psd", "svg", "jpg")
 _audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")
 _video_files = ("avi", "mp4", "wmv", "m4v", "mpg", "mpeg")
@@ -21,6 +22,12 @@ REGEX_REPLACEMENTS = {
     _re.compile(key, _re.DOTALL): value
     for key, value in _PRE_REGEX_REPLACEMENTS.items()
 }
+
+OPTION_SEPERATORS = (
+    ":small_orange_diamond:",
+    ":small_blue_diamond:",
+    ":small_red_triangle:"
+)
 
 READABLE_TYPE = {
     _compressed_files: "a compressed file",
@@ -77,7 +84,7 @@ GTTS_ESPEAK_DICT = {
     "es-us":"es"
     }
 
-DB_SETUP_QUERY = """
+GUILDS_CREATE = """
     CREATE TABLE guilds (
         guild_id       bigint     PRIMARY KEY,
         channel        bigint     DEFAULT 0,
@@ -88,12 +95,14 @@ DB_SETUP_QUERY = """
         repeated_chars smallint   DEFAULT 0,
         prefix         varchar(6) DEFAULT '-',
         default_lang   varchar(3)
-    );
+    );"""
+USERINFO_CREATE = """
     CREATE TABLE userinfo (
         user_id  bigint     PRIMARY KEY,
         blocked  bool       DEFAULT False,
         lang     varchar(4)
-    );
+    );"""
+NICKNAMES_CREATE = """
     CREATE TABLE nicknames (
         guild_id bigint,
         user_id  bigint,
@@ -108,5 +117,20 @@ DB_SETUP_QUERY = """
         FOREIGN KEY         (user_id)
         REFERENCES userinfo (user_id)
         ON DELETE CASCADE
-    );
-"""
+    );"""
+ANALYTICS_CREATE = """
+    CREATE TABLE analytics (
+        event          text  NOT NULL,
+        count          int   NOT NULL,
+        is_command     bool  NOT NULL,
+        date_collected date  NOT NULL DEFAULT CURRENT_DATE,
+
+        PRIMARY KEY (event, is_command, date_collected)
+    );"""
+
+DB_SETUP_QUERY = "\n".join((
+    GUILDS_CREATE,
+    USERINFO_CREATE,
+    NICKNAMES_CREATE,
+    ANALYTICS_CREATE
+))

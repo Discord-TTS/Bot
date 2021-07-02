@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Optional
 
 from cryptography.fernet import Fernet
 

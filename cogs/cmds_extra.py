@@ -33,26 +33,33 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
     async def botstats(self, ctx: commands.Context):
         "Shows various different stats"
 
-        channels = len(self.bot.voice_clients)
+        guilds = [guild for guild in self.bot.guilds if not guild.unavailable]
+        total_members = sum(guild.member_count for guild in guilds)
+        total_voice_clients = len(self.bot.voice_clients)
 
-        main_section = cleandoc(f"""
-          Currently in:
-            :small_blue_diamond: {channels} voice channels
-            :small_blue_diamond: {len(self.bot.guilds)} servers
-          Currently using:
-            :small_orange_diamond: {len(self.bot.shards)} shards
-            :small_orange_diamond: {Process(getpid()).memory_info().rss / 1024 ** 2:.1f}MB of RAM
-          and can be used by {sum(guild.member_count for guild in self.bot.guilds if not guild.unavailable):,} people!
-        """)
+        current_proc = Process(getpid()).memory_info()
+        ram_usage = current_proc.rss() / 1024 ** 2
 
         footer = cleandoc("""
             Support Server: https://discord.gg/zWPWwQC
             Repository: https://github.com/Gnome-py/Discord-TTS-Bot
         """)
 
-        embed = discord.Embed(title=f"{self.bot.user.name}: Now open source!", description=main_section, url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.set_thumbnail(url=str(self.bot.user.avatar_url))
-        embed.set_footer(text=footer)
+        sep1, sep2, *_ = utils.OPTION_SEPERATORS
+        embed = discord.Embed(
+            title=f"{self.bot.user.name}: Now open source!",
+            url="https://discord.gg/zWPWwQC",
+            colour=utils.NETURAL_COLOUR,
+            description=cleandoc(f"""
+                Currently in:
+                    {sep2} {total_voice_clients} voice channels
+                    {sep2} {len(self.bot.guilds)} servers
+                Currently using:
+                    {sep1} {len(self.bot.shards)} shards
+                    {sep1} {ram_usage:.1f}MB of RAM
+                and can be used by {total_members:,} people!
+            """)
+        ).set_footer(text=footer).set_thumbnail(url=self.bot.avatar_url)
 
         await ctx.send(embed=embed)
 
@@ -76,7 +83,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
         "Shows how you can help support TTS Bot's development and hosting!"
 
         await ctx.send(cleandoc(f"""
-            To donate to support the development and hosting of {self.bot.user.mention}, you can donate via Patreon (Fees) or directly via DonateBot.io!
+            To donate to support the development and hosting of {self.bot.user.mention}, you can donate via Patreon or DonateBot.io!
             <https://donatebot.io/checkout/693901918342217758>
             https://www.patreon.com/Gnome_the_Bot_Maker
         """))

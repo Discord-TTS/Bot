@@ -47,6 +47,7 @@ class TTSBot(commands.AutoShardedBot):
 
         command_prefix: Callable[[TTSBot, discord.Message], Awaitable[str]]
         voice_clients: List[TTSVoicePlayer]
+        analytics_buffer: utils.SafeDict
         cache_db: aioredis.Redis
         gtts: asyncgTTS.easygTTS
         pool: asyncpg.Pool
@@ -74,6 +75,14 @@ class TTSBot(commands.AutoShardedBot):
         support_server = self.support_server
         return support_server.get_channel(694127922801410119) if support_server else None # type: ignore
 
+    @property
+    def avatar_url(self) -> str:
+        return str(self.user.avatar_url) if self.user else ""
+
+    def load_extensions(self, folder: str):
+        filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
+        for ext in filered_exts:
+            self.load_extension(f"{folder}.{ext[:-3]}")
 
     async def check_gtts(self) -> Union[bool, Exception]:
         try:
@@ -84,6 +93,7 @@ class TTSBot(commands.AutoShardedBot):
         except Exception as e:
             return e
 
+
     async def process_commands(self, message: discord.Message) -> None:
         if message.author.bot:
             return
@@ -93,11 +103,9 @@ class TTSBot(commands.AutoShardedBot):
 
         await self.invoke(ctx)
 
+    async def wait_until_ready(self, *args, **kwargs) -> None:
+        return await super().wait_until_ready()
 
-    def load_extensions(self, folder: str):
-        filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
-        for ext in filered_exts:
-            self.load_extension(f"{folder}.{ext[:-3]}")
 
     async def start(self, token: str, *args, **kwargs):
         "Get everything ready in async env"

@@ -4,7 +4,7 @@ from typing import Dict, TYPE_CHECKING, List, Mapping, Optional, Union
 
 import discord
 from discord.ext import commands
-
+from utils import NETURAL_COLOUR
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -37,8 +37,6 @@ class FancyHelpCommand(commands.HelpCommand):
         from utils import TypedContext
         context: TypedContext
         del TypedContext
-
-    COLOUR = 0x3498db
 
     def __init__(self, *args, **kwargs):
         kwargs["verify_checks"] = False
@@ -83,7 +81,7 @@ class FancyHelpCommand(commands.HelpCommand):
         embed = discord.Embed(
             title="TTS Bot Help!",
             description=description,
-            colour=self.COLOUR
+            colour=NETURAL_COLOUR
         )
 
         embed.set_author(name=self.context.author.display_name, icon_url=str(self.context.author.avatar_url))
@@ -100,7 +98,7 @@ class FancyHelpCommand(commands.HelpCommand):
         embed = discord.Embed(
             title=f"`{self.clean_prefix}{group.qualified_name}` Help!",
             description=description,
-            colour=self.COLOUR
+            colour=NETURAL_COLOUR
         )
 
         embed.set_footer(text=self.get_ending_note(isinstance(group, commands.Group)))

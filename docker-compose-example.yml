@@ -5,6 +5,7 @@ services:
           - type: bind
             source: ./config.ini
             target: /config.ini
+        command: ["./wait-for-it.sh", "postgres:5432", "cache:6379", "--strict", "--", "python3", "-u" "bot.py"]
         depends_on: [database, cache]
         restart: always
     database:
@@ -16,3 +17,7 @@ services:
     cache:
         image: eqalpha/keydb:latest
         expose: [6379]
+        volumes:
+            - type: bind
+              source: ./keydb.conf
+              target: /etc/keydb/keydb.conf

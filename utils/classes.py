@@ -16,6 +16,13 @@ class CommonCog(commands.Cog):
     def __init__(self, bot: TTSBot):
         self.bot = bot
 
+class SafeDict(dict):
+    def add(self, event):
+        if event not in self:
+            self[event] = 0
+
+        self[event] += 1
+
 
 # Typed Classes for silencing type errors.
 VoiceChannel = Union[discord.VoiceChannel, discord.StageChannel]
