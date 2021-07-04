@@ -115,21 +115,5 @@ class Loops(utils.CommonCog):
             for first, second in sections[section_name]:
                 embed.description += f"{first:<{max}} {second}\n"
 
-        rstats = await self.bot.cache_db.info("stats")
-        hits: int = rstats["keyspace_hits"]
-        misses: int = rstats["keyspace_misses"]
-
-        # Redis is actually stupid, so stats reset on server restart... :(
-        if hits and misses:
-            total_queries = hits + misses
-            hit_rate = (hits / (total_queries)) * 100
-            embed.description += cleandoc(f"""
-                Redis Info:
-                {sep} `Total Queries: {total_queries}`
-                {sep} `Hit Rate:      {hit_rate:.2f}%`
-
-                {sep} `Key Hits:      {hits}`
-                {sep} `Key Misses:    {misses}`
-            """)
-
+        embed.description += await utils.get_redis_info(self.bot.cache_db)
         await self.bot.channels["analytics"].send(embed=embed)

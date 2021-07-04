@@ -38,7 +38,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
         total_voice_clients = len(self.bot.voice_clients)
 
         current_proc = Process(getpid()).memory_info()
-        ram_usage = current_proc.rss() / 1024 ** 2
+        ram_usage = current_proc.rss / 1024 ** 2
 
         footer = cleandoc("""
             Support Server: https://discord.gg/zWPWwQC
