@@ -16,8 +16,16 @@ class CommonCog(commands.Cog):
     def __init__(self, bot: TTSBot):
         self.bot = bot
 
+class SafeDict(dict):
+    def add(self, event):
+        if event not in self:
+            self[event] = 0
+
+        self[event] += 1
+
 
 # Typed Classes for silencing type errors.
+VoiceChannel = Union[discord.VoiceChannel, discord.StageChannel]
 class TypedContext(commands.Context):
     bot: TTSBot
     author: Union[TypedMember, discord.User]
@@ -25,8 +33,8 @@ class TypedContext(commands.Context):
     async def reply(self, *args, **kwargs) -> discord.Message:
         if not self.guild or self.channel.permissions_for(self.guild.me).read_message_history: # type: ignore
             return await super().reply(*args, **kwargs)
-        else:
-            return await super().send(*args, **kwargs)
+
+        return await super().send(*args, **kwargs)
 
 class TypedGuildContext(TypedContext):
     guild: TypedGuild
@@ -38,6 +46,7 @@ class TypedMessage(discord.Message):
 
 class TypedGuildMessage(TypedMessage):
     guild: TypedGuild
+    author: TypedMember
     channel: discord.TextChannel
 
 
@@ -50,4 +59,4 @@ class TypedGuild(discord.Guild):
     voice_client: Optional[TTSVoicePlayer]
 
 class TypedVoiceState(discord.VoiceState):
-    channel: Optional[Union[discord.VoiceChannel, discord.StageChannel]]
+    channel: VoiceChannel

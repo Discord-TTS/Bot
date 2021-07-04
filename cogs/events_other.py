@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from asyncio.subprocess import create_subprocess_exec
 from inspect import cleandoc
-from subprocess import call
 from typing import TYPE_CHECKING
 
 import discord
@@ -45,46 +45,39 @@ class events_other(utils.CommonCog):
             if dm_sender.discriminator != "0000":
                 return
 
-            dm_command = self.bot.get_command("dm")
+            dm_command: commands.Command = self.bot.get_command("dm") # type: ignore
             ctx = await self.bot.get_context(message)
 
             todm = await commands.UserConverter().convert(ctx, dm_sender.name)
             await dm_command(ctx, todm, message=message.content)
 
-        if message.channel.id == 749971061843558440 and message.embeds and str(message.author) == "GitHub#0000":
-            embed_title = message.embeds[0].title
-            if " new commit" not in embed_title: # type: ignore
-                return
-
-            correct_id = self.bot.user.id == 698218518335848538
-            correct_title = embed_title.startswith("[Discord-TTS-Bot:dev]") # type: ignore
-            if correct_title and correct_id:
-                await self.bot.channels['logs'].send("Detected new bot commit! Pulling changes")
-                call(['git', 'pull'])
-                await self.bot.close()
-
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
         _, prefix, owner = await asyncio.gather(
             self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!"),
-            self.bot.settings.get(guild, setting="prefix"),
+            self.bot.settings.get(guild, ["prefix"]),
             guild.fetch_member(guild.owner_id)
         )
 
-        embed = discord.Embed(title=f"Welcome to {self.bot.user.name}!", description=WELCOME_MESSAGE.format(guild=guild, prefix=prefix))
-        embed.set_footer(text=f"Support Server: https://discord.gg/zWPWwQC | Bot Invite: https://bit.ly/TTSBot")
-        embed.set_author(name=str(owner), icon_url=str(owner.avatar_url))
+        embed = discord.Embed(
+            title=f"Welcome to {self.bot.user.name}!",
+            description=WELCOME_MESSAGE.format(guild=guild, prefix=prefix[0])
+        ).set_footer(
+            text="Support Server: https://discord.gg/zWPWwQC | Bot Invite: https://bit.ly/TTSBot"
+        ).set_author(name=str(owner), icon_url=str(owner.avatar_url))
 
         try: await owner.send(embed=embed)
         except discord.errors.HTTPException: pass
 
         support_server = self.bot.support_server
-        if owner in support_server.members:
+        if support_server and owner in support_server.members:
             role = support_server.get_role(738009431052386304)
             if not role:
                 return
 
-            await support_server.get_member(owner.id).add_roles(role)
+            support_guild_member = support_server.get_member(owner.id)
+            if support_guild_member:
+                await support_guild_member.add_roles(role)
 
             embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild}")
             embed.set_author(name=f"{owner} (ID {owner.id})", icon_url=str(owner.avatar_url))

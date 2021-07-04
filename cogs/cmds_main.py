@@ -23,7 +23,8 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
 
     async def channel_check(self, ctx: utils.TypedGuildContext) -> bool:
-        if ctx.channel.id != await self.bot.settings.get(ctx.guild, "channel"):
+        channel = (await self.bot.settings.get(ctx.guild, ["channel"]))[0]
+        if ctx.channel.id != channel:
             await ctx.send(f"Error: Wrong channel, do {ctx.prefix}channel get the channel that has been setup.")
             return False
 
@@ -66,7 +67,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
             title="Joined your voice channel!",
             description="Just type normally and TTS Bot will say your messages!"
         )
-        join_embed.set_thumbnail(url=str(self.bot.user.avatar_url))
+        join_embed.set_thumbnail(url=self.bot.avatar_url)
         join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
         join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
@@ -125,7 +126,7 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
         if not vc or (not vc.is_playing() and vc.message_queue.empty() and vc.audio_buffer.empty()):
             return await ctx.send("**Error:** Nothing in message queue to skip!")
 
-        ctx.guild.voice_client.skip()
+        vc.skip()
         return await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
 
     @skip.after_invoke

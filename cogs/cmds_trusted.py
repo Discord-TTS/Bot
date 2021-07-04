@@ -51,22 +51,6 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.check(is_trusted)
-    @commands.bot_has_permissions(send_messages=True)
-    async def getinvite(self, ctx: commands.Context, guild: int):
-        guild_obj = self.bot.get_guild(guild)
-
-        for channel in guild_obj.channels:
-            try:
-                invite = str(await channel.create_invite())
-            except:
-                continue
-            if invite:
-                return await ctx.send(f"Invite to {guild_obj} | {guild}: {invite}")
-
-        await ctx.send("Error: No permissions to make an invite!")
-
-    @commands.command()
-    @commands.check(is_trusted)
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def dm(self, ctx: utils.TypedContext, todm: discord.User, *, message: str):
         embed = discord.Embed(title="Message from the developers:", description=message)
@@ -124,25 +108,31 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
         if not (ofs_role and highlighted_ofs):
             return
 
-
         people_with_owner_of_server = [member.id for member in ofs_role.members]
         people_with_highlighted_ofs = [member.id for member in highlighted_ofs.members]
         support_server_members = [member.id for member in support_server.members]
 
         owner_list = [guild.owner_id for guild in self.bot.guilds]
-        ofs_roles = list()
-        for role in (738009431052386304, 738009620601241651, 738009624443224195):
-            ofs_roles.append(support_server.get_role(role))
+        ofs_roles = [
+            support_server.get_role(role)
+            for role in (
+                738009431052386304,
+                738009620601241651,
+                738009624443224195,
+            )
+        ]
 
-        for ofs_person in people_with_owner_of_server:
-            if ofs_person not in owner_list:
+        for ofs_person_id in people_with_owner_of_server:
+            if ofs_person_id not in owner_list:
                 roles = [ofs_role, ]
-                embed = discord.Embed(description=f"Role Removed: Removed {ofs_role.mention} from <@{ofs_person}>")
-                if ofs_person in people_with_highlighted_ofs:
+                embed = discord.Embed(description=f"Role Removed: Removed {ofs_role.mention} from <@{ofs_person_id}>")
+                if ofs_person_id in people_with_highlighted_ofs:
                     roles.append(highlighted_ofs)
 
-                await support_server.get_member(ofs_person).remove_roles(*roles)
-                await self.bot.channels["logs"].send(embed=embed)
+                ofs_person = support_server.get_member(ofs_person_id)
+                if ofs_person is not None:
+                    await ofs_person.remove_roles(*roles)
+                    await self.bot.channels["logs"].send(embed=embed)
 
         for guild_owner in owner_list:
             if guild_owner not in support_server_members:
@@ -152,6 +142,9 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
             additional_message = None
             embed = None
 
+            if guild_owner is None:
+                continue
+
             if guild_owner.id not in people_with_owner_of_server:
                 await guild_owner.add_roles(ofs_role)
 
@@ -159,10 +152,9 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
                 embed.set_author(name=f"{guild_owner} (ID {guild_owner.id})", icon_url=str(guild_owner.avatar_url))
                 embed.set_thumbnail(url=str(guild_owner.avatar_url))
 
-            if highlighted_ofs not in guild_owner.roles:
-                if [True for role in ofs_roles if role in guild_owner.roles]:
-                    additional_message = f"Added highlighted owner of a server to {guild_owner.mention}"
-                    await guild_owner.add_roles(highlighted_ofs)
+            if highlighted_ofs not in guild_owner.roles and any(role in guild_owner.roles for role in ofs_roles):
+                additional_message = f"Added highlighted owner of a server to {guild_owner.mention}"
+                await guild_owner.add_roles(highlighted_ofs)
 
             if not (embed and additional_message):
                 continue
