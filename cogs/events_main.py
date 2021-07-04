@@ -88,23 +88,20 @@ class events_main(utils.CommonCog):
             if message_clean.startswith(prefix):
                 return
 
+            bot_voice_client = message.guild.voice_client
             if message.author.bot:
-                if bot_ignore:
+                if bot_ignore or not bot_voice_client:
                     return
-            elif not isinstance(message.author, discord.Member):
+            elif (
+                not isinstance(message.author, discord.Member)
+                or not message.author.voice
+            ):
                 return
-            elif not message.author.voice:
-                return
-            else:
-                bot_voice_client = message.guild.voice_client
-                if not bot_voice_client:
-                    if not autojoin:
-                        return
+            elif not bot_voice_client:
+                if not autojoin:
+                    return
 
-                    if not await do_autojoin(message.author):
-                        return
-
-                elif message.author.voice.channel != bot_voice_client.channel:
+                if not await do_autojoin(message.author):
                     return
 
             # Fix linter issues

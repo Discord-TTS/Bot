@@ -132,7 +132,6 @@ async def setup_bot(bot: TTSBot) -> bool:
     db_info = bot.config["PostgreSQL Info"]
     bot.config["Main"]["key"] = str(Fernet.generate_key())
 
-    await asyncio.sleep(10) # wait for database to definitely be ready
     conn = await asyncpg.connect(**db_info)
     await conn.execute(utils.DB_SETUP_QUERY)
     await conn.close()

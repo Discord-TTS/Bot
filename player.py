@@ -283,6 +283,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         except Exception as error:
             exceptions.append(error)
 
+        exceptions = [err for err in exceptions if err is not None]
         return await asyncio.gather(*(
             self.bot.on_error("play_audio", exception)
             for exception in exceptions

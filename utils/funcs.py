@@ -5,16 +5,21 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from inspect import cleandoc
 from typing import TYPE_CHECKING, Awaitable, Optional, Sequence, TypeVar
 
-from utils.constants import ANIMATED_EMOJI_REGEX, EMOJI_REGEX, READABLE_TYPE
+from utils.constants import (ANIMATED_EMOJI_REGEX, EMOJI_REGEX,
+                             OPTION_SEPERATORS, READABLE_TYPE)
 
 
 if TYPE_CHECKING:
+    import aioredis
     import discord
 
     _R = TypeVar("_R")
 
+
+_sep = OPTION_SEPERATORS[2]
 
 def get_size(start_path: str = ".") -> int:
     "Gets the recursive size of a directory"
@@ -66,6 +71,26 @@ def to_async(coro: Awaitable[_R], loop: asyncio.AbstractEventLoop = None) -> _R:
         return loop.run_until_complete(coro)
 
     return asyncio.run_coroutine_threadsafe(coro, loop).result()
+
+async def get_redis_info(cache_db: aioredis.Redis) -> str:
+    rstats = await cache_db.info("stats")
+    hits: int = rstats["keyspace_hits"]
+    misses: int = rstats["keyspace_misses"]
+
+    # Redis is actually stupid, so stats reset on server restart... :(
+    if not (hits and misses):
+        return ""
+
+    total_queries = hits + misses
+    hit_rate = (hits / (total_queries)) * 100
+    return cleandoc(f"""
+        Redis Info:
+        {_sep} `Total Queries: {total_queries}`
+        {_sep} `Hit Rate:      {hit_rate:.2f}%`
+
+        {_sep} `Key Hits:      {hits}`
+        {_sep} `Key Misses:    {misses}`
+    """)
 
 
 if sys.version_info >= (3, 9):
