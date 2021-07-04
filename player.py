@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from concurrent.futures import Future
 from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Tuple, Union, cast
 
 import asyncgTTS
 import discord
@@ -83,6 +82,7 @@ class TTSVoicePlayer(discord.VoiceClient):
 
         self.bot = bot
         self.prefix = None
+        self.linked_channel = 0
 
         self.currently_playing = asyncio.Event()
         self.currently_playing.set()
@@ -181,7 +181,7 @@ class TTSVoicePlayer(discord.VoiceClient):
 
             self.bot.blocked = True
             if await self.bot.check_gtts() is not True:
-                await self._handle_rl()
+                asyncio.create_task(self._handle_rl())
             else:
                 self.bot.blocked = False
 
@@ -194,15 +194,19 @@ class TTSVoicePlayer(discord.VoiceClient):
             return
 
         file_length = mutagen.MP3(BytesIO(audio)).info.length
-        await self.bot.cache.set(text, lang, audio)
+        if audio and file_length <= self.max_length:
+            await self.bot.cache.set(text, lang, audio)
+
         return audio, file_length
 
     async def get_espeak(self, _: Any, text: str, lang: str) -> _AudioData:
         if text.startswith("-") and " " not in text:
             text += " " # fix espeak hang
 
-        voice = voxpopuli.Voice(lang=utils.GTTS_ESPEAK_DICT.get(lang, "en"), speed=130, volume=2)
-        wav = await voice.to_audio(text)
+        wav = await voxpopuli.Voice(
+            lang=utils.GTTS_ESPEAK_DICT.get(lang, "en"),
+            speed=130, volume=2
+        ).to_audio(text)
 
         pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
         audio_length = len(pydub_wav)/1000 # type: ignore
@@ -218,8 +222,9 @@ class TTSVoicePlayer(discord.VoiceClient):
         if not self.bot.sent_fallback:
             self.bot.sent_fallback = True
 
-            send_fallback_coros = [vc._send_fallback() for vc in self.bot.voice_clients]
-            await asyncio.gather(*(send_fallback_coros))
+            await asyncio.gather(*(
+                vc._send_fallback() for vc in self.bot.voice_clients
+            ))
             await self.bot.channels["logs"].send("**Fallback/RL messages have been sent.**")
 
     async def _handle_rl_reset(self):
@@ -253,7 +258,8 @@ class TTSVoicePlayer(discord.VoiceClient):
             await channel.send(embed=await self._get_embed())
 
     async def _get_embed(self):
-        prefix = self.prefix or await self.bot.settings.get(self.guild, "prefix")
+        prefix = self.prefix or (await self.bot.settings.get(self.guild, ["prefix"]))[0]
+
         return discord.Embed(
             title="TTS Bot has been blocked by Google",
             description=cleandoc(f"""
@@ -264,18 +270,20 @@ class TTSVoicePlayer(discord.VoiceClient):
 
 
     # Helper functions
-    def _after_player(self, exception: Optional[Exception]) -> List[Any]:
-        exceptions = [exception] if exception else []
+    def _after_player(self, exception: Optional[Exception]) -> Sequence[Any]:
+        # This func runs in a seperate thread and has to do awaiting,
+        # also we want to get back to the main thread to fix race conditions.
+        coro = self._after_player_coro(exception)
+        return utils.to_async(coro, self.bot.loop)
+
+    async def _after_player_coro(self, exception: Optional[Exception]) -> Sequence[Any]:
+        exceptions = [exception] or []
         try:
             self.currently_playing.set()
         except Exception as error:
             exceptions.append(error)
 
-        futures: List[Future] = []
-        for exception in exceptions:
-            callable_func = self.bot.on_error("play_audio", exception)
-            futures.append(asyncio.run_coroutine_threadsafe(
-                callable_func, self.bot.loop
-            ))
-
-        return [future.result() for future in futures]
+        return await asyncio.gather(*(
+            self.bot.on_error("play_audio", exception)
+            for exception in exceptions
+        ))

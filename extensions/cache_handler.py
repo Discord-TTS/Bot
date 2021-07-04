@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
-from typing import TYPE_CHECKING, Optional
+from typing import Any, TYPE_CHECKING, Optional
 
 from cryptography.fernet import Fernet
 
@@ -10,8 +10,8 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
-def hash_args(func):
-    def wrapper(self: CacheHandler, text: str, lang: str, *args, **kwargs):
+def hash_args(func) -> Any:
+    def wrapper(self: CacheHandler, text: str, lang: str, *args, **kwargs) -> Any:
         return func(self, self.get_hash(text, lang), *args, **kwargs)
     return wrapper
 

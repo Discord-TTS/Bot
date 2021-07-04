@@ -51,33 +51,20 @@ class events_other(utils.CommonCog):
             todm = await commands.UserConverter().convert(ctx, dm_sender.name)
             await dm_command(ctx, todm, message=message.content)
 
-        if message.channel.id == 749971061843558440 and message.embeds and str(message.author) == "GitHub#0000":
-            embed_title = message.embeds[0].title
-            if " new commit" not in embed_title: # type: ignore
-                return
-
-            correct_id = self.bot.user.id == 698218518335848538
-            correct_title = embed_title.startswith("[Discord-TTS-Bot:dev]") # type: ignore
-            if correct_title and correct_id:
-                closing_task = asyncio.create_task(self.bot.close())
-                try:
-                    await self.bot.channels["logs"].send("Detected new bot commit! Pulling changes")
-                    await create_subprocess_exec("git", "pull")
-                    await create_subprocess_exec("docker", "build", ".")
-                finally:
-                    await closing_task
-
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
         _, prefix, owner = await asyncio.gather(
             self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!"),
-            self.bot.settings.get(guild, setting="prefix"),
+            self.bot.settings.get(guild, ["prefix"]),
             guild.fetch_member(guild.owner_id)
         )
 
-        embed = discord.Embed(title=f"Welcome to {self.bot.user.name}!", description=WELCOME_MESSAGE.format(guild=guild, prefix=prefix))
-        embed.set_footer(text=f"Support Server: https://discord.gg/zWPWwQC | Bot Invite: https://bit.ly/TTSBot")
-        embed.set_author(name=str(owner), icon_url=str(owner.avatar_url))
+        embed = discord.Embed(
+            title=f"Welcome to {self.bot.user.name}!",
+            description=WELCOME_MESSAGE.format(guild=guild, prefix=prefix[0])
+        ).set_footer(
+            text="Support Server: https://discord.gg/zWPWwQC | Bot Invite: https://bit.ly/TTSBot"
+        ).set_author(name=str(owner), icon_url=str(owner.avatar_url))
 
         try: await owner.send(embed=embed)
         except discord.errors.HTTPException: pass

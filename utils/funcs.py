@@ -1,12 +1,19 @@
 "Useful functions used throughout the bot"
 
+from __future__ import annotations
+
+import asyncio
 import os
 import sys
-from typing import Optional, Sequence
-
-import discord
+from typing import TYPE_CHECKING, Awaitable, Optional, Sequence, TypeVar
 
 from utils.constants import ANIMATED_EMOJI_REGEX, EMOJI_REGEX, READABLE_TYPE
+
+
+if TYPE_CHECKING:
+    import discord
+
+    _R = TypeVar("_R")
 
 
 def get_size(start_path: str = ".") -> int:
@@ -46,6 +53,20 @@ def exts_to_format(attachments: Sequence[discord.Attachment]) -> Optional[str]:
     returned_format_gen = (file_type for exts, file_type in READABLE_TYPE.items() if ext in exts)
 
     return next(returned_format_gen, "a file")
+
+def to_async(coro: Awaitable[_R], loop: asyncio.AbstractEventLoop = None) -> _R:
+    """Gets to an async env and returns the coro's result
+    Notes: Can be used for swapping threads, if loop is passed."""
+
+    if not loop:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            raise RuntimeError
+
+        return loop.run_until_complete(coro)
+
+    return asyncio.run_coroutine_threadsafe(coro, loop).result()
+
 
 if sys.version_info >= (3, 9):
     removeprefix = str.removeprefix

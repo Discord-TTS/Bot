@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import timedelta, datetime, time
-from typing import Dict, TYPE_CHECKING, Awaitable, List, Tuple
+from datetime import datetime, time, timedelta
+from inspect import cleandoc
+from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
 
 import discord
 from discord.ext import tasks
@@ -68,9 +69,10 @@ class Loops(utils.CommonCog):
 
     @tasks.loop(minutes=10)
     @utils.decos.handle_errors
-    async def send_analytics_msg(self):
-        midday = time(hour=12)
-        await sleep_until(midday)
+    async def send_analytics_msg(self, wait: bool = True):
+        if wait:
+            midday = time(hour=12)
+            await sleep_until(midday)
 
         max = 0
         yesterday = datetime.today() - timedelta(days=1)
@@ -88,6 +90,9 @@ class Loops(utils.CommonCog):
             yesterday_data = await conn.fetch(get_from_date, yesterday)
             for row in yesterday_data:
                 event, count, is_command, *_ = row
+                if len(sections[lookup[is_command]]) >= 10:
+                    continue
+
                 max_count: int = (await conn.fetchrow("""
                     SELECT max(count) FROM analytics
                     WHERE event = $1 and is_command = $2
@@ -109,5 +114,22 @@ class Loops(utils.CommonCog):
             embed.description += section_name + "\n" # type: ignore
             for first, second in sections[section_name]:
                 embed.description += f"{first:<{max}} {second}\n"
+
+        rstats = await self.bot.cache_db.info("stats")
+        hits: int = rstats["keyspace_hits"]
+        misses: int = rstats["keyspace_misses"]
+
+        # Redis is actually stupid, so stats reset on server restart... :(
+        if hits and misses:
+            total_queries = hits + misses
+            hit_rate = (hits / (total_queries)) * 100
+            embed.description += cleandoc(f"""
+                Redis Info:
+                {sep} `Total Queries: {total_queries}`
+                {sep} `Hit Rate:      {hit_rate:.2f}%`
+
+                {sep} `Key Hits:      {hits}`
+                {sep} `Key Misses:    {misses}`
+            """)
 
         await self.bot.channels["analytics"].send(embed=embed)

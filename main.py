@@ -5,7 +5,7 @@ import traceback
 from configparser import ConfigParser
 from os import listdir
 from time import monotonic
-from typing import (TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional,
+from typing import (Any, TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional,
                     Union, cast)
 
 import aiohttp
@@ -33,8 +33,12 @@ status = getattr(discord.Status, config["Activity"]["status"])
 # Custom prefix support
 async def prefix(bot: TTSBot, message: discord.Message) -> str:
     "Gets the prefix for a guild based on the passed message object"
-    return await bot.settings.get(message.guild, "prefix") if message.guild else "-"
+    if message.guild:
+        return (await bot.settings.get(message.guild, ["prefix"]))[0]
 
+    return "-"
+
+Pool = asyncpg.Pool[asyncpg.Record] if TYPE_CHECKING else asyncpg.Pool
 class TTSBot(commands.AutoShardedBot):
     if TYPE_CHECKING:
         from extensions import cache_handler, database_handler
@@ -50,8 +54,8 @@ class TTSBot(commands.AutoShardedBot):
         analytics_buffer: utils.SafeDict
         cache_db: aioredis.Redis
         gtts: asyncgTTS.easygTTS
-        pool: asyncpg.Pool
         blocked: bool # Handles if to be on gtts or espeak
+        pool: Pool
 
         del cache_handler, database_handler, TTSVoicePlayer
 
@@ -103,18 +107,18 @@ class TTSBot(commands.AutoShardedBot):
 
         await self.invoke(ctx)
 
-    async def wait_until_ready(self, *args, **kwargs) -> None:
+    async def wait_until_ready(self, *args: Any, **kwargs: Any) -> None:
         return await super().wait_until_ready()
 
 
-    async def start(self, token: str, *args, **kwargs):
+    async def start(self, token: str, *args: None, **kwargs: bool):
         "Get everything ready in async env"
         cache_info = self.config["Redis Info"]
         db_info = self.config["PostgreSQL Info"]
 
         self.cache_db = aioredis.from_url(**cache_info)
         self.pool, self.gtts = await asyncio.gather(
-            cast(Awaitable[asyncpg.Pool], asyncpg.create_pool(**db_info)),
+            cast(Awaitable[Pool], asyncpg.create_pool(**db_info)),
             asyncgTTS.setup(premium=False, session=self.session),
         )
 
@@ -139,6 +143,9 @@ class TTSBot(commands.AutoShardedBot):
 def get_error_string(e: BaseException) -> str:
     return f"{type(e).__name__}: {e}"
 
+async def only_avaliable(ctx: utils.TypedContext):
+    return not ctx.guild.unavailable if ctx.guild else True
+
 
 async def main() -> None:
     async with aiohttp.ClientSession() as session:
@@ -157,6 +164,7 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         chunk_guilds_at_startup=False,
         allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
     )
+    bot.add_check(only_avaliable)
 
     await automatic_update.do_early_updates(bot)
     try:

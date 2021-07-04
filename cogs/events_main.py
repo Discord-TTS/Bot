@@ -130,7 +130,9 @@ class events_main(utils.CommonCog):
                 "lang", message.author, default=None
             )
             if not user_lang:
-                guild_lang = await self.bot.settings.get(message.guild, "default_lang")
+                guild_lang = cast(str, (await self.bot.settings.get(
+                    message.guild, ["default_lang"]
+                ))[0])
 
             lang = user_lang or guild_lang or "en"
 

@@ -23,7 +23,8 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
 
     async def channel_check(self, ctx: utils.TypedGuildContext) -> bool:
-        if ctx.channel.id != await self.bot.settings.get(ctx.guild, "channel"):
+        channel = (await self.bot.settings.get(ctx.guild, ["channel"]))[0]
+        if ctx.channel.id != channel:
             await ctx.send(f"Error: Wrong channel, do {ctx.prefix}channel get the channel that has been setup.")
             return False
 

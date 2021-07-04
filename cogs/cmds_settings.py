@@ -174,12 +174,10 @@ class cmds_settings(utils.CommonCog, name="Settings"):
     @commands.has_permissions(administrator=True)
     async def limits(self, ctx: utils.TypedGuildContext):
         "A group of settings to modify the limits of what the bot reads"
-        prefix = await self.bot.settings.get(ctx.guild, "prefix")
-
         if ctx.invoked_subcommand is not None:
             return
 
-        if ctx.message.content != f"{prefix}set limits":
+        if ctx.message.content != f"{ctx.prefix}set limits":
             return await ctx.send_help(ctx.command)
 
         msg_length, repeated_chars = await self.bot.settings.get(

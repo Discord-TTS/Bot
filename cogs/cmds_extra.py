@@ -68,7 +68,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
     @commands.command()
     async def channel(self, ctx: utils.TypedGuildContext):
         "Shows the current setup channel!"
-        channel = await self.bot.settings.get(ctx.guild, "channel")
+        channel = (await self.bot.settings.get(ctx.guild, ["channel"]))[0]
 
         if channel == ctx.channel.id:
             await ctx.send("You are in the right channel already!")
