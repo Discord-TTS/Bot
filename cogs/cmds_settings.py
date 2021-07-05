@@ -137,21 +137,22 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
 
         # Show settings embed
+        sep1, sep2, sep3 = utils.OPTION_SEPERATORS
         server_settings = cleandoc(f"""
-            :small_orange_diamond: Setup Channel: `#{channel_name}`
-            :small_orange_diamond: Auto Join: `{auto_join}`
-            :small_orange_diamond: Command Prefix: `{prefix}`
+            {sep1} Setup Channel: `#{channel_name}`
+            {sep1} Auto Join: `{auto_join}`
+            {sep1} Command Prefix: `{prefix}`
         """)
 
         tts_settings = cleandoc(f"""
-            :small_blue_diamond: <User> said: message `{xsaid}`
-            :small_blue_diamond: Ignore bot's messages: `{bot_ignore}`
-            :small_blue_diamond: Default Server Language: `{default_voice}`
+            {sep2} <User> said: message `{xsaid}`
+            {sep2} Ignore bot's messages: `{bot_ignore}`
+            {sep2} Default Server Voice: `{default_voice}`
         """)
 
         user_settings = cleandoc(f"""
-            :small_red_triangle: Language: `{voice}`
-            :small_red_triangle: Nickname: `{nickname}`
+            {sep3} Voice: `{voice}`
+            {sep3} Nickname: `{nickname}`
         """)
 
         embed = discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
@@ -230,7 +231,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
         if "<" in nickname and ">" in nickname:
             await ctx.send("Hey! You can't have mentions/emotes in your nickname!")
-        elif not re.match(r'^(\w|\s)+$', nickname):
+        elif not re.match(r"^(\w|\s)+$", nickname):
             await ctx.send("Hey! Please keep your nickname to only letters, numbers, and spaces!")
         else:
             await self.bot.nicknames.set(ctx.guild, user, nickname)
@@ -253,12 +254,10 @@ class cmds_settings(utils.CommonCog, name="Settings"):
     @commands.has_permissions(administrator=True)
     async def limits(self, ctx: utils.TypedGuildContext):
         "A group of settings to modify the limits of what the bot reads"
-        prefix = await self.bot.settings.get(ctx.guild, "prefix")
-
         if ctx.invoked_subcommand is not None:
             return
 
-        if ctx.message.content != f"{prefix}set limits":
+        if ctx.message.content != f"{ctx.prefix}set limits":
             return await ctx.send_help(ctx.command)
 
         msg_length, repeated_chars = await self.bot.settings.get(
@@ -269,9 +268,10 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             ]
         )
 
+        sep = utils.OPTION_SEPERATORS[0]
         message1 = cleandoc(f"""
-            :small_orange_diamond: Max Message Length: `{msg_length} seconds`
-            :small_orange_diamond: Max Repeated Characters: `{repeated_chars}`
+            {sep} Max Message Length: `{msg_length} seconds`
+            {sep} Max Repeated Characters: `{repeated_chars}`
         """)
 
         embed = discord.Embed(title="Current Limits", description=message1, url="https://discord.gg/zWPWwQC", color=0x3498db)
@@ -316,7 +316,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             """)
         )
         embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
-        embed.set_thumbnail(url=str(self.bot.user.avatar_url))
+        embed.set_thumbnail(url=self.bot.avatar_url)
         embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
 
         await ctx.send(embed=embed)

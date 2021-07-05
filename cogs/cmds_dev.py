@@ -25,7 +25,8 @@ class cmds_dev(utils.CommonCog, command_attrs={"hidden": True}):
         await self.bot.close()
 
     @commands.command()
-    async def debug(self, ctx: commands.Context):
+    @commands.guild_only()
+    async def debug(self, ctx: utils.TypedGuildContext):
         embed = discord.Embed(
             title="TTS Bot debug info!",
             description=f"Voice Client: {ctx.guild.voice_client!r}"

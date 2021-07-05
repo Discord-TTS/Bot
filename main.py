@@ -7,9 +7,10 @@ import traceback
 from configparser import ConfigParser
 from os import listdir
 from time import monotonic
-from typing import Any, Callable, Coroutine, List, TYPE_CHECKING, Dict, Optional
+from typing import Any, Awaitable, Callable, Coroutine, List, TYPE_CHECKING, Dict, Optional, cast
 
 import aiohttp
+import aioredis
 import asyncgTTS
 import asyncpg
 import discord
@@ -18,7 +19,7 @@ from discord.ext import commands
 import automatic_update
 import utils
 
-print("Starting TTS Bot!")
+print("Starting TTS Bot Premium!")
 start_time = monotonic()
 
 # Read config file
@@ -33,7 +34,7 @@ status = getattr(discord.Status, config["Activity"]["status"])
 # Custom prefix support
 async def prefix(bot: TTSBotPremium, message: discord.Message) -> str:
     "Gets the prefix for a guild based on the passed message object"
-    return await bot.settings.get(message.guild, "prefix") if message.guild else "p-"
+    return (await bot.settings.get(message.guild, ["prefix"]))[0] if message.guild else "p-"
 
 async def premium_check(ctx: utils.TypedGuildContext):
     if not ctx.bot.patreon_role:
@@ -74,7 +75,7 @@ async def premium_check(ctx: utils.TypedGuildContext):
         else:
             await ctx.send(f"{main_msg}\n*{footer_msg}*")
 
-
+Pool = asyncpg.Pool[asyncpg.Record] if TYPE_CHECKING else asyncpg.Pool
 class TTSBotPremium(commands.AutoShardedBot):
     if TYPE_CHECKING:
         from extensions import cache_handler, database_handler
@@ -83,13 +84,15 @@ class TTSBotPremium(commands.AutoShardedBot):
         settings: database_handler.GeneralSettings
         userinfo: database_handler.UserInfoHandler
         nicknames: database_handler.NicknameHandler
-        cache: cache_handler.cache
+        cache: cache_handler.CacheHandler
 
         command_prefix: Callable[[TTSBotPremium, discord.Message], Coroutine[Any, Any, str]]
         voice_clients: List[TTSVoicePlayer]
         patreon_json: Dict[str, int]
+        analytics_buffer: utils.SafeDict
+        cache_db: aioredis.Redis
         gtts: asyncgTTS.asyncgTTS
-        pool: asyncpg.Pool
+        pool: Pool
 
         del cache_handler, database_handler, TTSVoicePlayer
 
@@ -98,7 +101,7 @@ class TTSBotPremium(commands.AutoShardedBot):
         self.session = session
         self.channels: Dict[str, discord.Webhook] = {}
 
-        self.trusted = utils.remove_chars(config["Main"]["trusted_ids"], "[]'").split(", ")
+        self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
 
         with open("patreon_users.json") as f:
             self.patreon_json = json.load(f)
@@ -113,11 +116,14 @@ class TTSBotPremium(commands.AutoShardedBot):
     @property
     def invite_channel(self) -> Optional[discord.TextChannel]:
         support_server = self.support_server
-        return support_server.get_channel(694127922801410119) if support_server else None # type: ignore
+        return support_server.get_channel(835224660458864670) if support_server else None # type: ignore
 
     @property
     def patreon_role(self) -> Optional[discord.Role]:
         return discord.utils.get(self.support_server.roles, name="Patreon!")
+    @property
+    def avatar_url(self) -> str:
+        return str(self.user.avatar_url) if self.user else ""
 
     def load_extensions(self, folder: str):
         filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
@@ -129,6 +135,7 @@ class TTSBotPremium(commands.AutoShardedBot):
         super().add_check(*args, **kwargs)
         return self
 
+
     async def process_commands(self, message: discord.Message) -> None:
         if message.author.bot:
             return
@@ -138,34 +145,41 @@ class TTSBotPremium(commands.AutoShardedBot):
 
         await self.invoke(ctx)
 
-    async def start(self, token, *args, **kwargs):
+    async def wait_until_ready(self, *args: Any, **kwargs: Any) -> None:
+        return await super().wait_until_ready()
+
+    async def start(self, token: str, *args: None, **kwargs: bool):
         "Get everything ready in async env"
+        cache_info = self.config["Redis Info"]
         db_info = self.config["PostgreSQL Info"]
-        self.gtts, self.pool = await asyncio.gather( # type: ignore
+
+        gcp_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if not gcp_creds:
+            raise asyncgTTS.AuthorizationException("GOOGLE_APPLICATION_CREDENTIALS is not set or empty!")
+
+        self.cache_db = aioredis.from_url(**cache_info)
+        self.pool, self.gtts = await asyncio.gather(
+            cast(Awaitable[Pool], asyncpg.create_pool(**db_info)),
             asyncgTTS.setup(
                 premium=True,
                 session=self.session,
-                service_account_json_location=os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+                service_account_json_location=gcp_creds
             ),
-            asyncpg.create_pool(
-                host=db_info["ip"],
-                user=db_info["name"],
-                database=db_info["db"],
-                password=db_info["pass"]
-            )
         )
 
         # Fill up bot.channels, as a load of webhooks
-        for channel_name, webhook_url in self.config["Channels"].items():
+        for channel_name, webhook_url in self.config["Webhook URLs"].items():
             adapter = discord.AsyncWebhookAdapter(session=self.session)
-            self.channels[channel_name] = discord.Webhook.from_url(url=webhook_url, adapter=adapter)
+            self.channels[channel_name] = discord.Webhook.from_url(
+                url=webhook_url, adapter=adapter
+            )
 
         # Load all of /cogs
         self.load_extensions("cogs")
         self.load_extensions("extensions")
 
         # Send starting message and actually start the bot
-        await self.channels["logs"].send("Starting TTS Bot Premium!")
+        await self.channels["logs"].send("Starting TTS Bot!")
 
         await automatic_update.do_normal_updates(self)
         await super().start(token, *args, **kwargs)
@@ -173,6 +187,9 @@ class TTSBotPremium(commands.AutoShardedBot):
 
 def get_error_string(e: BaseException) -> str:
     return f"{type(e).__name__}: {e}"
+
+async def only_avaliable(ctx: utils.TypedContext):
+    return not ctx.guild.unavailable if ctx.guild else True
 
 
 async def main() -> None:
@@ -191,8 +208,9 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         case_insensitive=True,
         chunk_guilds_at_startup=False,
         allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
-    ).add_check(premium_check)
+    ).add_check(premium_check).add_check(only_avaliable)
 
+    await automatic_update.do_early_updates(bot)
     try:
         print("\nLogging into Discord...")
         ready_task = asyncio.create_task(bot.wait_until_ready())
@@ -203,7 +221,8 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         if bot_task in done:
             error = bot_task.exception()
             print("Bot shutdown before ready!")
-            traceback.print_exception(type(error), error, error.__traceback__)
+            if error:
+                traceback.print_exception(type(error), error, error.__traceback__)
             return
 
         print(f"Logged in as {bot.user} and ready!")
@@ -216,7 +235,9 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
             return
 
         await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
-        await bot.close()
+        await asyncio.wait_for(asyncio.gather(
+            bot.pool.close(), bot.cache_db.close(), bot.close()
+        ), timeout=5)
 
 try:
     import uvloop

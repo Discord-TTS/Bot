@@ -70,7 +70,7 @@ class events_errors(utils.CommonCog):
             else:
                 info = f"General TTS | Sent by {message.author} in {message.guild} | {message.guild.id}"
 
-        elif event in ("on_guild_join", "on_guild_remove"):
+        elif event in {"on_guild_join", "on_guild_remove"}:
             guild: discord.Guild = args[0]
             info = f"Guild = {guild} | {guild.id}"
 
@@ -83,11 +83,11 @@ class events_errors(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: utils.TypedContext, error: commands.CommandError):
-        if hasattr(ctx.command, 'on_error') or isinstance(error, (commands.CommandNotFound, commands.NotOwner)):
+        if hasattr(ctx.command, "on_error") or isinstance(error, (commands.CommandNotFound, commands.NotOwner)):
             return
 
         command = f"`{ctx.prefix}{ctx.command}`"
-        error = getattr(error, 'original', error)
+        error = getattr(error, "original", error)
 
         if isinstance(error, commands.UserInputError):
             error_name = type(error).__name__

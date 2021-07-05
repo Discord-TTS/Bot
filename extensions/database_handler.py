@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, List, Tuple, Union, overload
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import asyncpg
-import discord
-from typing_extensions import TypeVar
 
 
 if TYPE_CHECKING:
+    from discord import Guild
+    from discord.abc import User
+    from typing_extensions import TypeVar
+
     from main import TTSBotPremium
 
+    Return = TypeVar("Return")
 
-Return = TypeVar("Return")
 
 def setup(bot: TTSBotPremium):
     bot.settings = GeneralSettings(bot.pool)
@@ -20,15 +22,16 @@ def setup(bot: TTSBotPremium):
     bot.nicknames = NicknameHandler(bot.pool)
 
 
+_DK = Union[int, Tuple[int, ...]]
 class handles_db:
-    def __init__(self, pool: asyncpg.Pool):
+    def __init__(self, pool: asyncpg.Pool[asyncpg.Record]):
         self.pool = pool
-        self._cache = dict()
+        self._cache: Dict[_DK, Optional[asyncpg.Record]] = {}
 
         self._cache_lock = asyncio.Event()
         self._cache_lock.set()
 
-    async def fetchrow(self, query: str, id: Union[int, Tuple[int, ...]], *args) -> asyncpg.Record:
+    async def fetchrow(self, query: str, id: _DK, *args: Any) -> Optional[asyncpg.Record]:
         await self._cache_lock.wait()
         if id not in self._cache:
             if isinstance(id, tuple):
@@ -40,37 +43,27 @@ class handles_db:
 
 
 class GeneralSettings(handles_db):
-    def __init__(self, pool: asyncpg.Pool, *args, **kwargs):
+    DEFAULT_SETTINGS: asyncio.Task[asyncpg.Record]
+    def __init__(self, pool: asyncpg.Pool[asyncpg.Record], *args: Any, **kwargs: Any):
         super().__init__(pool, *args, **kwargs)
-        self.DEFAULT_SETTINGS = asyncio.create_task(pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;"))
+        self.DEFAULT_SETTINGS = asyncio.create_task( # type: ignore
+            pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
+        )
 
 
-    async def remove(self, guild: discord.Guild):
+    async def remove(self, guild: Guild):
         await self.pool.execute("DELETE FROM guilds WHERE guild_id = $1;", guild.id)
 
-    @overload
-    async def get(self, guild: discord.Guild, setting: str) -> Any: ...
-
-    @overload
-    async def get(self, guild: discord.Guild, settings: List[str]) -> List[Any]: ...
-
-    @overload
-    async def get(self, guild: discord.Guild, setting: str, settings: List[str]) -> List[Any]: ...
-
-    async def get(self, guild: discord.Guild, setting=None, settings=None): # type: ignore
+    async def get(self, guild: Guild, settings: List[str]) -> List[Any]:
         row = await self.fetchrow("SELECT * from guilds WHERE guild_id = $1", guild.id)
 
-        if setting:
-            # Could be cleaned up with `settings=[]` in func define then
-            # just settings.append(setting) however that causes weirdness
-            settings = settings + [setting] if settings else [setting]
+        if row:
+            return [row[current_setting] for current_setting in settings]
 
-        rets = [row[current_setting] for current_setting in settings] if row else \
-               [(await self.DEFAULT_SETTINGS)[setting] for setting in settings]
+        defaults = await self.DEFAULT_SETTINGS
+        return [defaults[setting] for setting in settings]
 
-        return rets[0] if len(rets) == 1 else rets
-
-    async def set(self, guild: discord.Guild, setting: str, value):
+    async def set(self, guild: Guild, setting: str, value):
         await self._cache_lock.wait()
         self._cache_lock.clear()
 
@@ -87,11 +80,11 @@ class GeneralSettings(handles_db):
             self._cache_lock.set()
 
 class UserInfoHandler(handles_db):
-    async def get(self, value: str, user: discord.abc.User, default: Return) -> Return:
+    async def get(self, value: str, user: User, default: Return) -> Return:
         row = await self.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user.id)
         return row.get(value, default) if row else default # type: ignore
 
-    async def set(self, setting: str, user: discord.abc.User, value: Union[str, bool]) -> None:
+    async def set(self, setting: str, user: User, value: Union[str, bool]) -> None:
         await self._cache_lock.wait()
         self._cache_lock.clear()
 
@@ -108,18 +101,18 @@ class UserInfoHandler(handles_db):
         finally:
             self._cache_lock.set()
 
-    async def block(self, user: discord.abc.User) -> None:
+    async def block(self, user: User) -> None:
         await self.set("blocked", user, True)
 
-    async def unblock(self, user: discord.abc.User) -> None:
+    async def unblock(self, user: User) -> None:
         await self.set("blocked", user, False)
 
 class NicknameHandler(handles_db):
-    async def get(self, guild: discord.Guild, user: discord.abc.User) -> str:
+    async def get(self, guild: Guild, user: User) -> str:
         row = await self.fetchrow("SELECT * FROM nicknames WHERE guild_id = $1 AND user_id = $2", (guild.id, user.id))
         return row["name"] if row else user.display_name
 
-    async def set(self, guild: discord.Guild, user: discord.abc.User, nickname: str) -> None:
+    async def set(self, guild: Guild, user: User, nickname: str) -> None:
         await self._cache_lock.wait()
         self._cache_lock.clear()
 

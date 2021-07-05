@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Mapping, Optional, Union
+from typing import Dict, TYPE_CHECKING, List, Mapping, Optional, Union
 
 import discord
 from discord.ext import commands
-
+from utils import NETURAL_COLOUR
 
 if TYPE_CHECKING:
     from main import TTSBotPremium
@@ -38,8 +38,6 @@ class FancyHelpCommand(commands.HelpCommand):
         context: TypedContext
         del TypedContext
 
-    COLOUR = 0x3498db
-
     def __init__(self, *args, **kwargs):
         kwargs["verify_checks"] = False
         super().__init__(*args, **kwargs)
@@ -61,7 +59,9 @@ class FancyHelpCommand(commands.HelpCommand):
 
         known_cogs = [bot.get_cog(cog) for cog in known_cogs_names]
         unknown_cogs = [cog for cog in bot.cogs.values() if cog not in known_cogs]
-        cogs: List[Optional[commands.Cog]] = known_cogs + unknown_cogs # type: ignore
+        cogs: List[commands.Cog] = known_cogs + unknown_cogs # type: ignore
+
+        mapping: Dict[Optional[commands.Cog], List[commands.Command]]
 
         mapping = {cog: cog.get_commands() for cog in cogs}
         mapping[None] = [c for c in bot.all_commands.values() if c.cog is None]
@@ -81,7 +81,7 @@ class FancyHelpCommand(commands.HelpCommand):
         embed = discord.Embed(
             title="TTS Bot Help!",
             description=description,
-            colour=self.COLOUR
+            colour=NETURAL_COLOUR
         )
 
         embed.set_author(name=self.context.author.display_name, icon_url=str(self.context.author.avatar_url))
@@ -98,7 +98,7 @@ class FancyHelpCommand(commands.HelpCommand):
         embed = discord.Embed(
             title=f"`{self.clean_prefix}{group.qualified_name}` Help!",
             description=description,
-            colour=self.COLOUR
+            colour=NETURAL_COLOUR
         )
 
         embed.set_footer(text=self.get_ending_note(isinstance(group, commands.Group)))

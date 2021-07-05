@@ -9,11 +9,11 @@ from typing_extensions import ParamSpec
 from .classes import CommonCog
 
 
-Return = TypeVar("Return")
-Params = ParamSpec("Params")
+_R = TypeVar("_R")
+_P = ParamSpec("_P")
 
-def handle_errors(func: Callable[Params, Awaitable[Optional[Return]]]) -> Callable[Params, Awaitable[Optional[Return]]]:
-    async def wrapper(*args: Params.args, **kwargs: Params.kwargs) -> Optional[Return]:
+def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, Awaitable[Optional[_R]]]:
+    async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Optional[_R]:
         try:
             return await func(*args, **kwargs)
         except Exception as error:
@@ -26,8 +26,8 @@ def handle_errors(func: Callable[Params, Awaitable[Optional[Return]]]) -> Callab
         return None
     return wraps(func)(wrapper)
 
-def run_in_executor(func: Callable[Params, Return]) -> Callable[Params, Awaitable[Return]]:
-    def wrapper(*args: Params.args, **kwargs: Params.kwargs) -> Awaitable[Return]:
+def run_in_executor(func: Callable[_P, _R]) -> Callable[_P, Awaitable[_R]]:
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Awaitable[_R]:
         self = cast(CommonCog, args[0])
         callable_func = partial(func, *args, **kwargs)
 
