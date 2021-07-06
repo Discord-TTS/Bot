@@ -121,8 +121,8 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
     @commands.bot_has_permissions(send_messages=True)
     async def invite(self, ctx: commands.Context):
         "Sends the instructions to invite TTS Bot and join the support server!"
-        if ctx.guild == self.bot.support_server:
-            await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
+        if ctx.guild == self.bot.get_support_server():
+            await ctx.send(f"Check out <#835224660458864670> to invite {self.bot.user.mention}!")
         else:
             invite_channel = self.bot.invite_channel
             invite_channel = invite_channel.name if invite_channel else "deleted-channel"

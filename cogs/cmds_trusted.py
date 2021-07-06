@@ -96,7 +96,7 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.check(is_trusted)
     @commands.bot_has_permissions(send_messages=True)
     async def refreshroles(self, ctx: commands.Context):
-        support_server = self.bot.support_server
+        support_server = self.bot.get_support_server()
         if support_server is None:
             return
 

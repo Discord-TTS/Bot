@@ -49,8 +49,12 @@ async def premium_check(ctx: utils.TypedGuildContext):
     if str(ctx.command) in ("donate", "add_premium") or str(ctx.command).startswith(("jishaku"),):
         return True
 
-    if not ctx.bot.support_server.chunked:
-        await ctx.bot.support_server.chunk(cache=True)
+    support_server = ctx.bot.get_support_server()
+    if not support_server:
+        return False
+
+    if not support_server.chunked:
+        await support_server.chunk(cache=True)
 
     premium_user_for_guild = ctx.bot.patreon_json.get(str(ctx.guild.id))
     if any(premium_user_for_guild == member.id for member in ctx.bot.patreon_role.members):
@@ -58,11 +62,11 @@ async def premium_check(ctx: utils.TypedGuildContext):
 
     print(f"{ctx.author} | {ctx.author.id} failed premium check in {ctx.guild.name} | {ctx.guild.id}")
 
-    main_msg = f"Hey! This server isn't premium! Please purchase TTS Bot Premium via Patreon! (`{ctx.prefix}donate`)"
-    footer_msg = "If this is an error, please contact Gnome!#6669."
-
     permissions = ctx.channel.permissions_for(ctx.guild.me) # type: ignore
     if permissions.send_messages:
+        main_msg = f"Hey! This server isn't premium! Please purchase TTS Bot Premium via Patreon! (`{ctx.prefix}donate`)"
+        footer_msg = "If this is an error, please contact Gnome!#6669."
+
         if permissions.embed_links:
             embed = discord.Embed(
                 title="TTS Bot Premium",
@@ -109,18 +113,22 @@ class TTSBotPremium(commands.AutoShardedBot):
         super().__init__(*args, **kwargs)
 
 
-    @property
-    def support_server(self) -> Optional[discord.Guild]:
+    def get_support_server(self) -> Optional[discord.Guild]:
         return self.get_guild(int(self.config["Main"]["main_server"]))
 
     @property
     def invite_channel(self) -> Optional[discord.TextChannel]:
-        support_server = self.support_server
+        support_server = self.get_support_server()
         return support_server.get_channel(835224660458864670) if support_server else None # type: ignore
 
     @property
     def patreon_role(self) -> Optional[discord.Role]:
-        return discord.utils.get(self.support_server.roles, name="Patreon!")
+        support_server = self.get_support_server()
+        if not support_server:
+            return
+
+        return discord.utils.get(support_server.roles, name="Patreon!")
+
     @property
     def avatar_url(self) -> str:
         return str(self.user.avatar_url) if self.user else ""
@@ -134,7 +142,6 @@ class TTSBotPremium(commands.AutoShardedBot):
     def add_check(self, *args, **kwargs):
         super().add_check(*args, **kwargs)
         return self
-
 
     async def process_commands(self, message: discord.Message) -> None:
         if message.author.bot:

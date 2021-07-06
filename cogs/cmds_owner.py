@@ -90,12 +90,15 @@ class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.is_owner()
-    async def add_premium(self, ctx: commands.Context, guild: int, user: discord.User):
+    async def add_premium(self, ctx: commands.Context, guild_id: int, user: discord.User):
+        guild = self.bot.get_guild(guild_id)
         if user.id in tuple(self.bot.patreon_json.values()):
             return await ctx.send(f"{user} is already linked to a guild, check json for more details.")
+        if not guild:
+            return await ctx.send("I'm not in that guild!")
 
         self.bot.patreon_json[str(guild)] = user.id
         with open("patreon_users.json", "w") as f:
             dump(self.bot.patreon_json, f)
 
-        await ctx.send(f"Linked {user.mention} ({user} | {user.id}) to {self.bot.get_guild(guild).name}")
+        await ctx.send(f"Linked {user.mention} ({user} | {user.id}) to {guild.name}")

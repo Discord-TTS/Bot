@@ -6,26 +6,27 @@ import re
 from dataclasses import dataclass
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import (Any, Coroutine, TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional,
+from typing import (TYPE_CHECKING, Any, Callable, Coroutine, List, Optional,
                     Tuple, TypeVar, Union, cast)
 
 import discord
 from discord.ext import commands, menus  # type: ignore
-from typing_extensions import ParamSpec
 
 import utils
 
 
 if TYPE_CHECKING:
     from main import TTSBotPremium
+    from typing_extensions import ParamSpec
+
+    Return = TypeVar("Return")
+    Params = ParamSpec("Params")
 
 
-to_enabled = {True: "Enabled", False: "Disabled"}
+def require_voices(
+    func: Callable[Params, Coroutine[Any, Any, Return]]
+) -> Callable[Params, Coroutine[Any, Any, Return]]:
 
-Return = TypeVar("Return")
-Params = ParamSpec("Params")
-
-def require_voices(func: Callable[Params, Awaitable[Return]]) -> Callable[Params, Coroutine[Any, Any, Return]]:
     @functools.wraps(func)
     async def wrapper(*args: Params.args, **kwargs: Params.kwargs) -> Return:
         self = cast(cmds_settings, args[0])
@@ -92,6 +93,7 @@ class Paginator(menus.ListPageSource):
 def setup(bot: TTSBotPremium):
     bot.add_cog(cmds_settings(bot))
 
+to_enabled = {True: "Enabled", False: "Disabled"}
 class cmds_settings(utils.CommonCog, name="Settings"):
     "TTS Bot settings commands, configuration is done here."
     _voice_data: List[Voice]
@@ -345,7 +347,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(hidden=True)
-    async def voice(self, ctx, lang: str, variant = ""):
+    async def voice(self, ctx: commands.Context, lang: str, variant = ""):
         "Changes the voice your messages are read in, full list in `-voices`"
         lang, variant = lang.lower(), variant.lower()
         ret = await self.safe_get_voice(ctx, lang, variant)
@@ -371,7 +373,12 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         )
 
         langs = {voice.lang for voice in self._voice_data}
-        pages = sorted("\n".join(v.formatted for v in self._voice_data if v.lang == lang) for lang in langs)
+        pages = sorted("\n".join(
+            v.formatted for v in self._voice_data if v.lang == lang
+        ) for lang in langs)
 
-        menu = menus.MenuPages(source=Paginator(await self.get_voice(lang, variant), pages, per_page=1), clear_reactions_after=True)
+        voice = await self.get_voice(lang, variant)
+        paginator = Paginator(voice, pages, per_page=1)
+        menu = menus.MenuPages(source=paginator, clear_reactions_after=True)
+
         await menu.start(ctx)

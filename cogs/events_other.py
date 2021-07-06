@@ -39,7 +39,12 @@ class events_other(utils.CommonCog):
         if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
             await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
 
-        if message.reference and message.guild == self.bot.support_server and message.channel.name in ("premium-dm_logs", "suggestions") and not message.author.bot:
+        if (
+            message.reference
+            and message.guild == self.bot.get_support_server()
+            and message.channel.name in ("premium-dm_logs", "suggestions")
+            and not message.author.bot
+        ):
             dm_message = message.reference.resolved or await message.channel.fetch_message(message.reference.message_id) # type: ignore
             dm_sender = dm_message.author # type: ignore
             if dm_sender.discriminator != "0000":
@@ -69,7 +74,7 @@ class events_other(utils.CommonCog):
         try: await owner.send(embed=embed)
         except discord.errors.HTTPException: pass
 
-        support_server = self.bot.support_server
+        support_server = self.bot.get_support_server()
         if support_server and owner in support_server.members:
             role = support_server.get_role(738009431052386304)
             if not role:
