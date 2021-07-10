@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import Any, Optional, Sequence, TYPE_CHECKING, Tuple, Union
+from typing import Any, Awaitable, Optional, TYPE_CHECKING, Tuple, Union
 
 import discord
 from discord.ext import tasks
@@ -69,11 +68,11 @@ class FFmpegPCMAudio(discord.AudioSource):
 
 
 _AudioData = Tuple[bytes, Union[int, float]]
-_MessageQueue = Tuple[discord.Message, str, Tuple[str, str]]
+_MessageQueue = Tuple[str, Tuple[str, str]]
 class TTSVoicePlayer(discord.VoiceClient):
     bot: TTSBotPremium
     guild: discord.Guild
-    channel: Union[discord.VoiceChannel, discord.StageChannel]
+    channel: utils.VoiceChannel
 
     def __init__(self, bot: TTSBotPremium, channel: Union[discord.VoiceChannel, discord.StageChannel]):
         super().__init__(bot, channel)
@@ -104,10 +103,10 @@ class TTSVoicePlayer(discord.VoiceClient):
         self.fill_audio_buffer.cancel()
         self.play_audio.cancel()
 
-    async def queue(self, message: discord.Message, text: str, lang: Tuple[str, str], max_length: int = 30) -> None:
+    async def queue(self, text: str, lang: Tuple[str, str], max_length: int = 30) -> None:
         self.max_length = max_length
 
-        await self.message_queue.put((message, text, lang))
+        await self.message_queue.put((text, lang))
         if not self.fill_audio_buffer.is_running:
             self.fill_audio_buffer.start()
 
@@ -124,43 +123,42 @@ class TTSVoicePlayer(discord.VoiceClient):
     @utils.decos.handle_errors
     async def play_audio(self):
         self.currently_playing.clear()
+
         audio, length = await self.audio_buffer.get()
+        source = FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"')
 
         try:
-            self.play(
-                FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"'),
-                after=self._after_player # type: ignore
-            )
+            self.play(source, after=self._after_player)
         except discord.ClientException:
             self.currently_playing.set()
 
         try:
             await asyncio.wait_for(self.currently_playing.wait(), timeout=length+5)
         except asyncio.TimeoutError:
-            await self.bot.channels["errors"].send(cleandoc(f"""
-                ```asyncio.TimeoutError```
-                `{self.guild.id}`'s vc.play didn't finish audio!
-            """))
+            self.bot.log("on_play_timeout")
+
+            error = f"`{self.guild.id}`'s vc.play didn't finish audio!"
+            await self.send_timeout_error(error)
 
     @tasks.loop()
     @utils.decos.handle_errors
     async def fill_audio_buffer(self):
-        message, text, lang = await self.message_queue.get()
+        text, lang = await self.message_queue.get()
 
-        ret_values = await self.get_tts(message, text, lang)
-        if not ret_values or len(ret_values) == 1:
+        ret_values = await self.get_tts(text, lang)
+        if not ret_values or None in ret_values:
             return
 
         audio, file_length = ret_values
-        if not audio or file_length > self.max_length:
-            return
+        if file_length > self.max_length:
+            return self.bot.log("on_above_max_length")
 
         await self.audio_buffer.put((audio, file_length))
         if not self.play_audio.is_running():
             self.play_audio.start()
 
 
-    async def get_tts(self, message: discord.Message, text: str, lang: Tuple[str, str]) -> Tuple[bytes, float]:
+    async def get_tts(self, text: str, lang: Tuple[str, str]) -> Tuple[bytes, float]:
         ogg = await self.bot.cache.get(text, *lang)
         if not ogg:
             ogg = await self.bot.gtts.get(text, voice_lang=lang)
@@ -168,18 +166,19 @@ class TTSVoicePlayer(discord.VoiceClient):
 
         return ogg, await self.get_duration(ogg)
 
-    @utils.decos.run_in_executor
-    def get_duration(self, audio_file: bytes) -> float:
-        return len(AudioSegment.from_file_using_temporary_files(BytesIO(audio_file))) / 1000 # type: ignore
 
     # Helper functions
-    def _after_player(self, exception: Optional[Exception]) -> Sequence[Any]:
-        # This func runs in a seperate thread and has to do awaiting,
-        # also we want to get back to the main thread to fix race conditions.
-        coro = self._after_player_coro(exception)
-        return utils.to_async(coro, self.bot.loop)
+    def _after_player(self, exception: Optional[Exception]) -> None:
+        # This func runs in a seperate thread, has to do awaiting, and we
+        # don't care about it's return value, so we get back to the main
+        # thread to fix race conditions and get this thread out of the way
+        return utils.to_async(
+            self._after_player_coro(exception),
+            return_result=False,
+            loop=self.bot.loop,
+        )
 
-    async def _after_player_coro(self, exception: Optional[Exception]) -> Sequence[Any]:
+    async def _after_player_coro(self, exception: Optional[Exception]) -> Tuple[Any]:
         exceptions = [exception] or []
         try:
             self.currently_playing.set()
@@ -191,3 +190,12 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.bot.on_error("play_audio", exception)
             for exception in exceptions
         ))
+
+
+    @utils.decos.run_in_executor
+    def get_duration(self, audio_data: bytes) -> float:
+        return len(AudioSegment.from_file_using_temporary_files(BytesIO(audio_data))) / 1000 # type: ignore
+
+    def send_timeout_error(self, reason: str) -> Awaitable[discord.Message]:
+        error = f"`asyncio.TimeoutError`: {reason}"
+        return self.bot.channels["errors"].send(error)

@@ -62,7 +62,7 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.command()
     @commands.check(is_trusted)
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
-    async def r(self, ctx: commands.Context, *, message: str):
+    async def r(self, ctx: utils.TypedContext, *, message: str):
         async for history_message in ctx.channel.history(limit=10):
             if history_message.author.discriminator == "0000":
                 converter = commands.UserConverter()

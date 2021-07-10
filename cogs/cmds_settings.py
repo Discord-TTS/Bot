@@ -242,7 +242,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
     @set.command()
     @commands.has_permissions(administrator=True)
-    async def channel(self, ctx: commands.Context, channel: discord.TextChannel):
+    async def channel(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel):
         "Alias of `-setup`"
         await self.setup(ctx, channel)
 

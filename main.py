@@ -133,6 +133,9 @@ class TTSBotPremium(commands.AutoShardedBot):
     def avatar_url(self) -> str:
         return str(self.user.avatar_url) if self.user else ""
 
+    def log(self, event: str) -> None:
+        self.analytics_buffer.add(event)
+
     def load_extensions(self, folder: str):
         filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
         for ext in filered_exts:

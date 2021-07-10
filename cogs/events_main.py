@@ -231,7 +231,7 @@ class events_main(utils.CommonCog):
 
             # Adds filtered message to queue
             await message.guild.voice_client.queue(
-                message, message_clean, voice, max_length
+                message_clean, voice, max_length
             )
 
 
