@@ -1,7 +1,6 @@
 git+https://github.com/hadware/voxpopuli.git@async-support
 git+https://github.com/Gnome-py/asyncgTTS.git
 aioredis[hiredis]>=2.0.0a1,<3.0
-typing_extensions
 discord.py[voice]
 cryptography
 asyncpg

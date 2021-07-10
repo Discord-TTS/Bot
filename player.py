@@ -5,7 +5,7 @@ from inspect import cleandoc
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen, SubprocessError
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Awaitable, Optional, Tuple, Union, cast
 
 import asyncgTTS
 import discord
@@ -75,7 +75,7 @@ _MessageQueue = Tuple[discord.Message, str, str]
 class TTSVoicePlayer(discord.VoiceClient):
     bot: TTSBot
     guild: discord.Guild
-    channel: Union[discord.VoiceChannel, discord.StageChannel]
+    channel: utils.VoiceChannel
 
     def __init__(self, bot: TTSBot, channel: discord.VoiceChannel):
         super().__init__(bot, channel)
@@ -129,23 +129,22 @@ class TTSVoicePlayer(discord.VoiceClient):
     @utils.decos.handle_errors
     async def play_audio(self):
         self.currently_playing.clear()
+
         audio, length = await self.audio_buffer.get()
+        source = FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"')
 
         try:
-            self.play(
-                FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"'),
-                after=self._after_player # type: ignore
-            )
+            self.play(source, after=self._after_player)
         except discord.ClientException:
             self.currently_playing.set()
 
         try:
             await asyncio.wait_for(self.currently_playing.wait(), timeout=length+5)
         except asyncio.TimeoutError:
-            await self.bot.channels["errors"].send(cleandoc(f"""
-                ```asyncio.TimeoutError```
-                `{self.guild.id}`'s vc.play didn't finish audio!
-            """))
+            self.bot.log("on_play_timeout")
+
+            error = f"`{self.guild.id}`'s vc.play didn't finish audio!"
+            await self.send_timeout_error(error)
 
     @tasks.loop()
     @utils.decos.handle_errors
@@ -154,14 +153,22 @@ class TTSVoicePlayer(discord.VoiceClient):
 
         lang = lang.split("-")[0]
         get_tts = self.get_espeak if self.bot.blocked else self.get_gtts
-        ret_values = await asyncio.wait_for(get_tts(message, text, lang), timeout=10)
 
-        if not ret_values or len(ret_values) == 1:
+        try:
+            coro = get_tts(message, text, lang)
+            ret_values = await asyncio.wait_for(coro, timeout=10)
+        except asyncio.TimeoutError:
+            self.bot.log("on_generate_timeout")
+
+            error = f"`{self.guild.id}`'s `{len(text)}` character long message was cancelled!"
+            return await self.send_timeout_error(error)
+
+        if not ret_values or None in ret_values:
             return
 
         audio, file_length = ret_values
-        if not audio or file_length > self.max_length:
-            return
+        if file_length > self.max_length:
+            return self.bot.log("on_above_max_length")
 
         await self.audio_buffer.put((audio, file_length))
         if not self.play_audio.is_running():
@@ -197,21 +204,18 @@ class TTSVoicePlayer(discord.VoiceClient):
         if audio and file_length <= self.max_length:
             await self.bot.cache.set(text, lang, audio)
 
+        self.bot.log("on_gtts_complete")
         return audio, file_length
 
     async def get_espeak(self, _: Any, text: str, lang: str) -> _AudioData:
         if text.startswith("-") and " " not in text:
             text += " " # fix espeak hang
 
-        wav = await voxpopuli.Voice(
-            lang=utils.GTTS_ESPEAK_DICT.get(lang, "en"),
-            speed=130, volume=2
-        ).to_audio(text)
+        lang = utils.GTTS_ESPEAK_DICT.get(lang, "en")
+        wav = await voxpopuli.Voice(lang=lang, speed=130, volume=2).to_audio(text)
 
-        pydub_wav = AudioSegment.from_file_using_temporary_files(BytesIO(wav))
-        audio_length = len(pydub_wav)/1000 # type: ignore
-
-        return wav, audio_length
+        self.bot.log("on_espeak_complete")
+        return wav, await self.get_duration(wav)
 
 
     # easygTTS -> espeak handling
@@ -270,13 +274,17 @@ class TTSVoicePlayer(discord.VoiceClient):
 
 
     # Helper functions
-    def _after_player(self, exception: Optional[Exception]) -> Sequence[Any]:
-        # This func runs in a seperate thread and has to do awaiting,
-        # also we want to get back to the main thread to fix race conditions.
-        coro = self._after_player_coro(exception)
-        return utils.to_async(coro, self.bot.loop)
+    def _after_player(self, exception: Optional[Exception]) -> None:
+        # This func runs in a seperate thread, has to do awaiting, and we
+        # don't care about it's return value, so we get back to the main
+        # thread to fix race conditions and get this thread out of the way
+        return utils.to_async(
+            self._after_player_coro(exception),
+            return_result=False,
+            loop=self.bot.loop,
+        )
 
-    async def _after_player_coro(self, exception: Optional[Exception]) -> Sequence[Any]:
+    async def _after_player_coro(self, exception: Optional[Exception]) -> Tuple[Any]:
         exceptions = [exception] or []
         try:
             self.currently_playing.set()
@@ -288,3 +296,12 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.bot.on_error("play_audio", exception)
             for exception in exceptions
         ))
+
+
+    @utils.decos.run_in_executor
+    def get_duration(self, audio_data: bytes) -> float:
+        return len(AudioSegment.from_file_using_temporary_files(BytesIO(audio_data))) / 1000 # type: ignore
+
+    def send_timeout_error(self, reason: str) -> Awaitable[discord.Message]:
+        error = f"`asyncio.TimeoutError`: {reason}"
+        return self.bot.channels["errors"].send(error)

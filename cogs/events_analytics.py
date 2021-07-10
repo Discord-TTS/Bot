@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from discord.ext import commands
 
@@ -18,16 +18,16 @@ def setup(bot: TTSBot):
 class events_analytics(utils.CommonCog):
     @commands.Cog.listener()
     async def on_command(self, ctx: utils.TypedContext):
-        self.bot.analytics_buffer.add(ctx.command.qualified_name)
+        self.bot.log(ctx.command.qualified_name)
 
     @commands.Cog.listener()
     async def on_resumed(self):
-        self.bot.analytics_buffer.add("on_resumed")
+        self.bot.log("on_resumed")
 
     @commands.Cog.listener()
     async def on_message(self, message: utils.TypedMessage):
         if not message.guild:
-            self.bot.analytics_buffer.add("on_dm")
+            self.bot.log("on_dm")
         elif message.guild.me is None and not message.guild.unavailable:
             # Weird bug, gonna check on it for a while.
-            self.bot.analytics_buffer.add("on_me_none")
+            self.bot.log("on_me_none")

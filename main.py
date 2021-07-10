@@ -83,6 +83,9 @@ class TTSBot(commands.AutoShardedBot):
     def avatar_url(self) -> str:
         return str(self.user.avatar_url) if self.user else ""
 
+    def log(self, event: str) -> None:
+        self.analytics_buffer.add(event)
+
     def load_extensions(self, folder: str):
         filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
         for ext in filered_exts:
@@ -119,7 +122,7 @@ class TTSBot(commands.AutoShardedBot):
         self.cache_db = aioredis.from_url(**cache_info)
         self.pool, self.gtts = await asyncio.gather(
             cast(Awaitable[Pool], asyncpg.create_pool(**db_info)),
-            asyncgTTS.setup(premium=False, session=self.session),
+            asyncgTTS.setup(premium=False, session=self.session, base_url=None),
         )
 
         # Fill up bot.channels, as a load of webhooks

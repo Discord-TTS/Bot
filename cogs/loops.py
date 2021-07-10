@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta
-from inspect import cleandoc
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
 
 import discord
@@ -17,7 +16,20 @@ if TYPE_CHECKING:
 sep = utils.OPTION_SEPERATORS[2]
 special_sep = utils.OPTION_SEPERATORS[1]
 lookup = {True: "Commands:", False: "Events:"}
-get_from_date = "SELECT * FROM analytics WHERE date_collected = $1"
+get_events = """
+    SELECT * FROM analytics
+    WHERE date_collected = $1 AND NOT is_command
+    ORDER BY count DESC
+    LIMIT 10
+"""
+get_commands = """
+    SELECT * FROM analytics
+    WHERE date_collected = $1 AND is_command
+    ORDER BY count DESC
+    LIMIT 10
+"""
+
+
 def sleep_until(time: time) -> Awaitable[None]:
     now = datetime.utcnow()
     date = now.date()
@@ -32,7 +44,6 @@ def setup(bot: TTSBot):
     bot.add_cog(Loops(bot))
 
 class Loops(utils.CommonCog):
-    yesterday_data = None
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -87,12 +98,11 @@ class Loops(utils.CommonCog):
         )
 
         async with self.bot.pool.acquire() as conn:
-            yesterday_data = await conn.fetch(get_from_date, yesterday)
-            for row in yesterday_data:
-                event, count, is_command, *_ = row
-                if len(sections[lookup[is_command]]) >= 10:
-                    continue
+            yesterday_events = await conn.fetch(get_events, yesterday)
+            yesterday_commands = await conn.fetch(get_commands, yesterday)
 
+            for row in [*yesterday_events, *yesterday_commands]:
+                event, count, is_command, *_ = row
                 max_count: int = (await conn.fetchrow("""
                     SELECT max(count) FROM analytics
                     WHERE event = $1 and is_command = $2

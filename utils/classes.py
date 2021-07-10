@@ -28,6 +28,7 @@ class SafeDict(dict):
 VoiceChannel = Union[discord.VoiceChannel, discord.StageChannel]
 class TypedContext(commands.Context):
     bot: TTSBot
+    message: TypedMessage
     author: Union[TypedMember, discord.User]
 
     async def reply(self, *args, **kwargs) -> discord.Message:
@@ -53,7 +54,6 @@ class TypedGuildMessage(TypedMessage):
 class TypedMember(discord.Member):
     guild: TypedGuild
     voice: Optional[TypedVoiceState]
-
 
 class TypedGuild(discord.Guild):
     voice_client: Optional[TTSVoicePlayer]
