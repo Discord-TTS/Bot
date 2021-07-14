@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union
+import asyncio
+from typing import TYPE_CHECKING, Optional, Union, TypeVar
 
 import discord
 from discord.ext import commands
 
 
 if TYPE_CHECKING:
+    import collections
+
     from main import TTSBot
     from player import TTSVoicePlayer
+
+    _T = TypeVar("_T")
 
 
 # Cleanup classes
@@ -22,6 +27,12 @@ class SafeDict(dict):
             self[event] = 0
 
         self[event] += 1
+
+class ClearableQueue(asyncio.Queue[_T]):
+    _queue: collections.deque
+
+    def clear(self):
+        self._queue.clear()
 
 
 # Typed Classes for silencing type errors.

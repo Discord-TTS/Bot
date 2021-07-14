@@ -170,8 +170,8 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         "Alias of `-setup`"
         await self.setup(ctx, channel)
 
-    @set.command(aliases=("voice", "lang", "language"))
-    async def _language(self, ctx: utils.TypedGuildContext, voicecode: str):
+    @set.command(aliases=("voice", "lang", "_language"))
+    async def language(self, ctx: utils.TypedGuildContext, voicecode: str):
         "Changes the language your messages are read in, full list in `-voices`"
         await self.voice(ctx, voicecode)
 

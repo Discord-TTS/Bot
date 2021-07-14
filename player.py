@@ -87,8 +87,8 @@ class TTSVoicePlayer(discord.VoiceClient):
         self.currently_playing = asyncio.Event()
         self.currently_playing.set()
 
-        self.audio_buffer: asyncio.Queue[_AudioData] = asyncio.Queue(maxsize=5)
-        self.message_queue: asyncio.Queue[_MessageQueue] = asyncio.Queue()
+        self.audio_buffer = utils.ClearableQueue[_AudioData](maxsize=5)
+        self.message_queue = utils.ClearableQueue[_MessageQueue]()
 
         self.fill_audio_buffer.start()
 
@@ -117,8 +117,8 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.fill_audio_buffer.start()
 
     def skip(self):
-        self.message_queue = asyncio.Queue()
-        self.audio_buffer = asyncio.Queue(maxsize=5)
+        self.audio_buffer.clear()
+        self.message_queue.clear()
 
         self.stop()
         self.play_audio.restart()
