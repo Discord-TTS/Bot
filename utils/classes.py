@@ -7,13 +7,12 @@ import discord
 from discord.ext import commands
 
 
+_T = TypeVar("_T")
 if TYPE_CHECKING:
     import collections
 
     from main import TTSBot
     from player import TTSVoicePlayer
-
-    _T = TypeVar("_T")
 
 
 # Cleanup classes
