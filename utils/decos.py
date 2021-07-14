@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-from functools import partial, wraps
-from typing import Awaitable, Callable, Optional, TypeVar, cast
-
-from typing_extensions import ParamSpec
+from functools import wraps
+from typing import Awaitable, Callable, Optional, TYPE_CHECKING, TypeVar, cast
 
 from .classes import CommonCog
+from .funcs import to_thread
 
 
-_R = TypeVar("_R")
-_P = ParamSpec("_P")
+if TYPE_CHECKING:
+    from typing_extensions import ParamSpec
+
+    _R = TypeVar("_R")
+    _P = ParamSpec("_P")
+
 
 def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, Awaitable[Optional[_R]]]:
     async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Optional[_R]:
@@ -28,9 +31,6 @@ def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, A
 
 def run_in_executor(func: Callable[_P, _R]) -> Callable[_P, Awaitable[_R]]:
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Awaitable[_R]:
-        self = cast(CommonCog, args[0])
-        callable_func = partial(func, *args, **kwargs)
-
-        return self.bot.loop.run_in_executor(None, callable_func)
+        return to_thread(func, *args, **kwargs)
 
     return wraps(func)(wrapper)

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union
+import asyncio
+from typing import TYPE_CHECKING, Optional, Union, TypeVar
 
 import discord
 from discord.ext import commands
 
 
+_T = TypeVar("_T")
 if TYPE_CHECKING:
+    import collections
+
     from main import TTSBot
     from player import TTSVoicePlayer
 
@@ -23,11 +27,18 @@ class SafeDict(dict):
 
         self[event] += 1
 
+class ClearableQueue(asyncio.Queue[_T]):
+    _queue: collections.deque
+
+    def clear(self):
+        self._queue.clear()
+
 
 # Typed Classes for silencing type errors.
 VoiceChannel = Union[discord.VoiceChannel, discord.StageChannel]
 class TypedContext(commands.Context):
     bot: TTSBot
+    message: TypedMessage
     author: Union[TypedMember, discord.User]
 
     async def reply(self, *args, **kwargs) -> discord.Message:
@@ -53,7 +64,6 @@ class TypedGuildMessage(TypedMessage):
 class TypedMember(discord.Member):
     guild: TypedGuild
     voice: Optional[TypedVoiceState]
-
 
 class TypedGuild(discord.Guild):
     voice_client: Optional[TTSVoicePlayer]

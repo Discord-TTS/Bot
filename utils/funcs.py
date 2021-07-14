@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import sys
 from inspect import cleandoc
-from typing import TYPE_CHECKING, Awaitable, Optional, Sequence, TypeVar
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
+                    Sequence, TypeVar, Union, overload)
 
 from utils.constants import (ANIMATED_EMOJI_REGEX, EMOJI_REGEX,
                              OPTION_SEPERATORS, READABLE_TYPE)
@@ -15,21 +15,13 @@ from utils.constants import (ANIMATED_EMOJI_REGEX, EMOJI_REGEX,
 if TYPE_CHECKING:
     import aioredis
     import discord
+    from typing_extensions import ParamSpec
 
+    _P = ParamSpec("_P")
     _R = TypeVar("_R")
 
 
 _sep = OPTION_SEPERATORS[2]
-
-def get_size(start_path: str = ".") -> int:
-    "Gets the recursive size of a directory"
-    total_size = 0
-    for dirpath, _, filenames in os.walk(start_path):
-        for file in filenames:
-            file_path = os.path.join(dirpath, file)
-            total_size += os.path.getsize(file_path)
-
-    return total_size
 
 def emojitoword(text: str) -> str:
     "Replaces discord emojis with an alternates that can be spoken"
@@ -59,19 +51,6 @@ def exts_to_format(attachments: Sequence[discord.Attachment]) -> Optional[str]:
 
     return next(returned_format_gen, "a file")
 
-def to_async(coro: Awaitable[_R], loop: asyncio.AbstractEventLoop = None) -> _R:
-    """Gets to an async env and returns the coro's result
-    Notes: Can be used for swapping threads, if loop is passed."""
-
-    if not loop:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            raise RuntimeError
-
-        return loop.run_until_complete(coro)
-
-    return asyncio.run_coroutine_threadsafe(coro, loop).result()
-
 async def get_redis_info(cache_db: aioredis.Redis) -> str:
     rstats = await cache_db.info("stats")
     hits: int = rstats["keyspace_hits"]
@@ -92,10 +71,48 @@ async def get_redis_info(cache_db: aioredis.Redis) -> str:
         {_sep} `Key Misses:    {misses}`
     """)
 
+@overload
+def to_async(
+    coro: Awaitable[_R],
+    loop: Optional[asyncio.AbstractEventLoop] = None,
+    return_result: Literal[True] = True
+) -> _R: ...
+@overload
+def to_async(
+    coro: Awaitable[Any],
+    loop: Optional[asyncio.AbstractEventLoop] = None,
+    return_result: Literal[False] = False
+) -> None: ...
+
+def to_async(
+    coro: Awaitable[Union[_R, Any]],
+    loop: Optional[asyncio.AbstractEventLoop] = None,
+    return_result: bool = True
+) -> Optional[_R]:
+    """Gets to an async env and returns the coro's result
+    Notes: Can be used for swapping threads, if loop is passed."""
+
+    if not loop:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            raise RuntimeError
+
+        result = loop.run_until_complete(coro)
+        return result if return_result else None
+
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result() if return_result else None
+
 
 if sys.version_info >= (3, 9):
+    to_thread = asyncio.to_thread
     removeprefix = str.removeprefix
 else:
+    # For the people running older than 3.9, these are some functions
+    # backported, may not be 100% accurate but get the job done.
+    def to_thread(func: Callable[_P, _R]) -> Awaitable[_R]:
+        "asyncio.to_thread but for older python versions"
+        return asyncio.get_event_loop().run_in_executor(None, func)
     def removeprefix(self: str, __prefix: str) -> str:
         "str.removeprefix but for older python versions"
         return self[len(__prefix):] if self.startswith(__prefix) else self

@@ -272,15 +272,14 @@ class events_main(utils.CommonCog):
     ):
         vc = member.guild.voice_client
 
-        if member == self.bot.user:
-            return  # ignore bot leaving vc
-        if not before.channel or after.channel:
-            return  # ignore everything but vc leaves
-        if not vc:
-            return  # ignore if bot isn't in the vc
-
-        if any(not member.bot for member in vc.channel.members):
-            return  # ignore if bot isn't lonely
+        if (
+            not vc                         # ignore if bot isn't in the vc
+            or not before.channel          # ignore vc joins
+            or member == self.bot.user     # ignore bot leaving vc
+            or after.channel != vc.channel # ignore no change in voice channel
+            or any(not member.bot for member in vc.channel.members) # ignore if bot isn't lonely
+        ):
+            return
 
         await vc.disconnect(force=True)
 

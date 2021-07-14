@@ -4,11 +4,11 @@ import asyncio
 import re
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import Set, TYPE_CHECKING, Dict, Optional
 
 import discord
 from discord.ext import commands
-from gtts.lang import tts_langs
+from gtts.lang import tts_langs as _tts_langs
 
 import utils
 
@@ -17,7 +17,13 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
-tts_langs: Dict[str, str] = {lang: name for lang, name in tts_langs().items() if "-" not in lang}
+tts_langs: Set[str] = set(_tts_langs().keys())
+langs_lookup: Dict[str, str] = {
+    lang: name
+    for lang, name in _tts_langs().items()
+    if "-" not in lang
+}
+
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 def setup(bot: TTSBot):
@@ -160,12 +166,12 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
     @set.command()
     @commands.has_permissions(administrator=True)
-    async def channel(self, ctx: commands.Context, channel: discord.TextChannel):
+    async def channel(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel):
         "Alias of `-setup`"
         await self.setup(ctx, channel)
 
-    @set.command(aliases=("voice", "lang", "language"))
-    async def _language(self, ctx: commands.Context, voicecode: str):
+    @set.command(aliases=("voice", "lang", "_language"))
+    async def language(self, ctx: utils.TypedGuildContext, voicecode: str):
         "Changes the language your messages are read in, full list in `-voices`"
         await self.voice(ctx, voicecode)
 
@@ -247,7 +253,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         "Changes the language your messages are read in, full list in `-voices`"
         if lang in tts_langs:
             await self.bot.userinfo.set("lang", ctx.author, lang)
-            await ctx.send(f"Changed your voice to: {tts_langs[lang]}")
+            await ctx.send(f"Changed your voice to: {langs_lookup[lang]}")
         else:
             await ctx.send(f"Invalid voice, do `{ctx.prefix}voices`")
 
@@ -259,12 +265,12 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             return await self.voice(ctx, lang)
 
         lang = (await self.bot.userinfo.get("lang", ctx.author, default="en")).split("-")[0]
-        langs_string = str(list(tts_langs.keys())).strip("[]")
+        langs_string = str(tts_langs).strip("{}")
 
         embed = discord.Embed(title="TTS Bot Languages")
         embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
         embed.add_field(name="Currently Supported Languages", value=langs_string)
-        embed.add_field(name="Current Language used", value=f"{tts_langs[lang]} | {lang}")
+        embed.add_field(name="Current Language used", value=f"{langs_lookup[lang]} | {lang}")
         embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
 
         await ctx.send(embed=embed)
