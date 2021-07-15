@@ -6,11 +6,11 @@ import re
 from dataclasses import dataclass
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import (TYPE_CHECKING, Any, Callable, Coroutine, List, Optional,
-                    Tuple, TypeVar, Union, cast)
+from typing import (TYPE_CHECKING, Any, Callable, Coroutine, Dict, List,
+                    Optional, Tuple, TypeVar, Union, cast)
 
 import discord
-from discord.ext import commands, menus  # type: ignore
+from discord.ext import commands, menus
 
 import utils
 
@@ -93,10 +93,30 @@ class Paginator(menus.ListPageSource):
 def setup(bot: TTSBotPremium):
     bot.add_cog(cmds_settings(bot))
 
-to_enabled = {True: "Enabled", False: "Disabled"}
+TO_ENABLED = {True: "Enabled", False: "Disabled"}
 class cmds_settings(utils.CommonCog, name="Settings"):
     "TTS Bot settings commands, configuration is done here."
     _voice_data: List[Voice]
+    _translation_langs: Dict[str, str]
+
+    @property
+    async def translation_langs(self) -> Dict[str, str]:
+        if not getattr(self, "_translation_langs", False):
+            url = f"{utils.TRANSLATION_URL}/languages"
+            params = {
+                "type": "target",
+                "auth_key": self.bot.config["Translation"]["key"]
+            }
+
+            async with self.bot.session.get(url, params=params) as resp:
+                resp.raise_for_status()
+                self._translation_langs = {
+                    voice["language"].lower(): voice["name"]
+                    for voice in await resp.json()
+                }
+
+        return self._translation_langs
+
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.guild_only()
@@ -113,7 +133,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             self.bot.nicknames.get(ctx.guild, ctx.author)
         )
 
-        xsaid, prefix, channel, auto_join, bot_ignore, default_lang = await self.bot.settings.get(
+        xsaid, prefix, channel, auto_join, bot_ignore, target_lang, default_lang, to_translate = await self.bot.settings.get(
             ctx.guild,
             settings=[
                 "xsaid",
@@ -121,7 +141,9 @@ class cmds_settings(utils.CommonCog, name="Settings"):
                 "channel",
                 "auto_join",
                 "bot_ignore",
+                "target_lang",
                 "default_lang",
+                "to_translate",
             ]
         )
 
@@ -139,7 +161,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
 
         # Show settings embed
-        sep1, sep2, sep3 = utils.OPTION_SEPERATORS
+        sep1, sep2, sep3, sep4 = utils.OPTION_SEPERATORS
         server_settings = cleandoc(f"""
             {sep1} Setup Channel: `#{channel_name}`
             {sep1} Auto Join: `{auto_join}`
@@ -152,15 +174,28 @@ class cmds_settings(utils.CommonCog, name="Settings"):
             {sep2} Default Server Voice: `{default_voice}`
         """)
 
+        translation_settings = cleandoc(f"""
+            {sep4} Translation: `{TO_ENABLED[to_translate]}`
+            {sep4} Target Language: `{target_lang}`
+        """)
+
         user_settings = cleandoc(f"""
             {sep3} Voice: `{voice}`
             {sep3} Nickname: `{nickname}`
         """)
 
+        if not to_translate:
+            # Crosses out target language if translation is off, this is a
+            # terrible way to do it, if you can, clean this up.
+            lines = translation_settings.split("\n")
+            lines[1] = f"~~{lines[1]}~~"
+            translation_settings = "\n".join(lines)
+
         embed = discord.Embed(title="Current Settings", url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.add_field(name="**General Server Settings**", value=server_settings, inline=False)
-        embed.add_field(name="**TTS Settings**",            value=tts_settings, inline=False)
-        embed.add_field(name="**User Specific**",           value=user_settings, inline=False)
+        embed.add_field(name="**General Server Settings**", value=server_settings,      inline=False)
+        embed.add_field(name="**TTS Settings**",            value=tts_settings,         inline=False)
+        embed.add_field(name="**Translation Settings (BETA)**",    value=translation_settings, inline=False)
+        embed.add_field(name="**User Specific**",           value=user_settings,        inline=False)
 
         embed.set_footer(text=f"Change these settings with {ctx.prefix}set property value!")
         await ctx.send(embed=embed)
@@ -179,21 +214,21 @@ class cmds_settings(utils.CommonCog, name="Settings"):
     async def xsaid(self, ctx: utils.TypedGuildContext, value: bool):
         "Makes the bot say \"<user> said\" before each message"
         await self.bot.settings.set(ctx.guild, "xsaid", value)
-        await ctx.send(f"xsaid is now: {to_enabled[value]}")
+        await ctx.send(f"xsaid is now: {TO_ENABLED[value]}")
 
     @set.command(aliases=["auto_join"])
     @commands.has_permissions(administrator=True)
     async def autojoin(self, ctx: utils.TypedGuildContext, value: bool):
         "If you type a message in the setup channel, the bot will join your vc"
         await self.bot.settings.set(ctx.guild, "auto_join", value)
-        await ctx.send(f"Auto Join is now: {to_enabled[value]}")
+        await ctx.send(f"Auto Join is now: {TO_ENABLED[value]}")
 
     @set.command(aliases=["bot_ignore", "ignore_bots", "ignorebots"])
     @commands.has_permissions(administrator=True)
     async def botignore(self, ctx: utils.TypedGuildContext, value: bool):
         "Messages sent by bots and webhooks are not read"
         await self.bot.settings.set(ctx.guild, "bot_ignore", value)
-        await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
+        await ctx.send(f"Ignoring Bots is now: {TO_ENABLED[value]}")
 
 
     @set.command(aliases=["defaultlang", "default_lang", "defaultlanguage", "slang", "serverlanguage"])
@@ -207,6 +242,35 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         voice = ret
         await self.bot.settings.set(ctx.guild, "default_lang", voice.raw)
         await ctx.send(f"Default language for this server is now: {voice}")
+
+
+    @set.command(aliases=["translate", "to_translate", "should_translate"])
+    async def translation(self, ctx: utils.TypedGuildContext, value: bool):
+        await self.bot.settings.set(ctx.guild, "to_translate", value)
+        await ctx.send(f"Translation is now: {TO_ENABLED[value]}")
+
+    @set.command(aliases=["tlang", "tvoice", "target_voice", "target", "target_language"])
+    @commands.has_permissions(administrator=True)
+    async def target_lang(self, ctx: utils.TypedGuildContext, lang: Optional[str] = None):
+        "Changes the target language for translation"
+        lang = lang.lower() if lang else lang
+
+        if not lang or lang.lower() not in await self.translation_langs:
+            langs = str(list((await self.translation_langs).keys())).strip("[]")
+            embed = discord.Embed(
+                title="`lang` was not passed or was incorrect!",
+                description=cleandoc(f"Supported languages: {langs}")
+            )
+
+            return await ctx.send(embed=embed)
+
+        await self.bot.settings.set(ctx.guild, "target_lang", lang)
+        await ctx.send(
+            f"The target translation language is now: `{lang}`" + (
+            f". You may want to enable translation with `{ctx.prefix}set translation on`"
+            if not (await self.bot.settings.get(ctx.guild, ["to_translate"]))[0] else ""
+        ))
+
 
     @set.command()
     @commands.has_permissions(administrator=True)
@@ -347,7 +411,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
     @commands.bot_has_permissions(read_messages=True, send_messages=True, embed_links=True)
     @commands.command(hidden=True)
-    async def voice(self, ctx: commands.Context, lang: str, variant = ""):
+    async def voice(self, ctx: commands.Context, lang: str, variant: str = ""):
         "Changes the voice your messages are read in, full list in `-voices`"
         lang, variant = lang.lower(), variant.lower()
         ret = await self.safe_get_voice(ctx, lang, variant)

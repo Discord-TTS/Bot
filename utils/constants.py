@@ -10,6 +10,7 @@ _script_files = ("bat", "sh", "jar", "py", "php")
 _program_files = ("apk", "exe", "msi", "deb")
 _disk_images = ("dmg", "iso", "img", "ima")
 
+TRANSLATION_URL = "https://api-free.deepl.com/v2"
 ANIMATED_EMOJI_REGEX = _re.compile(r"<a\:.+:\d+>")
 EMOJI_REGEX = _re.compile(r"<:.+:\d+\d+>")
 
@@ -26,7 +27,8 @@ REGEX_REPLACEMENTS = {
 OPTION_SEPERATORS = (
     ":small_orange_diamond:",
     ":small_blue_diamond:",
-    ":small_red_triangle:"
+    ":small_red_triangle:",
+    ":star:",
 )
 
 READABLE_TYPE = {
@@ -53,10 +55,13 @@ GUILDS_CREATE = """
         xsaid          bool       DEFAULT True,
         bot_ignore     bool       DEFAULT True,
         auto_join      bool       DEFAULT False,
+        to_translate   bool       DEFAULT False,
+        formal         bool
         msg_length     smallint   DEFAULT 30,
         repeated_chars smallint   DEFAULT 0,
         prefix         varchar(6) DEFAULT 'p-',
-        default_lang   varchar(3)
+        default_lang   varchar(7),
+        target_lang    varchar(5),
     );"""
 USERINFO_CREATE = """
     CREATE TABLE userinfo (

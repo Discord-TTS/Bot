@@ -51,8 +51,13 @@ class GeneralSettings(handles_db):
         )
 
 
-    async def remove(self, guild: Guild):
-        await self.pool.execute("DELETE FROM guilds WHERE guild_id = $1;", guild.id)
+    async def remove(self, guild: Guild, columns: Optional[List[str]] = None):
+        if columns:
+            query = "UPDATE " + " = NULL, ".join(columns) + " = NULL WHERE guild_id = $1"
+        else:
+            query = "DELETE FROM guilds WHERE guild_id = $1"
+
+        await self.pool.execute(query, guild.id)
 
     async def get(self, guild: Guild, settings: List[str]) -> List[Any]:
         row = await self.fetchrow("SELECT * from guilds WHERE guild_id = $1", guild.id)

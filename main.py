@@ -7,7 +7,7 @@ import traceback
 from configparser import ConfigParser
 from os import listdir
 from time import monotonic
-from typing import Any, Awaitable, Callable, Coroutine, List, TYPE_CHECKING, Dict, Optional, cast
+from typing import Any, Awaitable, Callable, Coroutine, List, TYPE_CHECKING, Dict, Optional, Union, cast
 
 import aiohttp
 import aioredis
@@ -97,6 +97,8 @@ class TTSBotPremium(commands.AutoShardedBot):
         cache_db: aioredis.Redis
         gtts: asyncgTTS.asyncgTTS
         pool: Pool
+
+        conn: asyncpg.pool.PoolConnectionProxy # temporary conn for updates
 
         del cache_handler, database_handler, TTSVoicePlayer
 

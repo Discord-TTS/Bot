@@ -15,8 +15,19 @@ from player import TTSVoicePlayer
 
 
 if TYPE_CHECKING:
-    from main import TTSBotPremium
+    from typing_extensions import TypedDict
 
+    from main import TTSBotPremium
+    from .cmds_settings import cmds_settings
+
+    class _TRANSLATION(TypedDict):
+        text: str
+        detected_source_language: str
+
+    class _DEEPL_RESP(TypedDict):
+        translations: List[_TRANSLATION]
+else:
+    cmds_settings = None
 
 DM_WELCOME_MESSAGE = cleandoc("""
     **All messages after this will be sent to a private channel where we can assist you.**
@@ -63,7 +74,7 @@ class events_main(utils.CommonCog):
 
         if message.guild is not None:
             # Premium Check
-            if not getattr(self.bot, "patreon_role", False):
+            if not getattr(self.bot, "patreon_role", False) or self.bot.patreon_role is None:
                 return
 
             if str(message.author.id) not in self.bot.trusted:
@@ -72,14 +83,17 @@ class events_main(utils.CommonCog):
                     return
 
             # Get settings
-            repeated_limit, bot_ignore, max_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
+            repeated_limit, to_translate, target_lang, bot_ignore, max_length, autojoin, channel, is_formal, prefix, xsaid = await self.bot.settings.get(
                 message.guild,
                 settings=[
                     "repeated_chars",
+                    "to_translate",
+                    "target_lang",
                     "bot_ignore",
                     "msg_length",
                     "auto_join",
                     "channel",
+                    "formal",
                     "prefix",
                     "xsaid",
                 ]
@@ -143,7 +157,9 @@ class events_main(utils.CommonCog):
                 guild_voice = (await self.bot.settings.get(message.guild, ["default_lang"]))[0]
 
             str_voice: str = user_voice or guild_voice or "en-us a"
-            voice = (await self.bot.get_cog("Settings").get_voice(*str_voice.split())).tuple # type: ignore
+
+            settings_cog = cast(cmds_settings, self.bot.get_cog("Settings"))
+            voice = await settings_cog.get_voice(*str_voice.split())
 
             # Emoji filter
             message_clean = utils.emojitoword(message_clean)
@@ -229,9 +245,42 @@ class events_main(utils.CommonCog):
 
                 message_clean = "".join(message_clean_list)
 
+            # Premium Translation
+            if to_translate and target_lang:
+                body = {
+                    "text": message_clean,
+                    "preserve_formatting": 1,
+                    "target_lang": target_lang,
+                    "auth_key": self.bot.config["Translation"]["key"],
+                }
+
+                if is_formal is not None:
+                    body["formality"] = int(is_formal)
+
+                resp_json: Optional[_DEEPL_RESP] = None
+                url = f"{utils.TRANSLATION_URL}/translate"
+                async with self.bot.session.get(url, params=body) as resp:
+                    if resp.status in {429, 529}:
+                        self.bot.log("on_translate_ratelimit")
+                        await self.bot.channels["logs"].send(
+                            f"Hit ratelimit on deepL. {await resp.read()}"
+                        )
+                    elif resp.status == 418:
+                        self.bot.log("on_translate_too_long")
+                    elif resp.ok:
+                        resp_json = await resp.json()
+                    else:
+                        return resp.raise_for_status()
+
+                if resp_json:
+                    translation = resp_json["translations"][0]
+                    detected_lang = translation.get("detected_source_language")
+                    if detected_lang.lower() != voice.lang:
+                        message_clean = translation["text"]
+
             # Adds filtered message to queue
             await message.guild.voice_client.queue(
-                message_clean, voice, max_length
+                message_clean, voice.tuple, max_length
             )
 
 

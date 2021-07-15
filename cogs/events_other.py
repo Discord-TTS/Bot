@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from asyncio.subprocess import create_subprocess_exec
 from inspect import cleandoc
 from typing import TYPE_CHECKING
 
