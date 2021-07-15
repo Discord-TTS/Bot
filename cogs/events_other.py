@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from asyncio.subprocess import create_subprocess_exec
 from inspect import cleandoc
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import discord
 from discord.ext import commands
@@ -45,7 +44,7 @@ class events_other(utils.CommonCog):
             if dm_sender.discriminator != "0000":
                 return
 
-            dm_command: commands.Command = self.bot.get_command("dm") # type: ignore
+            dm_command = cast(commands.Command, self.bot.get_command("dm"))
             ctx = await self.bot.get_context(message)
 
             todm = await commands.UserConverter().convert(ctx, dm_sender.name)

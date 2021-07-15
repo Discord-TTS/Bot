@@ -149,7 +149,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         user = optional_user or ctx.author
         nickname = nickname or ctx.author.display_name
 
-        if user != ctx.author and not ctx.channel.permissions_for(ctx.author).administrator: # type: ignore
+        if user != ctx.author and not ctx.author_permissions().administrator:
             return await ctx.send("Error: You need admin to set other people's nicknames!")
 
         if not nickname:

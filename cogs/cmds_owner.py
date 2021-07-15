@@ -70,9 +70,10 @@ class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.is_owner()
+    @commands.guild_only()
     @commands.bot_has_permissions(send_messages=True)
-    async def say(self, ctx: commands.Context, channel: discord.TextChannel, *, to_say: str):
-        if ctx.channel.permissions_for(ctx.guild.me).manage_messages: # type: ignore
+    async def say(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel, *, to_say: str):
+        if ctx.bot_permissions().manage_messages:
             await ctx.message.delete()
 
         await channel.send(to_say)

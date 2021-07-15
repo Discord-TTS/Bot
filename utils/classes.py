@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Optional, Union, TypeVar
+from typing import Awaitable, List, TYPE_CHECKING, Optional, Union, TypeVar
 
 import discord
 from discord.ext import commands
@@ -41,15 +41,24 @@ class TypedContext(commands.Context):
     message: TypedMessage
     author: Union[TypedMember, discord.User]
 
-    async def reply(self, *args, **kwargs) -> discord.Message:
-        if not self.guild or self.channel.permissions_for(self.guild.me).read_message_history: # type: ignore
-            return await super().reply(*args, **kwargs)
-
-        return await super().send(*args, **kwargs)
+    def reply(self, *args, **kwargs) -> Awaitable[discord.Message]:
+        return self.send(*args, **kwargs)
 
 class TypedGuildContext(TypedContext):
     guild: TypedGuild
+    author: TypedMember
+    channel: discord.TextChannel
 
+    def author_permissions(self) -> discord.Permissions:
+        return self.channel.permissions_for(self.author)
+    def bot_permissions(self) -> discord.Permissions:
+        return self.channel.permissions_for(self.guild.me)
+
+    def reply(self, *args, **kwargs) -> Awaitable[discord.Message]:
+        if self.bot_permissions().read_message_history:
+            kwargs["reference"] = self.message
+
+        return self.send(*args, **kwargs)
 
 class TypedMessage(discord.Message):
     guild: Optional[TypedGuild]

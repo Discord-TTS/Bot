@@ -85,7 +85,7 @@ class Loops(utils.CommonCog):
             midday = time(hour=12)
             await sleep_until(midday)
 
-        max = 0
+        max_len = 0
         yesterday = datetime.today() - timedelta(days=1)
         sections: Dict[str, List[List[str]]] = {
             "Commands:": [], "Events:": []
@@ -116,7 +116,7 @@ class Loops(utils.CommonCog):
                 first_sect = f"{seperator} `{event}:"
                 second_sect = f"{count} (Max: {max_count})`"
 
-                max = max if max > len(first_sect) else len(first_sect)
+                max_len = max(max_len, len(first_sect))
                 sections[lookup[is_command]].append([first_sect, second_sect])
 
         embed.description = ""

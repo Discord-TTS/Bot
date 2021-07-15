@@ -5,7 +5,7 @@ from inspect import cleandoc
 from io import StringIO
 from sys import exc_info
 from traceback import format_exception
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 import discord
 from discord.ext import commands
@@ -29,7 +29,8 @@ class events_errors(utils.CommonCog):
 
     async def send_error(self, ctx: utils.TypedContext, error: str, fix: str) -> Optional[discord.Message]:
         if ctx.guild:
-            permissions = ctx.channel.permissions_for(ctx.guild.me) # type: ignore
+            ctx = cast(utils.TypedGuildContext, ctx)
+            permissions = ctx.bot_permissions()
 
             if not permissions.send_messages:
                 return
@@ -112,10 +113,12 @@ class events_errors(utils.CommonCog):
             cooldown_error = await self.send_error(ctx, f"{command} is on cooldown", f"try again in {error.retry_after:.1f} seconds")
             await asyncio.sleep(error.retry_after)
 
-            if cooldown_error:
-                await cooldown_error.delete()
-            if ctx.channel.permissions_for(ctx.guild.me).manage_messages: # type: ignore
-                await ctx.message.delete()
+            if ctx.guild:
+                ctx = cast(utils.TypedGuildContext, ctx)
+                if cooldown_error:
+                    await cooldown_error.delete()
+                if ctx.bot_permissions().manage_messages:
+                    await ctx.message.delete()
 
         elif isinstance(error, commands.NoPrivateMessage):
             await self.send_error(ctx, f"{command} cannot be used in private messages", f"try running it on a server with {self.bot.user} in")

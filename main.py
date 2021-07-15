@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import traceback
+from signal import SIGHUP, SIGINT, SIGTERM
 from configparser import ConfigParser
+from functools import partial
 from os import listdir
 from time import monotonic
-from typing import (Any, TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional,
-                    Union, cast)
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
+                    Optional, Union, cast)
 
 import aiohttp
 import aioredis
@@ -57,6 +58,7 @@ class TTSBot(commands.AutoShardedBot):
         blocked: bool # Handles if to be on gtts or espeak
         pool: Pool
 
+        conn: asyncpg.pool.PoolConnectionProxy
         del cache_handler, database_handler, TTSVoicePlayer
 
     def __init__(self, config: ConfigParser, session: aiohttp.ClientSession, *args, **kwargs):
@@ -86,6 +88,10 @@ class TTSBot(commands.AutoShardedBot):
     def log(self, event: str) -> None:
         self.analytics_buffer.add(event)
 
+    def add_check(self, *args, **kwargs):
+        super().add_check(*args, **kwargs)
+        return self
+
     def load_extensions(self, folder: str):
         filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
         for ext in filered_exts:
@@ -110,7 +116,7 @@ class TTSBot(commands.AutoShardedBot):
 
         await self.invoke(ctx)
 
-    async def wait_until_ready(self, *args: Any, **kwargs: Any) -> None:
+    async def wait_until_ready(self, *_: Any, **__: Any) -> None:
         return await super().wait_until_ready()
 
 
@@ -122,7 +128,7 @@ class TTSBot(commands.AutoShardedBot):
         self.cache_db = aioredis.from_url(**cache_info)
         self.pool, self.gtts = await asyncio.gather(
             cast(Awaitable[Pool], asyncpg.create_pool(**db_info)),
-            asyncgTTS.setup(premium=False, session=self.session, base_url=None),
+            asyncgTTS.setup(premium=False, session=self.session),
         )
 
         # Fill up bot.channels, as a load of webhooks
@@ -150,6 +156,12 @@ async def only_avaliable(ctx: utils.TypedContext):
     return not ctx.guild.unavailable if ctx.guild else True
 
 
+async def on_ready(bot: TTSBot):
+    await bot.wait_until_ready()
+
+    print(f"Logged in as {bot.user} and ready!")
+    await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
+
 async def main() -> None:
     async with aiohttp.ClientSession() as session:
         return await _real_main(session)
@@ -166,26 +178,17 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         case_insensitive=True,
         chunk_guilds_at_startup=False,
         allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
-    )
-    bot.add_check(only_avaliable)
+    ).add_check(only_avaliable)
+
+    stop_bot_sync = partial(asyncio.create_task, bot.close())
+    for sig in (SIGINT, SIGTERM, SIGHUP):
+        bot.loop.add_signal_handler(sig, stop_bot_sync)
 
     await automatic_update.do_early_updates(bot)
     try:
         print("\nLogging into Discord...")
-        ready_task = asyncio.create_task(bot.wait_until_ready())
-        bot_task = asyncio.create_task(bot.start(token=config["Main"]["Token"]))
-
-        done, _ = await asyncio.wait((bot_task, ready_task), return_when=asyncio.FIRST_COMPLETED)
-        if bot_task in done:
-            error = bot_task.exception()
-            print("Bot shutdown before ready!")
-            if error:
-                traceback.print_exception(type(error), error, error.__traceback__)
-            return
-
-        print(f"Logged in as {bot.user} and ready!")
-        await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
-        await bot_task
+        asyncio.create_task(on_ready(bot))
+        await bot.start(token=config["Main"]["Token"])
     except Exception as e:
         print(get_error_string(e))
     finally:

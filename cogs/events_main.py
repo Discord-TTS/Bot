@@ -123,9 +123,9 @@ class events_main(utils.CommonCog):
 
             # Get lang
             guild_lang = None
-            user_lang: str = await self.bot.userinfo.get( # type: ignore
+            user_lang = cast(str, await self.bot.userinfo.get(
                 "lang", message.author, default=None
-            )
+            ))
             if not user_lang:
                 guild_lang = cast(str, (await self.bot.settings.get(
                     message.guild, ["default_lang"]
@@ -137,33 +137,14 @@ class events_main(utils.CommonCog):
             message_clean = utils.emojitoword(message_clean)
 
             # Acronyms
-            message_clean = f" {message_clean} "
-            acronyms = {
-                "iirc": "if I recall correctly",
-                "afaik": "as far as I know",
-                "wdym": "what do you mean",
-                "imo": "in my opinion",
-                "brb": "be right back",
-                "irl": "in real life",
-                "jk": "just kidding",
-                "btw": "by the way",
-                ":)": "smiley face",
-                "gtg": "got to go",
-                "rn": "right now",
-                ":(": "sad face",
-                "ig": "i guess",
-                "rly": "really",
-                "cya": "see ya",
-                "ik": "i know",
-                "uwu": "oowoo",
-                "@": "at",
-                "™️": "tm"
-            }
+            if lang == "en":
+                message_clean = f" {message_clean} "
+                for toreplace, replacewith in utils.ACRONYMS.items():
+                    message_clean = message_clean.replace(
+                        f" {toreplace} ", f" {replacewith} "
+                    )
+                message_clean = message_clean[1:-1]
 
-            for toreplace, replacewith in acronyms.items():
-                message_clean = message_clean.replace(f" {toreplace} ", f" {replacewith} ")
-
-            message_clean = message_clean[1:-1]
             if message_clean == "?":
                 message_clean = "what"
 
@@ -276,7 +257,7 @@ class events_main(utils.CommonCog):
             not vc                         # ignore if bot isn't in the vc
             or not before.channel          # ignore vc joins
             or member == self.bot.user     # ignore bot leaving vc
-            or after.channel != vc.channel # ignore no change in voice channel
+            or after.channel == vc.channel # ignore no change in voice channel
             or any(not member.bot for member in vc.channel.members) # ignore if bot isn't lonely
         ):
             return

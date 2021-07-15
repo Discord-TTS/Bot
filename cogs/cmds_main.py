@@ -131,5 +131,5 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
 
     @skip.after_invoke
     async def reset_cooldown(self, ctx: utils.TypedGuildContext):
-        if ctx.channel.permissions_for(ctx.author).administrator: # type: ignore
+        if ctx.author_permissions().administrator:
             self.skip.reset_cooldown(ctx)

@@ -17,8 +17,6 @@ import utils
 
 if TYPE_CHECKING:
     from asyncpg import Record
-
-    from extensions.database_handler import GeneralSettings
     from main import TTSBot
 
     _UF = Callable[[TTSBot], Awaitable[Optional[bool]]]
@@ -28,9 +26,9 @@ def _update_config(config: ConfigParser):
     with open("config.ini", "w") as config_file:
         config.write(config_file)
 
-def _update_defaults(settings: GeneralSettings) -> asyncio.Task[Record]:
+def _update_defaults(bot: TTSBot) -> asyncio.Task[Record]:
     return asyncio.create_task( # type: ignore
-        settings.pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
+        bot.conn.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
     )
 
 
@@ -57,10 +55,12 @@ async def do_early_updates(bot: TTSBot):
             print(f"Completed update: {func.__name__}")
 
 async def do_normal_updates(bot: TTSBot):
-    for func in normal_updates:
-        if await func(bot):
-            print(f"Completed update: {func.__name__}")
-
+    async with bot.pool.acquire() as conn:
+        bot.conn = conn
+        for func in normal_updates:
+            if await func(bot):
+                print(f"Completed update: {func.__name__}")
+    del bot.conn
 
 # All updates added from here
 @add_to_updates("normal")
@@ -70,19 +70,18 @@ async def add_default_column(bot: TTSBot) -> bool:
         # Default column already created
         return False
 
-    await bot.pool.execute("INSERT INTO guilds(guild_id) VALUES(0)")
-    bot.settings.DEFAULT_SETTINGS = _update_defaults(bot.settings)
+    await bot.conn.execute("INSERT INTO guilds(guild_id) VALUES(0)")
+    bot.settings.DEFAULT_SETTINGS = _update_defaults(bot)
 
     return True
 
 @add_to_updates("normal")
 async def add_analytics(bot: TTSBot) -> bool:
-    async with bot.pool.acquire() as conn:
-        if await conn.fetchval("SELECT to_regclass('public.analytics')"):
-            return False
+    if await bot.conn.fetchval("SELECT to_regclass('public.analytics')"):
+        return False
 
-        await conn.execute(utils.ANALYTICS_CREATE)
-        return True
+    await bot.conn.execute(utils.ANALYTICS_CREATE)
+    return True
 
 
 @add_to_updates("early")
@@ -126,8 +125,6 @@ async def setup_bot(bot: TTSBot) -> bool:
 
     import asyncpg
     from cryptography.fernet import Fernet
-
-    import utils
 
     db_info = bot.config["PostgreSQL Info"]
     bot.config["Main"]["key"] = str(Fernet.generate_key())
