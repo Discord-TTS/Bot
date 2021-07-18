@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Awaitable, List, TYPE_CHECKING, Optional, Union, TypeVar
+from typing import Awaitable, TYPE_CHECKING, Optional, Union, TypeVar
 
 import discord
 from discord.ext import commands

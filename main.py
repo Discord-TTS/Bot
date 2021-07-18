@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from signal import SIGHUP, SIGINT, SIGTERM
+import sys
+import traceback
 from configparser import ConfigParser
 from functools import partial
 from os import listdir
+from signal import SIGHUP, SIGINT, SIGTERM
 from time import monotonic
 from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
                     Optional, Union, cast)
@@ -30,6 +32,9 @@ config.read("config.ini")
 activity = discord.Activity(name=config["Activity"]["name"], type=getattr(discord.ActivityType, config["Activity"]["type"]))
 intents = discord.Intents(voice_states=True, messages=True, guilds=True, members=True)
 status = getattr(discord.Status, config["Activity"]["status"])
+
+allowed_mentions = discord.AllowedMentions(everyone=False, roles=False)
+cache_flags = discord.MemberCacheFlags(online=False, joined=False)
 
 # Custom prefix support
 async def prefix(bot: TTSBot, message: discord.Message) -> str:
@@ -73,6 +78,10 @@ class TTSBot(commands.AutoShardedBot):
 
 
     @property
+    def avatar_url(self) -> str:
+        return str(self.user.avatar_url) if self.user else ""
+
+    @property
     def support_server(self) -> Optional[discord.Guild]:
         return self.get_guild(int(self.config["Main"]["main_server"]))
 
@@ -81,16 +90,8 @@ class TTSBot(commands.AutoShardedBot):
         support_server = self.support_server
         return support_server.get_channel(694127922801410119) if support_server else None # type: ignore
 
-    @property
-    def avatar_url(self) -> str:
-        return str(self.user.avatar_url) if self.user else ""
-
     def log(self, event: str) -> None:
         self.analytics_buffer.add(event)
-
-    def add_check(self, *args, **kwargs):
-        super().add_check(*args, **kwargs)
-        return self
 
     def load_extensions(self, folder: str):
         filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
@@ -106,6 +107,20 @@ class TTSBot(commands.AutoShardedBot):
         except Exception as e:
             return e
 
+    async def user_from_dm(self, dm_name: str) -> Optional[discord.User]:
+        match = utils.ID_IN_BRACKETS_REGEX.search(dm_name)
+        if not match:
+            return
+
+        real_user_id = int(match.group(1))
+        try:
+            return await self.fetch_user(real_user_id)
+        except commands.UserNotFound:
+            return
+
+    def add_check(self, *args, **kwargs):
+        super().add_check(*args, **kwargs)
+        return self
 
     async def process_commands(self, message: discord.Message) -> None:
         if message.author.bot:
@@ -172,12 +187,14 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         status=status,
         intents=intents,
         session=session,
+        max_messages=None,
         help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
         activity=activity,
         command_prefix=prefix,
         case_insensitive=True,
         chunk_guilds_at_startup=False,
-        allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
+        member_cache_flags=cache_flags,
+        allowed_mentions=allowed_mentions,
     ).add_check(only_avaliable)
 
     stop_bot_sync = partial(asyncio.create_task, bot.close())
@@ -189,8 +206,8 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         print("\nLogging into Discord...")
         asyncio.create_task(on_ready(bot))
         await bot.start(token=config["Main"]["Token"])
-    except Exception as e:
-        print(get_error_string(e))
+    except Exception:
+        traceback.print_exception(*sys.exc_info())
     finally:
         if not bot.user:
             return
@@ -206,7 +223,4 @@ try:
 except ModuleNotFoundError:
     print("Failed to import uvloop, performance may be reduced")
 
-try:
-    asyncio.run(main())
-except (KeyboardInterrupt, RuntimeError) as e:
-    print(f"Shutdown forcefully: {get_error_string(e)}")
+asyncio.run(main())

@@ -10,8 +10,8 @@ _script_files = ("bat", "sh", "jar", "py", "php")
 _program_files = ("apk", "exe", "msi", "deb")
 _disk_images = ("dmg", "iso", "img", "ima")
 
-ANIMATED_EMOJI_REGEX = _re.compile(r"<a\:.+:\d+>")
-EMOJI_REGEX = _re.compile(r"<:.+:\d+\d+>")
+ID_IN_BRACKETS_REGEX = _re.compile(r"\((\d+)\)")
+EMOJI_REGEX = _re.compile(r"<(a?):(.+):(\d+)>")
 
 _PRE_REGEX_REPLACEMENTS = {
     r"\|\|.*?\|\|": ". spoiler avoided.",

@@ -39,16 +39,22 @@ class events_other(utils.CommonCog):
             await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
 
         if message.reference and message.guild == self.bot.support_server and message.channel.name in ("dm_logs", "suggestions") and not message.author.bot:
-            dm_message = message.reference.resolved or await message.channel.fetch_message(message.reference.message_id) # type: ignore
-            dm_sender = dm_message.author # type: ignore
-            if dm_sender.discriminator != "0000":
+            dm_message = message.reference.resolved
+            if (
+                not dm_message
+                or isinstance(dm_message, discord.DeletedReferencedMessage)
+                or dm_message.author.discriminator != "0000"
+            ):
                 return
 
             dm_command = cast(commands.Command, self.bot.get_command("dm"))
             ctx = await self.bot.get_context(message)
 
-            todm = await commands.UserConverter().convert(ctx, dm_sender.name)
-            await dm_command(ctx, todm, message=message.content)
+            real_user = await self.bot.user_from_dm(dm_message.author.name)
+            if not real_user:
+                return
+
+            await dm_command(ctx, real_user, message=message.content)
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):

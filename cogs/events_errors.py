@@ -17,16 +17,14 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
+IGNORED_ERRORS = (commands.CommandNotFound, commands.NotOwner)
 def setup(bot: TTSBot):
-    bot.add_cog(events_errors(bot))
+    cog = events_errors(bot)
+
+    bot.add_cog(cog)
+    bot.on_error = cog.on_error
 
 class events_errors(utils.CommonCog):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.bot.on_error = self.on_error
-
-
     async def send_error(self, ctx: utils.TypedContext, error: str, fix: str) -> Optional[discord.Message]:
         if ctx.guild:
             ctx = cast(utils.TypedGuildContext, ctx)
@@ -84,13 +82,13 @@ class events_errors(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: utils.TypedContext, error: commands.CommandError):
-        if hasattr(ctx.command, "on_error") or isinstance(error, (commands.CommandNotFound, commands.NotOwner)):
-            return
-
         command = f"`{ctx.prefix}{ctx.command}`"
         error = getattr(error, "original", error)
 
-        if isinstance(error, commands.UserInputError):
+        if isinstance(error, IGNORED_ERRORS):
+            return
+
+        elif isinstance(error, commands.UserInputError):
             error_name = type(error).__name__
             fix = f"check out `{ctx.prefix}help {ctx.command}`"
 
@@ -137,6 +135,9 @@ class events_errors(utils.CommonCog):
                 self.send_error(ctx, "I encountered an unknown permission error", "please give TTS Bot the required permissions"),
                 self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}")
             )
+
+        elif isinstance(error, asyncio.TimeoutError):
+            await self.bot.channels["errors"].send(f"`asyncio.TimeoutError:` Unhandled in {ctx.command.qualified_name}")
 
         else:
             await self.send_error(ctx, "an unknown error occured", "get in contact with us via the support server for help")

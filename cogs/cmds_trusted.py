@@ -64,10 +64,14 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def r(self, ctx: utils.TypedContext, *, message: str):
         async for history_message in ctx.channel.history(limit=10):
-            if history_message.author.discriminator == "0000":
-                converter = commands.UserConverter()
-                todm = await converter.convert(ctx, history_message.author.name)
-                return await self.dm(ctx, todm, message=message)
+            if history_message.author.discriminator != "0000":
+                continue
+
+            user = await self.bot.user_from_dm(history_message.author.name)
+            if not user:
+                continue
+
+            await self.dm(ctx, user, message=message)
         await ctx.send("Webhook not found")
 
     @commands.command()

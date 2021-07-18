@@ -108,11 +108,14 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
 
         if not await self.bot.userinfo.get("blocked", ctx.author, default=False):
             files = [await attachment.to_file() for attachment in ctx.message.attachments]
+
+            author_name = str(ctx.author)
+            author_id = f" ({ctx.author.id})"
             await self.bot.channels["suggestions"].send(
-                suggestion,
                 files=files,
-                username=str(ctx.author),
-                avatar_url=ctx.author.avatar_url
+                content=suggestion,
+                avatar_url=ctx.author.avatar_url,
+                username=author_name[:32 - len(author_id)] + author_id,
             )
 
         await ctx.send("Suggestion noted")

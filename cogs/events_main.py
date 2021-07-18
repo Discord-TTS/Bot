@@ -134,7 +134,7 @@ class events_main(utils.CommonCog):
             lang = user_lang or guild_lang or "en"
 
             # Emoji filter
-            message_clean = utils.emojitoword(message_clean)
+            message_clean = utils.EMOJI_REGEX.sub(utils.emoji_match_to_cleaned, message_clean)
 
             # Acronyms
             if lang == "en":
@@ -221,11 +221,14 @@ class events_main(utils.CommonCog):
 
                 elif not await self.bot.userinfo.get("blocked", message.author, default=False):
                     files = [await attachment.to_file() for attachment in message.attachments]
+
+                    author_name = str(message.author)
+                    author_id = f" ({message.author.id})"
                     await self.bot.channels["dm_logs"].send(
-                        message.content,
                         files=files,
-                        username=str(message.author),
-                        avatar_url=message.author.avatar_url
+                        content=message.content,
+                        avatar_url=message.author.avatar_url,
+                        username=author_name[:32 - len(author_id)] + author_id,
                     )
 
             else:
