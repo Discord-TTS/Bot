@@ -17,6 +17,7 @@ import asyncgTTS
 import asyncpg
 import discord
 from discord.ext import commands
+import websockets
 
 import automatic_update
 import utils
@@ -60,18 +61,26 @@ class TTSBot(commands.AutoShardedBot):
         analytics_buffer: utils.SafeDict
         cache_db: aioredis.Redis
         gtts: asyncgTTS.easygTTS
+        status_code: int
         blocked: bool # Handles if to be on gtts or espeak
         pool: Pool
 
         conn: asyncpg.pool.PoolConnectionProxy
         del cache_handler, database_handler, TTSVoicePlayer
 
-    def __init__(self, config: ConfigParser, session: aiohttp.ClientSession, *args, **kwargs):
+    def __init__(self,
+        config: ConfigParser,
+        session: aiohttp.ClientSession,
+        cluster_id: int = None,
+    *args, **kwargs):
         self.config = config
+        self.websocket = None
         self.session = session
         self.sent_fallback = False
+        self.cluster_id = cluster_id
         self.channels: Dict[str, discord.Webhook] = {}
 
+        self.status_code = utils.RESTART_CLUSTER
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
 
         super().__init__(*args, **kwargs)
@@ -118,6 +127,7 @@ class TTSBot(commands.AutoShardedBot):
         except commands.UserNotFound:
             return
 
+
     def add_check(self, *args, **kwargs):
         super().add_check(*args, **kwargs)
         return self
@@ -135,7 +145,7 @@ class TTSBot(commands.AutoShardedBot):
         return await super().wait_until_ready()
 
 
-    async def start(self, token: str, *args: None, **kwargs: bool):
+    async def start(self, token: str, **kwargs):
         "Get everything ready in async env"
         cache_info = self.config["Redis Info"]
         db_info = self.config["PostgreSQL Info"]
@@ -158,10 +168,23 @@ class TTSBot(commands.AutoShardedBot):
         self.load_extensions("extensions")
 
         # Send starting message and actually start the bot
-        await self.channels["logs"].send("Starting TTS Bot!")
+        if self.shard_ids is not None:
+            prefix = f"`[Cluster {self.cluster_id}] [Shards {self.shard_count}]`: "
+            kwargs["reconnect"] = False # allow cluster launcher to handle restarting
+            host = self.config["Clustering"].get("websocket_host", "localhost")
+            port = self.config["Clustering"].get("websocket_port", "8765")
+
+            uri = f"ws://{host}:{port}/{self.cluster_id}"
+            self.websocket = await websockets.connect(uri)
+        else:
+            prefix = ""
+            self.websocket = None
+
+        self.logger = utils.setup_logging(aio=True, level="info", session=self.session, prefix=prefix)
+        self.logger.info("Starting TTS Bot!")
 
         await automatic_update.do_normal_updates(self)
-        await super().start(token, *args, **kwargs)
+        await super().start(token, **kwargs)
 
 
 def get_error_string(e: BaseException) -> str:
@@ -173,15 +196,18 @@ async def only_avaliable(ctx: utils.TypedContext):
 
 async def on_ready(bot: TTSBot):
     await bot.wait_until_ready()
+    bot.logger.info(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
 
-    print(f"Logged in as {bot.user} and ready!")
-    await bot.channels["logs"].send(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
-
-async def main() -> None:
+async def main(*args, **kwargs) -> int:
     async with aiohttp.ClientSession() as session:
-        return await _real_main(session)
+        return await _real_main(session, *args, **kwargs)
 
-async def _real_main(session: aiohttp.ClientSession) -> None:
+async def _real_main(
+    session: aiohttp.ClientSession,
+    cluster_id: Optional[int] = None,
+    total_shard_count: Optional[int] = None,
+    shards_to_handle: Optional[List[int]] = None,
+) -> int:
     bot = TTSBot(
         config=config,
         status=status,
@@ -191,31 +217,45 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
         activity=activity,
         command_prefix=prefix,
+        cluster_id=cluster_id,
         case_insensitive=True,
+        shard_ids=shards_to_handle,
+        shard_count=total_shard_count,
         chunk_guilds_at_startup=False,
         member_cache_flags=cache_flags,
         allowed_mentions=allowed_mentions,
     ).add_check(only_avaliable)
 
-    stop_bot_sync = partial(asyncio.create_task, bot.close())
+    def stop_bot_sync(sig: int, *args, **kwargs):
+        bot.status_code = -sig
+        bot.logger.warning(f"Recieved signal {sig} and shutting down.")
+
+        asyncio.create_task(bot.close())
+
     for sig in (SIGINT, SIGTERM, SIGHUP):
-        bot.loop.add_signal_handler(sig, stop_bot_sync)
+        bot.loop.add_signal_handler(sig, partial(stop_bot_sync, sig))
 
     await automatic_update.do_early_updates(bot)
     try:
         print("\nLogging into Discord...")
         asyncio.create_task(on_ready(bot))
         await bot.start(token=config["Main"]["Token"])
+        return bot.status_code
+
     except Exception:
         traceback.print_exception(*sys.exc_info())
+        return utils.DO_NOT_RESTART_CLUSTER
+
     finally:
         if not bot.user:
-            return
+            return utils.DO_NOT_RESTART_CLUSTER
 
-        await bot.channels["logs"].send(f"{bot.user.mention} is shutting down.")
-        await asyncio.wait_for(asyncio.gather(
-            bot.pool.close(), bot.cache_db.close(), bot.close()
-        ), timeout=5)
+        closing_coros = [bot.pool.close(), bot.cache_db.close(), bot.close()]
+        if bot.websocket is not None:
+            closing_coros.append(bot.websocket.close())
+
+        bot.logger.info(f"{bot.user.mention} is shutting down.")
+        await asyncio.wait_for(asyncio.gather(*closing_coros), timeout=5)
 
 try:
     import uvloop
@@ -223,4 +263,5 @@ try:
 except ModuleNotFoundError:
     print("Failed to import uvloop, performance may be reduced")
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

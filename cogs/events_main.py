@@ -214,10 +214,8 @@ class events_main(utils.CommonCog):
                     await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
 
                 elif message.content.lower() == "help":
-                    await asyncio.gather(
-                        self.bot.channels["logs"].send(f"{message.author} just got the 'dont ask to ask' message"),
-                        message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
-                    )
+                    self.bot.logger.info(f"{message.author} just got the 'dont ask to ask' message")
+                    await message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
 
                 elif not await self.bot.userinfo.get("blocked", message.author, default=False):
                     files = [await attachment.to_file() for attachment in message.attachments]
@@ -241,11 +239,9 @@ class events_main(utils.CommonCog):
                 ).set_footer(text=pick_random(utils.FOOTER_MSGS))
 
                 dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=embed)
+                self.bot.logger.info(f"{message.author} just got the 'Welcome to Support DMs' message")
 
-                await asyncio.gather(
-                    self.bot.channels["logs"].send(f"{message.author} just got the 'Welcome to Support DMs' message"),
-                    dm_message.pin()
-                )
+                await dm_message.pin()
 
     @commands.Cog.listener()
     async def on_voice_state_update(

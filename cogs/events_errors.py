@@ -73,6 +73,9 @@ class events_errors(utils.CommonCog):
             guild: discord.Guild = args[0]
             info = f"Guild = {guild} | {guild.id}"
 
+        if self.bot.cluster_id:
+            info += f"\nCluster Info: Cluster ID {self.bot.cluster_id} | Shards {self.bot.shard_count}"
+
         try:
             error_message = f"Event: `{event}`\nInfo: `{info}`\n```{''.join(format_exception(etype, value, tb))}```"
         except:

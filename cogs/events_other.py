@@ -81,13 +81,11 @@ class events_other(utils.CommonCog):
                 return
 
             support_guild_member = support_server.get_member(owner.id)
-            if support_guild_member:
-                await support_guild_member.add_roles(role)
+            if not support_guild_member:
+                return
 
-            embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild}")
-            embed.set_author(name=f"{owner} (ID {owner.id})", icon_url=str(owner.avatar_url))
-
-            await self.bot.channels["logs"].send(embed=embed)
+            await support_guild_member.add_roles(role)
+            self.bot.logger.info(f"Added OFS role to {support_guild_member}")
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild):
@@ -95,3 +93,21 @@ class events_other(utils.CommonCog):
             self.bot.settings.remove(guild),
             self.bot.channels["servers"].send(f"Just got kicked from {guild}. I am now in {len(self.bot.guilds)} servers")
         )
+
+
+    # IPC events that have been plugged into bot.dispatch
+    @commands.Cog.listener()
+    async def on_websocket_msg(self, msg):
+        self.bot.logger.debug(f"Recieved Websocket message: {msg}")
+
+    @commands.Cog.listener()
+    async def on_close(self):
+        self.bot.status_code = utils.RESTART_CLUSTER
+        await self.bot.close()
+
+    @commands.Cog.listener()
+    async def on_change_log_level(self, level: str):
+        level = level.upper()
+        self.bot.logger.setLevel(level)
+        for handler in self.bot.logger.handlers:
+            handler.setLevel(level)

@@ -1,5 +1,9 @@
 import re as _re
 
+KILL_EVERYTHING = 0
+RESTART_CLUSTER = 1
+DO_NOT_RESTART_CLUSTER = 2
+
 NETURAL_COLOUR = 0x3498db
 _image_files = ("bmp", "gif", "ico", "png", "psd", "svg", "jpg")
 _audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
 
 import discord
 from discord.ext import tasks
+import websockets
 
 import utils
 
@@ -58,6 +59,19 @@ class Loops(utils.CommonCog):
         for task in self.tasks:
             task.cancel()
 
+
+    @tasks.loop()
+    @utils.decos.handle_errors
+    async def websocket_client(self):
+        if self.bot.websocket is None:
+            return self.websocket_client.stop()
+
+        async for msg in self.bot.websocket:
+            if isinstance(msg, bytes):
+                msg = msg.decode()
+
+            self.bot.dispatch("websocket_msg", msg)
+            self.bot.dispatch(*msg.lower().split())
 
     @tasks.loop(seconds=60)
     @utils.decos.handle_errors

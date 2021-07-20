@@ -144,7 +144,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.bot.log("on_play_timeout")
 
             error = f"`{self.guild.id}`'s vc.play didn't finish audio!"
-            await self.send_timeout_error(error)
+            self.bot.logger.error(error)
 
     @tasks.loop()
     @utils.decos.handle_errors
@@ -161,7 +161,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.bot.log("on_generate_timeout")
 
             error = f"`{self.guild.id}`'s `{len(text)}` character long message was cancelled!"
-            return await self.send_timeout_error(error)
+            return self.bot.logger.error(error)
 
         if not ret_values or None in ret_values:
             return
@@ -220,7 +220,7 @@ class TTSVoicePlayer(discord.VoiceClient):
 
     # easygTTS -> espeak handling
     async def _handle_rl(self):
-        await self.bot.channels["logs"].send("**Swapping to espeak**")
+        self.bot.logger.warning("Swapping to espeak")
 
         asyncio.create_task(self._handle_rl_reset())
         if not self.bot.sent_fallback:
@@ -229,7 +229,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             await asyncio.gather(*(
                 vc._send_fallback() for vc in self.bot.voice_clients
             ))
-            await self.bot.channels["logs"].send("**Fallback/RL messages have been sent.**")
+            self.bot.logger.info("Fallback/RL messages have been sent.")
 
     async def _handle_rl_reset(self):
         await asyncio.sleep(3601)
@@ -238,13 +238,13 @@ class TTSVoicePlayer(discord.VoiceClient):
             if ret:
                 break
             elif isinstance(ret, Exception):
-                await self.bot.channels["logs"].send("**Failed to connect to easygTTS for unknown reason.**")
+                self.bot.logger.warning("**Failed to connect to easygTTS for unknown reason.**")
             else:
-                await self.bot.channels["logs"].send("**Rate limit still in place, waiting another hour.**")
+                self.bot.logger.info("**Rate limit still in place, waiting another hour.**")
 
             await asyncio.sleep(3601)
 
-        await self.bot.channels["logs"].send("**Swapping back to easygTTS**")
+        self.bot.logger.info("**Swapping back to easygTTS**")
         self.bot.blocked = False
 
     @utils.decos.handle_errors
@@ -301,7 +301,3 @@ class TTSVoicePlayer(discord.VoiceClient):
     @utils.decos.run_in_executor
     def get_duration(self, audio_data: bytes) -> float:
         return len(AudioSegment.from_file_using_temporary_files(BytesIO(audio_data))) / 1000 # type: ignore
-
-    def send_timeout_error(self, reason: str) -> Awaitable[discord.Message]:
-        error = f"`asyncio.TimeoutError`: {reason}"
-        return self.bot.channels["errors"].send(error)

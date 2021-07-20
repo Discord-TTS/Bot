@@ -50,11 +50,17 @@ early_updates: List[_UF] = []
 normal_updates: List[_UF] = []
 
 async def do_early_updates(bot: TTSBot):
+    if bot.cluster_id != 0:
+        return
+
     for func in early_updates:
         if await func(bot):
             print(f"Completed update: {func.__name__}")
 
 async def do_normal_updates(bot: TTSBot):
+    if bot.cluster_id != 0:
+        return
+
     async with bot.pool.acquire() as conn:
         bot.conn = conn
         for func in normal_updates:
