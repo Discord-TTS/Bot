@@ -134,7 +134,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         source = FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"')
 
         try:
-            self.play(source, after=self._after_player)
+            self.play(source, after=self.after_player)
         except discord.ClientException:
             self.currently_playing.set()
 
@@ -274,7 +274,7 @@ class TTSVoicePlayer(discord.VoiceClient):
 
 
     # Helper functions
-    def _after_player(self, exception: Optional[Exception]) -> None:
+    def after_player(self, exception: Optional[Exception]) -> None:
         # This func runs in a seperate thread, has to do awaiting, and we
         # don't care about it's return value, so we get back to the main
         # thread to fix race conditions and get this thread out of the way

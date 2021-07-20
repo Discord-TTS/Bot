@@ -19,12 +19,12 @@ if TYPE_CHECKING:
 
 IGNORED_ERRORS = (commands.CommandNotFound, commands.NotOwner)
 def setup(bot: TTSBot):
-    cog = events_errors(bot)
+    cog = ErrorEvents(bot)
 
     bot.add_cog(cog)
     bot.on_error = cog.on_error
 
-class events_errors(utils.CommonCog):
+class ErrorEvents(utils.CommonCog):
     async def send_error(self, ctx: utils.TypedContext, error: str, fix: str) -> Optional[discord.Message]:
         if ctx.guild:
             ctx = cast(utils.TypedGuildContext, ctx)
@@ -134,13 +134,11 @@ class events_errors(utils.CommonCog):
             )
 
         elif isinstance(error, discord.errors.Forbidden):
-            await asyncio.gather(
-                self.send_error(ctx, "I encountered an unknown permission error", "please give TTS Bot the required permissions"),
-                self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}")
-            )
+            self.bot.logger.error(f"`discord.errors.Forbidden` caused by {ctx.message.content} sent by {ctx.author}")
+            await self.send_error(ctx, "I encountered an unknown permission error", "please give TTS Bot the required permissions")
 
         elif isinstance(error, asyncio.TimeoutError):
-            await self.bot.channels["errors"].send(f"`asyncio.TimeoutError:` Unhandled in {ctx.command.qualified_name}")
+            self.bot.logger.error(f"`asyncio.TimeoutError:` Unhandled in {ctx.command.qualified_name}")
 
         else:
             await self.send_error(ctx, "an unknown error occured", "get in contact with us via the support server for help")

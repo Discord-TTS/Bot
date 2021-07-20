@@ -23,7 +23,7 @@ def setup(bot: TTSBot):
 
 
 _DK = Union[int, Tuple[int, ...]]
-class handles_db:
+class HandlesDB:
     def __init__(self, pool: asyncpg.Pool[asyncpg.Record]):
         self.pool = pool
         self._cache: Dict[_DK, Optional[asyncpg.Record]] = {}
@@ -42,7 +42,7 @@ class handles_db:
         return self._cache[id]
 
 
-class GeneralSettings(handles_db):
+class GeneralSettings(HandlesDB):
     DEFAULT_SETTINGS: asyncio.Task[asyncpg.Record]
     def __init__(self, pool: asyncpg.Pool[asyncpg.Record], *args: Any, **kwargs: Any):
         super().__init__(pool, *args, **kwargs)
@@ -79,7 +79,7 @@ class GeneralSettings(handles_db):
         finally:
             self._cache_lock.set()
 
-class UserInfoHandler(handles_db):
+class UserInfoHandler(HandlesDB):
     async def get(self, value: str, user: User, default: Return) -> Return:
         row = await self.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user.id)
         return row.get(value, default) if row else default # type: ignore
@@ -109,7 +109,7 @@ class UserInfoHandler(handles_db):
     async def unblock(self, user: User) -> None:
         await self.set("blocked", user, False)
 
-class NicknameHandler(handles_db):
+class NicknameHandler(HandlesDB):
     async def get(self, guild: Guild, user: User) -> str:
         row = await self.fetchrow("SELECT * FROM nicknames WHERE guild_id = $1 AND user_id = $2", (guild.id, user.id))
         return row["name"] if row else user.display_name

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
 
 import discord
 from discord.ext import tasks
-import websockets
 
 import utils
 

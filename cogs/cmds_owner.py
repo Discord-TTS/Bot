@@ -13,9 +13,9 @@ if TYPE_CHECKING:
 
 
 def setup(bot: TTSBot):
-    bot.add_cog(cmds_owner(bot))
+    bot.add_cog(OwnerCommands(bot))
 
-class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
+class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
     "TTS Bot commands meant only for the bot owner."
 
     @commands.command()

@@ -12,9 +12,9 @@ import utils
 start_time = monotonic()
 
 def setup(bot):
-    bot.add_cog(cmds_extra(bot))
+    bot.add_cog(ExtraCommands(bot))
 
-class cmds_extra(utils.CommonCog, name="Extra Commands"):
+class ExtraCommands(utils.CommonCog, name="Extra Commands"):
     "TTS Bot extra commands, not required but useful."
 
     @commands.command()
@@ -55,7 +55,7 @@ class cmds_extra(utils.CommonCog, name="Extra Commands"):
                     {sep2} {total_voice_clients} voice channels
                     {sep2} {len(self.bot.guilds)} servers
                 Currently using:
-                    {sep1} {len(self.bot.shards)} shards
+                    {sep1} {self.bot.shard_count} shards
                     {sep1} {ram_usage:.1f}MB of RAM
                 and can be used by {total_members:,} people!
             """)

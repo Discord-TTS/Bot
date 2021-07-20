@@ -10,7 +10,7 @@ import time
 from configparser import ConfigParser
 from functools import partial
 from itertools import zip_longest
-from signal import SIGINT, SIGKILL, SIGTERM, signal
+from signal import SIGINT, SIGKILL, SIGTERM
 from typing import (TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple,
                     TypeVar, Union)
 
@@ -32,8 +32,6 @@ if TYPE_CHECKING:
 
 def group_by(iterable: Iterable[_T], by:int) -> Iterable[Tuple[_T]]:
     yield from zip_longest(*[iter(iterable)]*by)
-
-# "\n".join(self.prefix + line for line in message.split("\n")))
 
 
 def make_user_agent():
@@ -138,7 +136,7 @@ class ClusterManager:
 
         self.keep_alive = asyncio.create_task(keep_alive())
 
-    async def shutdown(self, signal: Optional[int] = None, *args, **kwargs):
+    async def shutdown(self, *args, **kwargs):
         logger.warning("Shutting all clusters down")
 
         for cluster_id, pid in self.processes.items():
@@ -183,6 +181,11 @@ class ClusterManager:
         await self.websockets[int(cluster)].send(msg)
 
     async def broadcast_handler(self, _: _WSSP, *args: str):
+        if args[0].lower() == "change_log_level":
+            logger.setLevel(args[1].upper())
+            for handler in logger.handlers:
+                handler.setLevel(args[1].upper())
+
         for connection in self.websockets.values():
             await connection.send(" ".join(args))
 
@@ -204,17 +207,20 @@ async def main():
     manager = ClusterManager()
     def shutdown(sig, *args, **kwargs):
         logger.debug(f"Signal {sig} received")
-        return asyncio.run_coroutine_threadsafe(manager.shutdown(sig), manager.loop)
+        return manager.loop.create_task(manager.shutdown())
 
     for sig in (SIGTERM, SIGINT):
-        signal(sig, shutdown)
+        manager.loop.add_signal_handler(sig, partial(shutdown, sig))
 
     host = config["Clustering"].get("websocket_host", "localhost")
     port = int(config["Clustering"].get("websocket_port", "8765"))
 
     async with websockets.serve(manager.websocket_handler, host, port):
         async with aiohttp.ClientSession() as session:
-            logger = utils.setup_logging(aio=True, level="debug", session=session, prefix="`[Launcher]`: ")
+            logger = utils.setup_logging(
+                aio=True, level=config["Main"]["log_level"],
+                session=session, prefix="`[Launcher]`: "
+            )
 
             try:
                 await manager.start()

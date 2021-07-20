@@ -169,7 +169,7 @@ class TTSBot(commands.AutoShardedBot):
 
         # Send starting message and actually start the bot
         if self.shard_ids is not None:
-            prefix = f"`[Cluster {self.cluster_id}] [Shards {self.shard_count}]`: "
+            prefix = f"`[Cluster] [ID {self.cluster_id}] [Shards {len(self.shard_ids)}]`: "
             kwargs["reconnect"] = False # allow cluster launcher to handle restarting
             host = self.config["Clustering"].get("websocket_host", "localhost")
             port = self.config["Clustering"].get("websocket_port", "8765")
@@ -180,7 +180,10 @@ class TTSBot(commands.AutoShardedBot):
             prefix = ""
             self.websocket = None
 
-        self.logger = utils.setup_logging(aio=True, level="info", session=self.session, prefix=prefix)
+        self.logger = utils.setup_logging(
+            aio=True, level=config["Main"]["log_level"],
+            session=self.session, prefix=prefix
+        )
         self.logger.info("Starting TTS Bot!")
 
         await automatic_update.do_normal_updates(self)
@@ -237,7 +240,6 @@ async def _real_main(
 
     await automatic_update.do_early_updates(bot)
     try:
-        print("\nLogging into Discord...")
         asyncio.create_task(on_ready(bot))
         await bot.start(token=config["Main"]["Token"])
         return bot.status_code

@@ -13,9 +13,9 @@ if TYPE_CHECKING:
 
 def setup(bot: TTSBot):
     bot.analytics_buffer = utils.SafeDict()
-    bot.add_cog(events_analytics(bot))
+    bot.add_cog(AnalyticsEvents(bot))
 
-class events_analytics(utils.CommonCog):
+class AnalyticsEvents(utils.CommonCog):
     @commands.Cog.listener()
     async def on_command(self, ctx: utils.TypedContext):
         self.bot.log(ctx.command.qualified_name)

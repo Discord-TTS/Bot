@@ -29,9 +29,9 @@ WELCOME_MESSAGE = cleandoc("""
 """)
 
 def setup(bot: TTSBot):
-    bot.add_cog(events_other(bot))
+    bot.add_cog(OtherEvents(bot))
 
-class events_other(utils.CommonCog):
+class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_message(self, message: utils.TypedGuildMessage):

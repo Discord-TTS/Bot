@@ -1,7 +1,7 @@
 import asyncio
 import configparser
 import logging
-from typing import Sequence
+from typing import Dict, List, Sequence, Tuple, Union
 
 import aiohttp
 import discord
@@ -36,19 +36,21 @@ class WebhookHandler(logging.StreamHandler):
     def emit(self, *args, **kwargs):
         raise NotImplementedError
 
-    def webhook_send(self, record: logging.LogRecord):
-        msg = self.format(record)
-
-        severity = record.levelno
-        if severity >= WARNING:
-            msg = f"**{msg}**"
-
+    def webhook_send(self, severity: int, *messages: str):
+        severity_name = logging.getLevelName(severity)
         webhook = self.error_logs if severity >= ERROR else self.normal_logs
 
+        message = ""
+        for line in messages:
+            if severity >= WARNING:
+                line = f"**{line}**"
+
+            message += f"{self.prefix}{line}\n"
+
         return webhook.send(
-            self.prefix + msg,
-            username=f"TTS-Webhook [{record.levelname}]",
-            avatar_url=avatars.get(record.levelno, unknown_avatar_url),
+            content=message,
+            username=f"TTS-Webhook [{severity_name}]",
+            avatar_url=avatars.get(severity, unknown_avatar_url),
         )
 
 class SyncWebhookHandler(WebhookHandler):
@@ -58,7 +60,7 @@ class SyncWebhookHandler(WebhookHandler):
 
     def emit(self, record: logging.LogRecord):
         try:
-            self.webhook_send(record)
+            self.webhook_send(record.levelno, self.format(record))
         except RecursionError:
             raise
         except Exception:
@@ -69,30 +71,39 @@ class AsyncWebhookHandler(WebhookHandler):
         adapters = discord.AsyncWebhookAdapter(session), discord.AsyncWebhookAdapter(session)
         super().__init__(*args, adapters=adapters, **kwargs)
 
+        self.to_be_sent: Dict[int, List[str]] = {}
         self.loop = asyncio.get_running_loop()
-        self.to_be_sent: asyncio.Queue[logging.LogRecord] = asyncio.Queue()
 
-    @tasks.loop()
-    @handle_errors
+    @tasks.loop(seconds=1)
     async def sender_loop(self):
-        record = await self.to_be_sent.get()
-        await self.webhook_send(record)
+        for severity in self.to_be_sent.copy().keys():
+            msgs = self.to_be_sent.pop(severity)
+            try:
+                await self.webhook_send(severity, *msgs)
+            except RuntimeError:
+                return self.sender_loop.stop()
 
     def _emit(self, record: logging.LogRecord) -> None:
-        self.to_be_sent.put_nowait(record)
+        msg = self.format(record)
+        if record.levelno not in self.to_be_sent:
+            self.to_be_sent[record.levelno] = [msg]
+        else:
+            self.to_be_sent[record.levelno].append(msg)
+
         if not self.sender_loop.is_running():
             self.sender_loop.start()
 
     def emit(self, record: logging.LogRecord) -> None:
         self.loop.call_soon_threadsafe(self._emit, record)
 
-class CacheDisabledLogger(logging.Logger):
-    def is_enabled_for(self, level: int) -> bool:
-        return level >= self.getEffectiveLevel()
+class CacheFixedLogger(logging.Logger):
+    _cache: Dict[int, bool]
+    def setLevel(self, level: Union[int, str]) -> None:
+        self.level = logging.getLevelName(level)
+        self._cache.clear()
 
-
-def setup(aio: bool, level: str, *args, **kwargs) -> CacheDisabledLogger:
-    logger = CacheDisabledLogger("TTS Bot")
+def setup(aio: bool, level: str, *args, **kwargs) -> CacheFixedLogger:
+    logger = CacheFixedLogger("TTS Bot")
     logger.setLevel(level.upper())
 
     handler = AsyncWebhookHandler if aio else SyncWebhookHandler

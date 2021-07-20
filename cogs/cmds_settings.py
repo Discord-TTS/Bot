@@ -27,9 +27,9 @@ langs_lookup: Dict[str, str] = {
 to_enabled = {True: "Enabled", False: "Disabled"}
 
 def setup(bot: TTSBot):
-    bot.add_cog(cmds_settings(bot))
+    bot.add_cog(SettingCommands(bot))
 
-class cmds_settings(utils.CommonCog, name="Settings"):
+class SettingCommands(utils.CommonCog, name="Settings"):
     "TTS Bot settings commands, configuration is done here."
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)

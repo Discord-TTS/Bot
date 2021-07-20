@@ -40,9 +40,9 @@ async def do_autojoin(author: utils.TypedMember) -> bool:
 
 
 def setup(bot: TTSBot):
-    bot.add_cog(events_main(bot))
+    bot.add_cog(MainEvents(bot))
 
-class events_main(utils.CommonCog):
+class MainEvents(utils.CommonCog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

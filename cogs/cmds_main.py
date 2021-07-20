@@ -17,9 +17,9 @@ if TYPE_CHECKING:
 
 
 def setup(bot: TTSBot):
-    bot.add_cog(cmds_main(bot))
+    bot.add_cog(MainCommands(bot))
 
-class cmds_main(utils.CommonCog, name="Main Commands"):
+class MainCommands(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
 
     async def channel_check(self, ctx: utils.TypedGuildContext) -> bool:

@@ -12,20 +12,17 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
-def is_trusted(self, ctx: utils.TypedContext):
-    if str(ctx.author.id) in self.bot.config["Main"]["trusted_ids"]:
-        ctx.bot.logger.warning(f"{ctx.author} passed Trusted Check and ran {ctx.command.qualified_name}")
-        return True
-
-    raise commands.errors.NotOwner
-
-
 def setup(bot: TTSBot):
-    bot.add_cog(cmds_trusted(bot))
+    bot.add_cog(TrustedCommands(bot))
 
-class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
+class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
     "TTS Bot commands meant only for trusted users."
-    cog_check = is_trusted
+    def cog_check(self, ctx: utils.TypedContext):
+        if str(ctx.author.id) in self.bot.config["Main"]["trusted_ids"]:
+            ctx.bot.logger.warning(f"{ctx.author} passed Trusted Check and ran {ctx.command.qualified_name}")
+            return True
+
+        raise commands.errors.NotOwner
 
     @commands.command()
     async def block(self, ctx: commands.Context, user: discord.User, notify: bool = False):
@@ -92,10 +89,3 @@ class cmds_trusted(utils.CommonCog, command_attrs={"hidden": True}):
         )
 
         await ctx.send(embed=embed)
-
-    @commands.command(aliases=("log_level", "logger", "loglevel"))
-    async def change_log_level(self, ctx: utils.TypedContext, *, level: str):
-        if self.bot.websocket is None:
-            return self.bot.logger.setLevel(level.upper())
-
-        await self.bot.websocket.send(f"BROADCAST CHANGE_LOG_LEVEL {level}")
