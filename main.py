@@ -114,7 +114,6 @@ class TTSBot(commands.AutoShardedBot):
         uri = f"ws://{host}:{port}/{self.cluster_id}"
         return websockets.connect(uri)
 
-
     async def check_gtts(self) -> Union[bool, Exception]:
         try:
             await self.gtts.get(text="RL Test", lang="en")
