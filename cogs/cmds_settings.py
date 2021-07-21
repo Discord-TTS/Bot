@@ -18,18 +18,13 @@ if TYPE_CHECKING:
 
 
 tts_langs: Set[str] = set(_tts_langs().keys())
-langs_lookup: Dict[str, str] = {
-    lang: name
-    for lang, name in _tts_langs().items()
-    if "-" not in lang
-}
-
 to_enabled = {True: "Enabled", False: "Disabled"}
+langs_lookup: Dict[str, str] = {lang: name for lang, name in _tts_langs().items()}
 
 def setup(bot: TTSBot):
-    bot.add_cog(cmds_settings(bot))
+    bot.add_cog(SettingCommands(bot))
 
-class cmds_settings(utils.CommonCog, name="Settings"):
+class SettingCommands(utils.CommonCog, name="Settings"):
     "TTS Bot settings commands, configuration is done here."
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
@@ -149,7 +144,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         user = optional_user or ctx.author
         nickname = nickname or ctx.author.display_name
 
-        if user != ctx.author and not ctx.channel.permissions_for(ctx.author).administrator: # type: ignore
+        if user != ctx.author and not ctx.author_permissions().administrator:
             return await ctx.send("Error: You need admin to set other people's nicknames!")
 
         if not nickname:

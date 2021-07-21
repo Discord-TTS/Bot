@@ -13,9 +13,9 @@ if TYPE_CHECKING:
 
 def setup(bot: TTSBot):
     bot.analytics_buffer = utils.SafeDict()
-    bot.add_cog(events_analytics(bot))
+    bot.add_cog(AnalyticsEvents(bot))
 
-class events_analytics(utils.CommonCog):
+class AnalyticsEvents(utils.CommonCog):
     @commands.Cog.listener()
     async def on_command(self, ctx: utils.TypedContext):
         self.bot.log(ctx.command.qualified_name)
@@ -23,11 +23,3 @@ class events_analytics(utils.CommonCog):
     @commands.Cog.listener()
     async def on_resumed(self):
         self.bot.log("on_resumed")
-
-    @commands.Cog.listener()
-    async def on_message(self, message: utils.TypedMessage):
-        if not message.guild:
-            self.bot.log("on_dm")
-        elif message.guild.me is None and not message.guild.unavailable:
-            # Weird bug, gonna check on it for a while.
-            self.bot.log("on_me_none")

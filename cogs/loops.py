@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
 
 import discord
 from discord.ext import tasks
+import websockets
 
 import utils
 
@@ -59,6 +60,30 @@ class Loops(utils.CommonCog):
             task.cancel()
 
 
+    @tasks.loop()
+    @utils.decos.handle_errors
+    async def websocket_client(self):
+        if self.bot.websocket is None:
+            return self.websocket_client.stop()
+
+        try:
+            async for msg in self.bot.websocket:
+                if isinstance(msg, bytes):
+                    msg = msg.decode()
+
+                self.bot.dispatch("websocket_msg", msg)
+                self.bot.dispatch(*msg.lower().split())
+        except websockets.ConnectionClosed as error:
+            disconnect_msg = f"Websocket disconnected with code `{error.code}: {error.reason}`"
+            try:
+                self.bot.websocket = await self.bot.create_websocket()
+            except Exception as new_error:
+                self.bot.websocket = None
+                self.bot.logger.error(f"{disconnect_msg} and failed to reconnect: {new_error}")
+            else:
+                self.bot.logger.warning(f"{disconnect_msg} and was able to reconnect!")
+
+
     @tasks.loop(seconds=60)
     @utils.decos.handle_errors
     async def send_info_to_db(self):
@@ -85,7 +110,7 @@ class Loops(utils.CommonCog):
             midday = time(hour=12)
             await sleep_until(midday)
 
-        max = 0
+        max_len = 0
         yesterday = datetime.today() - timedelta(days=1)
         sections: Dict[str, List[List[str]]] = {
             "Commands:": [], "Events:": []
@@ -116,7 +141,7 @@ class Loops(utils.CommonCog):
                 first_sect = f"{seperator} `{event}:"
                 second_sect = f"{count} (Max: {max_count})`"
 
-                max = max if max > len(first_sect) else len(first_sect)
+                max_len = max(max_len, len(first_sect))
                 sections[lookup[is_command]].append([first_sect, second_sect])
 
         embed.description = ""

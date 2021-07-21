@@ -4,8 +4,8 @@ import asyncio
 from inspect import cleandoc
 from io import BytesIO
 from shlex import split
-from subprocess import PIPE, Popen, SubprocessError
-from typing import TYPE_CHECKING, Any, Awaitable, Optional, Tuple, Union, cast
+from subprocess import PIPE, Popen
+from typing import TYPE_CHECKING, Any, Optional, Tuple, Union, cast
 
 import asyncgTTS
 import discord
@@ -24,15 +24,11 @@ if TYPE_CHECKING:
 
 
 class FFmpegPCMAudio(discord.AudioSource):
-    """TEMP FIX FOR DISCORD.PY BUG
-    Orignal Source = https://github.com/Rapptz/discord.py/issues/5192
-    Currently fixes `io.UnsupportedOperation: fileno` when piping a file-like object into FFmpegPCMAudio
-    If this bug is fixed, notify me via Discord (Gnome!#6669) or PR to remove this file with a link to the discord.py commit that fixes this.
-    """
-    def __init__(self, source, *, executable="ffmpeg", pipe=False, stderr=None, before_options=None, options=None):
-        stdin = source if pipe else None
-        args = [executable]
+    """Reimplementation of discord.FFmpegPCMAudio with source: bytes support
+    Original Source: https://github.com/Rapptz/discord.py/issues/5192"""
 
+    def __init__(self, source, *, executable="ffmpeg", pipe=False, stderr=None, before_options=None, options=None):
+        args = [executable]
         if isinstance(before_options, str):
             args.extend(split(before_options))
 
@@ -44,28 +40,35 @@ class FFmpegPCMAudio(discord.AudioSource):
             args.extend(split(options))
 
         args.append("pipe:1")
-        self._process = None
-        try:
-            self._process = Popen(args, stdin=PIPE, stdout=PIPE, stderr=stderr)
-            self._stdout = BytesIO(self._process.communicate(input=stdin)[0])
-        except FileNotFoundError:
-            raise discord.ClientException(f"{executable} was not found.") from None
-        except SubprocessError as exc:
-            raise discord.ClientException(f"Popen failed: {exc.__class__.__name__}: {exc}") from exc
 
-    def read(self):
+        self._stdout = None
+        self._process = None
+        self._stderr = stderr
+        self._process_args = args
+        self._stdin = source if pipe else None
+
+    def _create_process(self) -> BytesIO:
+        stdin, stderr, args = self._stdin, self._stderr, self._process_args
+        self._process = Popen(args, stdin=PIPE, stdout=PIPE, stderr=stderr)
+        return BytesIO(self._process.communicate(input=stdin)[0])
+
+    def read(self) -> bytes:
+        if self._stdout is None:
+            # This function runs in a voice thread, so we can afford to block
+            # it and make the process now instead of in the main thread
+            self._stdout = self._create_process()
+
         ret = self._stdout.read(Encoder.FRAME_SIZE)
-        if len(ret) != Encoder.FRAME_SIZE:
-            return b""
-        return ret
+        return ret if len(ret) == Encoder.FRAME_SIZE else b""
 
     def cleanup(self):
-        proc = self._process
-        if proc is None:
+        process = self._process
+        if process is None:
             return
-        proc.kill()
-        if proc.poll() is None:
-            proc.communicate()
+
+        process.kill()
+        if process.poll() is None:
+            process.communicate()
 
         self._process = None
 
@@ -134,7 +137,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         source = FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"')
 
         try:
-            self.play(source, after=self._after_player)
+            self.play(source, after=self.after_player)
         except discord.ClientException:
             self.currently_playing.set()
 
@@ -144,7 +147,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.bot.log("on_play_timeout")
 
             error = f"`{self.guild.id}`'s vc.play didn't finish audio!"
-            await self.send_timeout_error(error)
+            self.bot.logger.error(error)
 
     @tasks.loop()
     @utils.decos.handle_errors
@@ -161,7 +164,7 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.bot.log("on_generate_timeout")
 
             error = f"`{self.guild.id}`'s `{len(text)}` character long message was cancelled!"
-            return await self.send_timeout_error(error)
+            return self.bot.logger.error(error)
 
         if not ret_values or None in ret_values:
             return
@@ -188,17 +191,19 @@ class TTSVoicePlayer(discord.VoiceClient):
 
             self.bot.blocked = True
             if await self.bot.check_gtts() is not True:
-                asyncio.create_task(self._handle_rl())
+                self.bot.loop.create_task(self._handle_rl())
             else:
                 self.bot.blocked = False
 
             return await self.get_gtts(message, text, lang)
 
-        except asyncgTTS.easygttsException as e:
-            if str(e)[:3] not in {"400", "500"}:
-                raise
+        except asyncgTTS.easygttsException as error:
+            error_message = str(error)
+            response_code = error_message[:3]
+            if response_code in {"400", "500"}:
+                return
 
-            return
+            raise
 
         file_length = mutagen.MP3(BytesIO(audio)).info.length
         if audio and file_length <= self.max_length:
@@ -220,16 +225,16 @@ class TTSVoicePlayer(discord.VoiceClient):
 
     # easygTTS -> espeak handling
     async def _handle_rl(self):
-        await self.bot.channels["logs"].send("**Swapping to espeak**")
+        self.bot.logger.warning("Swapping to espeak")
 
-        asyncio.create_task(self._handle_rl_reset())
+        self.bot.loop.create_task(self._handle_rl_reset())
         if not self.bot.sent_fallback:
             self.bot.sent_fallback = True
 
             await asyncio.gather(*(
                 vc._send_fallback() for vc in self.bot.voice_clients
             ))
-            await self.bot.channels["logs"].send("**Fallback/RL messages have been sent.**")
+            self.bot.logger.info("Fallback/RL messages have been sent.")
 
     async def _handle_rl_reset(self):
         await asyncio.sleep(3601)
@@ -238,13 +243,13 @@ class TTSVoicePlayer(discord.VoiceClient):
             if ret:
                 break
             elif isinstance(ret, Exception):
-                await self.bot.channels["logs"].send("**Failed to connect to easygTTS for unknown reason.**")
+                self.bot.logger.warning("**Failed to connect to easygTTS for unknown reason.**")
             else:
-                await self.bot.channels["logs"].send("**Rate limit still in place, waiting another hour.**")
+                self.bot.logger.info("**Rate limit still in place, waiting another hour.**")
 
             await asyncio.sleep(3601)
 
-        await self.bot.channels["logs"].send("**Swapping back to easygTTS**")
+        self.bot.logger.info("**Swapping back to easygTTS**")
         self.bot.blocked = False
 
     @utils.decos.handle_errors
@@ -274,7 +279,7 @@ class TTSVoicePlayer(discord.VoiceClient):
 
 
     # Helper functions
-    def _after_player(self, exception: Optional[Exception]) -> None:
+    def after_player(self, exception: Optional[Exception]) -> None:
         # This func runs in a seperate thread, has to do awaiting, and we
         # don't care about it's return value, so we get back to the main
         # thread to fix race conditions and get this thread out of the way
@@ -301,7 +306,3 @@ class TTSVoicePlayer(discord.VoiceClient):
     @utils.decos.run_in_executor
     def get_duration(self, audio_data: bytes) -> float:
         return len(AudioSegment.from_file_using_temporary_files(BytesIO(audio_data))) / 1000 # type: ignore
-
-    def send_timeout_error(self, reason: str) -> Awaitable[discord.Message]:
-        error = f"`asyncio.TimeoutError`: {reason}"
-        return self.bot.channels["errors"].send(error)

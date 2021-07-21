@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from asyncio.subprocess import create_subprocess_exec
 from inspect import cleandoc
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import discord
 from discord.ext import commands
@@ -30,9 +29,9 @@ WELCOME_MESSAGE = cleandoc("""
 """)
 
 def setup(bot: TTSBot):
-    bot.add_cog(events_other(bot))
+    bot.add_cog(OtherEvents(bot))
 
-class events_other(utils.CommonCog):
+class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_message(self, message: utils.TypedGuildMessage):
@@ -40,16 +39,22 @@ class events_other(utils.CommonCog):
             await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
 
         if message.reference and message.guild == self.bot.support_server and message.channel.name in ("dm_logs", "suggestions") and not message.author.bot:
-            dm_message = message.reference.resolved or await message.channel.fetch_message(message.reference.message_id) # type: ignore
-            dm_sender = dm_message.author # type: ignore
-            if dm_sender.discriminator != "0000":
+            dm_message = message.reference.resolved
+            if (
+                not dm_message
+                or isinstance(dm_message, discord.DeletedReferencedMessage)
+                or dm_message.author.discriminator != "0000"
+            ):
                 return
 
-            dm_command: commands.Command = self.bot.get_command("dm") # type: ignore
+            dm_command = cast(commands.Command, self.bot.get_command("dm"))
             ctx = await self.bot.get_context(message)
 
-            todm = await commands.UserConverter().convert(ctx, dm_sender.name)
-            await dm_command(ctx, todm, message=message.content)
+            real_user = await self.bot.user_from_dm(dm_message.author.name)
+            if not real_user:
+                return
+
+            await dm_command(ctx, real_user, message=message.content)
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
@@ -76,13 +81,11 @@ class events_other(utils.CommonCog):
                 return
 
             support_guild_member = support_server.get_member(owner.id)
-            if support_guild_member:
-                await support_guild_member.add_roles(role)
+            if not support_guild_member:
+                return
 
-            embed = discord.Embed(description=f"**Role Added:** {role.mention} to {owner.mention}\n**Reason:** Owner of {guild}")
-            embed.set_author(name=f"{owner} (ID {owner.id})", icon_url=str(owner.avatar_url))
-
-            await self.bot.channels["logs"].send(embed=embed)
+            await support_guild_member.add_roles(role)
+            self.bot.logger.info(f"Added OFS role to {support_guild_member}")
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild):
@@ -90,3 +93,24 @@ class events_other(utils.CommonCog):
             self.bot.settings.remove(guild),
             self.bot.channels["servers"].send(f"Just got kicked from {guild}. I am now in {len(self.bot.guilds)} servers")
         )
+
+
+    # IPC events that have been plugged into bot.dispatch
+    @commands.Cog.listener()
+    async def on_websocket_msg(self, msg):
+        self.bot.logger.debug(f"Recieved Websocket message: {msg}")
+
+    @commands.Cog.listener()
+    async def on_close(self):
+        await self.bot.close(utils.KILL_EVERYTHING)
+
+    @commands.Cog.listener()
+    async def on_restart(self):
+        await self.bot.close(utils.RESTART_CLUSTER)
+
+    @commands.Cog.listener()
+    async def on_change_log_level(self, level: str):
+        level = level.upper()
+        self.bot.logger.setLevel(level)
+        for handler in self.bot.logger.handlers:
+            handler.setLevel(level)

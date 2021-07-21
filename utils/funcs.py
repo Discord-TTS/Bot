@@ -8,11 +8,12 @@ from inspect import cleandoc
 from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
                     Sequence, TypeVar, Union, overload)
 
-from utils.constants import (ANIMATED_EMOJI_REGEX, EMOJI_REGEX,
-                             OPTION_SEPERATORS, READABLE_TYPE)
+from utils.constants import OPTION_SEPERATORS, READABLE_TYPE
 
 
 if TYPE_CHECKING:
+    import re
+
     import aioredis
     import discord
     from typing_extensions import ParamSpec
@@ -23,20 +24,12 @@ if TYPE_CHECKING:
 
 _sep = OPTION_SEPERATORS[2]
 
-def emojitoword(text: str) -> str:
-    "Replaces discord emojis with an alternates that can be spoken"
-    output = []
-    words = text.split(" ")
+def emoji_match_to_cleaned(match: re.Match) -> str:
+    emoji_name: str
+    is_animated, emoji_name = bool(match[1]), match.group(2)
 
-    for word in words:
-        if EMOJI_REGEX.match(word):
-            output.append(f"emoji {word.split(':')[1]}")
-        elif ANIMATED_EMOJI_REGEX.match(word):
-            output.append(f"animated emoji {word.split(':')[1]}")
-        else:
-            output.append(word)
-
-    return " ".join(output)
+    emoji_prefix = "animated " * is_animated + "emoji "
+    return emoji_prefix + emoji_name
 
 def exts_to_format(attachments: Sequence[discord.Attachment]) -> Optional[str]:
     "Returns a description of the given attachment(s)"
@@ -110,9 +103,9 @@ if sys.version_info >= (3, 9):
 else:
     # For the people running older than 3.9, these are some functions
     # backported, may not be 100% accurate but get the job done.
-    def to_thread(func: Callable[_P, _R]) -> Awaitable[_R]:
+    async def to_thread(func: Callable[_P, _R]) -> _R:
         "asyncio.to_thread but for older python versions"
-        return asyncio.get_event_loop().run_in_executor(None, func)
+        return await asyncio.get_event_loop().run_in_executor(None, func)
     def removeprefix(self: str, __prefix: str) -> str:
         "str.removeprefix but for older python versions"
         return self[len(__prefix):] if self.startswith(__prefix) else self
