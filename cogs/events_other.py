@@ -109,6 +109,10 @@ class OtherEvents(utils.CommonCog):
         await self.bot.close(utils.RESTART_CLUSTER)
 
     @commands.Cog.listener()
+    async def on_reload(self, cog: str):
+        self.bot.reload_extension(f"cogs.{cog}")
+
+    @commands.Cog.listener()
     async def on_change_log_level(self, level: str):
         level = level.upper()
         self.bot.logger.setLevel(level)

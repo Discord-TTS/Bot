@@ -9,11 +9,11 @@ import discord
 from discord.ext import commands
 
 import utils
+from player import TTSVoicePlayer
 
 
 if TYPE_CHECKING:
     from main import TTSBot
-    from player import TTSVoicePlayer
 
 
 async def do_autojoin(author: utils.TypedMember) -> bool:
@@ -92,7 +92,7 @@ class MainEvents(utils.CommonCog):
 
         # Fix linter issues
         if TYPE_CHECKING:
-            bot_voice_client = cast(TTSVoicePlayer, bot_voice_client)
+            message.guild.voice_client = cast(TTSVoicePlayer, message.guild.voice_client)
 
         # Get lang
         guild_lang = None
@@ -175,7 +175,7 @@ class MainEvents(utils.CommonCog):
             return
 
         # Adds filtered message to queue
-        await bot_voice_client.queue(
+        await message.guild.voice_client.queue(
             message, message_clean, lang, channel, prefix, max_length
         )
 
