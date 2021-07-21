@@ -35,6 +35,9 @@ class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_message(self, message: utils.TypedGuildMessage):
+        if message.guild is None:
+            return
+
         if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
             await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
 
@@ -74,19 +77,6 @@ class OtherEvents(utils.CommonCog):
         try: await owner.send(embed=embed)
         except discord.errors.HTTPException: pass
 
-        support_server = self.bot.support_server
-        if support_server and owner in support_server.members:
-            role = support_server.get_role(738009431052386304)
-            if not role:
-                return
-
-            support_guild_member = support_server.get_member(owner.id)
-            if not support_guild_member:
-                return
-
-            await support_guild_member.add_roles(role)
-            self.bot.logger.info(f"Added OFS role to {support_guild_member}")
-
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild):
         await asyncio.gather(
@@ -118,3 +108,21 @@ class OtherEvents(utils.CommonCog):
         self.bot.logger.setLevel(level)
         for handler in self.bot.logger.handlers:
             handler.setLevel(level)
+
+    @commands.Cog.listener()
+    async def on_ofs_add(self, owner_id: int):
+        support_server = self.bot.support_server
+        if support_server is None:
+            return
+
+        role = support_server.get_role(738009431052386304)
+        if not role:
+            return
+
+        try:
+            owner_member = await support_server.fetch_member(owner_id)
+        except discord.HTTPException:
+            return
+
+        await owner_member.add_roles(role)
+        self.bot.logger.info(f"Added OFS role to {owner_member}")

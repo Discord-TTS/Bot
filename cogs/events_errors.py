@@ -73,14 +73,15 @@ class ErrorEvents(utils.CommonCog):
             guild: discord.Guild = args[0]
             info = f"Guild = {guild} | {guild.id}"
 
-        cluster_info = ""
-        if self.bot.cluster_id:
-            cluster_info = f"\nCluster Info: `Cluster ID {self.bot.cluster_id} | Shards {self.bot.shard_ids}`"
+        cluster_info = None
+        if self.bot.cluster_id is not None:
+            cluster_info = f"Cluster ID {self.bot.cluster_id} | Shards {self.bot.shard_ids}"
 
         try:
             error_message = cleandoc(f"""
                 Event: `{event}`
-                Info: `{info}`{cluster_info}
+                Info: `{info}`
+                Cluster Info: `{cluster_info}`
                 ```{''.join(format_exception(etype, value, tb))}```
             """)
         except:

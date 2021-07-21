@@ -34,7 +34,7 @@ def group_by(iterable: Iterable[_T], by:int) -> Iterable[Tuple[_T]]:
 
 
 def make_user_agent():
-    first = "TTSBot Launcher (https://github.com/Gnome-py/Discord-TTS-Bot Rolling)"
+    first = "DiscordBot (https://github.com/Gnome-py/Discord-TTS-Bot Rolling)"
     versions = "Python/{sysver} requests/{requestsver}".format(
         sysver=".".join(str(i) for i in sys.version_info[:3]),
         requestsver=requests.__version__

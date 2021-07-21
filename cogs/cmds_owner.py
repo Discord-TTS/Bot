@@ -87,3 +87,7 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
             await ctx.send(f"**`ERROR:`** {type(e).__name__} - {e}")
         else:
             await ctx.send("**`SUCCESS`**")
+            if self.bot.websocket is None:
+                return
+
+            await self.bot.websocket.send(f"BROADCAST reload {to_reload}")
