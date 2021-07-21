@@ -74,10 +74,10 @@ class ErrorEvents(utils.CommonCog):
             info = f"Guild = {guild} | {guild.id}"
 
         if self.bot.cluster_id:
-            info += f"\nCluster Info: Cluster ID {self.bot.cluster_id} | Shards {self.bot.shard_count}"
+            info += f"\nCluster Info: `Cluster ID {self.bot.cluster_id} | Shards {self.bot.shard_ids}`"
 
         try:
-            error_message = f"Event: `{event}`\nInfo: `{info}`\n```{''.join(format_exception(etype, value, tb))}```"
+            error_message = f"Event: `{event}`\nInfo: `{info}` \n```{''.join(format_exception(etype, value, tb))}```"
         except:
             error_message = f"```{''.join(format_exception(etype, value, tb))}```"
 

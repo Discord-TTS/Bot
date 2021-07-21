@@ -18,13 +18,8 @@ if TYPE_CHECKING:
 
 
 tts_langs: Set[str] = set(_tts_langs().keys())
-langs_lookup: Dict[str, str] = {
-    lang: name
-    for lang, name in _tts_langs().items()
-    if "-" not in lang
-}
-
 to_enabled = {True: "Enabled", False: "Disabled"}
+langs_lookup: Dict[str, str] = {lang: name for lang, name in _tts_langs().items()}
 
 def setup(bot: TTSBot):
     bot.add_cog(SettingCommands(bot))

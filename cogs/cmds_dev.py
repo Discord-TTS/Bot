@@ -41,7 +41,7 @@ class DevCommands(utils.CommonCog, command_attrs={"hidden": True}):
             await ctx.send(f"Broadcast complete, log level is now: {level}")
 
 
-    @commands.group(aliases=("end",))
+    @commands.group(aliases=("end", "restart"))
     @commands.is_owner()
     async def close(self, ctx: utils.TypedContext):
         if not ctx.invoked_subcommand:
@@ -49,8 +49,7 @@ class DevCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
     @close.command()
     async def all(self, _: utils.TypedContext):
-        self.bot.status_code = utils.KILL_EVERYTHING
-        return await self.bot.close()
+        return await self.bot.close(utils.KILL_EVERYTHING)
 
     @close.command()
     async def cluster(self, ctx: utils.TypedContext, cluster_id: int):
@@ -58,11 +57,10 @@ class DevCommands(utils.CommonCog, command_attrs={"hidden": True}):
             return await ctx.send("Manager websocket is None!")
 
         if cluster_id == self.bot.cluster_id:
-            self.bot.status_code = utils.RESTART_CLUSTER
-            await self.bot.close()
+            await self.bot.close(utils.RESTART_CLUSTER)
         else:
-            await self.bot.websocket.send(f"SEND {cluster_id} CLOSE")
-            await ctx.send(f"Told cluster {cluster_id} to die.")
+            await self.bot.websocket.send(f"SEND {cluster_id} RESTART")
+            await ctx.send(f"Told cluster {cluster_id} to restart.")
 
 
     @commands.command()

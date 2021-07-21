@@ -92,11 +92,7 @@ class MainEvents(utils.CommonCog):
 
         # Fix linter issues
         if TYPE_CHECKING:
-            message.guild.voice_client = cast(
-                TTSVoicePlayer,
-                message.guild.voice_client
-            )
-
+            bot_voice_client = cast(TTSVoicePlayer, bot_voice_client)
 
         # Get lang
         guild_lang = None
@@ -179,7 +175,7 @@ class MainEvents(utils.CommonCog):
             return
 
         # Adds filtered message to queue
-        await message.guild.voice_client.queue(
+        await bot_voice_client.queue(
             message, message_clean, lang, channel, prefix, max_length
         )
 

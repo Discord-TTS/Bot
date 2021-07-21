@@ -107,6 +107,14 @@ class TTSBot(commands.AutoShardedBot):
         for ext in filered_exts:
             self.load_extension(f"{folder}.{ext[:-3]}")
 
+    def create_websocket(self) -> Awaitable[websockets.WebSocketClientProtocol]:
+        host = self.config["Clustering"].get("websocket_host", "localhost")
+        port = self.config["Clustering"].get("websocket_port", "8765")
+
+        uri = f"ws://{host}:{port}/{self.cluster_id}"
+        return websockets.connect(uri)
+
+
     async def check_gtts(self) -> Union[bool, Exception]:
         try:
             await self.gtts.get(text="RL Test", lang="en")
@@ -144,6 +152,12 @@ class TTSBot(commands.AutoShardedBot):
     async def wait_until_ready(self, *_: Any, **__: Any) -> None:
         return await super().wait_until_ready()
 
+    def close(self, status_code: Optional[int] = None) -> Awaitable[None]:
+        if status_code is not None:
+            self.status_code = status_code
+            self.logger.debug(f"Shutting down with status code {status_code}")
+
+        return super().close()
 
     async def start(self, token: str, **kwargs):
         "Get everything ready in async env"
@@ -171,11 +185,7 @@ class TTSBot(commands.AutoShardedBot):
         if self.shard_ids is not None:
             prefix = f"`[Cluster] [ID {self.cluster_id}] [Shards {len(self.shard_ids)}]`: "
             kwargs["reconnect"] = False # allow cluster launcher to handle restarting
-            host = self.config["Clustering"].get("websocket_host", "localhost")
-            port = self.config["Clustering"].get("websocket_port", "8765")
-
-            uri = f"ws://{host}:{port}/{self.cluster_id}"
-            self.websocket = await websockets.connect(uri)
+            self.websocket = await self.create_websocket()
         else:
             prefix = ""
             self.websocket = None
@@ -233,14 +243,14 @@ async def _real_main(
         bot.status_code = -sig
         bot.logger.warning(f"Recieved signal {sig} and shutting down.")
 
-        asyncio.create_task(bot.close())
+        bot.loop.create_task(bot.close())
 
     for sig in (SIGINT, SIGTERM, SIGHUP):
         bot.loop.add_signal_handler(sig, partial(stop_bot_sync, sig))
 
     await automatic_update.do_early_updates(bot)
     try:
-        asyncio.create_task(on_ready(bot))
+        bot.loop.create_task(on_ready(bot))
         await bot.start(token=config["Main"]["Token"])
         return bot.status_code
 

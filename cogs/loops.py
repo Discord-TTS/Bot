@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
 
 import discord
 from discord.ext import tasks
+import websockets
 
 import utils
 
@@ -65,12 +66,23 @@ class Loops(utils.CommonCog):
         if self.bot.websocket is None:
             return self.websocket_client.stop()
 
-        async for msg in self.bot.websocket:
-            if isinstance(msg, bytes):
-                msg = msg.decode()
+        try:
+            async for msg in self.bot.websocket:
+                if isinstance(msg, bytes):
+                    msg = msg.decode()
 
-            self.bot.dispatch("websocket_msg", msg)
-            self.bot.dispatch(*msg.lower().split())
+                self.bot.dispatch("websocket_msg", msg)
+                self.bot.dispatch(*msg.lower().split())
+        except websockets.ConnectionClosed as error:
+            disconnect_msg = f"Websocket disconnected with code `{error.code}: {error.reason}`"
+            try:
+                self.bot.websocket = await self.bot.create_websocket()
+            except Exception as new_error:
+                self.bot.websocket = None
+                self.bot.logger.error(f"{disconnect_msg} and failed to reconnect: {new_error}")
+            else:
+                self.bot.logger.warning(f"{disconnect_msg} and was able to reconnect!")
+
 
     @tasks.loop(seconds=60)
     @utils.decos.handle_errors

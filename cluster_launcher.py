@@ -10,12 +10,11 @@ import time
 from configparser import ConfigParser
 from functools import partial
 from itertools import zip_longest
-from signal import SIGINT, SIGKILL, SIGTERM
+from signal import SIGHUP, SIGINT, SIGKILL, SIGTERM
 from typing import (TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple,
                     TypeVar, Union)
 
 import aiohttp
-
 import requests
 import websockets
 
@@ -70,13 +69,32 @@ def run_bot(cluster_id: int, total_shard_count: int, shards: List[int]) -> _CLUS
         sys.exit(return_code)
 
 class ClusterManager:
-    def __init__(self) -> None:
-        self.loop = asyncio.get_running_loop()
+    def __init__(self, websocket_host: str, websocket_port: int) -> None:
+        self.websocket_port = websocket_port
+        self.websocket_host = websocket_host
 
         self.shutting_down: bool = False
+        self.loop = asyncio.get_running_loop()
         self.monitors: Dict[int, asyncio.Task] = {}
         self.processes: Dict[int, Optional[int]] = {}
         self.websockets: Dict[int, websockets.WebSocketServerProtocol] = {}
+
+        for sig in (SIGTERM, SIGINT, SIGHUP):
+            callable_handler = partial(self.signal_handler, sig)
+            self.loop.add_signal_handler(sig, callable_handler)
+
+    async def __aenter__(self):
+        await self.start()
+        return self
+
+    async def __aexit__(self, *_, **__):
+        if not self.shutting_down:
+            await self.shutdown()
+
+
+    def signal_handler(self, signal: int, *args, **kwargs):
+        logger.debug(f"Signal {signal} received")
+        return self.loop.create_task(self.shutdown())
 
     def cluster_watcher(self, cluster_args: _CLUSTER_ARG):
         cluster_id = cluster_args[0]
@@ -88,9 +106,6 @@ class ClusterManager:
             self.processes[cluster_id] = process.pid # store PID so can be killed later
             process.join() # wait until finished
 
-            if self.shutting_down:
-                break
-
             while process.exitcode is None:
                 logger.warning(f"{cluster_name} joined with no exit code, rejoining and waiting 10 seconds.")
                 process.join()
@@ -98,12 +113,15 @@ class ClusterManager:
 
             if process.exitcode in (utils.KILL_EVERYTHING, utils.DO_NOT_RESTART_CLUSTER):
                 logger.warning(f"Shutting down all clusters due to {cluster_name} return.")
+
+                process.close()
+                del self.processes[cluster_id]
                 return asyncio.run_coroutine_threadsafe(self.shutdown(), self.loop)
 
             elif process.exitcode == utils.RESTART_CLUSTER:
                 logger.warning(f"Restarting {cluster_name} due to RESTART_CLUSTER")
-                process.close()
 
+                process.close()
                 process = multiprocessing.Process(target=run_bot, args=cluster_args)
 
             else:
@@ -132,23 +150,34 @@ class ClusterManager:
             self.monitors[cluster_id] = asyncio.Task(utils.to_thread(cluster_watcher_func))
 
         async def keep_alive():
-            await asyncio.gather(*self.monitors.values())
+            async with websockets.serve(
+                self.websocket_handler,
+                self.websocket_host,
+                self.websocket_port
+            ):
+                await asyncio.gather(*self.monitors.values())
 
-        self.keep_alive = asyncio.create_task(keep_alive())
+        self.keep_alive = self.loop.create_task(keep_alive())
 
     async def shutdown(self, *args, **kwargs):
-        logger.warning("Shutting all clusters down")
+        if self.shutting_down:
+            return
 
+        self.shutting_down = True
+        logger.warning("Shutting all clusters down")
         for cluster_id, pid in self.processes.items():
             if pid:
                 logger.debug(f"Killing cluster {cluster_id}")
-                await self.websockets[cluster_id].send("CLOSE")
-                logger.debug(f"Sent signal to cluster {cluster_id}")
+                try:
+                    await self.websockets[cluster_id].send("CLOSE")
+                except Exception as err:
+                    logger.error(err)
+                else:
+                    logger.debug(f"Sent signal to cluster {cluster_id}")
             else:
                 logger.warning(f"Cluster {cluster_id} has no PID")
 
         logger.info("Kiilled all processes, and cancelling keep alive. Bye!")
-        await asyncio.sleep(0.5)
         self.keep_alive.cancel()
 
         try:
@@ -204,29 +233,18 @@ class ClusterManager:
 async def main():
     global logger
 
-    manager = ClusterManager()
-    def shutdown(sig, *args, **kwargs):
-        logger.debug(f"Signal {sig} received")
-        return manager.loop.create_task(manager.shutdown())
-
-    for sig in (SIGTERM, SIGINT):
-        manager.loop.add_signal_handler(sig, partial(shutdown, sig))
-
     host = config["Clustering"].get("websocket_host", "localhost")
     port = int(config["Clustering"].get("websocket_port", "8765"))
 
-    async with websockets.serve(manager.websocket_handler, host, port):
-        async with aiohttp.ClientSession() as session:
-            logger = utils.setup_logging(
-                aio=True, level=config["Main"]["log_level"],
-                session=session, prefix="`[Launcher]`: "
-            )
-
+    async with aiohttp.ClientSession() as session:
+        logger = utils.setup_logging(aio=True, level=config["Main"]["log_level"], session=session, prefix="`[Launcher]`: ")
+        async with ClusterManager(host, port) as manager:
             try:
-                await manager.start()
                 await manager.keep_alive
             except asyncio.CancelledError:
-                return
+                pass
+
+        await asyncio.sleep(1) # wait for final logs to be sent
 
 if __name__ == "__main__":
     # I just spent 1 and a half hours trying to figure out why multiprocessing

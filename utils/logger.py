@@ -1,13 +1,11 @@
 import asyncio
 import configparser
 import logging
-from typing import Dict, List, Sequence, Tuple, Union
+from typing import Dict, List, Sequence, Union
 
 import aiohttp
 import discord
 from discord.ext import tasks
-
-from utils.decos import handle_errors
 
 from logging import WARNING, ERROR
 
@@ -23,6 +21,11 @@ avatars = {
     logging.WARNING: default_avatar_url.format(3),
 }
 
+class CacheFixedLogger(logging.Logger):
+    _cache: Dict[int, bool]
+    def setLevel(self, level: Union[int, str]) -> None:
+        self.level = logging.getLevelName(level)
+        self._cache.clear()
 
 class WebhookHandler(logging.StreamHandler):
     webhook: discord.Webhook
@@ -96,11 +99,8 @@ class AsyncWebhookHandler(WebhookHandler):
     def emit(self, record: logging.LogRecord) -> None:
         self.loop.call_soon_threadsafe(self._emit, record)
 
-class CacheFixedLogger(logging.Logger):
-    _cache: Dict[int, bool]
-    def setLevel(self, level: Union[int, str]) -> None:
-        self.level = logging.getLevelName(level)
-        self._cache.clear()
+    def close(self):
+        self.sender_loop.cancel()
 
 def setup(aio: bool, level: str, *args, **kwargs) -> CacheFixedLogger:
     logger = CacheFixedLogger("TTS Bot")

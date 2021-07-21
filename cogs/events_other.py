@@ -102,8 +102,11 @@ class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_close(self):
-        self.bot.status_code = utils.RESTART_CLUSTER
-        await self.bot.close()
+        await self.bot.close(utils.KILL_EVERYTHING)
+
+    @commands.Cog.listener()
+    async def on_restart(self):
+        await self.bot.close(utils.RESTART_CLUSTER)
 
     @commands.Cog.listener()
     async def on_change_log_level(self, level: str):

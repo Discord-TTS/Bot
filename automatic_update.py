@@ -27,7 +27,7 @@ def _update_config(config: ConfigParser):
         config.write(config_file)
 
 def _update_defaults(bot: TTSBot) -> asyncio.Task[Record]:
-    return asyncio.create_task( # type: ignore
+    return bot.loop.create_task( # type: ignore
         bot.conn.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
     )
 
