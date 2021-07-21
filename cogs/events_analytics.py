@@ -23,11 +23,3 @@ class AnalyticsEvents(utils.CommonCog):
     @commands.Cog.listener()
     async def on_resumed(self):
         self.bot.log("on_resumed")
-
-    @commands.Cog.listener()
-    async def on_message(self, message: utils.TypedMessage):
-        if not message.guild:
-            self.bot.log("on_dm")
-        elif message.guild.me is None and not message.guild.unavailable:
-            # Weird bug, gonna check on it for a while.
-            self.bot.log("on_me_none")

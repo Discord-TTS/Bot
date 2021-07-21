@@ -50,7 +50,7 @@ early_updates: List[_UF] = []
 normal_updates: List[_UF] = []
 
 async def do_early_updates(bot: TTSBot):
-    if bot.cluster_id != 0:
+    if bot.cluster_id not in {0, None}:
         return
 
     for func in early_updates:
@@ -58,7 +58,7 @@ async def do_early_updates(bot: TTSBot):
             print(f"Completed update: {func.__name__}")
 
 async def do_normal_updates(bot: TTSBot):
-    if bot.cluster_id != 0:
+    if bot.cluster_id not in {0, None}:
         return
 
     async with bot.pool.acquire() as conn:
@@ -148,5 +148,14 @@ async def cache_to_redis(bot: TTSBot) -> bool:
         return False
 
     bot.config["Redis Info"] = {"url": "redis://cache"}
+    _update_config(bot.config)
+    return True
+
+@add_to_updates("normal")
+async def add_log_level(bot: TTSBot) -> bool:
+    if "log_level" in bot.config["Main"]:
+        return False
+
+    bot.config["Main"]["log_level"] = "INFO"
     _update_config(bot.config)
     return True
