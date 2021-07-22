@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, time, timedelta
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
+from utils.websocket_types import WSGenericJSON
 
 import discord
-from discord.ext import tasks
+import orjson
 import websockets
+from discord.ext import tasks
 
 import utils
 
@@ -68,11 +70,15 @@ class Loops(utils.CommonCog):
 
         try:
             async for msg in self.bot.websocket:
-                if isinstance(msg, bytes):
-                    msg = msg.decode()
-
+                wsjson: WSGenericJSON = orjson.loads(msg)
                 self.bot.dispatch("websocket_msg", msg)
-                self.bot.dispatch(*msg.lower().split())
+
+                kwargs = {**wsjson["a"]}
+                if "target" in wsjson:
+                    kwargs["target"] = wsjson["t"]
+
+                command = wsjson["c"].lower()
+                self.bot.dispatch(command, **kwargs)
         except websockets.ConnectionClosed as error:
             disconnect_msg = f"Websocket disconnected with code `{error.code}: {error.reason}`"
             try:
@@ -148,7 +154,7 @@ class Loops(utils.CommonCog):
         for section_name in lookup.values():
             embed.description += section_name + "\n" # type: ignore
             for first, second in sections[section_name]:
-                embed.description += f"{first:<{max}} {second}\n"
+                embed.description += f"{first:<{max_len}} {second}\n"
 
         embed.description += await utils.get_redis_info(self.bot.cache_db)
         await self.bot.channels["analytics"].send(embed=embed)

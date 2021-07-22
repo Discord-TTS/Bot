@@ -77,6 +77,15 @@ class OtherEvents(utils.CommonCog):
         try: await owner.send(embed=embed)
         except discord.errors.HTTPException: pass
 
+        if self.bot.websocket is None or self.bot.support_server is not None:
+            return await self.on_ofs_add(owner.id)
+
+        wsjson = utils.data_to_ws_json("SEND", "*", **{
+            "c": "ofs_add",
+            "a": {"owner_id": owner.id}
+        })
+        await self.bot.websocket.send(wsjson)
+
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild):
         await asyncio.gather(
@@ -87,7 +96,7 @@ class OtherEvents(utils.CommonCog):
 
     # IPC events that have been plugged into bot.dispatch
     @commands.Cog.listener()
-    async def on_websocket_msg(self, msg):
+    async def on_websocket_msg(self, msg: str):
         self.bot.logger.debug(f"Recieved Websocket message: {msg}")
 
     @commands.Cog.listener()
@@ -100,7 +109,7 @@ class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_reload(self, cog: str):
-        self.bot.reload_extension(f"cogs.{cog}")
+        self.bot.reload_extension(cog)
 
     @commands.Cog.listener()
     async def on_change_log_level(self, level: str):

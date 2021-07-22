@@ -82,7 +82,7 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.is_owner()
     async def reload_cog(self, ctx: commands.Context, *, to_reload: str):
         try:
-            self.bot.reload_extension(f"cogs.{to_reload}")
+            self.bot.reload_extension(to_reload)
         except Exception as e:
             await ctx.send(f"**`ERROR:`** {type(e).__name__} - {e}")
         else:
@@ -90,4 +90,10 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
             if self.bot.websocket is None:
                 return
 
-            await self.bot.websocket.send(f"BROADCAST reload {to_reload}")
+            await self.bot.websocket.send(
+                utils.data_to_ws_json(
+                    "SEND", target="*", **{
+                        "c": "reload",
+                        "a": {"cog": to_reload},
+                })
+            )

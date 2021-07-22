@@ -4,7 +4,7 @@ import asyncio
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import asyncpg
-
+from utils import data_to_ws_json
 
 if TYPE_CHECKING:
     from discord import Guild
@@ -24,23 +24,27 @@ def setup(bot: TTSBot):
 
 _DK = Union[int, Tuple[int, ...]]
 class CacheWriter:
-    def __init__(self, db_handler: HandlesDB, *cache_id: _DK, broadcast: bool) -> None:
+    def __init__(self, db_handler: HandlesDB, *cache_id, broadcast: bool) -> None:
         self.handler = db_handler
         self.broadcast = broadcast
         self.websocket = db_handler.bot.websocket
-        self.cache_id = " ".join(str(id) for id in cache_id)
-
+        self.cache_id: _DK = cache_id if len(cache_id) > 1 else cache_id[0]
 
     async def __aenter__(self):
-        await self.handler._cache_lock.wait()
-        self.handler._cache_lock.clear()
+        self.handler._do_not_cache.append(self.cache_id)
 
     async def __aexit__(self, etype, error, tb):
-        self.handler._cache_lock.set()
+        self.handler._cache.pop(self.cache_id, None)
+        self.handler._do_not_cache.remove(self.cache_id)
         if error is not None or self.websocket is None or not self.broadcast:
             return
 
-        await self.websocket.send(f"BROADCAST invalidate_cache {self.cache_id}")
+        await self.websocket.send(
+            data_to_ws_json("SEND", target="*", **{
+                "c": "invalidate_cache",
+                "a": {"id": self.cache_id},
+            })
+        )
 
 class HandlesDB:
     def __init__(self, bot: TTSBot):
@@ -48,14 +52,12 @@ class HandlesDB:
         self.pool = bot.pool
         bot.add_listener(self.on_invalidate_cache)
 
+        self._do_not_cache: List[_DK] = []
         self._cache: Dict[_DK, Optional[asyncpg.Record]] = {}
-        self._cache_lock = asyncio.Event()
-        self._cache_lock.set()
 
 
     async def fetchrow(self, query: str, id: _DK, *args: Any) -> Optional[asyncpg.Record]:
-        await self._cache_lock.wait()
-        if id not in self._cache:
+        if id not in self._cache or id in self._do_not_cache:
             if isinstance(id, tuple):
                 self._cache[id] = await self.pool.fetchrow(query, *id)
             else:
@@ -63,13 +65,11 @@ class HandlesDB:
 
         return self._cache[id]
 
-    async def on_invalidate_cache(self, *to_invalidate: str):
-        if len(to_invalidate) > 1:
-            invalidate_id = tuple(int(id) for id in to_invalidate)
-        else:
-            invalidate_id = int(to_invalidate[0])
+    async def on_invalidate_cache(self, id: Union[_DK, List[int]]):
+        if isinstance(id, list):
+            id = (*id,)
 
-        self._cache.pop(invalidate_id, None)
+        self._cache.pop(id, None)
 
 class GeneralSettings(HandlesDB):
     DEFAULT_SETTINGS: asyncio.Task[asyncpg.Record]

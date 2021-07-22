@@ -32,7 +32,12 @@ class DevCommands(utils.CommonCog, command_attrs={"hidden": True}):
             return self.bot.logger.setLevel(level.upper())
 
         try:
-            await self.bot.websocket.send(f"BROADCAST CHANGE_LOG_LEVEL {level}")
+            wsjson = utils.data_to_ws_json("SEND", target="*", **{
+                "c": "change_log_level",
+                "a": {"level": level.upper()},
+                "t": "*"
+            })
+            await self.bot.websocket.send(wsjson)
             await asyncio.wait_for(self.bot.wait_for("change_log_level"), timeout=10)
         except asyncio.TimeoutError:
             await ctx.send(f"Didn't recieve broadcast within 10 seconds!")
@@ -59,7 +64,12 @@ class DevCommands(utils.CommonCog, command_attrs={"hidden": True}):
         if cluster_id == self.bot.cluster_id:
             await self.bot.close(utils.RESTART_CLUSTER)
         else:
-            await self.bot.websocket.send(f"SEND {cluster_id} RESTART")
+            wsjson = utils.data_to_ws_json("SEND", target=cluster_id, **{
+                "c": "restart",
+                "a": {},
+            })
+
+            await self.bot.websocket.send(wsjson)
             await ctx.send(f"Told cluster {cluster_id} to restart.")
 
 
