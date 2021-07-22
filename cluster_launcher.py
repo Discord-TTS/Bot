@@ -11,10 +11,11 @@ from configparser import ConfigParser
 from functools import partial
 from itertools import zip_longest
 from signal import SIGHUP, SIGINT, SIGKILL, SIGTERM
-from typing import (TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple,
-                    TypeVar, Union)
+from typing import (TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple,
+                    TypeVar)
 
 import aiohttp
+import orjson
 import requests
 import websockets
 
@@ -24,6 +25,8 @@ config = ConfigParser()
 config.read("config.ini")
 
 if TYPE_CHECKING:
+    from utils.websocket_types import *
+
     _T = TypeVar("_T")
     _CLUSTER_ARG = Tuple[int, int, Tuple[int]]
     _CLUSTER_RET = Tuple[int, int, _CLUSTER_ARG]
@@ -34,7 +37,7 @@ def group_by(iterable: Iterable[_T], by:int) -> Iterable[Tuple[_T]]:
 
 
 def make_user_agent():
-    first = "TTSBot Launcher (https://github.com/Gnome-py/Discord-TTS-Bot Rolling)"
+    first = "DiscordBot (https://github.com/Gnome-py/Discord-TTS-Bot Rolling)"
     versions = "Python/{sysver} requests/{requestsver}".format(
         sysver=".".join(str(i) for i in sys.version_info[:3]),
         requestsver=requests.__version__
@@ -165,17 +168,9 @@ class ClusterManager:
 
         self.shutting_down = True
         logger.warning("Shutting all clusters down")
-        for cluster_id, pid in self.processes.items():
-            if pid:
-                logger.debug(f"Killing cluster {cluster_id}")
-                try:
-                    await self.websockets[cluster_id].send("CLOSE")
-                except Exception as err:
-                    logger.error(err)
-                else:
-                    logger.debug(f"Sent signal to cluster {cluster_id}")
-            else:
-                logger.warning(f"Cluster {cluster_id} has no PID")
+
+        wsrequest = {"c": "send", "a": {"c": "close", "a": {}}, "t": "*"}
+        await self.send_handler(None, wsrequest) # type: ignore
 
         logger.info("Kiilled all processes, and cancelling keep alive. Bye!")
         self.keep_alive.cancel()
@@ -193,41 +188,40 @@ class ClusterManager:
 
         self.websockets[cluster_id] = connection
         async for msg in connection:
-            if isinstance(msg, bytes):
-                msg = msg.decode()
-
             logger.debug(f"Recieved msg from cluster {cluster_id}: {msg}")
-            command, *arguments = msg.lower().split()
+
+            json_msg: WSGenericJSON = orjson.loads(msg)
+            command = json_msg["c"]
 
             handler = getattr(self, f"{command}_handler", None)
             if handler is None:
                 logger.error(f"Websocket sent unknown command: {command}")
-                continue
+            else:
+                await handler(connection, request=json_msg)
 
-            await handler(connection, *arguments)
 
-    async def send_handler(self, _: _WSSP, cluster: str, *msg: str):
-        await self.websockets[int(cluster)].send(msg)
+    async def send_handler(self, _: Any, request: WSSendJSON):
+        target = request["t"]
+        to_be_sent = orjson.dumps(request["a"])
 
-    async def broadcast_handler(self, _: _WSSP, *args: str):
-        if args[0].lower() == "change_log_level":
-            logger.setLevel(args[1].upper())
+        if request["a"]["c"] == "change_log_level":
+            level: str = request["a"]["a"]["level"]
+            logger.setLevel(level)
             for handler in logger.handlers:
-                handler.setLevel(args[1].upper())
+                handler.setLevel(level)
+
+        if target != "*":
+            return await self.websockets[target].send(to_be_sent)
 
         for connection in self.websockets.values():
-            await connection.send(" ".join(args))
+            await connection.send(to_be_sent)
 
-    async def kill_handler(self, _: _WSSP,
-        to_kill: str,
-        signal: Union[int, str] = SIGTERM
-    ):
-        process = self.processes.get(int(to_kill))
+    async def kill_handler(self, _: Any, request: WSKillJSON):
+        process = self.processes.get(request["t"])
         if not process:
             return
 
-        os.kill(process, int(signal))
-        return True
+        os.kill(process, request["a"].get("signal", SIGTERM))
 
 
 async def main():

@@ -24,7 +24,7 @@ avatars = {
 class CacheFixedLogger(logging.Logger):
     _cache: Dict[int, bool]
     def setLevel(self, level: Union[int, str]) -> None:
-        self.level = logging.getLevelName(level)
+        self.level = logging._checkLevel(level) # type: ignore
         self._cache.clear()
 
 class WebhookHandler(logging.StreamHandler):

@@ -1,11 +1,12 @@
+git+https://github.com/Gnome-py/asyncgTTS.git@8839acc4b2e28d4cb1d374501904bfa16ef3519d
 git+https://github.com/hadware/voxpopuli.git@async-support
-git+https://github.com/Gnome-py/asyncgTTS.git
 aioredis[hiredis]>=2.0.0a1,<3.0
 discord.py[voice]
 cryptography
 websockets
 asyncpg
 mutagen
+orjson
 psutil
 pydub
 gtts
