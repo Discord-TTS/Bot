@@ -25,7 +25,11 @@ def setup(bot: TTSBot):
     bot.on_error = cog.on_error
 
 class ErrorEvents(utils.CommonCog):
-    async def send_error(self, ctx: utils.TypedContext, error: str, fix: str) -> Optional[discord.Message]:
+    async def send_error(
+        self, ctx: utils.TypedContext, error: str,
+        fix: str = "get in contact with us via the support server for help"
+    ) -> Optional[discord.Message]:
+
         if ctx.guild:
             ctx = cast(utils.TypedGuildContext, ctx)
             permissions = ctx.bot_permissions()
@@ -77,17 +81,10 @@ class ErrorEvents(utils.CommonCog):
         if self.bot.cluster_id is not None:
             cluster_info = f"Cluster ID {self.bot.cluster_id} | Shards {self.bot.shard_ids}"
 
-        try:
-            error_message = cleandoc(f"""
-                Event: `{event}`
-                Info: `{info}`
-                Cluster Info: `{cluster_info}`
-                ```{''.join(format_exception(etype, value, tb))}```
-            """)
-        except:
-            error_message = f"```{''.join(format_exception(etype, value, tb))}```"
+        error_message = f"Event: `{event}`\nInfo: `{info}`\nCluster Info: `{cluster_info}`"
+        formatted_err = f"```{''.join(format_exception(etype, value, tb))}```"
 
-        await self.bot.channels["errors"].send(cleandoc(error_message))
+        await self.bot.channels["errors"].send(f"{error_message} {formatted_err}")
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: utils.TypedContext, error: commands.CommandError):
@@ -147,7 +144,7 @@ class ErrorEvents(utils.CommonCog):
             self.bot.logger.error(f"`asyncio.TimeoutError:` Unhandled in {ctx.command.qualified_name}")
 
         else:
-            await self.send_error(ctx, "an unknown error occured", "get in contact with us via the support server for help")
+            await self.send_error(ctx, "an unknown error occured")
 
             context_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
             error_traceback = "".join(format_exception(type(error), error, error.__traceback__))

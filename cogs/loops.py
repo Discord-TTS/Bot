@@ -73,12 +73,12 @@ class Loops(utils.CommonCog):
                 wsjson: WSGenericJSON = orjson.loads(msg)
                 self.bot.dispatch("websocket_msg", msg)
 
-                kwargs = {**wsjson["a"]}
-                if "target" in wsjson:
-                    kwargs["target"] = wsjson["t"]
+                args = [*wsjson["a"].values()]
+                if wsjson.get("t", None):
+                    args.append(wsjson["t"])
 
                 command = wsjson["c"].lower()
-                self.bot.dispatch(command, **kwargs)
+                self.bot.dispatch(command, *args)
         except websockets.ConnectionClosed as error:
             disconnect_msg = f"Websocket disconnected with code `{error.code}: {error.reason}`"
             try:

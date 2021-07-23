@@ -3,15 +3,24 @@ from typing import Any, Dict, List, Literal, Union
 
 from typing_extensions import TypedDict
 
+__all__ = (
+    "_TARGET",
+    "WSSendJSON",
+    "WSKillJSON",
+    "WSRequestJSON",
+    "WSGenericJSON",
+    "WSClientResponseJSON",
+)
 
-_TARGET = Union[Literal["*"], int]
+
+_TARGET = Union[Literal["*", "support"], int]
 class EmptyDict(TypedDict): ...
 
 
 class WSGenericJSON(TypedDict):
     c: str
     a: Any
-    t: Union[_TARGET, uuid.UUID]
+    t: _TARGET
 
 class WSSendJSON(TypedDict):
     c: Literal["send"]
@@ -28,32 +37,17 @@ class WSKillJSON(TypedDict):
     t: int
 
 
-# Classes for future state flow
-class WSClientRequestArgs(TypedDict):
+class WSRequestArgs(TypedDict):
     info: List[str]
-    nonce: uuid.UUID
+    nonce: str
 
-class WSServerRequestArgs(TypedDict):
-    info: List[str]
-
-
-class WSClientRequestJSON(TypedDict):
+class WSRequestJSON(TypedDict):
     c: Literal["request"]
-    a: WSClientRequestArgs
+    a: WSRequestArgs
     t: _TARGET
-
-class WSServerRequestJSON(TypedDict):
-    c: Literal["request"]
-    a: WSServerRequestArgs
-    t: uuid.UUID
 
 
 class WSClientResponseJSON(TypedDict):
     c: Literal["response"]
     a: Dict[str, Any]
-    t: uuid.UUID
-
-class WSServerResponseJSON(TypedDict):
-    c: Literal["response"]
-    a: List[Dict[str, Any]]
-    t: uuid.UUID
+    t: str

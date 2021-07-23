@@ -1,17 +1,32 @@
+from __future__ import annotations
+
+import asyncio
+import time
+import uuid
 from inspect import cleandoc
 from os import getpid
-from time import monotonic
+from typing import TYPE_CHECKING, cast
 
 import discord
 from discord.ext import commands
 from psutil import Process
 
 import utils
+from utils.websocket_types import *
 
 
-start_time = monotonic()
 
-def setup(bot):
+if TYPE_CHECKING:
+    from main import TTSBot
+
+    from events_errors import ErrorEvents
+else:
+    ErrorEvents = None
+
+start_time = time.monotonic()
+
+
+def setup(bot: TTSBot):
     bot.add_cog(ExtraCommands(bot))
 
 class ExtraCommands(utils.CommonCog, name="Extra Commands"):
@@ -20,7 +35,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
     @commands.command()
     async def uptime(self, ctx: commands.Context):
         "Shows how long TTS Bot has been online"
-        await ctx.send(f"{self.bot.user.mention} has been up for {(monotonic() - start_time) / 60:.2f} minutes")
+        await ctx.send(f"{self.bot.user.mention} has been up for {(time.monotonic() - start_time) / 60:.2f} minutes")
 
     @commands.bot_has_permissions(send_messages=True)
     @commands.command(hidden=True)
@@ -30,17 +45,42 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.command(aliases=["info", "stats"])
-    async def botstats(self, ctx: commands.Context):
+    async def botstats(self, ctx: utils.TypedContext):
         "Shows various different stats"
+        await ctx.trigger_typing()
 
-        guilds = [guild for guild in self.bot.guilds if not guild.unavailable]
-        total_members = sum(guild.member_count for guild in guilds)
-        total_voice_clients = len(self.bot.voice_clients)
+        start_time = time.perf_counter()
+        if self.bot.websocket is None:
+            guilds = [guild for guild in self.bot.guilds if not guild.unavailable]
+            total_members = sum(guild.member_count for guild in guilds)
+            total_voice_clients = len(self.bot.voice_clients)
+            total_guild_count = len(guilds)
 
-        current_proc = Process(getpid()).memory_info()
-        ram_usage = current_proc.rss / 1024 ** 2
+            raw_ram_usage = Process(getpid()).memory_info().rss
+        else:
+            ws_uuid = uuid.uuid4()
+            to_fetch = ["guild_count", "member_count", "voice_count"]
+            wsjson = utils.data_to_ws_json("REQUEST", target="*", info=to_fetch, nonce=ws_uuid)
 
-        footer = cleandoc("""
+            await self.bot.websocket.send(wsjson)
+            try:
+                check = lambda _, nonce: uuid.UUID(nonce) == ws_uuid
+                responses, _ = await self.bot.wait_for(timeout=10, check=check, event="response",)
+            except asyncio.TimeoutError:
+                cog = cast(ErrorEvents, self.bot.get_cog("ErrorEvents"))
+                self.bot.logger.error("Timed out fetching botstats!")
+
+                error_msg = "the bot timed out fetching this info"
+                return await cog.send_error(ctx, error_msg)
+
+            raw_ram_usage = sum(proc.memory_info().rss for proc in Process(getpid()).parent().children()) # type: ignore
+            total_voice_clients = sum(resp["voice_count"] for resp in responses)
+            total_guild_count = sum(resp["guild_count"] for resp in responses)
+            total_members = sum(resp["member_count"] for resp in responses)
+
+        time_to_fetch = (time.perf_counter() - start_time) * 1000
+        footer = cleandoc(f"""
+            Time to fetch: {time_to_fetch:.2f}ms
             Support Server: https://discord.gg/zWPWwQC
             Repository: https://github.com/Gnome-py/Discord-TTS-Bot
         """)
@@ -53,10 +93,10 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             description=cleandoc(f"""
                 Currently in:
                     {sep2} {total_voice_clients} voice channels
-                    {sep2} {len(self.bot.guilds)} servers
+                    {sep2} {total_guild_count} servers
                 Currently using:
                     {sep1} {self.bot.shard_count} shards
-                    {sep1} {ram_usage:.1f}MB of RAM
+                    {sep1} {raw_ram_usage / 1024 ** 2:.1f}MB of RAM
                 and can be used by {total_members:,} people!
             """)
         ).set_footer(text=footer).set_thumbnail(url=self.bot.avatar_url)
@@ -93,9 +133,9 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
     async def ping(self, ctx: commands.Context):
         "Gets current ping to discord!"
 
-        ping_before = monotonic()
+        ping_before = time.perf_counter()
         ping_message = await ctx.send("Loading!")
-        ping = (monotonic() - ping_before) * 1000
+        ping = (time.perf_counter() - ping_before) * 1000
         await ping_message.edit(content=f"Current Latency: `{ping:.0f}ms`")
 
     @commands.command()
@@ -124,9 +164,9 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
     @commands.bot_has_permissions(send_messages=True)
     async def invite(self, ctx: commands.Context):
         "Sends the instructions to invite TTS Bot and join the support server!"
-        if ctx.guild == self.bot.support_server:
-            await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
-        else:
-            invite_channel = self.bot.invite_channel
-            invite_channel = invite_channel.name if invite_channel else "deleted-channel"
-            await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{invite_channel} to invite {self.bot.user.mention}!")
+        if ctx.guild == self.bot.get_support_server():
+            return await ctx.send(f"Check out <#694127922801410119> to invite {self.bot.user.mention}!")
+
+        invite_channel = await self.bot.get_invite_channel()
+        invite_channel = invite_channel.name if invite_channel else "deleted-channel"
+        await ctx.send(f"Join https://discord.gg/zWPWwQC and look in #{invite_channel} to invite {self.bot.user.mention}!")

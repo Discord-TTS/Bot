@@ -90,17 +90,11 @@ class TTSBot(commands.AutoShardedBot):
     def avatar_url(self) -> str:
         return str(self.user.avatar_url) if self.user else ""
 
-    @property
-    def support_server(self) -> Optional[discord.Guild]:
-        return self.get_guild(int(self.config["Main"]["main_server"]))
-
-    @property
-    def invite_channel(self) -> Optional[discord.TextChannel]:
-        support_server = self.support_server
-        return support_server.get_channel(694127922801410119) if support_server else None # type: ignore
-
     def log(self, event: str) -> None:
         self.analytics_buffer.add(event)
+
+    def get_support_server(self) -> Optional[discord.Guild]:
+        return self.get_guild(int(self.config["Main"]["main_server"]))
 
     def load_extensions(self, folder: str):
         filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
@@ -113,6 +107,15 @@ class TTSBot(commands.AutoShardedBot):
 
         uri = f"ws://{host}:{port}/{self.cluster_id}"
         return websockets.connect(uri)
+
+
+    async def get_invite_channel(self) -> Optional[discord.TextChannel]:
+        channel_id = 694127922801410119
+        support_server = self.get_support_server()
+        if support_server is None:
+            return await self.fetch_channel(channel_id) # type: ignore
+        else:
+            return support_server.get_channel(channel_id) # type: ignore
 
     async def check_gtts(self) -> Union[bool, Exception]:
         try:
