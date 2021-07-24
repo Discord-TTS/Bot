@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import discord
 from discord.ext import commands
@@ -67,8 +67,8 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
             title="Joined your voice channel!",
             description="Just type normally and TTS Bot will say your messages!"
         )
-        join_embed.set_thumbnail(url=self.bot.avatar_url)
-        join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+        join_embed.set_thumbnail(url=self.bot.user.avatar.url)
+        join_embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
         join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
         try:

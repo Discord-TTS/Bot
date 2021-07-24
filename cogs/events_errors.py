@@ -46,7 +46,7 @@ class ErrorEvents(utils.CommonCog):
             description=f"Sorry but {error}, to fix this, please {fix}!"
         ).set_author(
             name=ctx.author.display_name,
-            icon_url=str(ctx.author.avatar_url)
+            icon_url=ctx.author.avatar.url
         ).set_footer(
             text="Support Server: https://discord.gg/zWPWwQC"
         )

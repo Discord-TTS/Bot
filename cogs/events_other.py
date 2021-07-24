@@ -66,7 +66,7 @@ class OtherEvents(utils.CommonCog):
             await dm_command(ctx, real_user, message=message.content)
 
     @commands.Cog.listener()
-    async def on_guild_join(self, guild: discord.Guild):
+    async def on_guild_join(self, guild: utils.TypedGuild):
         _, prefix, owner = await asyncio.gather(
             self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!"),
             self.bot.settings.get(guild, ["prefix"]),
@@ -78,7 +78,7 @@ class OtherEvents(utils.CommonCog):
             description=WELCOME_MESSAGE.format(guild=guild, prefix=prefix[0])
         ).set_footer(
             text="Support Server: https://discord.gg/zWPWwQC | Bot Invite: https://bit.ly/TTSBot"
-        ).set_author(name=str(owner), icon_url=str(owner.avatar_url))
+        ).set_author(name=str(owner), icon_url=owner.avatar.url)
 
         try: await owner.send(embed=embed)
         except discord.errors.HTTPException: pass

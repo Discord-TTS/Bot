@@ -14,6 +14,8 @@ _script_files = ("bat", "sh", "jar", "py", "php")
 _program_files = ("apk", "exe", "msi", "deb")
 _disk_images = ("dmg", "iso", "img", "ima")
 
+DEFAULT_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/{}.png"
+
 ID_IN_BRACKETS_REGEX = _re.compile(r"\((\d+)\)")
 EMOJI_REGEX = _re.compile(r"<(a?):(.+):(\d+)>")
 

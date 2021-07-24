@@ -35,7 +35,7 @@ intents = discord.Intents(voice_states=True, messages=True, guilds=True, members
 status = getattr(discord.Status, config["Activity"]["status"])
 
 allowed_mentions = discord.AllowedMentions(everyone=False, roles=False)
-cache_flags = discord.MemberCacheFlags(online=False, joined=False)
+cache_flags = discord.MemberCacheFlags(joined=False)
 
 # Custom prefix support
 async def prefix(bot: TTSBot, message: discord.Message) -> str:
@@ -59,6 +59,7 @@ class TTSBot(commands.AutoShardedBot):
         command_prefix: Callable[[TTSBot, discord.Message], Awaitable[str]]
         voice_clients: List[TTSVoicePlayer]
         analytics_buffer: utils.SafeDict
+        user: discord.ClientUser
         cache_db: aioredis.Redis
         gtts: asyncgTTS.easygTTS
         status_code: int
@@ -86,9 +87,6 @@ class TTSBot(commands.AutoShardedBot):
         super().__init__(*args, **kwargs)
 
 
-    @property
-    def avatar_url(self) -> str:
-        return str(self.user.avatar_url) if self.user else ""
 
     def log(self, event: str) -> None:
         self.analytics_buffer.add(event)
@@ -174,9 +172,8 @@ class TTSBot(commands.AutoShardedBot):
 
         # Fill up bot.channels, as a load of webhooks
         for channel_name, webhook_url in self.config["Webhook URLs"].items():
-            adapter = discord.AsyncWebhookAdapter(session=self.session)
             self.channels[channel_name] = discord.Webhook.from_url(
-                url=webhook_url, adapter=adapter
+                webhook_url, session=self.session, bot_token=self.http.token
             )
 
         # Load all of /cogs and /extensions
@@ -186,16 +183,13 @@ class TTSBot(commands.AutoShardedBot):
         # Send starting message and actually start the bot
         if self.shard_ids is not None:
             prefix = f"`[Cluster] [ID {self.cluster_id}] [Shards {len(self.shard_ids)}]`: "
-            kwargs["reconnect"] = False # allow cluster launcher to handle restarting
             self.websocket = await self.create_websocket()
+            kwargs["reconnect"] = True
         else:
             prefix = ""
             self.websocket = None
 
-        self.logger = utils.setup_logging(
-            aio=True, level=config["Main"]["log_level"],
-            session=self.session, prefix=prefix
-        )
+        self.logger = utils.setup_logging(config["Main"]["log_level"], prefix, self.session)
         self.logger.info("Starting TTS Bot!")
 
         await automatic_update.do_normal_updates(self)

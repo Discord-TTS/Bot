@@ -295,7 +295,7 @@ async def main():
     port = int(config["Clustering"].get("websocket_port", "8765"))
 
     async with aiohttp.ClientSession() as session:
-        logger = utils.setup_logging(aio=True, level=config["Main"]["log_level"], session=session, prefix="`[Launcher]`: ")
+        logger = utils.setup_logging(level=config["Main"]["log_level"], session=session, prefix="`[Launcher]`: ")
         async with ClusterManager(host, port) as manager:
             try:
                 await manager.keep_alive

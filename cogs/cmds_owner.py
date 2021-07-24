@@ -21,14 +21,14 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.command()
     @commands.is_owner()
     @commands.bot_has_permissions(send_messages=True, manage_messages=True, manage_webhooks=True)
-    async def sudo(self, ctx: commands.Context, user: Union[discord.User, str], *, message):
+    async def sudo(self, ctx: utils.TypedContext, user: Union[discord.User, str], *, message):
         """mimics another user"""
         await ctx.message.delete()
 
         if isinstance(user, str):
-            avatar = "https://cdn.discordapp.com/avatars/689564772512825363/f05524fd9e011108fd227b85c53e3d87.png"
+            avatar = "https://cdn.discordapp.com/.png"
         else:
-            avatar = str(user.avatar_url)
+            avatar = user.avatar.url
             user = user.display_name
 
         if not isinstance(ctx.channel, discord.TextChannel):

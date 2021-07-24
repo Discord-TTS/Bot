@@ -69,7 +69,7 @@ class DMHandler(utils.CommonCog):
                 await self.bot.channels["dm_logs"].send(
                     files=files,
                     content=message.content,
-                    avatar_url=message.author.avatar_url,
+                    avatar_url=message.author.avatar.url,
                     username=author_name[:32 - len(author_id)] + author_id,
                 )
 
@@ -92,6 +92,6 @@ class DMHandler(utils.CommonCog):
             await dm_message.pin()
 
     @commands.Cog.listener()
-    async def on_private_channel_pins_update(self, channel: discord.DMChannel, _):
+    async def on_private_channel_pins_update(self, channel: utils.TypedDMChannel, _):
         welcomed = any(map(self.is_welcome_message, await channel.pins()))
         self.is_welcomed[channel.recipient.id] = welcomed

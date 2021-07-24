@@ -39,7 +39,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
 
     @commands.bot_has_permissions(send_messages=True)
     @commands.command(hidden=True)
-    async def tts(self, ctx: commands.Context):
+    async def tts(self, ctx: utils.TypedContext):
         if ctx.message.content == f"{ctx.prefix}tts":
             await ctx.send(f"You don't need to do `{ctx.prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{ctx.prefix}`!")
 
@@ -99,7 +99,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
                     {sep1} {raw_ram_usage / 1024 ** 2:.1f}MB of RAM
                 and can be used by {total_members:,} people!
             """)
-        ).set_footer(text=footer).set_thumbnail(url=self.bot.avatar_url)
+        ).set_footer(text=footer).set_thumbnail(url=self.bot.user.avatar.url)
 
         await ctx.send(embed=embed)
 
@@ -140,7 +140,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
 
     @commands.command()
     @commands.bot_has_permissions(send_messages=True)
-    async def suggest(self, ctx: commands.Context, *, suggestion: str):
+    async def suggest(self, ctx: utils.TypedContext, *, suggestion: str):
         "Suggests a new feature!"
 
         if suggestion.lower().replace("*", "") == "suggestion":

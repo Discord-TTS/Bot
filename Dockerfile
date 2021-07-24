@@ -12,7 +12,7 @@ RUN git clone https://github.com/numediart/MBROLA MBROLA && \
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -U -r requirements.txt uvloop jishaku
-RUN python3 -u -m voxpopuli.voice_install --all en
+RUN python3 -u -m voxpopuli.voice_install all
 
 COPY . .
 CMD ["python3", "-u", "main.py"]

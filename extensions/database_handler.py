@@ -7,14 +7,13 @@ import asyncpg
 from utils import data_to_ws_json
 
 if TYPE_CHECKING:
-    from discord import Guild
-    from discord.abc import User
+    from discord import Guild, User, Member
     from typing_extensions import TypeVar
 
     from main import TTSBot
 
     Return = TypeVar("Return")
-
+    User = Union[User, Member]
 
 def setup(bot: TTSBot):
     bot.settings = GeneralSettings(bot)
