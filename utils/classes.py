@@ -40,6 +40,7 @@ class TypedContext(commands.Context):
     bot: TTSBot
     message: TypedMessage
     command: commands.Command
+    guild: Optional[TypedGuild]
 
     def reply(self, *args, **kwargs) -> Awaitable[discord.Message]:
         return self.send(*args, **kwargs)

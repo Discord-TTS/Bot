@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import TYPE_CHECKING, cast
+from typing import List, TYPE_CHECKING
 
 import discord
 from discord.ext import commands

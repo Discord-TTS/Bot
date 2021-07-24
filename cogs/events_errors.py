@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 
 IGNORED_ERRORS = (commands.CommandNotFound, commands.NotOwner)
+interaction_item_lookup = {discord.ui.Select: "select", discord.ui.Button: "button"}
+
 def setup(bot: TTSBot):
     cog = ErrorEvents(bot)
 
@@ -159,3 +161,15 @@ class ErrorEvents(utils.CommonCog):
                         filename="long error.txt"
                     )
                 )
+
+    @commands.Cog.listener()
+    async def on_interaction_error(self,
+        error: Exception,
+        item: discord.ui.Item,
+        interaction: discord.Interaction
+    ) -> None:
+
+        context_part = f"{interaction.user} caused an error on {item.__class__.__name__} with the interaction: {interaction}"
+        error_traceback = "".join(format_exception(type(error), error, error.__traceback__))
+        full_error = f"{context_part}\n```{error_traceback}```"
+        await self.bot.channels["errors"].send(full_error)
