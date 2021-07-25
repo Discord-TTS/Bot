@@ -1,6 +1,7 @@
 from __future__ import annotations
-import asyncio
 
+import asyncio
+import logging
 from inspect import cleandoc
 from typing import TYPE_CHECKING
 
@@ -8,7 +9,7 @@ import discord
 from discord.ext import commands
 
 import utils
-import logging
+
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -38,7 +39,7 @@ class DevCommands(utils.CommonCog, command_attrs={"hidden": True}):
                 "t": "*"
             })
             await self.bot.websocket.send(wsjson)
-            await asyncio.wait_for(self.bot.wait_for("change_log_level"), timeout=10)
+            await self.bot.wait_for("change_log_level", timeout=10)
         except asyncio.TimeoutError:
             await ctx.send(f"Didn't recieve broadcast within 10 seconds!")
         else:

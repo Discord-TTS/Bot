@@ -4,7 +4,7 @@ import asyncio
 import re
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import Set, TYPE_CHECKING, Dict, Optional
+from typing import List, Set, TYPE_CHECKING, Dict, Optional, Type
 
 import discord
 from discord.ext import commands
@@ -97,6 +97,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
 
     @set.command()
     @commands.has_permissions(administrator=True)
+    @utils.decos.make_fancy
     async def xsaid(self, ctx: utils.TypedGuildContext, value: bool):
         "Makes the bot say \"<user> said\" before each message"
         await self.bot.settings.set(ctx.guild, "xsaid", value)
@@ -104,6 +105,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
 
     @set.command(aliases=["auto_join"])
     @commands.has_permissions(administrator=True)
+    @utils.decos.make_fancy
     async def autojoin(self, ctx: utils.TypedGuildContext, value: bool):
         "If you type a message in the setup channel, the bot will join your vc"
         await self.bot.settings.set(ctx.guild, "auto_join", value)
@@ -111,6 +113,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
 
     @set.command(aliases=["bot_ignore", "ignore_bots", "ignorebots"])
     @commands.has_permissions(administrator=True)
+    @utils.decos.make_fancy
     async def botignore(self, ctx: utils.TypedGuildContext, value: bool):
         "Messages sent by bots and webhooks are not read"
         await self.bot.settings.set(ctx.guild, "bot_ignore", value)
@@ -161,9 +164,10 @@ class SettingCommands(utils.CommonCog, name="Settings"):
 
     @set.command()
     @commands.has_permissions(administrator=True)
-    async def channel(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel):
+    @utils.decos.make_fancy
+    async def channel(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel = None):
         "Alias of `-setup`"
-        await self.setup(ctx, channel)
+        await self.setup(ctx, channel) # type: ignore
 
     @set.command(aliases=("voice", "lang", "_language"))
     async def language(self, ctx: utils.TypedGuildContext, voicecode: str):
@@ -225,6 +229,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.guild_only()
     @commands.command()
+    @utils.decos.make_fancy
     async def setup(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel):
         "Setup the bot to read messages from `<channel>`"
         await self.bot.settings.set(ctx.guild, "channel", channel.id)
@@ -237,8 +242,8 @@ class SettingCommands(utils.CommonCog, name="Settings"):
             """)
         )
         embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
-        embed.set_thumbnail(url=self.bot.avatar_url)
-        embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
 
         await ctx.send(embed=embed)
 
@@ -266,6 +271,6 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
         embed.add_field(name="Currently Supported Languages", value=langs_string)
         embed.add_field(name="Current Language used", value=f"{langs_lookup[lang]} | {lang}")
-        embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
 
         await ctx.send(embed=embed)

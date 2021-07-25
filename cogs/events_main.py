@@ -89,6 +89,8 @@ class MainEvents(utils.CommonCog):
 
             if not await do_autojoin(message.author):
                 return
+        elif message.author.voice.channel != bot_voice_client.channel:
+            return
 
         # Fix linter issues
         if TYPE_CHECKING:

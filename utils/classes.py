@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Awaitable, TYPE_CHECKING, Optional, Union, TypeVar
+from typing import TYPE_CHECKING, Awaitable, Callable, Optional, TypeVar, Union
 
 import discord
 from discord.ext import commands
@@ -39,7 +39,8 @@ VoiceChannel = Union[discord.VoiceChannel, discord.StageChannel]
 class TypedContext(commands.Context):
     bot: TTSBot
     message: TypedMessage
-    author: Union[TypedMember, discord.User]
+    command: commands.Command
+    guild: Optional[TypedGuild]
 
     def reply(self, *args, **kwargs) -> Awaitable[discord.Message]:
         return self.send(*args, **kwargs)
@@ -60,7 +61,9 @@ class TypedGuildContext(TypedContext):
 
         return self.send(*args, **kwargs)
 
+
 class TypedMessage(discord.Message):
+    content: str
     guild: Optional[TypedGuild]
     author: Union[TypedMember, discord.User]
 
@@ -72,10 +75,16 @@ class TypedGuildMessage(TypedMessage):
 
 class TypedMember(discord.Member):
     guild: TypedGuild
-    voice: Optional[TypedVoiceState]
+    voice: TypedVoiceState
+    avatar: discord.Asset
 
 class TypedGuild(discord.Guild):
+    owner_id: int
     voice_client: Optional[TTSVoicePlayer]
+    fetch_member: Callable[[int], Awaitable[TypedMember]]
 
 class TypedVoiceState(discord.VoiceState):
     channel: VoiceChannel
+
+class TypedDMChannel(discord.DMChannel):
+    recipient: discord.User

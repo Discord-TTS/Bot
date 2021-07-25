@@ -11,7 +11,7 @@ from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
 import orjson
 
 from utils.constants import OPTION_SEPERATORS, READABLE_TYPE
-from utils.websocket_types import _TARGET, WSGenericJSON
+from utils.websocket_types import _TARGET
 
 if TYPE_CHECKING:
     import re
@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 
 _sep = OPTION_SEPERATORS[2]
 
-def data_to_ws_json(command: str, target: _TARGET, **kwargs) -> bytes:
-    wsjson: WSGenericJSON = {"c": command.lower(), "a": kwargs, "t": target}
+def data_to_ws_json(command: str, target: Union[_TARGET, str], **kwargs) -> bytes:
+    wsjson = {"c": command.lower(), "a": kwargs, "t": target}
     return orjson.dumps(wsjson)
 
 def emoji_match_to_cleaned(match: re.Match) -> str:

@@ -2,17 +2,23 @@ from __future__ import annotations
 
 import asyncio
 from inspect import cleandoc
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, List, cast
 
 import discord
-from discord.ext import commands
-
 import utils
+from discord.ext import commands
 
 
 if TYPE_CHECKING:
     from main import TTSBot
 
+
+data_lookup = {
+    "guild_count":  lambda b: len(b.guilds),
+    "voice_count":  lambda b: len(b.voice_clients),
+    "member_count": lambda b: sum(guild.member_count for guild in b.guilds),
+    "has_support":  lambda b: None if b.get_support_server() is None else b.cluster_id,
+}
 
 WELCOME_MESSAGE = cleandoc("""
     Hello! Someone invited me to your server `{guild}`!
@@ -41,7 +47,7 @@ class OtherEvents(utils.CommonCog):
         if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
             await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
 
-        if message.reference and message.guild == self.bot.support_server and message.channel.name in ("dm_logs", "suggestions") and not message.author.bot:
+        if message.reference and message.guild == self.bot.get_support_server() and message.channel.name in ("dm_logs", "suggestions") and not message.author.bot:
             dm_message = message.reference.resolved
             if (
                 not dm_message
@@ -60,7 +66,7 @@ class OtherEvents(utils.CommonCog):
             await dm_command(ctx, real_user, message=message.content)
 
     @commands.Cog.listener()
-    async def on_guild_join(self, guild: discord.Guild):
+    async def on_guild_join(self, guild: utils.TypedGuild):
         _, prefix, owner = await asyncio.gather(
             self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!"),
             self.bot.settings.get(guild, ["prefix"]),
@@ -72,18 +78,17 @@ class OtherEvents(utils.CommonCog):
             description=WELCOME_MESSAGE.format(guild=guild, prefix=prefix[0])
         ).set_footer(
             text="Support Server: https://discord.gg/zWPWwQC | Bot Invite: https://bit.ly/TTSBot"
-        ).set_author(name=str(owner), icon_url=str(owner.avatar_url))
+        ).set_author(name=str(owner), icon_url=owner.avatar.url)
 
         try: await owner.send(embed=embed)
         except discord.errors.HTTPException: pass
 
-        if self.bot.websocket is None or self.bot.support_server is not None:
+        if self.bot.websocket is None or self.bot.get_support_server() is not None:
             return await self.on_ofs_add(owner.id)
 
-        wsjson = utils.data_to_ws_json("SEND", "*", **{
-            "c": "ofs_add",
-            "a": {"owner_id": owner.id}
-        })
+        json = {"c": "ofs_add", "a": {"owner_id": owner.id}}
+        wsjson = utils.data_to_ws_json("SEND", target="support", **json)
+
         await self.bot.websocket.send(wsjson)
 
     @commands.Cog.listener()
@@ -119,12 +124,16 @@ class OtherEvents(utils.CommonCog):
             handler.setLevel(level)
 
     @commands.Cog.listener()
-    async def on_ofs_add(self, owner_id: int):
-        support_server = self.bot.support_server
-        if support_server is None:
-            return
+    async def on_request(self, info: List[str], nonce: str, *args):
+        data = {to_get: data_lookup[to_get](self.bot) for to_get in info}
+        wsjson = utils.data_to_ws_json("RESPONSE", target=nonce, **data)
 
-        role = support_server.get_role(738009431052386304)
+        await self.bot.websocket.send(wsjson) # type: ignore
+
+    @commands.Cog.listener()
+    async def on_ofs_add(self, owner_id: int):
+        support_server: discord.Guild = self.bot.get_support_server() # type: ignore
+        role = support_server.get_role(703307566654160969)
         if not role:
             return
 
