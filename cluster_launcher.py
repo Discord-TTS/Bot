@@ -151,9 +151,11 @@ class ClusterManager:
 
         logger.info(f"Launching {cluster_count} clusters to handle {shard_count} shards with {shards_per_cluster} per cluster.")
 
-        all_shards = enumerate(group_by(range(shard_count), shards_per_cluster))
-        for cluster_id, shards in all_shards:
+        all_shards = group_by(range(shard_count), shards_per_cluster)
+        for cluster_id, shards in enumerate(all_shards):
+            shards = [s for s in shards if s is not None]
             args = (cluster_id, shard_count, shards)
+
             cluster_watcher_func = partial(self.cluster_watcher, args)
             self.monitors[cluster_id] = asyncio.Task(utils.to_thread(cluster_watcher_func))
 
@@ -267,8 +269,15 @@ class ClusterManager:
                 handler.setLevel(level)
 
         if target == "*":
-            for connection in self.websockets.values():
-                await connection.send(to_be_sent)
+            for cluster_id, connection in self.websockets.copy().items():
+                try:
+                    await connection.send(to_be_sent)
+                except websockets.WebSocketException as err:
+                    self.websockets.pop(cluster_id, None)
+
+                    err_msg = f"Could not send message to cluster {cluster_id}"
+                    logger.error(f"{err_msg}: {err}")
+
         elif target == "support":
             support_cluster = self.support_cluster
             if support_cluster is None:

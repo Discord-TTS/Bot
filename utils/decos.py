@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from functools import wraps
-from typing import TYPE_CHECKING, Awaitable, Callable, Optional, TypeVar, cast
+from typing import Any, TYPE_CHECKING, Awaitable, Callable, Optional, TypeVar, cast
 
 from .views import BoolView, ChannelSelector, GenericView
 from .classes import CommonCog, TypedGuildContext
@@ -20,7 +20,7 @@ def make_fancy(
     func: Callable[[CommonCog, TypedGuildContext, _T], Awaitable[_R]]
 ) -> Callable[[CommonCog, TypedGuildContext, Optional[_T]], Awaitable[Optional[_R]]]:
 
-    async def wrapper(self: CommonCog, ctx: TypedGuildContext, value: Optional[_T]) -> Optional[_R]:
+    async def wrapper(self: CommonCog, ctx: TypedGuildContext, value: Optional[Any] = None) -> Optional[Any]:
         if value is not None:
             return await func(self, ctx, value)
 
@@ -37,7 +37,9 @@ def make_fancy(
         else:
             ctx.bot.logger.error(f"Unknown Conversion Type: {type_to_convert}")
 
-    return wraps(func)(wrapper)
+    wrapper.__name__ = func.__name__
+    wrapper.__doc__ = func.__doc__
+    return wrapper
 
 def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, Awaitable[Optional[_R]]]:
     async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Optional[_R]:
