@@ -1,6 +1,11 @@
 import re as _re
 
 NETURAL_COLOUR = 0xcaa652
+
+KILL_EVERYTHING = 0
+RESTART_CLUSTER = 1
+DO_NOT_RESTART_CLUSTER = 2
+
 _image_files = ("bmp", "gif", "ico", "png", "psd", "svg", "jpg")
 _audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")
 _video_files = ("avi", "mp4", "wmv", "m4v", "mpg", "mpeg")
@@ -11,8 +16,8 @@ _program_files = ("apk", "exe", "msi", "deb")
 _disk_images = ("dmg", "iso", "img", "ima")
 
 TRANSLATION_URL = "https://api-free.deepl.com/v2"
-ANIMATED_EMOJI_REGEX = _re.compile(r"<a\:.+:\d+>")
-EMOJI_REGEX = _re.compile(r"<:.+:\d+\d+>")
+ID_IN_BRACKETS_REGEX = _re.compile(r"\((\d+)\)")
+EMOJI_REGEX = _re.compile(r"<(a?):(.+):(\d+)>")
 
 _PRE_REGEX_REPLACEMENTS = {
     r"\|\|.*?\|\|": ". spoiler avoided.",
@@ -47,6 +52,28 @@ FOOTER_MSGS = (
     "You can vote for me or review me on top.gg!\nhttps://top.gg/bot/513423712582762502",
     "There are loads of customizable settings, check out -settings help",
 )
+
+ACRONYMS = {
+    "iirc": "if I recall correctly",
+    "afaik": "as far as I know",
+    "wdym": "what do you mean",
+    "imo": "in my opinion",
+    "brb": "be right back",
+    "irl": "in real life",
+    "jk": "just kidding",
+    "btw": "by the way",
+    ":)": "smiley face",
+    "gtg": "got to go",
+    "rn": "right now",
+    ":(": "sad face",
+    "ig": "i guess",
+    "rly": "really",
+    "cya": "see ya",
+    "ik": "i know",
+    "uwu": "oowoo",
+    "@": "at",
+    "™️": "tm"
+}
 
 GUILDS_CREATE = """
     CREATE TABLE guilds (

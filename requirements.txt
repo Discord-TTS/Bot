@@ -2,7 +2,11 @@ git+https://github.com/Rapptz/discord-ext-menus
 git+https://github.com/Gnome-py/asyncgTTS.git
 aioredis[hiredis]>=2.0.0a1,<3.0
 discord.py[voice]
+aiohttp[speedups]
 cryptography
+websockets
+requests
 asyncpg
 psutil
+orjson
 pydub

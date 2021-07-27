@@ -14,9 +14,9 @@ if TYPE_CHECKING:
 
 
 def setup(bot: TTSBotPremium):
-    bot.add_cog(cmds_owner(bot))
+    bot.add_cog(OwnerCommands(bot))
 
-class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
+class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
     "TTS Bot commands meant only for the bot owner."
 
     @commands.command()
@@ -71,9 +71,10 @@ class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.is_owner()
+    @commands.guild_only()
     @commands.bot_has_permissions(send_messages=True)
-    async def say(self, ctx: commands.Context, channel: discord.TextChannel, *, to_say: str):
-        if ctx.channel.permissions_for(ctx.guild.me).manage_messages: # type: ignore
+    async def say(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel, *, to_say: str):
+        if ctx.bot_permissions().manage_messages:
             await ctx.message.delete()
 
         await channel.send(to_say)
@@ -82,11 +83,21 @@ class cmds_owner(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.is_owner()
     async def reload_cog(self, ctx: commands.Context, *, to_reload: str):
         try:
-            self.bot.reload_extension(f"cogs.{to_reload}")
+            self.bot.reload_extension(to_reload)
         except Exception as e:
             await ctx.send(f"**`ERROR:`** {type(e).__name__} - {e}")
         else:
             await ctx.send("**`SUCCESS`**")
+            if self.bot.websocket is None:
+                return
+
+            await self.bot.websocket.send(
+                utils.data_to_ws_json(
+                    "SEND", target="*", **{
+                        "c": "reload",
+                        "a": {"cog": to_reload},
+                })
+            )
 
     @commands.command()
     @commands.is_owner()

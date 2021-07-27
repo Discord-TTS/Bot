@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union
+import asyncio
+import collections
+from typing import TYPE_CHECKING, Awaitable, Optional, TypeVar, Union
 
 import discord
 from discord.ext import commands
 
 
+_T = TypeVar("_T")
 if TYPE_CHECKING:
     from main import TTSBotPremium
     from player import TTSVoicePlayer
@@ -23,6 +26,12 @@ class SafeDict(dict):
 
         self[event] += 1
 
+class ClearableQueue(asyncio.Queue[_T]):
+    _queue: collections.deque
+
+    def clear(self):
+        self._queue.clear()
+
 
 # Typed Classes for silencing type errors.
 VoiceChannel = Union[discord.VoiceChannel, discord.StageChannel]
@@ -31,15 +40,24 @@ class TypedContext(commands.Context):
     message: TypedMessage
     author: Union[TypedMember, discord.User]
 
-    async def reply(self, *args, **kwargs) -> discord.Message:
-        if not self.guild or self.channel.permissions_for(self.guild.me).read_message_history: # type: ignore
-            return await super().reply(*args, **kwargs)
-
-        return await super().send(*args, **kwargs)
+    def reply(self, *args, **kwargs) -> Awaitable[discord.Message]:
+        return self.send(*args, **kwargs)
 
 class TypedGuildContext(TypedContext):
     guild: TypedGuild
+    author: TypedMember
+    channel: discord.TextChannel
 
+    def author_permissions(self) -> discord.Permissions:
+        return self.channel.permissions_for(self.author)
+    def bot_permissions(self) -> discord.Permissions:
+        return self.channel.permissions_for(self.guild.me)
+
+    def reply(self, *args, **kwargs) -> Awaitable[discord.Message]:
+        if self.bot_permissions().read_message_history:
+            kwargs["reference"] = self.message
+
+        return self.send(*args, **kwargs)
 
 class TypedMessage(discord.Message):
     guild: Optional[TypedGuild]

@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 
 
 def setup(bot: TTSBotPremium):
-    bot.add_cog(cmds_main(bot))
+    bot.add_cog(MainCommands(bot))
 
-class cmds_main(utils.CommonCog, name="Main Commands"):
+class MainCommands(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
 
     async def channel_check(self, ctx: utils.TypedGuildContext) -> bool:
@@ -120,5 +120,5 @@ class cmds_main(utils.CommonCog, name="Main Commands"):
 
     @skip.after_invoke
     async def reset_cooldown(self, ctx: utils.TypedGuildContext):
-        if ctx.channel.permissions_for(ctx.author).administrator: # type: ignore
+        if ctx.author_permissions().administrator:
             self.skip.reset_cooldown(ctx)

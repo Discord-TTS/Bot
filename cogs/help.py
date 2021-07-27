@@ -55,7 +55,7 @@ class FancyHelpCommand(commands.HelpCommand):
     def get_bot_mapping(self):
         bot = self.context.bot
 
-        known_cogs_names = ("Main Commands", "Settings", "Extra Commands", "cmds_dev")
+        known_cogs_names = ("Main Commands", "Settings", "Extra Commands")
 
         known_cogs = [bot.get_cog(cog) for cog in known_cogs_names]
         unknown_cogs = [cog for cog in bot.cogs.values() if cog not in known_cogs]

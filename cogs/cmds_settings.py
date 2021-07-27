@@ -11,6 +11,7 @@ from typing import (TYPE_CHECKING, Any, Callable, Coroutine, Dict, List,
 
 import discord
 from discord.ext import commands, menus
+from typing import Set, TYPE_CHECKING, Dict, Optional
 
 import utils
 
@@ -289,7 +290,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         user = optional_user or ctx.author
         nickname = nickname or ctx.author.display_name
 
-        if user != ctx.author and not ctx.channel.permissions_for(ctx.author).administrator: # type: ignore
+        if user != ctx.author and not ctx.author_permissions().administrator:
             return await ctx.send("Error: You need admin to set other people's nicknames!")
 
         if not nickname:
@@ -310,8 +311,8 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         "Alias of `-setup`"
         await self.setup(ctx, channel)
 
-    @set.command(aliases=("voice", "lang"))
-    async def language(self, ctx: commands.Context, lang: str, variant: str = ""):
+    @set.command(aliases=("voice", "lang", "_language"))
+    async def language(self, ctx: utils.TypedGuildContext, lang: str, variant: str = ""):
         "Changes the language your messages are read in, full list in `-voices`"
         await self.voice(ctx, lang, variant)
 

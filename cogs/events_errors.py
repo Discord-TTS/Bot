@@ -5,7 +5,7 @@ from inspect import cleandoc
 from io import StringIO
 from sys import exc_info
 from traceback import format_exception
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 import discord
 from discord.ext import commands
@@ -17,19 +17,22 @@ if TYPE_CHECKING:
     from main import TTSBotPremium
 
 
+IGNORED_ERRORS = (commands.CommandNotFound, commands.NotOwner)
 def setup(bot: TTSBotPremium):
-    bot.add_cog(events_errors(bot))
+    cog = ErrorEvents(bot)
 
-class events_errors(utils.CommonCog):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    bot.add_cog(cog)
+    bot.on_error = cog.on_error
 
-        self.bot.on_error = self.on_error
+class ErrorEvents(utils.CommonCog):
+    async def send_error(
+        self, ctx: utils.TypedContext, error: str,
+        fix: str = "get in contact with us via the support server for help"
+    ) -> Optional[discord.Message]:
 
-
-    async def send_error(self, ctx: utils.TypedContext, error: str, fix: str) -> Optional[discord.Message]:
         if ctx.guild:
-            permissions = ctx.channel.permissions_for(ctx.guild.me) # type: ignore
+            ctx = cast(utils.TypedGuildContext, ctx)
+            permissions = ctx.bot_permissions()
 
             if not permissions.send_messages:
                 return
@@ -74,22 +77,24 @@ class events_errors(utils.CommonCog):
             guild: discord.Guild = args[0]
             info = f"Guild = {guild} | {guild.id}"
 
-        try:
-            error_message = f"Event: `{event}`\nInfo: `{info}`\n```{''.join(format_exception(etype, value, tb))}```"
-        except:
-            error_message = f"```{''.join(format_exception(etype, value, tb))}```"
+        cluster_info = None
+        if self.bot.cluster_id is not None:
+            cluster_info = f"Cluster ID {self.bot.cluster_id} | Shards {self.bot.shard_ids}"
 
-        await self.bot.channels["errors"].send(cleandoc(error_message))
+        error_message = f"Event: `{event}`\nInfo: `{info}`\nCluster Info: `{cluster_info}`"
+        formatted_err = f"```{''.join(format_exception(etype, value, tb))}```"
+
+        await self.bot.channels["errors"].send(f"{error_message} {formatted_err}")
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: utils.TypedContext, error: commands.CommandError):
-        if hasattr(ctx.command, "on_error") or isinstance(error, (commands.CommandNotFound, commands.NotOwner)):
-            return
-
         command = f"`{ctx.prefix}{ctx.command}`"
         error = getattr(error, "original", error)
 
-        if isinstance(error, commands.UserInputError):
+        if isinstance(error, IGNORED_ERRORS):
+            return
+
+        elif isinstance(error, commands.UserInputError):
             error_name = type(error).__name__
             fix = f"check out `{ctx.prefix}help {ctx.command}`"
 
@@ -112,10 +117,12 @@ class events_errors(utils.CommonCog):
             cooldown_error = await self.send_error(ctx, f"{command} is on cooldown", f"try again in {error.retry_after:.1f} seconds")
             await asyncio.sleep(error.retry_after)
 
-            if cooldown_error:
-                await cooldown_error.delete()
-            if ctx.channel.permissions_for(ctx.guild.me).manage_messages: # type: ignore
-                await ctx.message.delete()
+            if ctx.guild:
+                ctx = cast(utils.TypedGuildContext, ctx)
+                if cooldown_error:
+                    await cooldown_error.delete()
+                if ctx.bot_permissions().manage_messages:
+                    await ctx.message.delete()
 
         elif isinstance(error, commands.NoPrivateMessage):
             await self.send_error(ctx, f"{command} cannot be used in private messages", f"try running it on a server with {self.bot.user} in")
@@ -130,16 +137,17 @@ class events_errors(utils.CommonCog):
             )
 
         elif isinstance(error, discord.errors.Forbidden):
-            await asyncio.gather(
-                self.send_error(ctx, "I encountered an unknown permission error", "please give TTS Bot the required permissions"),
-                self.bot.channels["errors"].send(f"```discord.errors.Forbidden``` caused by {ctx.message.content} sent by {ctx.author}")
-            )
+            self.bot.logger.error(f"`discord.errors.Forbidden` caused by {ctx.message.content} sent by {ctx.author}")
+            await self.send_error(ctx, "I encountered an unknown permission error", "please give TTS Bot the required permissions")
+
+        elif isinstance(error, asyncio.TimeoutError):
+            self.bot.logger.error(f"`asyncio.TimeoutError:` Unhandled in {ctx.command.qualified_name}")
 
         elif isinstance(error, commands.CheckFailure) and "global check" in str(error):
             return
 
         else:
-            await self.send_error(ctx, "an unknown error occured", "get in contact with us via the support server for help")
+            await self.send_error(ctx, "an unknown error occured")
 
             context_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
             error_traceback = "".join(format_exception(type(error), error, error.__traceback__))

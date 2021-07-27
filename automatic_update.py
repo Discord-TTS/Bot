@@ -27,7 +27,7 @@ def _update_config(config: ConfigParser):
         config.write(config_file)
 
 def _update_defaults(bot: TTSBotPremium) -> asyncio.Task[Record]:
-    return asyncio.create_task( # type: ignore
+    return bot.loop.create_task( # type: ignore
         bot.conn.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
     )
 
@@ -49,11 +49,17 @@ early_updates: List[_UF] = []
 normal_updates: List[_UF] = []
 
 async def do_early_updates(bot: TTSBotPremium):
+    if bot.cluster_id not in {0, None}:
+        return
+
     for func in early_updates:
         if await func(bot):
             print(f"Completed update: {func.__name__}")
 
 async def do_normal_updates(bot: TTSBotPremium):
+    if bot.cluster_id not in {0, None}:
+        return
+
     async with bot.pool.acquire() as conn:
         bot.conn = conn
         for func in normal_updates:
@@ -128,8 +134,6 @@ async def setup_bot(bot: TTSBotPremium) -> bool:
     import asyncpg
     from cryptography.fernet import Fernet
 
-    import utils
-
     db_info = bot.config["PostgreSQL Info"]
     bot.config["Main"]["key"] = str(Fernet.generate_key())
 
@@ -146,5 +150,14 @@ async def cache_to_redis(bot: TTSBotPremium) -> bool:
         return False
 
     bot.config["Redis Info"] = {"url": "redis://cache"}
+    _update_config(bot.config)
+    return True
+
+@add_to_updates("normal")
+async def add_log_level(bot: TTSBotPremium) -> bool:
+    if "log_level" in bot.config["Main"]:
+        return False
+
+    bot.config["Main"]["log_level"] = "INFO"
     _update_config(bot.config)
     return True

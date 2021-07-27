@@ -4,9 +4,12 @@ from datetime import datetime, time, timedelta
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
 
 import discord
+import orjson
+import websockets
 from discord.ext import tasks
 
 import utils
+from utils.websocket_types import WSGenericJSON
 
 
 if TYPE_CHECKING:
@@ -57,6 +60,34 @@ class Loops(utils.CommonCog):
     def cog_unload(self):
         for task in self.tasks:
             task.cancel()
+
+
+    @tasks.loop()
+    @utils.decos.handle_errors
+    async def websocket_client(self):
+        if self.bot.websocket is None:
+            return self.websocket_client.stop()
+
+        try:
+            async for msg in self.bot.websocket:
+                wsjson: WSGenericJSON = orjson.loads(msg)
+                self.bot.dispatch("websocket_msg", msg)
+
+                args = [*wsjson["a"].values()]
+                if wsjson.get("t", None):
+                    args.append(wsjson["t"])
+
+                command = wsjson["c"].lower()
+                self.bot.dispatch(command, *args)
+        except websockets.ConnectionClosed as error:
+            disconnect_msg = f"Websocket disconnected with code `{error.code}: {error.reason}`"
+            try:
+                self.bot.websocket = await self.bot.create_websocket()
+            except Exception as new_error:
+                self.bot.websocket = None
+                self.bot.logger.error(f"{disconnect_msg} and failed to reconnect: {new_error}")
+            else:
+                self.bot.logger.warning(f"{disconnect_msg} and was able to reconnect!")
 
 
     @tasks.loop(seconds=60)
@@ -123,7 +154,7 @@ class Loops(utils.CommonCog):
         for section_name in lookup.values():
             embed.description += section_name + "\n" # type: ignore
             for first, second in sections[section_name]:
-                embed.description += f"{first:<{max}} {second}\n"
+                embed.description += f"{first:<{max_len}} {second}\n"
 
         embed.description += await utils.get_redis_info(self.bot.cache_db)
         await self.bot.channels["analytics"].send(embed=embed)

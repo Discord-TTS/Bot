@@ -11,6 +11,7 @@ services:
 
         environment:
             - GOOGLE_APPLICATION_CREDENTIALS=gcp.json
+
         command: ["./wait-for-it.sh", "postgres:5432", "cache:6379", "--strict", "--", "python3", "-u", "main.py"]
     database:
         image: postgres:13

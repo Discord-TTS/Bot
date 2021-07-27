@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from inspect import cleandoc
 from itertools import groupby
-from random import choice as pick_random
 from typing import List, Optional, TYPE_CHECKING, cast
 
 import discord
@@ -29,15 +27,6 @@ if TYPE_CHECKING:
 else:
     cmds_settings = None
 
-DM_WELCOME_MESSAGE = cleandoc("""
-    **All messages after this will be sent to a private channel where we can assist you.**
-    Please keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day repeat your message.
-    There are some basic rules if you want to get help though:
-    `1.` Ask your question, don't just ask for help
-    `2.` Don't spam, troll, or send random stuff (including server invites)
-    `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
-""")
-
 async def do_autojoin(author: utils.TypedMember) -> bool:
     try:
         voice_channel = author.voice.channel # type: ignore
@@ -49,280 +38,183 @@ async def do_autojoin(author: utils.TypedMember) -> bool:
     except (asyncio.TimeoutError, AttributeError):
         return False
 
-
 def setup(bot: TTSBotPremium):
-    bot.add_cog(events_main(bot))
+    bot.add_cog(MainEvents(bot))
 
-class events_main(utils.CommonCog):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.dm_pins = {}
-
-
-    def is_welcome_message(self, message: discord.Message) -> bool:
-        if not message.embeds:
-            return False
-
-        return message.embeds[0].title == f"Welcome to {self.bot.user.name} Support DMs!"
-
-
+class MainEvents(utils.CommonCog):
     @commands.Cog.listener()
-    async def on_message(self, message: utils.TypedMessage):
-        if not message.attachments and not message.content:
+    async def on_message(self, message: utils.TypedGuildMessage):
+        if (not message.attachments and not message.content) or not message.guild:
             return
 
-        if message.guild is not None:
-            # Premium Check
-            if not getattr(self.bot, "patreon_role", False) or self.bot.patreon_role is None:
+        # Premium Check
+        if not getattr(self.bot, "patreon_role", False) or self.bot.patreon_role is None:
+            return
+
+        if str(message.author.id) not in self.bot.trusted:
+            premium_user_for_guild = self.bot.patreon_json.get(str(message.guild.id))
+            if premium_user_for_guild not in [member.id for member in self.bot.patreon_role.members]:
                 return
 
-            if str(message.author.id) not in self.bot.trusted:
-                premium_user_for_guild = self.bot.patreon_json.get(str(message.guild.id))
-                if premium_user_for_guild not in [member.id for member in self.bot.patreon_role.members]:
-                    return
+        # Get settings
+        repeated_limit, to_translate, target_lang, bot_ignore, max_length, autojoin, channel, is_formal, prefix, xsaid = await self.bot.settings.get(
+            message.guild,
+            settings=[
+                "repeated_chars",
+                "to_translate",
+                "target_lang",
+                "bot_ignore",
+                "msg_length",
+                "auto_join",
+                "channel",
+                "formal",
+                "prefix",
+                "xsaid",
+            ]
+        )
 
-            # Get settings
-            repeated_limit, to_translate, target_lang, bot_ignore, max_length, autojoin, channel, is_formal, prefix, xsaid = await self.bot.settings.get(
-                message.guild,
-                settings=[
-                    "repeated_chars",
-                    "to_translate",
-                    "target_lang",
-                    "bot_ignore",
-                    "msg_length",
-                    "auto_join",
-                    "channel",
-                    "formal",
-                    "prefix",
-                    "xsaid",
-                ]
-            )
+        message_clean = utils.removeprefix(
+            message.clean_content.lower(), f"{prefix}tts"
+        )
 
-            message_clean = utils.removeprefix(
-                message.clean_content.lower(), f"{prefix}tts"
-            )
+        # Check if a setup channel
+        if message.channel.id != channel:
+            return
 
-            # Check if a setup channel
-            if message.channel.id != channel:
+        if message_clean.startswith(prefix):
+            return
+
+        bot_voice_client = message.guild.voice_client
+        if message.author.bot:
+            if bot_ignore or not bot_voice_client:
+                return
+        elif (
+            not isinstance(message.author, discord.Member)
+            or not message.author.voice
+        ):
+            return
+        elif not bot_voice_client:
+            if not autojoin:
                 return
 
-            if message_clean.startswith(prefix):
+            if not await do_autojoin(message.author):
                 return
 
-            bot_voice_client = message.guild.voice_client
-            if message.author.bot:
-                if bot_ignore or not bot_voice_client:
-                    return
-            elif (
-                not isinstance(message.author, discord.Member)
-                or not message.author.voice
-            ):
-                return
-            elif not bot_voice_client:
-                if not autojoin:
-                    return
+        # Fix linter issues
+        if TYPE_CHECKING:
+            message.guild.voice_client = cast(TTSVoicePlayer, message.guild.voice_client)
 
-                if not await do_autojoin(message.author):
-                    return
+        # Get voice and parse it into a useable format
+        user_voice = None
+        guild_voice = None
+        lang, variant = cast(List[Optional[str]], await asyncio.gather(
+            self.bot.userinfo.get("lang", message.author, default=None),
+            self.bot.userinfo.get("variant", message.author, default="")
+        ))
 
-            # Fix linter issues
-            if TYPE_CHECKING:
-                message.author = cast(utils.TypedMember, message.author)
+        if lang is not None:
+            user_voice = " ".join((lang, variant)) # type: ignore
+        else:
+            guild_voice = (await self.bot.settings.get(message.guild, ["default_lang"]))[0]
 
-                message.guild.voice_client = cast(
-                    TTSVoicePlayer,
-                    message.guild.voice_client
-                )
-                message.author.voice = cast(
-                    utils.TypedVoiceState,
-                    message.author.voice
-                )
-                message.author.voice.channel = cast(
-                    utils.VoiceChannel,
-                    message.author.voice.channel
-                )
+        str_voice: str = user_voice or guild_voice or "en-us a"
 
-            # Get voice and parse it into a useable format
-            user_voice = None
-            guild_voice = None
-            lang, variant = cast(List[Optional[str]], await asyncio.gather(
-                self.bot.userinfo.get("lang", message.author, default=None),
-                self.bot.userinfo.get("variant", message.author, default="")
-            ))
+        settings_cog = cast(cmds_settings, self.bot.get_cog("Settings"))
+        voice = await settings_cog.get_voice(*str_voice.split())
 
-            if lang is not None:
-                user_voice = " ".join((lang, variant)) # type: ignore
-            else:
-                guild_voice = (await self.bot.settings.get(message.guild, ["default_lang"]))[0]
+        # Emoji filter
+        message_clean = utils.EMOJI_REGEX.sub(utils.emoji_match_to_cleaned, message_clean)
 
-            str_voice: str = user_voice or guild_voice or "en-us a"
-
-            settings_cog = cast(cmds_settings, self.bot.get_cog("Settings"))
-            voice = await settings_cog.get_voice(*str_voice.split())
-
-            # Emoji filter
-            message_clean = utils.emojitoword(message_clean)
-
-            # Acronyms
+        # Acronyms
+        if lang == "en":
             message_clean = f" {message_clean} "
-            acronyms = {
-                "iirc": "if I recall correctly",
-                "afaik": "as far as I know",
-                "wdym": "what do you mean",
-                "imo": "in my opinion",
-                "brb": "be right back",
-                "irl": "in real life",
-                "jk": "just kidding",
-                "btw": "by the way",
-                ":)": "smiley face",
-                "gtg": "got to go",
-                "rn": "right now",
-                ":(": "sad face",
-                "ig": "i guess",
-                "rly": "really",
-                "cya": "see ya",
-                "ik": "i know",
-                "uwu": "oowoo",
-                "@": "at",
-                "™️": "tm"
-            }
-
-            for toreplace, replacewith in acronyms.items():
-                message_clean = message_clean.replace(f" {toreplace} ", f" {replacewith} ")
-
+            for toreplace, replacewith in utils.ACRONYMS.items():
+                message_clean = message_clean.replace(
+                    f" {toreplace} ", f" {replacewith} "
+                )
             message_clean = message_clean[1:-1]
-            if message_clean == "?":
-                message_clean = "what"
 
-            # Do Regex replacements
-            for regex, replacewith in utils.REGEX_REPLACEMENTS.items():
-                message_clean = re.sub(regex, replacewith, message_clean)
+        if message_clean == "?":
+            message_clean = "what"
 
-            # Url filter
-            with_urls = " ".join(message_clean.split())
-            link_starters = ("https://", "http://", "www.")
-            message_clean = " ".join(w if not w.startswith(link_starters) else "" for w in with_urls.split())
+        # Do Regex replacements
+        for regex, replacewith in utils.REGEX_REPLACEMENTS.items():
+            message_clean = re.sub(regex, replacewith, message_clean)
 
-            contained_url = message_clean != with_urls
-            # Toggleable xsaid and attachment + links detection
-            if xsaid:
-                said_name = await self.bot.nicknames.get(message.guild, message.author)
-                file_format = utils.exts_to_format(message.attachments)
+        # Url filter
+        with_urls = " ".join(message_clean.split())
+        link_starters = ("https://", "http://", "www.")
+        message_clean = " ".join(w if not w.startswith(link_starters) else "" for w in with_urls.split())
 
-                if contained_url:
-                    if message_clean:
-                        message_clean += " and sent a link."
-                    else:
-                        message_clean = "a link."
+        contained_url = message_clean != with_urls
+        # Toggleable xsaid and attachment + links detection
+        if xsaid:
+            said_name = await self.bot.nicknames.get(message.guild, message.author)
+            file_format = utils.exts_to_format(message.attachments)
 
-                if message.attachments:
-                    if not message_clean:
-                        message_clean = f"{said_name} sent {file_format}"
-                    else:
-                        message_clean = f"{said_name} sent {file_format} and said {message_clean}"
-                else:
-                    message_clean = f"{said_name} said: {message_clean}"
+            if contained_url:
 
-            elif contained_url:
                 if message_clean:
-                    message_clean += ". This message contained a link"
+                    message_clean += " and sent a link."
                 else:
                     message_clean = "a link."
 
-            if message_clean.strip(" ?.)'!\":") == "":
-                return
+        if message_clean.strip(" ?.)'!\":") == "":
+            return
 
-            # Repeated chars removal if setting is not 0
-            if message_clean.isprintable() and repeated_limit != 0:
-                message_clean_list = []
+        # Repeated chars removal if setting is not 0
+        if message_clean.isprintable() and repeated_limit != 0:
+            message_clean_list = []
 
-                for char in ("".join(g) for _, g in groupby(message_clean)):
-                    if len(char) > repeated_limit:
-                        message_clean_list.append(char[0] * repeated_limit)
-                    else:
-                        message_clean_list.append(char)
+            for char in ("".join(g) for _, g in groupby(message_clean)):
+                if len(char) > repeated_limit:
+                    message_clean_list.append(char[0] * repeated_limit)
+                else:
+                    message_clean_list.append(char)
 
-                message_clean = "".join(message_clean_list)
+            message_clean = "".join(message_clean_list)
 
-            # Premium Translation
-            if to_translate and target_lang:
-                body = {
-                    "text": message_clean,
-                    "preserve_formatting": 1,
-                    "target_lang": target_lang,
-                    "auth_key": self.bot.config["Translation"]["key"],
-                }
+        if len(message_clean) >= 1500:
+            return
 
-                if is_formal is not None:
-                    body["formality"] = int(is_formal)
+        # Premium Translation
+        if to_translate and target_lang:
+            body = {
+                "text": message_clean,
+                "preserve_formatting": 1,
+                "target_lang": target_lang,
+                "auth_key": self.bot.config["Translation"]["key"],
+            }
 
-                resp_json: Optional[_DEEPL_RESP] = None
-                url = f"{utils.TRANSLATION_URL}/translate"
-                async with self.bot.session.get(url, params=body) as resp:
-                    if resp.status in {429, 529}:
-                        self.bot.log("on_translate_ratelimit")
-                        await self.bot.channels["logs"].send(
-                            f"Hit ratelimit on deepL. {await resp.read()}"
-                        )
-                    elif resp.status == 418:
-                        self.bot.log("on_translate_too_long")
-                    elif resp.ok:
-                        resp_json = await resp.json()
-                    else:
-                        return resp.raise_for_status()
+            if is_formal is not None:
+                body["formality"] = int(is_formal)
 
-                if resp_json:
-                    translation = resp_json["translations"][0]
-                    detected_lang = translation.get("detected_source_language")
-                    if detected_lang.lower() != voice.lang:
-                        message_clean = translation["text"]
-
-            # Adds filtered message to queue
-            await message.guild.voice_client.queue(
-                message_clean, voice.tuple, max_length
-            )
-
-
-        elif not (message.author.bot or message.content.startswith("-")):
-            pins = self.dm_pins.get(message.author.id, None)
-            if not pins:
-                self.dm_pins[message.author.id] = pins = await message.author.pins()
-
-            if any(map(self.is_welcome_message, pins)):
-                if "https://discord.gg/" in message.content.lower():
-                    await message.author.send(f"Join https://discord.gg/zWPWwQC and look in <#694127922801410119> to invite {self.bot.user.mention}!")
-
-                elif message.content.lower() == "help":
-                    await asyncio.gather(
-                        self.bot.channels["logs"].send(f"{message.author} just got the 'dont ask to ask' message"),
-                        message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
+            resp_json: Optional[_DEEPL_RESP] = None
+            url = f"{utils.TRANSLATION_URL}/translate"
+            async with self.bot.session.get(url, params=body) as resp:
+                if resp.status in {429, 529}:
+                    self.bot.log("on_translate_ratelimit")
+                    await self.bot.channels["logs"].send(
+                        f"Hit ratelimit on deepL. {await resp.read()}"
                     )
+                elif resp.status == 418:
+                    self.bot.log("on_translate_too_long")
+                elif resp.ok:
+                    resp_json = await resp.json()
+                else:
+                    return resp.raise_for_status()
 
-                elif not await self.bot.userinfo.get("blocked", message.author, default=False):
-                    files = [await attachment.to_file() for attachment in message.attachments]
-                    await self.bot.channels["dm_logs"].send(
-                        message.content,
-                        files=files,
-                        username=str(message.author),
-                        avatar_url=message.author.avatar_url
-                    )
+            if resp_json:
+                translation = resp_json["translations"][0]
+                detected_lang = translation.get("detected_source_language")
+                if detected_lang.lower() != voice.lang:
+                    message_clean = translation["text"]
 
-            else:
-                if len(pins) >= 49:
-                    return await message.channel.send("Error: Pinned messages are full, cannot pin the Welcome to Support DMs message!")
+        # Adds filtered message to queue
+        await message.guild.voice_client.queue(
+            message_clean, voice.tuple, max_length
+        )
 
-                embed = discord.Embed(
-                    title=f"Welcome to {self.bot.user.name} Support DMs!",
-                    description=DM_WELCOME_MESSAGE
-                ).set_footer(text=pick_random(utils.FOOTER_MSGS))
-
-                dm_message = await message.author.send("Please do not unpin this notice, if it is unpinned you will get the welcome message again!", embed=embed)
-
-                await asyncio.gather(
-                    self.bot.channels["logs"].send(f"{message.author} just got the 'Welcome to Support DMs' message"),
-                    dm_message.pin()
-                )
 
     @commands.Cog.listener()
     async def on_voice_state_update(
@@ -333,18 +225,13 @@ class events_main(utils.CommonCog):
     ):
         vc = member.guild.voice_client
 
-        if member == self.bot.user:
-            return  # ignore bot leaving vc
-        if not before.channel or after.channel:
-            return  # ignore everything but vc leaves
-        if not vc:
-            return  # ignore if bot isn't in the vc
-
-        if any(not member.bot for member in vc.channel.members):
-            return  # ignore if bot isn't lonely
+        if (
+            not vc                         # ignore if bot isn't in the vc
+            or not before.channel          # ignore vc joins
+            or member == self.bot.user     # ignore bot leaving vc
+            or after.channel == vc.channel # ignore no change in voice channel
+            or any(not member.bot for member in vc.channel.members) # ignore if bot isn't lonely
+        ):
+            return
 
         await vc.disconnect(force=True)
-
-    @commands.Cog.listener()
-    async def on_private_channel_pins_update(self, channel: discord.DMChannel, _):
-        self.dm_pins.pop(channel.recipient.id, None)
