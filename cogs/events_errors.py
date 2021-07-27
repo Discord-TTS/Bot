@@ -130,7 +130,7 @@ class ErrorEvents(utils.CommonCog):
             await self.send_error(ctx, f"{command} cannot be used in private messages", f"try running it on a server with {self.bot.user} in")
 
         elif isinstance(error, commands.MissingPermissions):
-            await self.send_error(ctx, "you cannot run this command", f"you are missing the permissions: {', '.join(error.missing_perms)}") # type: ignore (Stubs bug, actually list[str])
+            await self.send_error(ctx, "you cannot run this command", f"ask for the following permissions: {', '.join(error.missing_perms)}") # type: ignore (Stubs bug, actually list[str])
 
         elif isinstance(error, commands.BotMissingPermissions):
             await self.send_error(ctx,
