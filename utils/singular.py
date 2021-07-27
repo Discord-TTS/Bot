@@ -2,8 +2,6 @@
 async def migrate_json_to_psql(bot):
     async with bot.pool.acquire() as connection:
         query = "INSERT INTO donators VALUES ($1, $2);"
-        rows = []
+        rows = [guild_id for guild_id, user_id in bot.patreon_json.items()]
 
-        for guild_id, user_id in bot.patreon_json.items():
-            rows.append(guild_id, user_id)
         await connection.executemany(query, rows)
