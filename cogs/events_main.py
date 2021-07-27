@@ -67,7 +67,8 @@ class events_main(utils.CommonCog):
                 return
 
             if str(message.author.id) not in self.bot.trusted:
-                premium_user_for_guild = self.bot.patreon_json.get(str(message.guild.id))
+                await self.bot.wait_until_ready()
+                premium_user_for_guild = self.bot.donators.get(message.guild.id)
                 if premium_user_for_guild not in [member.id for member in self.bot.patreon_role.members]:
                     return
 

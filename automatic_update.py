@@ -118,9 +118,18 @@ async def setup_bot(bot: TTSBotPremium) -> bool:
 
     conn = await asyncpg.connect(**db_info)
     await conn.execute(utils.DB_SETUP_QUERY)
-    await conn.close()
+    # cyrus01337: delete this line once it performs it's initial run successfully
+    await utils.migrate_json_to_psql(bot)
+
+    donators = await conn.fetch("SELECT * FROM donators;")
+    bot.donators = {
+        key: value
+        for key, value in donators.items()
+    }
+    bot.tied_to_database.set()
 
     _update_config(bot.config)
+
     return True
 
 @add_to_updates("early")

@@ -56,7 +56,7 @@ async def premium_check(ctx: utils.TypedGuildContext):
     if not support_server.chunked:
         await support_server.chunk(cache=True)
 
-    premium_user_for_guild = ctx.bot.patreon_json.get(str(ctx.guild.id))
+    premium_user_for_guild = ctx.bot.donators.get(ctx.guild.id)
     if any(premium_user_for_guild == member.id for member in ctx.bot.patreon_role.members):
         return True
 
@@ -106,7 +106,11 @@ class TTSBotPremium(commands.AutoShardedBot):
         self.channels: Dict[str, discord.Webhook] = {}
 
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
+        self.donators: Dict[int, int] = {}
+        self.tied_to_database = asyncio.Event()
 
+        # cyrus01337: delete this block once utils.migrate_json_to_psql
+        # performs it's initial run successfully
         with open("patreon_users.json") as f:
             self.patreon_json = json.load(f)
 
@@ -152,8 +156,11 @@ class TTSBotPremium(commands.AutoShardedBot):
 
         await self.invoke(ctx)
 
-    async def wait_until_ready(self, *args: Any, **kwargs: Any) -> None:
-        return await super().wait_until_ready()
+    async def wait_until_ready(self, *args: Any, **kwargs: Any) -> bool:
+        await super().wait_until_ready()
+        await self.tied_to_database.wait()
+
+        return True
 
     async def start(self, token: str, *args: None, **kwargs: bool):
         "Get everything ready in async env"
@@ -216,6 +223,11 @@ async def _real_main(session: aiohttp.ClientSession) -> None:
         chunk_guilds_at_startup=False,
         allowed_mentions=discord.AllowedMentions(everyone=False, roles=False)
     ).add_check(premium_check).add_check(only_avaliable)
+
+    # cyrus01337: testing something new, this might break or just flat
+    # out not work but ideally I want no commands to run until the bot
+    # is ready/has completed setup
+    bot.add_check(bot.wait_until_ready)
 
     await automatic_update.do_early_updates(bot)
     try:

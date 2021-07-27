@@ -90,10 +90,27 @@ ANALYTICS_CREATE = """
 
         PRIMARY KEY (event, is_command, date_collected)
     );"""
+# cyrus01337: I know nothing about foreign keys so this is as copy/paste as it gets
+DONATORS_CREATE = """
+    CREATE TABLE donators (
+        guild_id bigint,
+        user_id  bigint,
+
+        PRIMARY KEY (guild_id, user_id),
+
+        FOREIGN KEY         (guild_id)
+        REFERENCES guilds   (guild_id)
+        ON DELETE CASCADE,
+
+        FOREIGN KEY         (user_id)
+        REFERENCES userinfo (user_id)
+        ON DELETE CASCADE
+    );"""
 
 DB_SETUP_QUERY = "\n".join((
     GUILDS_CREATE,
     USERINFO_CREATE,
     NICKNAMES_CREATE,
-    ANALYTICS_CREATE
+    ANALYTICS_CREATE,
+    DONATORS_CREATE
 ))
