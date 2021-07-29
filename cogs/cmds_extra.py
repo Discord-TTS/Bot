@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from functools import partial
 import time
 import uuid
 from inspect import cleandoc
@@ -24,7 +25,8 @@ else:
     ErrorEvents = None
 
 start_time = time.monotonic()
-
+def get_ram_recursive(process: Process) -> int:
+    return sum(proc.memory_info().rss for proc in process.children())
 
 def setup(bot: TTSBot):
     bot.add_cog(ExtraCommands(bot))
@@ -73,7 +75,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
                 error_msg = "the bot timed out fetching this info"
                 return await cog.send_error(ctx, error_msg)
 
-            raw_ram_usage = sum(proc.memory_info().rss for proc in Process(getpid()).parent().children()) # type: ignore
+            raw_ram_usage = await utils.to_thread(partial(get_ram_recursive, Process(getpid()).parent()))
             total_voice_clients = sum(resp["voice_count"] for resp in responses)
             total_guild_count = sum(resp["guild_count"] for resp in responses)
             total_members = sum(resp["member_count"] for resp in responses)
