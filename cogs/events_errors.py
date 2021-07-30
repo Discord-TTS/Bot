@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from inspect import cleandoc
 from io import StringIO
 from sys import exc_info
 from traceback import format_exception
-from typing import TYPE_CHECKING, Optional, cast
+from typing import Any, TYPE_CHECKING, Optional, cast
+
 
 import discord
 from discord.ext import commands
@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
 
 IGNORED_ERRORS = (commands.CommandNotFound, commands.NotOwner)
-interaction_item_lookup = {discord.ui.Select: "select", discord.ui.Button: "button"}
 
 def setup(bot: TTSBot):
     cog = ErrorEvents(bot)
@@ -56,9 +55,9 @@ class ErrorEvents(utils.CommonCog):
         return await ctx.reply(embed=error_embed)
 
 
-    async def on_error(self, event_method: str, error: Optional[BaseException] = None, *args, **_):
+    async def on_error(self, event_method: str, error: Optional[BaseException] = None, *targs: Any, **_):
         info = "No Info"
-        args = list(args)
+        args = list(targs)
         event = event_method
 
         if isinstance(error, BaseException):
@@ -165,7 +164,7 @@ class ErrorEvents(utils.CommonCog):
     @commands.Cog.listener()
     async def on_interaction_error(self,
         error: Exception,
-        item: discord.ui.Item,
+        item: discord.ui.Item[utils.GenericView],
         interaction: discord.Interaction
     ) -> None:
 

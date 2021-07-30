@@ -9,7 +9,7 @@ from os import listdir
 from signal import SIGHUP, SIGINT, SIGTERM
 from time import monotonic
 from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
-                    Optional, Union, cast)
+                    Optional, TypeVar, Union, cast)
 
 import aiohttp
 import aioredis
@@ -45,7 +45,12 @@ async def prefix(bot: TTSBot, message: discord.Message) -> str:
 
     return "-"
 
-Pool = asyncpg.Pool[asyncpg.Record] if TYPE_CHECKING else asyncpg.Pool
+if TYPE_CHECKING:
+    _T = TypeVar("_T")
+    Pool = asyncpg.Pool[asyncpg.Record]
+else:
+    Pool = asyncpg.Pool
+
 class TTSBot(commands.AutoShardedBot):
     if TYPE_CHECKING:
         from extensions import cache_handler, database_handler
@@ -56,24 +61,27 @@ class TTSBot(commands.AutoShardedBot):
         nicknames: database_handler.NicknameHandler
         cache: cache_handler.CacheHandler
 
-        command_prefix: Callable[[TTSBot, discord.Message], Awaitable[str]]
-        voice_clients: List[TTSVoicePlayer]
         analytics_buffer: utils.SafeDict
-        user: discord.ClientUser
         cache_db: aioredis.Redis
         gtts: asyncgTTS.easygTTS
         status_code: int
         blocked: bool # Handles if to be on gtts or espeak
         pool: Pool
 
-        conn: asyncpg.pool.PoolConnectionProxy
+        command_prefix: Callable[[TTSBot, discord.Message], Awaitable[str]]
+        get_command: Callable[[str], Optional[commands.Command]]
+        voice_clients: List[TTSVoicePlayer]
+        user: discord.ClientUser
+        shard_ids: List[int]
+
+        conn: asyncpg.pool.PoolConnectionProxy[asyncpg.Record]
         del cache_handler, database_handler, TTSVoicePlayer
 
     def __init__(self,
         config: ConfigParser,
         session: aiohttp.ClientSession,
-        cluster_id: int = None,
-    *args, **kwargs):
+        cluster_id: Optional[int] = None,
+    *args: Any, **kwargs: Any):
         self.config = config
         self.websocket = None
         self.session = session
@@ -84,7 +92,7 @@ class TTSBot(commands.AutoShardedBot):
         self.status_code = utils.RESTART_CLUSTER
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
 
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs) # type: ignore
 
 
 
@@ -136,7 +144,7 @@ class TTSBot(commands.AutoShardedBot):
             return
 
 
-    def add_check(self, *args, **kwargs):
+    def add_check(self: _T, *args: Any, **kwargs: Any) -> _T:
         super().add_check(*args, **kwargs)
         return self
 
@@ -159,7 +167,7 @@ class TTSBot(commands.AutoShardedBot):
 
         return super().close()
 
-    async def start(self, token: str, **kwargs):
+    async def start(self, token: str, **kwargs: Any):
         "Get everything ready in async env"
         cache_info = self.config["Redis Info"]
         db_info = self.config["PostgreSQL Info"]
@@ -207,7 +215,7 @@ async def on_ready(bot: TTSBot):
     await bot.wait_until_ready()
     bot.logger.info(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
 
-async def main(*args, **kwargs) -> int:
+async def main(*args: Any, **kwargs: Any) -> int:
     async with aiohttp.ClientSession() as session:
         return await _real_main(session, *args, **kwargs)
 
@@ -235,14 +243,14 @@ async def _real_main(
         allowed_mentions=allowed_mentions,
     ).add_check(only_avaliable)
 
-    def stop_bot_sync(sig: int, *args, **kwargs):
+    def stop_bot_sync(sig: int):
         bot.status_code = -sig
         bot.logger.warning(f"Recieved signal {sig} and shutting down.")
 
         bot.loop.create_task(bot.close())
 
     for sig in (SIGINT, SIGTERM, SIGHUP):
-        bot.loop.add_signal_handler(sig, partial(stop_bot_sync, sig))
+        bot.loop.add_signal_handler(sig, stop_bot_sync, sig)
 
     await automatic_update.do_early_updates(bot)
     try:

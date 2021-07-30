@@ -91,7 +91,7 @@ class GeneralSettings(HandlesDB):
         defaults = await self.DEFAULT_SETTINGS
         return [defaults[setting] for setting in settings]
 
-    async def set(self, guild: Guild, setting: str, value):
+    async def set(self, guild: Guild, setting: str, value: Any):
         async with CacheWriter(self, guild.id, broadcast=False):
             await self.pool.execute(f"""
                 INSERT INTO guilds(guild_id, {setting}) VALUES($1, $2)

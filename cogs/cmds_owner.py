@@ -21,7 +21,7 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.command()
     @commands.is_owner()
     @commands.bot_has_permissions(send_messages=True, manage_messages=True, manage_webhooks=True)
-    async def sudo(self, ctx: utils.TypedContext, user: Union[discord.User, str], *, message):
+    async def sudo(self, ctx: utils.TypedContext, user: Union[discord.User, str], *, message: str):
         """mimics another user"""
         await ctx.message.delete()
 

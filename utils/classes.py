@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Awaitable, Callable, Optional, TypeVar, Union
+from typing import Any, List, TYPE_CHECKING, Awaitable, Callable, Optional, TypeVar, Union
 
 import discord
 from discord.ext import commands
@@ -20,29 +20,35 @@ class CommonCog(commands.Cog):
     def __init__(self, bot: TTSBot):
         self.bot = bot
 
-class SafeDict(dict):
-    def add(self, event):
+class SafeDict(dict[str, int]):
+    def add(self, event: str):
         if event not in self:
             self[event] = 0
 
         self[event] += 1
 
 class ClearableQueue(asyncio.Queue[_T]):
-    _queue: collections.deque
+    _queue: collections.deque[_T]
 
     def clear(self):
         self._queue.clear()
 
 
 # Typed Classes for silencing type errors.
+TextChannel = Union[discord.TextChannel, discord.DMChannel]
 VoiceChannel = Union[discord.VoiceChannel, discord.StageChannel]
 class TypedContext(commands.Context):
     bot: TTSBot
+    prefix: str
+    args: List[Any]
+    channel: TextChannel
     message: TypedMessage
-    command: commands.Command
+    command: TypedCommand
     guild: Optional[TypedGuild]
+    author: Union[discord.User, TypedMember]
+    invoked_subcommand: Optional[commands.Command]
 
-    def reply(self, *args, **kwargs) -> Awaitable[discord.Message]:
+    def reply(self, *args: Any, **kwargs: Any) -> Awaitable[discord.Message]:
         return self.send(*args, **kwargs)
 
 class TypedGuildContext(TypedContext):
@@ -55,7 +61,7 @@ class TypedGuildContext(TypedContext):
     def bot_permissions(self) -> discord.Permissions:
         return self.channel.permissions_for(self.guild.me)
 
-    def reply(self, *args, **kwargs) -> Awaitable[discord.Message]:
+    def reply(self, *args: Any, **kwargs: Any) -> Awaitable[discord.Message]:
         if self.bot_permissions().read_message_history:
             kwargs["reference"] = self.message
 
@@ -88,3 +94,6 @@ class TypedVoiceState(discord.VoiceState):
 
 class TypedDMChannel(discord.DMChannel):
     recipient: discord.User
+
+class TypedCommand(commands.Command):
+    qualified_name: str

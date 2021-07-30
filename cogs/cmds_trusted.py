@@ -50,7 +50,7 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def dm(self, ctx: utils.TypedContext, todm: discord.User, *, message: str):
         embed = discord.Embed(title="Message from the developers:", description=message)
-        embed.set_author(name=str(ctx.author), icon_url=str(ctx.author.avatar_url))
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar.url)
 
         sent = await todm.send(embed=embed)
         await ctx.send(f"Sent message to {todm}:", embed=sent.embeds[0])

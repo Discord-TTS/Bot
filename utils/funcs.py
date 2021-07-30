@@ -5,13 +5,13 @@ from __future__ import annotations
 import asyncio
 import sys
 from inspect import cleandoc
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
+from typing import (Dict, TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
                     Sequence, TypeVar, Union, overload)
 
 import orjson
 
 from utils.constants import OPTION_SEPERATORS, READABLE_TYPE
-from utils.websocket_types import _TARGET
+from utils.websocket_types import WS_TARGET
 
 if TYPE_CHECKING:
     import re
@@ -26,12 +26,11 @@ if TYPE_CHECKING:
 
 _sep = OPTION_SEPERATORS[2]
 
-def data_to_ws_json(command: str, target: Union[_TARGET, str], **kwargs) -> bytes:
+def data_to_ws_json(command: str, target: Union[WS_TARGET, str], **kwargs: Any) -> bytes:
     wsjson = {"c": command.lower(), "a": kwargs, "t": target}
     return orjson.dumps(wsjson)
 
-def emoji_match_to_cleaned(match: re.Match) -> str:
-    emoji_name: str
+def emoji_match_to_cleaned(match: re.Match[str]) -> str:
     is_animated, emoji_name = bool(match[1]), match.group(2)
 
     emoji_prefix = "animated " * is_animated + "emoji "

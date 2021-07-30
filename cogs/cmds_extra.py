@@ -156,7 +156,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             await self.bot.channels["suggestions"].send(
                 files=files,
                 content=suggestion,
-                avatar_url=ctx.author.avatar_url,
+                avatar_url=ctx.author.avatar.url,
                 username=author_name[:32 - len(author_id)] + author_id,
             )
 
