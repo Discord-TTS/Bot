@@ -101,7 +101,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     async def xsaid(self, ctx: utils.TypedGuildContext, value: bool):
         "Makes the bot say \"<user> said\" before each message"
         await self.bot.settings.set(ctx.guild, "xsaid", value)
-        await ctx.send(f"xsaid is now: {to_enabled[value]}")
+        await ctx.reply(f"xsaid is now: {to_enabled[value]}")
 
     @set.command(aliases=["auto_join"])
     @commands.has_permissions(administrator=True)
@@ -109,7 +109,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     async def autojoin(self, ctx: utils.TypedGuildContext, value: bool):
         "If you type a message in the setup channel, the bot will join your vc"
         await self.bot.settings.set(ctx.guild, "auto_join", value)
-        await ctx.send(f"Auto Join is now: {to_enabled[value]}")
+        await ctx.reply(f"Auto Join is now: {to_enabled[value]}")
 
     @set.command(aliases=["bot_ignore", "ignore_bots", "ignorebots"])
     @commands.has_permissions(administrator=True)
@@ -117,7 +117,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     async def botignore(self, ctx: utils.TypedGuildContext, value: bool):
         "Messages sent by bots and webhooks are not read"
         await self.bot.settings.set(ctx.guild, "bot_ignore", value)
-        await ctx.send(f"Ignoring Bots is now: {to_enabled[value]}")
+        await ctx.reply(f"Ignoring Bots is now: {to_enabled[value]}")
 
 
     @set.command(aliases=["defaultlang", "default_lang", "defaultlanguage", "slang", "serverlanguage"])

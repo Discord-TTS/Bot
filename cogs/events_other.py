@@ -44,10 +44,31 @@ class OtherEvents(utils.CommonCog):
         if message.guild is None:
             return
 
-        if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
-            await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
+        if self.bot.user.mentioned_in(message):
+            prefix = await self.bot.command_prefix(self.bot, message)
 
-        if message.reference and message.guild == self.bot.get_support_server() and message.channel.name in ("dm_logs", "suggestions") and not message.author.bot:
+            clean_prefix = f"`{discord.utils.escape_markdown(prefix)}`"
+            permissions = message.channel.permissions_for(message.guild.me) # type: discord.Permissions
+            if not permissions.send_messages:
+                try:
+                    name = discord.utils.escape_markdown(message.guild.name)
+                    return await message.author.send(
+                        f"My prefix for `{name}` is {clean_prefix} "
+                        "however I do not have permission to send messages "
+                        "so I cannot respond to your commands!"
+                    )
+                except discord.Forbidden:
+                    return
+
+            msg = f"Current Prefix for this server is: {clean_prefix}"
+            await message.channel.send(msg)
+
+        if (
+            message.reference
+            and not message.author.bot
+            and message.guild == self.bot.get_support_server()
+            and message.channel.name in ("dm_logs", "suggestions")
+        ):
             dm_message = message.reference.resolved
             if (
                 not dm_message

@@ -38,12 +38,6 @@ allowed_mentions = discord.AllowedMentions(everyone=False, roles=False)
 cache_flags = discord.MemberCacheFlags(joined=False)
 
 # Custom prefix support
-async def prefix(bot: TTSBot, message: discord.Message) -> str:
-    "Gets the prefix for a guild based on the passed message object"
-    if message.guild:
-        return (await bot.settings.get(message.guild, ["prefix"]))[0]
-
-    return "-"
 
 if TYPE_CHECKING:
     _T = TypeVar("_T")
@@ -68,7 +62,6 @@ class TTSBot(commands.AutoShardedBot):
         blocked: bool # Handles if to be on gtts or espeak
         pool: Pool
 
-        command_prefix: Callable[[TTSBot, discord.Message], Awaitable[str]]
         get_command: Callable[[str], Optional[commands.Command]]
         voice_clients: List[TTSVoicePlayer]
         user: discord.ClientUser
@@ -82,6 +75,7 @@ class TTSBot(commands.AutoShardedBot):
         session: aiohttp.ClientSession,
         cluster_id: Optional[int] = None,
     *args: Any, **kwargs: Any):
+
         self.config = config
         self.websocket = None
         self.session = session
@@ -92,6 +86,7 @@ class TTSBot(commands.AutoShardedBot):
         self.status_code = utils.RESTART_CLUSTER
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
 
+        kwargs["command_prefix"] = self.command_prefix
         super().__init__(*args, **kwargs) # type: ignore
 
 
@@ -148,12 +143,20 @@ class TTSBot(commands.AutoShardedBot):
         super().add_check(*args, **kwargs)
         return self
 
+    @staticmethod
+    async def command_prefix(bot: TTSBot, message: discord.Message) -> str:
+        if message.guild:
+            return (await bot.settings.get(message.guild, ["prefix"]))[0]
+
+        return "-"
+
     async def process_commands(self, message: discord.Message) -> None:
         if message.author.bot:
             return
 
         ctx_class = utils.TypedGuildContext if message.guild else utils.TypedContext
         ctx = await self.get_context(message=message, cls=ctx_class)
+        self.logger.debug(f"command: {ctx.command} {ctx.args} {ctx.kwargs}")
 
         await self.invoke(ctx)
 
@@ -233,7 +236,6 @@ async def _real_main(
         max_messages=None,
         help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
         activity=activity,
-        command_prefix=prefix,
         cluster_id=cluster_id,
         case_insensitive=True,
         shard_ids=shards_to_handle,
