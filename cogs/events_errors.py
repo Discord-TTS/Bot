@@ -17,8 +17,6 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
-IGNORED_ERRORS = (commands.CommandNotFound, commands.NotOwner)
-
 def setup(bot: TTSBot):
     cog = ErrorEvents(bot)
 
@@ -92,8 +90,11 @@ class ErrorEvents(utils.CommonCog):
         command = f"`{ctx.prefix}{ctx.command}`"
         error = getattr(error, "original", error)
 
-        if isinstance(error, IGNORED_ERRORS):
+        if isinstance(error, commands.CommandNotFound):
             return
+        elif isinstance(error, commands.NotOwner):
+            if ctx.interaction:
+                await ctx.send("You do not have permission to run this command!")
 
         elif isinstance(error, commands.UserInputError):
             error_name = type(error).__name__

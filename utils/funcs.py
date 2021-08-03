@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import sys
 from inspect import cleandoc
-from typing import (Dict, TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
-                    Sequence, TypeVar, Union, overload)
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
+                    Sequence, Type, TypeVar, Union, overload)
 
 import orjson
 
@@ -22,11 +22,17 @@ if TYPE_CHECKING:
 
     _P = ParamSpec("_P")
     _R = TypeVar("_R")
+    _T = TypeVar("_T")
 
 
 _sep = OPTION_SEPERATORS[2]
 
+def construct_unslotted(cls: Type[_T], *args, **kwargs) -> _T:
+    "Constructs cls without any slots, allowing attribute addition"
+    return type(cls.__name__, (cls,), {})(*args, **kwargs) # type: ignore
+
 def data_to_ws_json(command: str, target: Union[WS_TARGET, str], **kwargs: Any) -> bytes:
+    "Turns arguments and kwargs into usable data for the WS IPC system"
     wsjson = {"c": command.lower(), "a": kwargs, "t": target}
     return orjson.dumps(wsjson)
 

@@ -30,18 +30,14 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.guild_only()
     @commands.command()
-    async def settings(self, ctx: utils.TypedGuildContext, *, help: Optional[str] = None):
+    async def settings(self, ctx: utils.TypedGuildContext):
         "Displays the current settings!"
-
-        if help:
-            return await ctx.send_help(f"set{' limit' if help.lower() == 'limits' else ''}")
-
         lang, nickname = await asyncio.gather(
             self.bot.userinfo.get("lang", ctx.author, default="en"),
             self.bot.nicknames.get(ctx.guild, ctx.author)
         )
 
-        xsaid, prefix, channel, auto_join, bot_ignore, default_lang = await self.bot.settings.get(
+        xsaid, prefix, channel, auto_join, bot_ignore, msg_length, default_lang, repeated_chars = await self.bot.settings.get(
             ctx.guild,
             settings=[
                 "xsaid",
@@ -49,7 +45,9 @@ class SettingCommands(utils.CommonCog, name="Settings"):
                 "channel",
                 "auto_join",
                 "bot_ignore",
-                "default_lang"
+                "msg_length",
+                "default_lang",
+                "repeated_chars"
             ]
         )
 
@@ -66,13 +64,14 @@ class SettingCommands(utils.CommonCog, name="Settings"):
             {sep1} Auto Join: `{auto_join}`
             {sep1} Command Prefix: `{prefix}`
         """)
-
         tts_settings = cleandoc(f"""
             {sep2} <User> said: message `{xsaid}`
             {sep2} Ignore bot's messages: `{bot_ignore}`
             {sep2} Default Server Language: `{default_lang}`
-        """)
 
+            {sep2} Max Time to Read: `{msg_length} seconds`
+            {sep2} Max Repeated Characters: `{repeated_chars}`
+        """)
         user_settings = cleandoc(f"""
             {sep3} Language: `{lang}`
             {sep3} Nickname: `{nickname}`
@@ -90,7 +89,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     @commands.bot_has_permissions(send_messages=True)
     @commands.guild_only()
     @commands.group()
-    async def set(self, ctx: commands.Context):
+    async def set(self, ctx: utils.TypedContext):
         "Changes a setting!"
         if ctx.invoked_subcommand is None:
             await ctx.send_help(ctx.command)
@@ -161,60 +160,18 @@ class SettingCommands(utils.CommonCog, name="Settings"):
             await self.bot.nicknames.set(ctx.guild, user, nickname)
             await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {user.name}'s nickname to {nickname}"))
 
-
-    @set.command()
-    @commands.has_permissions(administrator=True)
-    @utils.decos.make_fancy
-    async def channel(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel = None):
-        "Alias of `-setup`"
-        await self.setup(ctx, channel) # type: ignore
-
-    @set.command(aliases=("voice", "lang", "_language"))
-    async def language(self, ctx: utils.TypedGuildContext, voicecode: str):
-        "Changes the language your messages are read in, full list in `-voices`"
-        await self.voice(ctx, voicecode)
-
-
-    @set.group()
-    @commands.has_permissions(administrator=True)
-    async def limits(self, ctx: utils.TypedGuildContext):
-        "A group of settings to modify the limits of what the bot reads"
-        if ctx.invoked_subcommand is not None:
-            return
-
-        if ctx.message.content != f"{ctx.prefix}set limits":
-            return await ctx.send_help(ctx.command)
-
-        msg_length, repeated_chars = await self.bot.settings.get(
-            ctx.guild,
-            settings=[
-                "msg_length",
-                "repeated_chars"
-            ]
-        )
-
-        sep = utils.OPTION_SEPERATORS[0]
-        message1 = cleandoc(f"""
-            {sep} Max Message Length: `{msg_length} seconds`
-            {sep} Max Repeated Characters: `{repeated_chars}`
-        """)
-
-        embed = discord.Embed(title="Current Limits", description=message1, url="https://discord.gg/zWPWwQC", color=0x3498db)
-        embed.set_footer(text=f"Change these settings with {ctx.prefix}set limits property value!")
-        await ctx.send(embed=embed)
-
-    @limits.command(aliases=("length", "max_length", "max_msg_length", "msglength", "maxlength"))
-    async def msg_length(self, ctx: utils.TypedGuildContext, length: int):
+    @set.command(aliases=("length", "max_length", "max_msg_length", "msglength", "maxlength", "msg_length"))
+    async def max_time_to_read(self, ctx: utils.TypedGuildContext, length: int):
         "Max seconds for a TTS'd message"
         if length > 60:
-            return await ctx.send("Hey! You can't set max message length above 60 seconds!")
+            return await ctx.send("Hey! You can't set the Max Time to Read above 60 seconds!")
         if length < 20:
-            return await ctx.send("Hey! You can't set max message length below 20 seconds!")
+            return await ctx.send("Hey! You can't set the Max Time to Read below 20 seconds!")
 
         await self.bot.settings.set(ctx.guild, "msg_length", length)
-        await ctx.send(f"Max message length (in seconds) is now: {length}")
+        await ctx.send(f"Max Time to Read (in seconds) is now: {length}")
 
-    @limits.command(aliases=("repeated_characters", "repeated_letters", "chars"))
+    @set.command(aliases=("repeated_characters", "repeated_letters", "chars"))
     async def repeated_chars(self, ctx: utils.TypedGuildContext, chars: int):
         "Max repetion of a character (0 = off)"
         if chars > 100:
@@ -224,6 +181,13 @@ class SettingCommands(utils.CommonCog, name="Settings"):
 
         await self.bot.settings.set(ctx.guild, "repeated_chars", chars)
         await ctx.send(f"Max repeated characters is now: {chars}")
+
+
+    @set.command(aliases=("voice", "lang", "_language"))
+    async def language(self, ctx: utils.TypedGuildContext, voicecode: str):
+        "Changes the language your messages are read in, full list in `-voices`"
+        await self.voice(ctx, voicecode)
+
 
     @commands.has_permissions(administrator=True)
     @commands.bot_has_permissions(send_messages=True, embed_links=True)

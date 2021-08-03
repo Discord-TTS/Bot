@@ -66,7 +66,7 @@ class BoolView(GenericView):
             button = cast(discord.ui.Button, button)
             button.disabled = True
 
-        self.ctx.bot.loop.create_task(self.message.edit(view=self))
+        self.ctx.bot.create_task(self.message.edit(view=self))
 
 class GenericItemMixin:
     view: GenericView

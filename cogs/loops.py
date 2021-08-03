@@ -64,6 +64,12 @@ class Loops(utils.CommonCog):
 
     @tasks.loop()
     @utils.decos.handle_errors
+    async def catch_task_errors(self):
+        "Makes sure asyncio.Task errors are handled"
+        await (await self.bot.tasks.get())
+
+    @tasks.loop()
+    @utils.decos.handle_errors
     async def websocket_client(self):
         if self.bot.websocket is None:
             return self.websocket_client.stop()

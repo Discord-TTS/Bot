@@ -21,11 +21,11 @@ if TYPE_CHECKING:
 
 
 def make_fancy(
-    func: Callable[[CommonCog, TypedGuildContext, _T], Awaitable[_R]]
-) -> Callable[[CommonCog, TypedGuildContext, Optional[_T]], Awaitable[Optional[_R]]]:
+    func: Callable[[CommonCog, TypedGuildContext, Any], Awaitable[_R]]
+) -> Callable[[CommonCog, TypedGuildContext, Optional[Union[discord.TextChannel, bool]]], Awaitable[Optional[_R]]]:
 
-    async def wrapper(self: CommonCog, ctx: TypedGuildContext, value: Optional[_T] = None) -> Optional[Any]:
-        if value is not None:
+    async def wrapper(self: CommonCog, ctx: TypedGuildContext, value: Optional[Union[discord.TextChannel, bool]] = None) -> Optional[_R]:
+        if value is not None or ctx.interaction is not None:
             return await func(self, ctx, value)
 
         type_to_convert = [*func.__annotations__.values()][1]
@@ -40,7 +40,7 @@ def make_fancy(
         else:
             ctx.bot.logger.error(f"Unknown Conversion Type: {type_to_convert}")
 
-    wrapper.__annotations__["value"] = Union[discord.TextChannel, bool, str]
+    wrapper.__original_func__ = func
     wrapper.__name__ = func.__name__
     wrapper.__doc__ = func.__doc__
 

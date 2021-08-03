@@ -25,7 +25,7 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
         raise commands.errors.NotOwner
 
     @commands.command()
-    async def block(self, ctx: commands.Context, user: discord.User, notify: bool = False):
+    async def block(self, ctx: utils.TypedContext, user: discord.User, notify: bool = False):
         if await self.bot.userinfo.get("blocked", user, default=False):
             return await ctx.send(f"{user} | {user.id} is already blocked!")
 
@@ -36,7 +36,7 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
             await user.send("You have been blocked from support DMs.")
 
     @commands.command()
-    async def unblock(self, ctx: commands.Context, user: discord.User, notify: bool = False):
+    async def unblock(self, ctx: utils.TypedContext, user: discord.User, notify: bool = False):
         if not await self.bot.userinfo.get("blocked", user, default=False):
             return await ctx.send(f"{user} | {user.id} isn't blocked!")
 
@@ -56,21 +56,7 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
         await ctx.send(f"Sent message to {todm}:", embed=sent.embeds[0])
 
     @commands.command()
-    @commands.bot_has_permissions(send_messages=True, embed_links=True)
-    async def r(self, ctx: utils.TypedContext, *, message: str):
-        async for history_message in ctx.channel.history(limit=10):
-            if history_message.author.discriminator != "0000":
-                continue
-
-            user = await self.bot.user_from_dm(history_message.author.name)
-            if not user:
-                continue
-
-            await self.dm(ctx, user, message=message)
-        await ctx.send("Webhook not found")
-
-    @commands.command()
-    async def dmhistory(self, ctx: commands.Context, user: discord.User, amount: int = 10):
+    async def dmhistory(self, ctx: utils.TypedContext, user: discord.User, amount: int = 10):
         messages: List[str] = []
         async for message in user.history(limit=amount):
             if message.embeds:
@@ -78,7 +64,6 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
                     messages.append(f"`{message.embeds[0].author.name} ⚙️`: {message.embeds[0].description}")
                 else:
                     messages.append(f"`{message.author} ⚙️`: {message.embeds[0].description}")
-
             else:
                 messages.append(f"`{message.author}`: {message.content}")
 

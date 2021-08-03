@@ -41,13 +41,14 @@ class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_message(self, message: utils.TypedGuildMessage):
-        if message.guild is None:
+        if message.guild is None or message.author.bot:
             return
 
-        if self.bot.user.mentioned_in(message):
+        if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
             prefix = await self.bot.command_prefix(self.bot, message)
 
-            clean_prefix = f"`{discord.utils.escape_markdown(prefix)}`"
+            cleanup = ('`', '\\`')
+            clean_prefix = f"`{prefix.replace(*cleanup)}`"
             permissions = message.channel.permissions_for(message.guild.me) # type: discord.Permissions
             if not permissions.send_messages:
                 try:
@@ -65,7 +66,6 @@ class OtherEvents(utils.CommonCog):
 
         if (
             message.reference
-            and not message.author.bot
             and message.guild == self.bot.get_support_server()
             and message.channel.name in ("dm_logs", "suggestions")
         ):
