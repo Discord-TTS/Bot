@@ -80,7 +80,7 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
             blocked_embed.description = cleandoc(f"""
                 During this temporary block, voice has been swapped to a worse quality voice.
                 If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `{ctx.prefix}donate`
-                """)
+            """)
             blocked_embed.set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
 
             await ctx.send(embed=blocked_embed)

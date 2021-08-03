@@ -25,10 +25,9 @@ if TYPE_CHECKING:
 
 
 NoneType = type(None)
-URL = f"{Route.BASE}/applications/{{application_id}}/guilds/{{guild_id}}/commands"
 type_lookup = {
-    discord.User: 6, discord.Member: 6, discord.abc.GuildChannel: 7, discord.Role: 8,
-    bool: 5, int: 4, float: 10, str: 3, discord.Object: 9,
+    discord.User: 6, discord.Member: 6, discord.abc.GuildChannel: 7,
+    discord.Role: 8, bool: 5, int: 4, float: 10, str: 3, discord.Object: 9,
 }
 
 
@@ -151,7 +150,7 @@ class SlashCommands(utils.CommonCog):
     async def ready_commands(self):
         await self.bot.wait_until_ready()
         headers = {"Authorization": f"Bot {self.bot.http.token}"}
-        send_to = URL.format(application_id=self.bot.application_id, guild_id=698223755582898207)
+        url = f"{Route.BASE}/applications/{self.bot.application_id}/commands"
 
         slash_commands = [
             {
@@ -173,7 +172,7 @@ class SlashCommands(utils.CommonCog):
                 ), filename="slash_commands.json"
             ))
 
-        async with self.bot.session.put(url=send_to, headers=headers, json=slash_commands) as resp:
+        async with self.bot.session.put(url, headers=headers, json=slash_commands) as resp:
             if not resp.ok:
                 self.bot.logger.error(f"Error {resp.status}: {await resp.json()}")
 
