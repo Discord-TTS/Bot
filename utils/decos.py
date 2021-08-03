@@ -6,13 +6,13 @@ from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Optional, TypeVar,
                     Union, cast)
 
 import discord
+from discord.ext import commands
 
 from .classes import CommonCog, TypedGuildContext
 from .funcs import to_thread
 from .views import BoolView, ChannelSelector, GenericView
 
 
-_T = TypeVar("_T")
 if TYPE_CHECKING:
     from typing_extensions import ParamSpec
 
@@ -20,16 +20,21 @@ if TYPE_CHECKING:
     _P = ParamSpec("_P")
 
 
+error_lookup = {"bool": commands.BadBoolArgument, "discord.TextChannel": commands.ChannelNotFound}
+
 def make_fancy(
     func: Callable[[CommonCog, TypedGuildContext, Any], Awaitable[_R]]
 ) -> Callable[[CommonCog, TypedGuildContext, Optional[Union[discord.TextChannel, bool]]], Awaitable[Optional[_R]]]:
 
     async def wrapper(self: CommonCog, ctx: TypedGuildContext, value: Optional[Union[discord.TextChannel, bool]] = None) -> Optional[_R]:
+        type_to_convert: str = [*func.__annotations__.values()][1].split(".")[-1]
         if value is not None or ctx.interaction is not None:
+            if type(value).__name__ != type_to_convert:
+                raise error_lookup[type_to_convert](str(value))
+
             return await func(self, ctx, value)
 
-        type_to_convert = [*func.__annotations__.values()][1]
-        if type_to_convert == "discord.TextChannel":
+        if type_to_convert == "TextChannel":
             select_view = GenericView.from_item(ChannelSelector, ctx)
             select_view.message = await ctx.reply("Select a channel!", view=select_view) # type: ignore
 

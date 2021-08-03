@@ -151,6 +151,7 @@ class SlashCommands(utils.CommonCog):
         await self.bot.wait_until_ready()
         headers = {"Authorization": f"Bot {self.bot.http.token}"}
         url = f"{Route.BASE}/applications/{self.bot.application_id}/commands"
+        #url = f"{Route.BASE}/applications/{self.bot.application_id}/guilds/{self.bot.get_support_server().id}/commands"
 
         slash_commands = [
             {

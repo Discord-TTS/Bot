@@ -79,7 +79,7 @@ class ChannelSelector(GenericItemMixin, discord.ui.Select):
         discord.ui.Select.__init__(self, *args, **kwargs, options=[
             discord.SelectOption(
                 label=f"""#{
-                    (channel.name[:22] + '..')
+                    (channel.name[:20] + '...')
                     if len(channel.name) >= 25
                     else channel.name
                 }""",
