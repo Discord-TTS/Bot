@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -38,9 +38,6 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
     async def join(self, ctx: utils.TypedGuildContext):
         "Joins the voice channel you're in!"
         if not await self.channel_check(ctx):
-            return
-
-        if not isinstance(ctx.author, discord.Member):
             return
 
         if not ctx.author.voice:
@@ -83,7 +80,7 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
             blocked_embed.description = cleandoc(f"""
                 During this temporary block, voice has been swapped to a worse quality voice.
                 If you want to avoid this, consider TTS Bot Premium, which you can get by donating via Patreon: `{ctx.prefix}donate`
-                """)
+            """)
             blocked_embed.set_footer(text="You can join the support server for more info: discord.gg/zWPWwQC")
 
             await ctx.send(embed=blocked_embed)
@@ -95,9 +92,6 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
     async def leave(self, ctx: utils.TypedGuildContext):
         "Leaves voice channel TTS Bot is in!"
         if not await self.channel_check(ctx):
-            return
-
-        if not isinstance(ctx.author, discord.Member):
             return
 
         if not ctx.author.voice:

@@ -1,4 +1,6 @@
-from typing import Any, Coroutine, Type
+from __future__ import annotations
+
+from typing import Any, Coroutine, Type, cast
 
 import discord
 
@@ -12,26 +14,44 @@ class GenericView(discord.ui.View):
         self.ctx = ctx
 
     @classmethod
-    def from_item(cls, item: Type[discord.ui.Item], ctx: TypedGuildContext, *args, **kwargs):
+    def from_item(cls,
+        item: Type[discord.ui.Item[GenericView]],
+        ctx: TypedGuildContext, *args: Any, **kwargs: Any
+    ):
         self = cls(ctx)
         self.add_item(item(ctx, *args, **kwargs)) # type: ignore
         return self
 
 
-    def _clean_args(self, *args):
+    def _clean_args(self, *args: Any):
         return [arg for arg in args if arg is not None][1:]
 
-    def recall_command(self, *args) -> Coroutine[Any, Any, Any]:
+    def recall_command(self, *args: Any) -> Coroutine[Any, Any, Any]:
         self.stop()
         return self.ctx.command(*self._clean_args(*self.ctx.args), *args)
 
-    async def on_error(self, *args) -> None:
+
+    async def on_error(self, *args: Any) -> None:
         self.ctx.bot.dispatch("interaction_error", *args)
 
-class BoolView(GenericView):
-    def __init__(self, ctx: TypedGuildContext, *args, **kwargs):
-        super().__init__(ctx, *args, **kwargs)
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        assert interaction.user is not None
+        assert interaction.channel is not None
+        assert isinstance(interaction.user, discord.Member)
 
+        if interaction.user != self.ctx.author:
+            await interaction.response.send_message("You don't own this interaction!", ephemeral=True)
+            return False
+
+        permissions = interaction.channel.permissions_for(interaction.user)
+        if not permissions.administrator:
+            await interaction.response.send_message("You don't have permission use this interaction!", ephemeral=True)
+            return False
+
+        return True
+
+
+class BoolView(GenericView):
     @discord.ui.button(label="True", style=discord.ButtonStyle.success)
     async def yes(self, *_):
         await self.recall_command(True)
@@ -40,12 +60,19 @@ class BoolView(GenericView):
     async def no(self, *_):
         await self.recall_command(False)
 
+    def stop(self) -> None:
+        super().stop()
+        for button in self.children:
+            button = cast(discord.ui.Button, button)
+            button.disabled = True
+
+        self.ctx.bot.create_task(self.message.edit(view=self))
 
 class GenericItemMixin:
     view: GenericView
 
 class ChannelSelector(GenericItemMixin, discord.ui.Select):
-    def __init__(self, ctx: TypedGuildContext, *args, **kwargs):
+    def __init__(self, ctx: TypedGuildContext, *args: Any, **kwargs: Any):
         self.ctx = ctx
         self.channels = ctx.guild.text_channels
 
@@ -53,7 +80,7 @@ class ChannelSelector(GenericItemMixin, discord.ui.Select):
             discord.SelectOption(
                 label=f"""#{
                     (channel.name[:22] + '..')
-                    if len(channel.name) > 25
+                    if len(channel.name) >= 25
                     else channel.name
                 }""",
                 value=str(channel.id)

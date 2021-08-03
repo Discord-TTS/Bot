@@ -191,7 +191,7 @@ class TTSVoicePlayer(discord.VoiceClient):
 
             self.bot.blocked = True
             if await self.bot.check_gtts() is not True:
-                self.bot.loop.create_task(self._handle_rl())
+                self.bot.create_task(self._handle_rl())
             else:
                 self.bot.blocked = False
 
@@ -227,7 +227,7 @@ class TTSVoicePlayer(discord.VoiceClient):
     async def _handle_rl(self):
         self.bot.logger.warning("Swapping to espeak")
 
-        self.bot.loop.create_task(self._handle_rl_reset())
+        self.bot.create_task(self._handle_rl_reset())
         if not self.bot.sent_fallback:
             self.bot.sent_fallback = True
 

@@ -59,7 +59,7 @@ class WebhookHandler(logging.StreamHandler):
         )
 
     @tasks.loop(seconds=1)
-    async def sender_loop(self):
+    async def sender_loop(self) -> None:
         for severity in self.to_be_sent.copy().keys():
             msgs = self.to_be_sent.pop(severity)
             try:

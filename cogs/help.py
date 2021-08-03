@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, TYPE_CHECKING, List, Mapping, Optional, Union
+from typing import Any, Dict, TYPE_CHECKING, List, Mapping, Optional, Union
 
 import discord
 from discord.ext import commands
@@ -37,7 +37,7 @@ class FancyHelpCommand(commands.HelpCommand):
         import utils
         context: utils.TypedContext
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         kwargs["verify_checks"] = False
         super().__init__(*args, **kwargs)
 

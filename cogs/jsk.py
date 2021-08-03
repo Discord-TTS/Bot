@@ -1,9 +1,14 @@
-from typing import Optional, cast
+from __future__ import annotations
+from typing import Optional, TYPE_CHECKING, cast
 
 from discord.ext import commands
 
 
-def setup(bot: commands.Bot):
+if TYPE_CHECKING:
+    from main import TTSBot
+
+
+def setup(bot: TTSBot):
     try:
         from jishaku import Jishaku
     except ModuleNotFoundError:

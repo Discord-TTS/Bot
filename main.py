@@ -4,19 +4,18 @@ import asyncio
 import sys
 import traceback
 from configparser import ConfigParser
-from functools import partial
 from os import listdir
 from signal import SIGHUP, SIGINT, SIGTERM
 from time import monotonic
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
-                    Optional, Union, cast)
+from typing import (Set, TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
+                    Optional, TypeVar, Union, cast)
 
 import aiohttp
 import aioredis
 import asyncgTTS
 import asyncpg
 import discord
-from discord.ext import commands
+from discord.ext import commands as _commands
 import websockets
 
 import automatic_update
@@ -38,15 +37,14 @@ allowed_mentions = discord.AllowedMentions(everyone=False, roles=False)
 cache_flags = discord.MemberCacheFlags(joined=False)
 
 # Custom prefix support
-async def prefix(bot: TTSBot, message: discord.Message) -> str:
-    "Gets the prefix for a guild based on the passed message object"
-    if message.guild:
-        return (await bot.settings.get(message.guild, ["prefix"]))[0]
 
-    return "-"
+if TYPE_CHECKING:
+    _T = TypeVar("_T")
+    Pool = asyncpg.Pool[asyncpg.Record]
+else:
+    Pool = asyncpg.Pool
 
-Pool = asyncpg.Pool[asyncpg.Record] if TYPE_CHECKING else asyncpg.Pool
-class TTSBot(commands.AutoShardedBot):
+class TTSBot(_commands.AutoShardedBot):
     if TYPE_CHECKING:
         from extensions import cache_handler, database_handler
         from player import TTSVoicePlayer
@@ -56,40 +54,49 @@ class TTSBot(commands.AutoShardedBot):
         nicknames: database_handler.NicknameHandler
         cache: cache_handler.CacheHandler
 
-        command_prefix: Callable[[TTSBot, discord.Message], Awaitable[str]]
-        voice_clients: List[TTSVoicePlayer]
         analytics_buffer: utils.SafeDict
-        user: discord.ClientUser
         cache_db: aioredis.Redis
         gtts: asyncgTTS.easygTTS
         status_code: int
         blocked: bool # Handles if to be on gtts or espeak
         pool: Pool
 
-        conn: asyncpg.pool.PoolConnectionProxy
+        get_command: Callable[[str], Optional[_commands.Command]]
+        voice_clients: List[TTSVoicePlayer]
+        commands: Set[utils.TypedCommand]
+        user: discord.ClientUser
+        shard_ids: List[int]
+
+        conn: asyncpg.pool.PoolConnectionProxy[asyncpg.Record]
         del cache_handler, database_handler, TTSVoicePlayer
 
     def __init__(self,
         config: ConfigParser,
         session: aiohttp.ClientSession,
-        cluster_id: int = None,
-    *args, **kwargs):
+        cluster_id: Optional[int] = None,
+    *args: Any, **kwargs: Any):
+
         self.config = config
         self.websocket = None
         self.session = session
         self.sent_fallback = False
         self.cluster_id = cluster_id
         self.channels: Dict[str, discord.Webhook] = {}
+        self.tasks: asyncio.Queue[Awaitable[Any]] = asyncio.Queue()
 
         self.status_code = utils.RESTART_CLUSTER
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
 
-        super().__init__(*args, **kwargs)
+        kwargs["command_prefix"] = self.command_prefix
+        super().__init__(*args, **kwargs) # type: ignore
 
 
 
     def log(self, event: str) -> None:
         self.analytics_buffer.add(event)
+
+    def create_task(self, *args: Any, **kwargs: Any) -> None:
+        self.tasks.put_nowait(self.loop.create_task(*args, **kwargs))
 
     def get_support_server(self) -> Optional[discord.Guild]:
         return self.get_guild(int(self.config["Main"]["main_server"]))
@@ -98,6 +105,7 @@ class TTSBot(commands.AutoShardedBot):
         filered_exts = filter(lambda e: e.endswith(".py"), listdir(folder))
         for ext in filered_exts:
             self.load_extension(f"{folder}.{ext[:-3]}")
+
 
     def create_websocket(self) -> Awaitable[websockets.WebSocketClientProtocol]:
         host = self.config["Clustering"].get("websocket_host", "localhost")
@@ -132,25 +140,29 @@ class TTSBot(commands.AutoShardedBot):
         real_user_id = int(match.group(1))
         try:
             return await self.fetch_user(real_user_id)
-        except commands.UserNotFound:
+        except _commands.UserNotFound:
             return
 
 
-    def add_check(self, *args, **kwargs):
+    def add_check(self: _T, *args: Any, **kwargs: Any) -> _T:
         super().add_check(*args, **kwargs)
         return self
 
-    async def process_commands(self, message: discord.Message) -> None:
-        if message.author.bot:
-            return
-
-        ctx_class = utils.TypedGuildContext if message.guild else utils.TypedContext
-        ctx = await self.get_context(message=message, cls=ctx_class)
-
-        await self.invoke(ctx)
-
     async def wait_until_ready(self, *_: Any, **__: Any) -> None:
         return await super().wait_until_ready()
+
+    @staticmethod
+    async def command_prefix(bot: TTSBot, message: discord.Message) -> str:
+        if message.guild:
+            return (await bot.settings.get(message.guild, ["prefix"]))[0]
+
+        return "-"
+
+    async def get_context(self,
+        message: discord.Message
+    ) -> Union[utils.TypedContext, utils.TypedGuildContext]:
+        cls = utils.TypedGuildContext if message.guild else utils.TypedContext
+        return await super().get_context(message, cls=cls)
 
     def close(self, status_code: Optional[int] = None) -> Awaitable[None]:
         if status_code is not None:
@@ -159,7 +171,7 @@ class TTSBot(commands.AutoShardedBot):
 
         return super().close()
 
-    async def start(self, token: str, **kwargs):
+    async def start(self, token: str, **kwargs: Any):
         "Get everything ready in async env"
         cache_info = self.config["Redis Info"]
         db_info = self.config["PostgreSQL Info"]
@@ -207,7 +219,7 @@ async def on_ready(bot: TTSBot):
     await bot.wait_until_ready()
     bot.logger.info(f"Started and ready! Took `{monotonic() - start_time:.2f} seconds`")
 
-async def main(*args, **kwargs) -> int:
+async def main(*args: Any, **kwargs: Any) -> int:
     async with aiohttp.ClientSession() as session:
         return await _real_main(session, *args, **kwargs)
 
@@ -225,7 +237,6 @@ async def _real_main(
         max_messages=None,
         help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
         activity=activity,
-        command_prefix=prefix,
         cluster_id=cluster_id,
         case_insensitive=True,
         shard_ids=shards_to_handle,
@@ -235,18 +246,18 @@ async def _real_main(
         allowed_mentions=allowed_mentions,
     ).add_check(only_avaliable)
 
-    def stop_bot_sync(sig: int, *args, **kwargs):
+    def stop_bot_sync(sig: int):
         bot.status_code = -sig
         bot.logger.warning(f"Recieved signal {sig} and shutting down.")
 
-        bot.loop.create_task(bot.close())
+        bot.create_task(bot.close())
 
     for sig in (SIGINT, SIGTERM, SIGHUP):
-        bot.loop.add_signal_handler(sig, partial(stop_bot_sync, sig))
+        bot.loop.add_signal_handler(sig, stop_bot_sync, sig)
 
     await automatic_update.do_early_updates(bot)
     try:
-        bot.loop.create_task(on_ready(bot))
+        bot.create_task(on_ready(bot))
         await bot.start(token=config["Main"]["Token"])
         return bot.status_code
 

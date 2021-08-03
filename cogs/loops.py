@@ -64,6 +64,12 @@ class Loops(utils.CommonCog):
 
     @tasks.loop()
     @utils.decos.handle_errors
+    async def catch_task_errors(self):
+        "Makes sure asyncio.Task errors are handled"
+        await (await self.bot.tasks.get())
+
+    @tasks.loop()
+    @utils.decos.handle_errors
     async def websocket_client(self):
         if self.bot.websocket is None:
             return self.websocket_client.stop()
@@ -112,6 +118,9 @@ class Loops(utils.CommonCog):
     @tasks.loop(minutes=10)
     @utils.decos.handle_errors
     async def send_analytics_msg(self, wait: bool = True):
+        if self.bot.cluster_id not in {None, 0}:
+            return self.send_analytics_msg.cancel()
+
         if wait:
             midday = time(hour=12)
             await sleep_until(midday)

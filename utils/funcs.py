@@ -6,12 +6,12 @@ import asyncio
 import sys
 from inspect import cleandoc
 from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
-                    Sequence, TypeVar, Union, overload)
+                    Sequence, Type, TypeVar, Union, overload)
 
 import orjson
 
 from utils.constants import OPTION_SEPERATORS, READABLE_TYPE
-from utils.websocket_types import _TARGET
+from utils.websocket_types import WS_TARGET
 
 if TYPE_CHECKING:
     import re
@@ -22,16 +22,21 @@ if TYPE_CHECKING:
 
     _P = ParamSpec("_P")
     _R = TypeVar("_R")
+    _T = TypeVar("_T")
 
 
 _sep = OPTION_SEPERATORS[2]
 
-def data_to_ws_json(command: str, target: Union[_TARGET, str], **kwargs) -> bytes:
+def construct_unslotted(cls: Type[_T], *args, **kwargs) -> _T:
+    "Constructs cls without any slots, allowing attribute addition"
+    return type(cls.__name__, (cls,), {})(*args, **kwargs) # type: ignore
+
+def data_to_ws_json(command: str, target: Union[WS_TARGET, str], **kwargs: Any) -> bytes:
+    "Turns arguments and kwargs into usable data for the WS IPC system"
     wsjson = {"c": command.lower(), "a": kwargs, "t": target}
     return orjson.dumps(wsjson)
 
-def emoji_match_to_cleaned(match: re.Match) -> str:
-    emoji_name: str
+def emoji_match_to_cleaned(match: re.Match[str]) -> str:
     is_animated, emoji_name = bool(match[1]), match.group(2)
 
     emoji_prefix = "animated " * is_animated + "emoji "

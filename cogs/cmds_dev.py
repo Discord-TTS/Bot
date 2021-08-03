@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import asyncio
-import logging
 from inspect import cleandoc
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -18,36 +16,11 @@ if TYPE_CHECKING:
 def setup(bot: TTSBot):
     bot.add_cog(DevCommands(bot))
 
-class DevCommands(utils.CommonCog, command_attrs={"hidden": True}):
+class DevCommands(utils.CommonCog, name="Development Commands"):
     """TTS Bot hidden commands for development
     New commands added and removed often from this cog."""
 
-    @commands.command(aliases=("log_level", "logger", "loglevel"))
-    @commands.is_owner()
-    async def change_log_level(self, ctx: utils.TypedContext, *, level: str):
-        with open("config.ini", "w") as config_file:
-            self.bot.config["Main"]["log_level"] = level
-            self.bot.config.write(config_file)
-
-        if self.bot.websocket is None:
-            return self.bot.logger.setLevel(level.upper())
-
-        try:
-            wsjson = utils.data_to_ws_json("SEND", target="*", **{
-                "c": "change_log_level",
-                "a": {"level": level.upper()},
-                "t": "*"
-            })
-            await self.bot.websocket.send(wsjson)
-            await self.bot.wait_for("change_log_level", timeout=10)
-        except asyncio.TimeoutError:
-            await ctx.send(f"Didn't recieve broadcast within 10 seconds!")
-        else:
-            level = logging.getLevelName(self.bot.logger.level)
-            await ctx.send(f"Broadcast complete, log level is now: {level}")
-
-
-    @commands.group(aliases=("end", "restart"))
+    @commands.group(aliases=("end", "restart"), hidden=True)
     @commands.is_owner()
     async def close(self, ctx: utils.TypedContext):
         if not ctx.invoked_subcommand:
@@ -74,15 +47,32 @@ class DevCommands(utils.CommonCog, command_attrs={"hidden": True}):
             await ctx.send(f"Told cluster {cluster_id} to restart.")
 
 
-    @commands.command()
+    @commands.group()
+    async def debug(self, ctx: utils.TypedContext):
+        "Shows info, for debug usage"
+        if not ctx.invoked_subcommand:
+            await self.info(ctx)
+
+    @debug.command()
     @commands.guild_only()
-    async def debug(self, ctx: utils.TypedGuildContext):
+    async def info(self, ctx: utils.TypedGuildContext):
+        "Shows info, for debug usage"
         embed = discord.Embed(
             title="TTS Bot debug info!",
             description=cleandoc(f"""
                 Cluster ID: {self.bot.cluster_id}
+                Blocked by Google: {self.bot.blocked}
                 Voice Client: {ctx.guild.voice_client!r}
             """)
         )
 
         await ctx.send(embed=embed)
+
+    @debug.command()
+    async def invoke(self, ctx: utils.TypedContext, command: str, *, args: Optional[str] = ""):
+        "Manually invokes command, for debug usage."
+        prefix = await self.bot.command_prefix(self.bot, ctx.message)
+        ctx.message.content = f"{prefix}{command} {args}"
+
+        ctx = await self.bot.get_context(ctx.message)
+        await ctx.command.invoke(ctx)

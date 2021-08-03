@@ -19,6 +19,8 @@ class AnalyticsEvents(utils.CommonCog):
     @commands.Cog.listener()
     async def on_command(self, ctx: utils.TypedContext):
         self.bot.log(ctx.command.qualified_name)
+        if ctx.interaction is None:
+            self.bot.log("on_normal_command")
 
     @commands.Cog.listener()
     async def on_resumed(self):
