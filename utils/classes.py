@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import asyncio
 from functools import partial
+from io import BytesIO
 from typing import (TYPE_CHECKING, Any, Awaitable, Callable, List, Literal,
-                    Optional, TypeVar, Union, overload)
+                    Optional, Tuple, TypeVar, Union, overload)
 
 import discord
+import voxpopuli
 from discord.ext import commands
+from mutagen import mp3 as mutagen
+from pydub import AudioSegment
 
+from .constants import GTTS_ESPEAK_DICT
+from .funcs import to_thread
 
 _T = TypeVar("_T")
 if TYPE_CHECKING:
@@ -34,6 +40,59 @@ class ClearableQueue(asyncio.Queue[_T]):
 
     def clear(self):
         self._queue.clear()
+
+class TTSAudioMaker:
+    def __init__(self, bot: TTSBot):
+        self.bot = bot
+
+    async def get_tts(self, text: str, lang: str, max_length: Union[float, int]) -> Union[Tuple[bytes, float], Tuple[None, None]]:
+        mode = "wav" if self.bot.blocked else "mp3"
+        audio = await self.bot.cache.get((mode, text, lang))
+        if audio is None:
+            try:
+                coro = self.get_espeak if self.bot.blocked else self.get_gtts
+                audio = await asyncio.wait_for(coro(text, lang), timeout=10)
+            except asyncio.TimeoutError:
+                self.bot.log("on_generate_timeout")
+                raise
+
+            if audio is None:
+                return None, None
+
+            file_length = await to_thread(self.get_duration, audio, mode)
+            if file_length > max_length:
+                return self.bot.log("on_above_max_length"), None
+
+            await self.bot.cache.set((mode, text, lang), audio)
+        else:
+            file_length = await to_thread(self.get_duration, audio, mode)
+
+        return audio, file_length
+
+
+    async def get_gtts(self, text: str, lang: str) -> bytes:
+        mp3 = await self.bot.gtts.get(text=text, lang=lang)
+        self.bot.log("on_gtts_complete")
+        return mp3
+
+    async def get_espeak(self, text: str, lang: str) -> bytes:
+        if text.startswith("-") and " " not in text:
+            text += " " # fix espeak hang
+
+        lang = GTTS_ESPEAK_DICT.get(lang, "en")
+        wav = await voxpopuli.Voice(lang=lang, speed=130, volume=2).to_audio(text)
+
+        self.bot.log("on_espeak_complete")
+        return wav
+
+
+    def get_duration(self, audio_data: bytes, mode: Literal["mp3", "wav"]) -> float:
+        audio_file = BytesIO(audio_data)
+        if mode == "mp3":
+            return mutagen.MP3(BytesIO(audio_data)).info.length
+
+        segment = AudioSegment.from_file_using_temporary_files(audio_file)
+        return len(segment) / 1000 # type: ignore
 
 
 # Typed Classes for silencing type errors.
@@ -64,8 +123,9 @@ class TypedContext(commands.Context):
         reference = kwargs.pop("reference", None)
 
         if self.interaction is None:
+            kwargs.pop("ephemeral", False)
             send = partial(super().send, reference=reference)
-        elif not self.interaction.response.is_done() and not return_msg:
+        elif not (self.interaction.response.is_done() or return_msg or "file" in kwargs):
             send = self.interaction.response.send_message
         else:
             if not self.interaction.response.is_done():

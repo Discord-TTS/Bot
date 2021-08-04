@@ -16,8 +16,8 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
-sep = utils.OPTION_SEPERATORS[2]
-special_sep = utils.OPTION_SEPERATORS[1]
+sep = utils.OPTION_SEPERATORS[1]
+special_sep = utils.OPTION_SEPERATORS[2]
 lookup = {True: "Commands:", False: "Events:"}
 get_events = """
     SELECT * FROM analytics

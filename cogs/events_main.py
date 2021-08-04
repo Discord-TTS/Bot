@@ -23,7 +23,7 @@ async def do_autojoin(author: utils.TypedMember) -> bool:
         if not (permissions.view_channel and permissions.speak):
             return False
 
-        return bool(await voice_channel.connect(cls=TTSVoicePlayer))
+        return bool(await voice_channel.connect(cls=TTSVoicePlayer)) # type: ignore
     except (asyncio.TimeoutError, AttributeError):
         return False
 
@@ -178,7 +178,7 @@ class MainEvents(utils.CommonCog):
 
         # Adds filtered message to queue
         await message.guild.voice_client.queue(
-            message, message_clean, lang, channel, prefix, max_length
+            message_clean, lang, channel, prefix, max_length
         )
 
 

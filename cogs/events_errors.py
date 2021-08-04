@@ -26,7 +26,7 @@ def setup(bot: TTSBot):
 class ErrorEvents(utils.CommonCog):
     async def send_error(
         self, ctx: utils.TypedContext, error: str,
-        fix: str = "get in contact with us via the support server for help"
+        fix: str = "get in contact with us via the support server for help",
     ) -> Optional[discord.Message]:
 
         if ctx.guild:
@@ -37,7 +37,10 @@ class ErrorEvents(utils.CommonCog):
                 return
 
             if not permissions.embed_links:
-                return await ctx.reply("An Error Occurred! Please give me embed links permissions so I can tell you more!")
+                return await ctx.reply(
+                    "An Error Occurred! Please give me embed links permissions so I can tell you more!",
+                    ephemeral=True
+                )
 
         error_embed = discord.Embed(
             title="An Error Occurred!",
@@ -50,7 +53,7 @@ class ErrorEvents(utils.CommonCog):
             text="Support Server: https://discord.gg/zWPWwQC"
         )
 
-        return await ctx.reply(embed=error_embed)
+        return await ctx.reply(embed=error_embed, ephemeral=True)
 
 
     async def on_error(self, event_method: str, error: Optional[BaseException] = None, *targs: Any, **_):
@@ -116,37 +119,58 @@ class ErrorEvents(utils.CommonCog):
             await self.send_error(ctx, reason, fix)
 
         elif isinstance(error, commands.CommandOnCooldown):
-            cooldown_error = await self.send_error(ctx, f"{command} is on cooldown", f"try again in {error.retry_after:.1f} seconds")
-            await asyncio.sleep(error.retry_after)
+            cooldown_error = await self.send_error(ctx,
+                error=f"{command} is on cooldown",
+                fix=f"try again in {error.retry_after:.1f} seconds"
+            )
 
-            if ctx.guild:
+            if ctx.guild is not None and ctx.interaction is None:
+                await asyncio.sleep(error.retry_after)
                 ctx = cast(utils.TypedGuildContext, ctx)
+
                 if cooldown_error:
                     await cooldown_error.delete()
                 if ctx.bot_permissions().manage_messages:
                     await ctx.message.delete()
 
         elif isinstance(error, commands.NoPrivateMessage):
-            await self.send_error(ctx, f"{command} cannot be used in private messages", f"try running it on a server with {self.bot.user} in")
+            await self.send_error(
+                ctx, error=f"{command} cannot be used in private messages",
+                fix=f"try running it on a server with {self.bot.user} in"
+            )
 
         elif isinstance(error, commands.MissingPermissions):
-            await self.send_error(ctx, "you cannot run this command", f"ask for the following permissions: {', '.join(error.missing_permissions)}")
+            missing_perms = ", ".join(error.missing_permissions)
+            await self.send_error(
+                ctx, error="you cannot run this command",
+                fix=f"ask for the following permissions: {missing_perms}"
+            )
 
         elif isinstance(error, commands.BotMissingPermissions):
+            missing_perms = ", ".join(error.missing_permissions)
             await self.send_error(ctx,
-                f"I cannot run {command} as I am missing permissions",
-                f"give me {', '.join(error.missing_permissions)}"
+                error=f"I cannot run {command} as I am missing permissions",
+                fix=f"give me {missing_perms}"
+            )
+
+        elif isinstance(error, commands.CheckFailure):
+            await self.send_error(
+                ctx, error="you ran this command in the wrong channel",
+                fix=f"do {ctx.prefix}channel get the channel that has been setup"
             )
 
         elif isinstance(error, discord.errors.Forbidden):
             self.bot.logger.error(f"`discord.errors.Forbidden` caused by {ctx.message.content} sent by {ctx.author}")
-            await self.send_error(ctx, "I encountered an unknown permission error", "please give TTS Bot the required permissions")
+            await self.send_error(
+                ctx, error="I encountered an unknown permission error",
+                fix="please give TTS Bot the required permissions"
+            )
 
         elif isinstance(error, asyncio.TimeoutError):
             self.bot.logger.error(f"`asyncio.TimeoutError:` Unhandled in {ctx.command.qualified_name}")
 
         else:
-            await self.send_error(ctx, "an unknown error occured")
+            self.bot.create_task(self.send_error(ctx, error="an unknown error occured"))
 
             context_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
             error_traceback = "".join(format_exception(type(error), error, error.__traceback__))

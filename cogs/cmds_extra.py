@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from functools import partial
 import time
 import uuid
+from functools import partial
 from inspect import cleandoc
+from io import BytesIO
 from os import getpid
 from typing import TYPE_CHECKING, cast
 
@@ -16,13 +17,13 @@ import utils
 from utils.websocket_types import *
 
 
-
 if TYPE_CHECKING:
     from main import TTSBot
 
     from events_errors import ErrorEvents
 else:
     ErrorEvents = None
+
 
 start_time = time.monotonic()
 def get_ram_recursive(process: Process) -> int:
@@ -39,11 +40,36 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
         "Shows how long TTS Bot has been online"
         await ctx.send(f"{self.bot.user.mention} has been up for {(time.monotonic() - start_time) / 60:.2f} minutes")
 
-    @commands.bot_has_permissions(send_messages=True)
-    @commands.command(hidden=True)
-    async def tts(self, ctx: utils.TypedContext):
-        if ctx.message.content == f"{ctx.prefix}tts":
-            await ctx.send(f"You don't need to do `{ctx.prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{ctx.prefix}`!")
+    @commands.bot_has_permissions(send_messages=True, attach_files=True)
+    @commands.command()
+    async def tts(self, ctx: utils.TypedContext, *, message: str):
+        "Generates TTS and sends it in the current text channel!"
+        if (
+            not ctx.interaction
+            and ctx.guild is not None
+            and ctx.guild.voice_client
+            and (await self.bot.settings.get(ctx.guild, ["channel"]))[0] == ctx.channel.id
+        ):
+            return # probably in VC, just let on_message do TTS
+
+        author_name = "".join(filter(str.isalnum, ctx.author.name))
+        lang = await self.bot.userinfo.get("lang", ctx.author, "en")
+
+        audio, _ = await utils.TTSAudioMaker(self.bot).get_tts(
+            lang=lang,
+            text=message,
+            max_length=float("inf")
+        )
+
+        if audio is None:
+            return await ctx.reply("Failed to generate TTS!", ephemeral=True)
+
+        await ctx.reply("Generated some TTS!", file=discord.File(
+            fp=BytesIO(audio), filename=(
+                f"{author_name}-{ctx.message.id}" +
+                ("-espeak.wav" if self.bot.blocked else "-gtts.mp3")
+            )
+        ))
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.command(aliases=["info", "stats"])

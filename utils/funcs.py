@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     _T = TypeVar("_T")
 
 
-_sep = OPTION_SEPERATORS[2]
+_sep = OPTION_SEPERATORS[0]
 
 def construct_unslotted(cls: Type[_T], *args, **kwargs) -> _T:
     "Constructs cls without any slots, allowing attribute addition"
