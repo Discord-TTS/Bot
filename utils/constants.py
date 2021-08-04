@@ -1,23 +1,17 @@
 import re as _re
-
-NETURAL_COLOUR = 0xcaa652
+from typing import Tuple, Union
 
 KILL_EVERYTHING = 0
 RESTART_CLUSTER = 1
 DO_NOT_RESTART_CLUSTER = 2
 
-_image_files = ("bmp", "gif", "ico", "png", "psd", "svg", "jpg")
-_audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")
-_video_files = ("avi", "mp4", "wmv", "m4v", "mpg", "mpeg")
-_document_files = ("doc", "docx", "txt", "odt", "rtf")
-_compressed_files = ("zip", "7z", "rar", "gz", "xz")
-_script_files = ("bat", "sh", "jar", "py", "php")
-_program_files = ("apk", "exe", "msi", "deb")
-_disk_images = ("dmg", "iso", "img", "ima")
-
+NETURAL_COLOUR = 0xcaa652
+AUDIODATA = Tuple[bytes, Union[int, float]]
 TRANSLATION_URL = "https://api-free.deepl.com/v2"
-ID_IN_BRACKETS_REGEX = _re.compile(r"\((\d+)\)")
+DEFAULT_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/{}.png"
+
 EMOJI_REGEX = _re.compile(r"<(a?):(.+):(\d+)>")
+ID_IN_BRACKETS_REGEX = _re.compile(r"\((\d+)\)")
 
 _PRE_REGEX_REPLACEMENTS = {
     r"\|\|.*?\|\|": ". spoiler avoided.",
@@ -35,6 +29,15 @@ OPTION_SEPERATORS = (
     ":small_red_triangle:",
     ":star:",
 )
+
+_image_files = ("bmp", "gif", "ico", "png", "psd", "svg", "jpg")
+_audio_files = ("mid", "midi", "mp3", "ogg", "wav", "wma")
+_video_files = ("avi", "mp4", "wmv", "m4v", "mpg", "mpeg")
+_document_files = ("doc", "docx", "txt", "odt", "rtf")
+_compressed_files = ("zip", "7z", "rar", "gz", "xz")
+_script_files = ("bat", "sh", "jar", "py", "php")
+_program_files = ("apk", "exe", "msi", "deb")
+_disk_images = ("dmg", "iso", "img", "ima")
 
 READABLE_TYPE = {
     _compressed_files: "a compressed file",

@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from functools import partial
 from inspect import cleandoc
+from io import BytesIO
 from os import getpid
 from typing import TYPE_CHECKING, cast
 
@@ -15,7 +17,6 @@ import utils
 from utils.websocket_types import *
 
 
-
 if TYPE_CHECKING:
     from main import TTSBotPremium
 
@@ -23,8 +24,10 @@ if TYPE_CHECKING:
 else:
     ErrorEvents = None
 
-start_time = time.monotonic()
 
+start_time = time.monotonic()
+def get_ram_recursive(process: Process) -> int:
+    return sum(proc.memory_info().rss for proc in process.children())
 
 def setup(bot: TTSBotPremium):
     bot.add_cog(ExtraCommands(bot))
@@ -33,15 +36,42 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
     "TTS Bot extra commands, not required but useful."
 
     @commands.command()
-    async def uptime(self, ctx: commands.Context):
+    async def uptime(self, ctx: utils.TypedContext):
         "Shows how long TTS Bot has been online"
         await ctx.send(f"{self.bot.user.mention} has been up for {(time.monotonic() - start_time) / 60:.2f} minutes")
 
-    @commands.bot_has_permissions(send_messages=True)
-    @commands.command(hidden=True)
-    async def tts(self, ctx: commands.Context):
-        if ctx.message.content == f"{ctx.prefix}tts":
-            await ctx.send(f"You don't need to do `{ctx.prefix}tts`! {self.bot.user.mention} is made to TTS any message, and ignore messages starting with `{ctx.prefix}`!")
+    @commands.bot_has_permissions(send_messages=True, attach_files=True)
+    @commands.command()
+    async def tts(self, ctx: utils.TypedContext, *, message: str):
+        "Generates TTS and sends it in the current text channel!"
+        if (
+            not ctx.interaction
+            and ctx.guild is not None
+            and ctx.guild.voice_client
+            and (await self.bot.settings.get(ctx.guild, ["channel"]))[0] == ctx.channel.id
+        ):
+            return # probably in VC, just let on_message do TTS
+
+        author_name = "".join(filter(str.isalnum, ctx.author.name))
+        
+        lang = await self.bot.userinfo.get("lang", ctx.author, "en-us")
+        variant = await self.bot.userinfo.get("variant", ctx.author, "a")
+        voice = await self.bot.get_voice(lang, variant)
+
+        audio, _ = await utils.TTSAudioMaker(self.bot).get_tts(
+            text=message,
+            voice=voice.tuple,
+            max_length=float("inf")
+        )
+
+        if audio is None:
+            return await ctx.reply("Failed to generate TTS!", ephemeral=True)
+
+        await ctx.reply("Generated some TTS!", file=discord.File(
+            fp=BytesIO(audio), filename=(
+                f"{author_name}-{ctx.message.id}-premium.ogg"
+            )
+        ))
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.command(aliases=["info", "stats"])
@@ -73,7 +103,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
                 error_msg = "the bot timed out fetching this info"
                 return await cog.send_error(ctx, error_msg)
 
-            raw_ram_usage = sum(proc.memory_info().rss for proc in Process(getpid()).parent().children()) # type: ignore
+            raw_ram_usage = await utils.to_thread(partial(get_ram_recursive, Process(getpid()).parent()))
             total_voice_clients = sum(resp["voice_count"] for resp in responses)
             total_guild_count = sum(resp["guild_count"] for resp in responses)
             total_members = sum(resp["member_count"] for resp in responses)
@@ -99,7 +129,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
                     {sep1} {raw_ram_usage / 1024 ** 2:.1f}MB of RAM
                 and can be used by {total_members:,} people!
             """)
-        ).set_footer(text=footer).set_thumbnail(url=self.bot.avatar_url)
+        ).set_footer(text=footer).set_thumbnail(url=self.bot.user.avatar.url)
 
         await ctx.send(embed=embed)
 
@@ -119,28 +149,28 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
 
     @commands.command()
     @commands.bot_has_permissions(send_messages=True)
-    async def donate(self, ctx: commands.Context):
+    async def donate(self, ctx: utils.TypedContext):
         "Shows how you can help support TTS Bot's development and hosting!"
+        await ctx.send(
+            "To donate to support the development and hosting of "
+            f"{self.bot.user.mention} and get access to TTS Bot Premium, "
+            "a more stable version of this bot with more and better voices "
+            "you can donate via Patreon!\nhttps://www.patreon.com/Gnome_the_Bot_Maker"
+        )
 
-        await ctx.send(cleandoc(f"""
-            To donate to support the development and hosting of {self.bot.user.mention}, you can donate via Patreon or DonateBot.io!
-            <https://donatebot.io/checkout/693901918342217758>
-            https://www.patreon.com/Gnome_the_Bot_Maker
-        """))
-
-    @commands.command(aliases=["lag"], hidden=True)
+    @commands.command(aliases=["lag"])
     @commands.bot_has_permissions(send_messages=True)
-    async def ping(self, ctx: commands.Context):
+    async def ping(self, ctx: utils.TypedContext):
         "Gets current ping to discord!"
 
         ping_before = time.perf_counter()
-        ping_message = await ctx.send("Loading!")
+        ping_message = await ctx.send("Loading!", return_msg=True)
         ping = (time.perf_counter() - ping_before) * 1000
         await ping_message.edit(content=f"Current Latency: `{ping:.0f}ms`")
 
     @commands.command()
     @commands.bot_has_permissions(send_messages=True)
-    async def suggest(self, ctx: commands.Context, *, suggestion: str):
+    async def suggest(self, ctx: utils.TypedContext, *, suggestion: str):
         "Suggests a new feature!"
 
         if suggestion.lower().replace("*", "") == "suggestion":
@@ -154,7 +184,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             await self.bot.channels["suggestions"].send(
                 files=files,
                 content=suggestion,
-                avatar_url=ctx.author.avatar_url,
+                avatar_url=ctx.author.avatar.url,
                 username=author_name[:32 - len(author_id)] + author_id,
             )
 
@@ -162,6 +192,6 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
 
     @commands.command()
     @commands.bot_has_permissions(send_messages=True)
-    async def invite(self, ctx: commands.Context):
+    async def invite(self, ctx: utils.TypedContext):
         "Sends the instructions to invite TTS Bot and join the support server!"
         await ctx.send(f"Join https://discord.gg/zWPWwQC and check out the patreon channel to invite me!")

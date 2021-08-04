@@ -14,9 +14,7 @@ from player import TTSVoicePlayer
 
 if TYPE_CHECKING:
     from typing_extensions import TypedDict
-
     from main import TTSBotPremium
-    from .cmds_settings import cmds_settings
 
     class _TRANSLATION(TypedDict):
         text: str
@@ -24,8 +22,7 @@ if TYPE_CHECKING:
 
     class _DEEPL_RESP(TypedDict):
         translations: List[_TRANSLATION]
-else:
-    cmds_settings = None
+
 
 async def do_autojoin(author: utils.TypedMember) -> bool:
     try:
@@ -34,7 +31,7 @@ async def do_autojoin(author: utils.TypedMember) -> bool:
         if not (permissions.view_channel and permissions.speak):
             return False
 
-        return bool(await voice_channel.connect(cls=TTSVoicePlayer))
+        return bool(await voice_channel.connect(cls=TTSVoicePlayer)) # type: ignore
     except (asyncio.TimeoutError, AttributeError):
         return False
 
@@ -53,9 +50,10 @@ class MainEvents(utils.CommonCog):
 
         if str(message.author.id) not in self.bot.trusted:
             premium_user_for_guild = self.bot.patreon_json.get(str(message.guild.id))
-            if premium_user_for_guild not in [member.id for member in self.bot.patreon_role.members]:
+            if not any(premium_user_for_guild == member.id for member in self.bot.patreon_role.members):
                 return
 
+        self.bot.logger.debug(f"Past premium check")
         # Get settings
         repeated_limit, to_translate, target_lang, bot_ignore, max_length, autojoin, channel, is_formal, prefix, xsaid = await self.bot.settings.get(
             message.guild,
@@ -99,6 +97,8 @@ class MainEvents(utils.CommonCog):
 
             if not await do_autojoin(message.author):
                 return
+        elif message.author.voice.channel != bot_voice_client.channel:
+            return
 
         # Fix linter issues
         if TYPE_CHECKING:
@@ -119,8 +119,7 @@ class MainEvents(utils.CommonCog):
 
         str_voice: str = user_voice or guild_voice or "en-us a"
 
-        settings_cog = cast(cmds_settings, self.bot.get_cog("Settings"))
-        voice = await settings_cog.get_voice(*str_voice.split())
+        voice = await self.bot.get_voice(*str_voice.split())
 
         # Emoji filter
         message_clean = utils.EMOJI_REGEX.sub(utils.emoji_match_to_cleaned, message_clean)

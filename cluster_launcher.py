@@ -19,7 +19,6 @@ import aiohttp
 import orjson
 import requests
 import websockets
-
 import utils
 
 config = ConfigParser()
@@ -27,6 +26,7 @@ config.read("config.ini")
 
 if TYPE_CHECKING:
     from utils.websocket_types import *
+    from concurrent.futures import Future
 
     _T = TypeVar("_T")
     _CLUSTER_ARG = Tuple[int, int, Tuple[int]]
@@ -81,26 +81,25 @@ class ClusterManager:
         self.loop = asyncio.get_running_loop()
         self.support_cluster: Optional[int] = None
 
-        self.monitors: Dict[int, asyncio.Task] = {}
         self.processes: Dict[int, Optional[int]] = {}
+        self.monitors: Dict[int, asyncio.Task[Optional[Future[None]]]] = {}
 
         self.websockets: Dict[int, websockets.WebSocketServerProtocol] = {}
         self.pending_responses: Dict[str, asyncio.Queue[Dict[str, Any]]] = {}
 
         for sig in (SIGTERM, SIGINT, SIGHUP):
-            callable_handler = partial(self.signal_handler, sig)
-            self.loop.add_signal_handler(sig, callable_handler)
+            self.loop.add_signal_handler(sig, self.signal_handler, sig)
 
     async def __aenter__(self):
         await self.start()
         return self
 
-    async def __aexit__(self, *_, **__):
+    async def __aexit__(self, *_: Any, **__: Any):
         if not self.shutting_down:
             await self.shutdown()
 
 
-    def signal_handler(self, signal: int, *args, **kwargs):
+    def signal_handler(self, signal: int):
         logger.debug(f"Signal {signal} received")
         return self.loop.create_task(self.shutdown())
 
@@ -151,9 +150,11 @@ class ClusterManager:
 
         logger.info(f"Launching {cluster_count} clusters to handle {shard_count} shards with {shards_per_cluster} per cluster.")
 
-        all_shards = enumerate(group_by(range(shard_count), shards_per_cluster))
-        for cluster_id, shards in all_shards:
+        all_shards = group_by(range(shard_count), shards_per_cluster)
+        for cluster_id, shards in enumerate(all_shards):
+            shards = [s for s in shards if s is not None]
             args = (cluster_id, shard_count, shards)
+
             cluster_watcher_func = partial(self.cluster_watcher, args)
             self.monitors[cluster_id] = asyncio.Task(utils.to_thread(cluster_watcher_func))
 
@@ -167,14 +168,14 @@ class ClusterManager:
 
         self.keep_alive = self.loop.create_task(keep_alive())
 
-    async def shutdown(self, *args, **kwargs):
+    async def shutdown(self, *_: Any, **__: Any):
         if self.shutting_down:
             return
 
         self.shutting_down = True
         logger.warning("Shutting all clusters down")
 
-        wsrequest = {"c": "send", "a": {"c": "close", "a": {}}, "t": "*"}
+        wsrequest = {"c": "send", "a": {"c": "close", "a": {}}, "t": "*"} # type: ignore
         await self.send_handler(None, wsrequest) # type: ignore
 
         logger.info("Kiilled all processes, and cancelling keep alive. Bye!")
@@ -190,11 +191,11 @@ class ClusterManager:
     async def _get_from_clusters(self,
         info: List[str],
         nonce: Union[str, uuid.UUID],
-        target: _TARGET = "*"
+        target: WS_TARGET = "*"
     ) -> List[Dict[str, Any]]:
 
-        responses = []
         nonce = str(nonce)
+        responses: List[Dict[str, Any]] = []
         self.pending_responses[nonce] = asyncio.Queue()
 
         request_json = {"c": "request", "a": {"info": info, "nonce": nonce}}
@@ -214,7 +215,7 @@ class ClusterManager:
         cluster_id = int("".join(c for c in cluster if c.isdigit()))
         logger.debug(f"New Websocket connection from cluster {cluster_id}")
 
-        tasks: List[asyncio.Task] = []
+        tasks: List[asyncio.Task[Any]] = []
         self.websockets[cluster_id] = connection
         async for msg in connection:
             logger.debug(f"Recieved msg from cluster {cluster_id}: {msg}")
@@ -267,8 +268,15 @@ class ClusterManager:
                 handler.setLevel(level)
 
         if target == "*":
-            for connection in self.websockets.values():
-                await connection.send(to_be_sent)
+            for cluster_id, connection in self.websockets.copy().items():
+                try:
+                    await connection.send(to_be_sent)
+                except websockets.WebSocketException as err:
+                    self.websockets.pop(cluster_id, None)
+
+                    err_msg = f"Could not send message to cluster {cluster_id}"
+                    logger.error(f"{err_msg}: {err}")
+
         elif target == "support":
             support_cluster = self.support_cluster
             if support_cluster is None:
@@ -295,7 +303,7 @@ async def main():
     port = int(config["Clustering"].get("websocket_port", "8765"))
 
     async with aiohttp.ClientSession() as session:
-        logger = utils.setup_logging(aio=True, level=config["Main"]["log_level"], session=session, prefix="`[Launcher]`: ")
+        logger = utils.setup_logging(level=config["Main"]["log_level"], session=session, prefix="`[Launcher]`: ")
         async with ClusterManager(host, port) as manager:
             try:
                 await manager.keep_alive

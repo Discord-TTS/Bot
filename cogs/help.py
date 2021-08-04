@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, TYPE_CHECKING, List, Mapping, Optional, Union
+from typing import Any, Dict, TYPE_CHECKING, List, Mapping, Optional, Union
 
 import discord
 from discord.ext import commands
@@ -34,20 +34,19 @@ class FancyHelpCommandCog(commands.Cog, name="Uncategoried"):
 
 class FancyHelpCommand(commands.HelpCommand):
     if TYPE_CHECKING:
-        from utils import TypedContext
-        context: TypedContext
-        del TypedContext
+        import utils
+        context: utils.TypedContext
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         kwargs["verify_checks"] = False
         super().__init__(*args, **kwargs)
 
     def get_ending_note(self, is_group: bool = False):
         args = " ".join(self.context.message.content.split()[1:]) if is_group else ""
-        return f"Use {self.clean_prefix}{self.invoked_with}{f' {args} '}[command] for more info on a command."
+        return f"Use {self.context.clean_prefix}{self.invoked_with}{f' {args} '}[command] for more info on a command."
 
     def get_command_signature(self, command: commands.Command) -> str:
-        cmd_usage = f"{self.clean_prefix}{command.qualified_name}"
+        cmd_usage = f"{self.context.clean_prefix}{command.qualified_name}"
         cmd_usage += f" {command.signature}" if command.signature else ""
 
         return cmd_usage
@@ -84,7 +83,7 @@ class FancyHelpCommand(commands.HelpCommand):
             colour=NETURAL_COLOUR
         )
 
-        embed.set_author(name=self.context.author.display_name, icon_url=str(self.context.author.avatar_url))
+        embed.set_author(name=self.context.author.display_name, icon_url=self.context.author.avatar.url)
         embed.set_footer(text=self.get_ending_note())
         await self.get_destination().send(embed=embed)
 
@@ -93,10 +92,10 @@ class FancyHelpCommand(commands.HelpCommand):
             group_commands = await self.filter_commands(group.commands, sort=True)
             description = "\n".join(f"`{self.get_command_signature(c)}:` {c.short_doc or 'no description'}" for c in group_commands)
         else:
-            description = f"{group.help}\n```{self.clean_prefix}{group.qualified_name} {group.signature}```"
+            description = f"{group.help}\n```{self.context.clean_prefix}{group.qualified_name} {group.signature}```"
 
         embed = discord.Embed(
-            title=f"`{self.clean_prefix}{group.qualified_name}` Help!",
+            title=f"`{self.context.clean_prefix}{group.qualified_name}` Help!",
             description=description,
             colour=NETURAL_COLOUR
         )

@@ -16,8 +16,8 @@ if TYPE_CHECKING:
     from main import TTSBotPremium
 
 
-sep = utils.OPTION_SEPERATORS[2]
-special_sep = utils.OPTION_SEPERATORS[1]
+sep = utils.OPTION_SEPERATORS[1]
+special_sep = utils.OPTION_SEPERATORS[2]
 lookup = {True: "Commands:", False: "Events:"}
 get_events = """
     SELECT * FROM analytics
@@ -61,6 +61,12 @@ class Loops(utils.CommonCog):
         for task in self.tasks:
             task.cancel()
 
+
+    @tasks.loop()
+    @utils.decos.handle_errors
+    async def catch_task_errors(self):
+        "Makes sure asyncio.Task errors are handled"
+        await (await self.bot.tasks.get())
 
     @tasks.loop()
     @utils.decos.handle_errors
@@ -112,6 +118,9 @@ class Loops(utils.CommonCog):
     @tasks.loop(minutes=10)
     @utils.decos.handle_errors
     async def send_analytics_msg(self, wait: bool = True):
+        if self.bot.cluster_id not in {None, 0}:
+            return self.send_analytics_msg.cancel()
+
         if wait:
             midday = time(hour=12)
             await sleep_until(midday)

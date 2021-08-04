@@ -20,14 +20,9 @@ def setup(bot: TTSBotPremium):
 
 class MainCommands(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
-
-    async def channel_check(self, ctx: utils.TypedGuildContext) -> bool:
+    async def cog_check(self, ctx: utils.TypedGuildContext) -> bool:
         channel = (await self.bot.settings.get(ctx.guild, ["channel"]))[0]
-        if ctx.channel.id != channel:
-            await ctx.send(f"Error: Wrong channel, do {ctx.prefix}channel get the channel that has been setup.")
-            return False
-
-        return True
+        return ctx.channel.id == channel
 
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
@@ -36,12 +31,6 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
     @commands.command()
     async def join(self, ctx: utils.TypedGuildContext):
         "Joins the voice channel you're in!"
-        if not await self.channel_check(ctx):
-            return
-
-        if not isinstance(ctx.author, discord.Member):
-            return
-
         if not ctx.author.voice:
             return await ctx.send("Error: You need to be in a voice channel to make me join your voice channel!")
 
@@ -66,12 +55,12 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
             title="Joined your voice channel!",
             description="Just type normally and TTS Bot Premium will say your messages!"
         )
-        join_embed.set_thumbnail(url=self.bot.avatar_url)
-        join_embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+        join_embed.set_thumbnail(url=self.bot.user.avatar.url)
+        join_embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
         join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
         try:
-            await voice_channel.connect(cls=TTSVoicePlayer)
+            await voice_channel.connect(cls=TTSVoicePlayer) # type: ignore
         except asyncio.TimeoutError:
             return await ctx.send("Error: Timed out when trying to join your voice channel!")
 
@@ -83,12 +72,6 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
     @commands.command()
     async def leave(self, ctx: utils.TypedGuildContext):
         "Leaves voice channel TTS Bot is in!"
-        if not await self.channel_check(ctx):
-            return
-
-        if not isinstance(ctx.author, discord.Member):
-            return
-
         if not ctx.author.voice:
             return await ctx.send("Error: You need to be in a voice channel to make me leave!")
 
@@ -108,15 +91,12 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
     @commands.guild_only()
     async def skip(self, ctx: utils.TypedGuildContext):
         "Clears the message queue!"
-        if not await self.channel_check(ctx):
-            return
-
         vc = ctx.guild.voice_client
         if not vc or (not vc.is_playing() and vc.message_queue.empty() and vc.audio_buffer.empty()):
             return await ctx.send("**Error:** Nothing in message queue to skip!")
 
         vc.skip()
-        return await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
+        await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
 
     @skip.after_invoke
     async def reset_cooldown(self, ctx: utils.TypedGuildContext):

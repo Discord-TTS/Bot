@@ -7,14 +7,13 @@ import asyncpg
 from utils import data_to_ws_json
 
 if TYPE_CHECKING:
-    from discord import Guild
-    from discord.abc import User
+    from discord import Guild, User, Member
     from typing_extensions import TypeVar
 
     from main import TTSBotPremium
 
     Return = TypeVar("Return")
-
+    User = Union[User, Member]
 
 def setup(bot: TTSBotPremium):
     bot.settings = GeneralSettings(bot)
@@ -92,7 +91,7 @@ class GeneralSettings(HandlesDB):
         defaults = await self.DEFAULT_SETTINGS
         return [defaults[setting] for setting in settings]
 
-    async def set(self, guild: Guild, setting: str, value):
+    async def set(self, guild: Guild, setting: str, value: Any):
         async with CacheWriter(self, guild.id, broadcast=False):
             await self.pool.execute(f"""
                 INSERT INTO guilds(guild_id, {setting}) VALUES($1, $2)

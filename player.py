@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, Optional, Tuple, Union
 import discord
 from discord.ext import tasks
 from discord.opus import Encoder
-from pydub import AudioSegment
 
 import utils
 
@@ -17,7 +16,6 @@ import utils
 
 if TYPE_CHECKING:
     from main import TTSBotPremium
-
 
 
 
@@ -71,9 +69,8 @@ class FFmpegPCMAudio(discord.AudioSource):
         self._process = None
 
 
-_AudioData = Tuple[bytes, Union[int, float]]
 _MessageQueue = Tuple[str, Tuple[str, str]]
-class TTSVoicePlayer(discord.VoiceClient):
+class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
     bot: TTSBotPremium
     guild: discord.Guild
     channel: utils.VoiceChannel
@@ -88,7 +85,7 @@ class TTSVoicePlayer(discord.VoiceClient):
         self.currently_playing = asyncio.Event()
         self.currently_playing.set()
 
-        self.audio_buffer = utils.ClearableQueue[_AudioData](maxsize=5)
+        self.audio_buffer = utils.ClearableQueue[utils.AUDIODATA](maxsize=5)
         self.message_queue = utils.ClearableQueue[_MessageQueue]()
 
         self.fill_audio_buffer.start()
@@ -148,27 +145,19 @@ class TTSVoicePlayer(discord.VoiceClient):
     @utils.decos.handle_errors
     async def fill_audio_buffer(self):
         text, lang = await self.message_queue.get()
-        ret_values = await self.get_tts(text, lang)
 
-        if not ret_values or None in ret_values:
+        try:
+            audio, length = await self.get_tts(text, lang, self.max_length)
+        except asyncio.TimeoutError:
+            error = f"`{self.guild.id}`'s `{len(text)}` character long message was cancelled!"
+            return self.bot.logger.error(error)
+
+        if audio is None or length is None:
             return
 
-        audio, file_length = ret_values
-        if file_length > self.max_length:
-            return self.bot.log("on_above_max_length")
-
-        await self.audio_buffer.put((audio, file_length))
+        await self.audio_buffer.put((audio, length))
         if not self.play_audio.is_running():
             self.play_audio.start()
-
-
-    async def get_tts(self, text: str, lang: Tuple[str, str]) -> Tuple[bytes, float]:
-        ogg = await self.bot.cache.get(text, *lang)
-        if not ogg:
-            ogg = await self.bot.gtts.get(text, voice_lang=lang)
-            await self.bot.cache.set(text, *lang, ogg)
-
-        return ogg, await self.get_duration(ogg)
 
 
     # Helper functions
@@ -194,8 +183,3 @@ class TTSVoicePlayer(discord.VoiceClient):
             self.bot.on_error("play_audio", exception)
             for exception in exceptions
         ))
-
-
-    @utils.decos.run_in_executor
-    def get_duration(self, audio_data: bytes) -> float:
-        return len(AudioSegment.from_file_using_temporary_files(BytesIO(audio_data))) / 1000 # type: ignore

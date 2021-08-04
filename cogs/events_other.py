@@ -41,13 +41,34 @@ class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_message(self, message: utils.TypedGuildMessage):
-        if message.guild is None:
+        if message.guild is None or message.author.bot:
             return
 
         if message.content in (self.bot.user.mention, f"<@!{self.bot.user.id}>"):
-            await message.channel.send(f"Current Prefix for this server is: `{await self.bot.command_prefix(self.bot, message)}`")
+            prefix = await self.bot.command_prefix(self.bot, message)
 
-        if message.reference and message.guild == self.bot.get_support_server() and message.channel.name in ("premium-dm-logs", "suggestions") and not message.author.bot:
+            cleanup = ('`', '\\`')
+            clean_prefix = f"`{prefix.replace(*cleanup)}`"
+            permissions = message.channel.permissions_for(message.guild.me) # type: discord.Permissions
+            if not permissions.send_messages:
+                try:
+                    name = discord.utils.escape_markdown(message.guild.name)
+                    return await message.author.send(
+                        f"My prefix for `{name}` is {clean_prefix} "
+                        "however I do not have permission to send messages "
+                        "so I cannot respond to your commands!"
+                    )
+                except discord.Forbidden:
+                    return
+
+            msg = f"Current Prefix for this server is: {clean_prefix}"
+            await message.channel.send(msg)
+
+        if (
+            message.reference
+            and message.guild == self.bot.get_support_server()
+            and message.channel.name in ("dm_logs", "suggestions")
+        ):
             dm_message = message.reference.resolved
             if (
                 not dm_message
@@ -66,7 +87,7 @@ class OtherEvents(utils.CommonCog):
             await dm_command(ctx, real_user, message=message.content)
 
     @commands.Cog.listener()
-    async def on_guild_join(self, guild: discord.Guild):
+    async def on_guild_join(self, guild: utils.TypedGuild):
         _, prefix, owner = await asyncio.gather(
             self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!"),
             self.bot.settings.get(guild, ["prefix"]),
@@ -78,7 +99,7 @@ class OtherEvents(utils.CommonCog):
             description=WELCOME_MESSAGE.format(guild=guild, prefix=prefix[0])
         ).set_footer(
             text="Support Server: https://discord.gg/zWPWwQC | Bot Invite: Ask Gnome!#6669"
-        ).set_author(name=str(owner), icon_url=str(owner.avatar_url))
+        ).set_author(name=str(owner), icon_url=owner.avatar.url)
 
         try: await owner.send(embed=embed)
         except discord.errors.HTTPException: pass
@@ -124,7 +145,7 @@ class OtherEvents(utils.CommonCog):
             handler.setLevel(level)
 
     @commands.Cog.listener()
-    async def on_request(self, info: List[str], nonce: str, *args):
+    async def on_request(self, info: List[str], nonce: str, *_):
         data = {to_get: data_lookup[to_get](self.bot) for to_get in info}
         wsjson = utils.data_to_ws_json("RESPONSE", target=nonce, **data)
 

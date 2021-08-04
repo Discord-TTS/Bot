@@ -1,4 +1,6 @@
 from __future__ import annotations
+import asyncio
+import logging
 
 from json import dump
 from typing import TYPE_CHECKING, Union
@@ -22,14 +24,14 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.command()
     @commands.is_owner()
     @commands.bot_has_permissions(send_messages=True, manage_messages=True, manage_webhooks=True)
-    async def sudo(self, ctx: commands.Context, user: Union[discord.User, str], *, message):
+    async def sudo(self, ctx: utils.TypedContext, user: Union[discord.User, str], *, message: str):
         """mimics another user"""
         await ctx.message.delete()
 
         if isinstance(user, str):
-            avatar = "https://cdn.discordapp.com/avatars/689564772512825363/f05524fd9e011108fd227b85c53e3d87.png"
+            avatar = "https://cdn.discordapp.com/.png"
         else:
-            avatar = str(user.avatar_url)
+            avatar = user.avatar.url
             user = user.display_name
 
         if not isinstance(ctx.channel, discord.TextChannel):
@@ -44,9 +46,33 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
             webhook = webhooks[0]
             await webhook.send(message, username=user, avatar_url=avatar)
 
+    @commands.command(aliases=("log_level", "logger", "loglevel"))
+    @commands.is_owner()
+    async def change_log_level(self, ctx: utils.TypedContext, *, level: str):
+        with open("config.ini", "w") as config_file:
+            self.bot.config["Main"]["log_level"] = level
+            self.bot.config.write(config_file)
+
+        if self.bot.websocket is None:
+            return self.bot.logger.setLevel(level.upper())
+
+        try:
+            wsjson = utils.data_to_ws_json("SEND", target="*", **{
+                "c": "change_log_level",
+                "a": {"level": level.upper()},
+                "t": "*"
+            })
+            await self.bot.websocket.send(wsjson)
+            await self.bot.wait_for("change_log_level", timeout=10)
+        except asyncio.TimeoutError:
+            await ctx.send(f"Didn't recieve broadcast within 10 seconds!")
+        else:
+            level = logging.getLevelName(self.bot.logger.level)
+            await ctx.send(f"Broadcast complete, log level is now: {level}")
+
     @commands.command()
     @commands.is_owner()
-    async def trust(self, ctx: commands.Context, mode: str, user: Union[discord.User, str] = ""):
+    async def trust(self, ctx: utils.TypedContext, mode: str, user: Union[discord.User, str] = ""):
         if mode == "list":
             await ctx.send("\n".join(self.bot.trusted))
 
@@ -81,7 +107,7 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command(aliases=("rc", "reload"))
     @commands.is_owner()
-    async def reload_cog(self, ctx: commands.Context, *, to_reload: str):
+    async def reload_cog(self, ctx: utils.TypedContext, *, to_reload: str):
         try:
             self.bot.reload_extension(to_reload)
         except Exception as e:
@@ -101,7 +127,7 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.is_owner()
-    async def add_premium(self, ctx: commands.Context, guild_id: int, user: discord.User):
+    async def add_premium(self, ctx: utils.TypedContext, guild_id: int, user: discord.User):
         guild = self.bot.get_guild(guild_id)
         if user.id in tuple(self.bot.patreon_json.values()):
             return await ctx.send(f"{user} is already linked to a guild, check json for more details.")

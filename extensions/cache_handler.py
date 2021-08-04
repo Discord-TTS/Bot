@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
-from typing import Any, TYPE_CHECKING, Optional
+from typing import Any, TYPE_CHECKING, Optional, Tuple
 
 from cryptography.fernet import Fernet
 
@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 
 def hash_args(func) -> Any:
-    def wrapper(self: CacheHandler, text: str, lang: str, variant: str, *args, **kwargs) -> Any:
-        return func(self, self.get_hash(text, lang, variant), *args, **kwargs)
+    def wrapper(self: CacheHandler, to_hash: Tuple[str], *args, **kwargs) -> Any:
+        return func(self, self.get_hash(*to_hash), *args, **kwargs)
     return wrapper
 
 

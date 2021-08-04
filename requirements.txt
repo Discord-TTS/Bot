@@ -1,8 +1,7 @@
-git+https://github.com/Rapptz/discord-ext-menus
+git+https://github.com/Rapptz/discord.py.git@58ca9e99325ac2678a51cd63afd7ae917f14bc8d#egg=discord.py[voice,speed]
+git+https://github.com/Rapptz/discord-ext-menus.git@fbb8803779373357e274e1540b368365fd9d8074
 git+https://github.com/Gnome-py/asyncgTTS.git
 aioredis[hiredis]>=2.0.0a1,<3.0
-discord.py[voice]
-aiohttp[speedups]
 cryptography
 websockets
 requests
