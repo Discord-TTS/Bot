@@ -154,10 +154,11 @@ class ErrorEvents(utils.CommonCog):
             )
 
         elif isinstance(error, commands.CheckFailure):
-            await self.send_error(
-                ctx, error="you ran this command in the wrong channel",
-                fix=f"do {ctx.prefix}channel get the channel that has been setup"
-            )
+            if "global check" not in str(error):
+                await self.send_error(
+                    ctx, error="you ran this command in the wrong channel",
+                    fix=f"do {ctx.prefix}channel get the channel that has been setup"
+                )
 
         elif isinstance(error, discord.errors.Forbidden):
             self.bot.logger.error(f"`discord.errors.Forbidden` caused by {ctx.message.content} sent by {ctx.author}")
@@ -168,9 +169,6 @@ class ErrorEvents(utils.CommonCog):
 
         elif isinstance(error, asyncio.TimeoutError):
             self.bot.logger.error(f"`asyncio.TimeoutError:` Unhandled in {ctx.command.qualified_name}")
-
-        elif isinstance(error, commands.CheckFailure) and "global check" in str(error):
-            return
 
         else:
             self.bot.create_task(self.send_error(ctx, error="an unknown error occured"))

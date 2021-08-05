@@ -53,7 +53,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             return # probably in VC, just let on_message do TTS
 
         author_name = "".join(filter(str.isalnum, ctx.author.name))
-        
+
         lang = await self.bot.userinfo.get("lang", ctx.author, "en-us")
         variant = await self.bot.userinfo.get("variant", ctx.author, "a")
         voice = await self.bot.get_voice(lang, variant)
@@ -194,4 +194,4 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
     @commands.bot_has_permissions(send_messages=True)
     async def invite(self, ctx: utils.TypedContext):
         "Sends the instructions to invite TTS Bot and join the support server!"
-        await ctx.send(f"Join https://discord.gg/zWPWwQC and check out the patreon channel to invite me!")
+        await ctx.send("Join https://discord.gg/zWPWwQC and check out the patreon channel to invite me!")

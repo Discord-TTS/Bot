@@ -45,15 +45,17 @@ class MainEvents(utils.CommonCog):
             return
 
         # Premium Check
-        if not getattr(self.bot, "patreon_role", False) or self.bot.patreon_role is None:
-            return
-
         if str(message.author.id) not in self.bot.trusted:
-            premium_user_for_guild = self.bot.patreon_json.get(str(message.guild.id))
-            if not any(premium_user_for_guild == member.id for member in self.bot.patreon_role.members):
+            premium_user: Optional[int] = (await self.bot.settings.get(message.guild, ["premium_user"]))[0]
+            if premium_user is None:
                 return
 
-        self.bot.logger.debug(f"Past premium check")
+            if self.bot.patreon_members is None:
+                self.bot.patreon_members = await self.bot.fill_patreon_members()
+
+            if premium_user not in self.bot.patreon_members:
+                return
+
         # Get settings
         repeated_limit, to_translate, target_lang, bot_ignore, max_length, autojoin, channel, is_formal, prefix, xsaid = await self.bot.settings.get(
             message.guild,
@@ -234,3 +236,20 @@ class MainEvents(utils.CommonCog):
             return
 
         await vc.disconnect(force=True)
+
+    @commands.Cog.listener()
+    async def on_member_update(self,
+        before: utils.TypedMember,
+        after: utils.TypedMember
+    ):
+        if self.bot.get_support_server() != after.guild:
+            return
+
+        patreon_role = self.bot.get_patreon_role()
+        if self.bot.patreon_members is None:
+            self.bot.patreon_members = await self.bot.fill_patreon_members()
+
+        if patreon_role in before.roles and patreon_role not in after.roles:
+            self.bot.patreon_members.remove(before.id)
+        elif patreon_role not in before.roles and patreon_role in after.roles:
+            self.bot.patreon_members.append(after.id)

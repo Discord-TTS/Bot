@@ -82,6 +82,7 @@ GUILDS_CREATE = """
     CREATE TABLE guilds (
         guild_id       bigint     PRIMARY KEY,
         channel        bigint     DEFAULT 0,
+        premium_user   bigint
         xsaid          bool       DEFAULT True,
         bot_ignore     bool       DEFAULT True,
         auto_join      bool       DEFAULT False,
@@ -92,6 +93,10 @@ GUILDS_CREATE = """
         prefix         varchar(6) DEFAULT 'p-',
         default_lang   varchar(7),
         target_lang    varchar(5),
+
+        FOREIGN KEY         (premium_user)
+        REFERENCES userinfo (user_id)
+        ON DELETE CASCADE,
     );"""
 USERINFO_CREATE = """
     CREATE TABLE userinfo (

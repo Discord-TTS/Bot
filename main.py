@@ -40,10 +40,7 @@ allowed_mentions = discord.AllowedMentions(everyone=False, roles=False)
 cache_flags = discord.MemberCacheFlags(joined=False)
 
 async def premium_check(ctx: utils.TypedGuildContext):
-    if not ctx.bot.patreon_role:
-        return
-
-    if not ctx.guild:
+    if ctx.guild is None:
         return True
 
     if str(ctx.author.id) in ctx.bot.trusted:
@@ -52,20 +49,15 @@ async def premium_check(ctx: utils.TypedGuildContext):
     if str(ctx.command) in ("donate", "add_premium") or str(ctx.command).startswith(("jishaku"),):
         return True
 
-    support_server = ctx.bot.get_support_server()
-    if not support_server:
-        return False
+    if ctx.bot.patreon_members is None:
+        ctx.bot.patreon_members = await ctx.bot.fill_patreon_members()
 
-    if not support_server.chunked:
-        await support_server.chunk(cache=True)
-
-    premium_user_for_guild = ctx.bot.patreon_json.get(str(ctx.guild.id))
-    if any(premium_user_for_guild == member.id for member in ctx.bot.patreon_role.members):
+    premium_user: Optional[int] = (await ctx.bot.settings.get(ctx.guild, ["premium_user"]))[0]
+    if premium_user is not None and premium_user in ctx.bot.patreon_members:
         return True
 
-    print(f"{ctx.author} | {ctx.author.id} failed premium check in {ctx.guild.name} | {ctx.guild.id}")
-
-    permissions = ctx.channel.permissions_for(ctx.guild.me) # type: ignore
+    ctx.bot.logger.warning(f"{ctx.author} | {ctx.author.id} failed premium check in {ctx.guild.name} | {ctx.guild.id}")
+    permissions: discord.Permissions = ctx.channel.permissions_for(ctx.guild.me)
     if permissions.send_messages:
         main_msg = f"Hey! This server isn't premium! Please purchase TTS Bot Premium via Patreon! (`{ctx.prefix}donate`)"
         footer_msg = "If this is an error, please contact Gnome!#6669."
@@ -102,7 +94,6 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
         voice_clients: List[TTSVoicePlayer]
         analytics_buffer: utils.SafeDict
         _voice_data: List[utils.Voice]
-        patreon_json: Dict[str, int]
         gtts: asyncgTTS.asyncgTTS
         cache_db: aioredis.Redis
         bot: TTSBotPremium
@@ -129,30 +120,20 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
         self.session = session
         self.cluster_id = cluster_id
         self.channels: Dict[str, discord.Webhook] = {}
+        self.patreon_members: Optional[List[int]] = None
         self.tasks: asyncio.Queue[Awaitable[Any]] = asyncio.Queue()
 
         self.status_code = utils.RESTART_CLUSTER
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
 
-        with open("patreon_users.json") as f:
-            self.patreon_json = json.load(f)
-
         kwargs["command_prefix"] = self.command_prefix
-        super().__init__(*args, **kwargs) # type: ignore
+        super().__init__(*args, **kwargs)
 
 
     @property
     def invite_channel(self) -> Optional[discord.TextChannel]:
         support_server = self.get_support_server()
         return support_server.get_channel(835224660458864670) if support_server else None # type: ignore
-
-    @property
-    def patreon_role(self) -> Optional[discord.Role]:
-        support_server = self.get_support_server()
-        if not support_server:
-            return
-
-        return discord.utils.get(support_server.roles, name="Patreon!")
 
 
     def log(self, event: str) -> None:
@@ -169,7 +150,6 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
         for ext in filered_exts:
             self.load_extension(f"{folder}.{ext[:-3]}")
 
-
     def create_websocket(self) -> Awaitable[websockets.WebSocketClientProtocol]:
         host = self.config["Clustering"].get("websocket_host", "localhost")
         port = self.config["Clustering"].get("websocket_port", "8765")
@@ -177,6 +157,12 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
         uri = f"ws://{host}:{port}/{self.cluster_id}"
         return websockets.connect(uri)
 
+    def get_patreon_role(self) -> Optional[discord.Role]:
+        support_server = self.get_support_server()
+        if not support_server:
+            return
+
+        return discord.utils.get(support_server.roles, name="Patreon!")
 
     async def get_invite_channel(self) -> Optional[discord.TextChannel]:
         channel_id = 694127922801410119
@@ -218,6 +204,27 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
             embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar.url)
             embed.set_footer(text=f"Try {ctx.prefix}voices for a full list!")
             return embed
+
+    async def fill_patreon_members(self) -> List[int]:
+        support_server = self.get_support_server()
+        if support_server is None:
+            return []
+
+        patreon_role = self.get_patreon_role()
+        if patreon_role is None:
+            return []
+
+        support_members = await support_server.chunk()
+        if support_members is None:
+            return []
+
+        support_members = cast(List[discord.Member], support_members)
+        self.patreon_members = [
+            member.id
+            for member in support_members
+            if member.get_role(patreon_role.id)
+        ]
+        return self.patreon_members
 
 
     def add_check(self: _T, *args: Any, **kwargs: Any) -> _T:
@@ -328,7 +335,7 @@ async def _real_main(
         chunk_guilds_at_startup=False,
         member_cache_flags=cache_flags,
         allowed_mentions=allowed_mentions,
-    ).add_check(only_avaliable)
+    ).add_check(only_avaliable).add_check(premium_check)
 
     def stop_bot_sync(sig: int):
         bot.status_code = -sig

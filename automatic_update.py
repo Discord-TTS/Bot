@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import asyncio
 from configparser import ConfigParser
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal, Optional
+from typing import (TYPE_CHECKING, Awaitable, Callable, Dict, List, Literal,
+                    Optional)
 
 import utils
 
@@ -28,9 +29,8 @@ def _update_config(config: ConfigParser):
 
 def _update_defaults(bot: TTSBotPremium) -> asyncio.Task[Record]:
     return bot.loop.create_task( # type: ignore
-        bot.conn.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
+        bot.pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
     )
-
 
 def add_to_updates(type: Literal["early", "normal"]) -> Callable[[_UF], _UF]:
     def deco(func: _UF) -> _UF:
@@ -61,10 +61,11 @@ async def do_normal_updates(bot: TTSBotPremium):
         return
 
     async with bot.pool.acquire() as conn:
-        bot.conn = conn
-        for func in normal_updates:
-            if await func(bot):
-                print(f"Completed update: {func.__name__}")
+        async with conn.transaction():
+            bot.conn = conn
+            for func in normal_updates:
+                if await func(bot):
+                    print(f"Completed update: {func.__name__}")
 
     del bot.conn
 
@@ -106,6 +107,48 @@ async def add_translation(bot: TTSBotPremium) -> bool:
     bot.settings.DEFAULT_SETTINGS = _update_defaults(bot)
     return True
 
+@add_to_updates("normal")
+async def json_to_sql(bot: TTSBotPremium) -> bool:
+    defaults = await bot.settings.DEFAULT_SETTINGS
+    if "premium_user" in defaults:
+        return False
+
+    import orjson
+
+    # Old patreon_users.json is "guild_id": user_id
+    with open("patreon_users.json") as json_file:
+        premium_users: Dict[str, int] = orjson.loads(json_file.read())
+
+    # Insert all premium users into the userinfo table, so that we can...
+    await bot.conn.executemany("""
+        INSERT INTO userinfo(user_id) VALUES ($1)
+        ON CONFLICT (user_id) DO NOTHING
+    """, [(uid,) for uid in premium_users.values()])
+
+    # Adds the premium_user column to the guilds table, with a foreign key
+    await bot.conn.execute("""
+        ALTER TABLE guilds
+            ADD COLUMN premium_user BIGINT,
+            ADD CONSTRAINT premium_user_fk
+                FOREIGN KEY         (premium_user)
+                REFERENCES userinfo (user_id)
+                ON DELETE CASCADE
+    """)
+
+    # Migrates json data into the SQL format
+    await bot.conn.executemany("""
+        INSERT INTO guilds(guild_id, premium_user)
+        VALUES ($1, $2)
+
+        ON CONFLICT (guild_id)
+        DO UPDATE SET premium_user = EXCLUDED.premium_user
+    """,[
+        (int(guild_id), user_id)
+        for guild_id, user_id in premium_users.items()
+    ])
+
+    bot.settings.DEFAULT_SETTINGS = _update_defaults(bot)
+    return True
 
 @add_to_updates("early")
 async def update_config(bot: TTSBotPremium) -> bool:

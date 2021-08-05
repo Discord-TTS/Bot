@@ -1,14 +1,15 @@
 from __future__ import annotations
+
 import asyncio
 import logging
-
-from json import dump
 from typing import TYPE_CHECKING, Union
 
+import asyncpg
 import discord
 from discord.ext import commands
 
 import utils
+from extensions.database_handler import CacheWriter
 
 
 if TYPE_CHECKING:
@@ -18,11 +19,11 @@ if TYPE_CHECKING:
 def setup(bot: TTSBotPremium):
     bot.add_cog(OwnerCommands(bot))
 
-class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
+class OwnerCommands(utils.CommonCog):
     "TTS Bot commands meant only for the bot owner."
 
-    @commands.command()
     @commands.is_owner()
+    @commands.command(hidden=True)
     @commands.bot_has_permissions(send_messages=True, manage_messages=True, manage_webhooks=True)
     async def sudo(self, ctx: utils.TypedContext, user: Union[discord.User, str], *, message: str):
         """mimics another user"""
@@ -46,7 +47,7 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
             webhook = webhooks[0]
             await webhook.send(message, username=user, avatar_url=avatar)
 
-    @commands.command(aliases=("log_level", "logger", "loglevel"))
+    @commands.command(hidden=True, aliases=("log_level", "logger", "loglevel"))
     @commands.is_owner()
     async def change_log_level(self, ctx: utils.TypedContext, *, level: str):
         with open("config.ini", "w") as config_file:
@@ -70,8 +71,8 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
             level = logging.getLevelName(self.bot.logger.level)
             await ctx.send(f"Broadcast complete, log level is now: {level}")
 
-    @commands.command()
     @commands.is_owner()
+    @commands.command(hidden=True)
     async def trust(self, ctx: utils.TypedContext, mode: str, user: Union[discord.User, str] = ""):
         if mode == "list":
             await ctx.send("\n".join(self.bot.trusted))
@@ -95,9 +96,9 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
             await ctx.send(f"Removed {user} | {user.id} from the trusted members")
 
-    @commands.command()
     @commands.is_owner()
     @commands.guild_only()
+    @commands.command(hidden=True)
     @commands.bot_has_permissions(send_messages=True)
     async def say(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel, *, to_say: str):
         if ctx.bot_permissions().manage_messages:
@@ -105,7 +106,7 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
         await channel.send(to_say)
 
-    @commands.command(aliases=("rc", "reload"))
+    @commands.command(hidden=True, aliases=("rc", "reload"))
     @commands.is_owner()
     async def reload_cog(self, ctx: utils.TypedContext, *, to_reload: str):
         try:
@@ -127,15 +128,33 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     @commands.is_owner()
-    async def add_premium(self, ctx: utils.TypedContext, guild_id: int, user: discord.User):
-        guild = self.bot.get_guild(guild_id)
-        if user.id in tuple(self.bot.patreon_json.values()):
-            return await ctx.send(f"{user} is already linked to a guild, check json for more details.")
-        if not guild:
+    async def add_premium(self, ctx: utils.TypedContext, guild_obj: discord.Object, user: discord.User, overwrite: bool = False):
+        guild = self.bot.get_guild(guild_obj.id)
+        if guild is None:
             return await ctx.send("I'm not in that guild!")
 
-        self.bot.patreon_json[str(guild)] = user.id
-        with open("patreon_users.json", "w") as f:
-            dump(self.bot.patreon_json, f)
+        async with self.bot.pool.acquire() as conn:
+            async with (
+                CacheWriter(self.bot.userinfo, user.id, broadcast=True),
+                CacheWriter(self.bot.settings, guild.id, broadcast=False)
+            ):
+                try:
+                    await conn.execute("""
+                        INSERT INTO userinfo(user_id) VALUES($1)
+                        ON CONFLICT (user_id) DO NOTHING
+                    """, user.id)
+                    await conn.execute("""
+                        INSERT INTO guilds(guild_id, premium_user)
+                        VALUES($1, $2)
+
+                        ON CONFLICT (guild_id)
+                        DO UPDATE SET premium_user = EXCLUDED.premium_user
+                    """, guild.id, user.id)
+                except asyncpg.UniqueViolationError:
+                    if not overwrite:
+                        return await ctx.send(f"{user} is already linked to a guild!")
+
+                    await conn.execute("UPDATE guilds SET premium_user = null WHERE premium_user = $1", user.id)
+                    return await self.add_premium(ctx, guild_obj, user, overwrite=False)
 
         await ctx.send(f"Linked {user.mention} ({user} | {user.id}) to {guild.name}")
