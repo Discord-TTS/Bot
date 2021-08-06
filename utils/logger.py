@@ -3,6 +3,7 @@ import configparser
 import logging
 from logging import ERROR, WARNING
 from typing import Dict, List, Union
+from utils.funcs import group_by
 
 import aiohttp
 import discord
@@ -41,31 +42,31 @@ class WebhookHandler(logging.StreamHandler):
         self.error_logs = discord.Webhook.from_url(url=config["Webhook URLs"]["errors"], session=session)
 
 
-    def webhook_send(self, severity: int, *messages: str):
+    def webhook_send(self, severity: int, *lines: str):
         severity_name = logging.getLevelName(severity)
         webhook = self.error_logs if severity >= ERROR else self.normal_logs
 
         message = ""
-        for line in messages:
+        for line in lines:
             if severity >= WARNING:
                 line = f"**{line}**"
 
             message += f"{self.prefix}{line}\n"
 
-        return webhook.send(
-            content=message,
-            username=f"TTS-Webhook [{severity_name}]",
-            avatar_url=avatars.get(severity, unknown_avatar_url),
-        )
+        return asyncio.gather(*(
+            webhook.send(
+                username=f"TTS-Webhook [{severity_name}]",
+                content="".join(l for l in message if l is not None),
+                avatar_url=avatars.get(severity, unknown_avatar_url),
+            )
+            for message in group_by(message, 2000)
+        ))
 
     @tasks.loop(seconds=1)
     async def sender_loop(self) -> None:
         for severity in self.to_be_sent.copy().keys():
-            msgs = self.to_be_sent.pop(severity)
-            try:
-                await self.webhook_send(severity, *msgs)
-            except RuntimeError:
-                return self.sender_loop.stop()
+            message = self.to_be_sent.pop(severity)
+            await self.webhook_send(severity, *message)
 
     def _emit(self, record: logging.LogRecord) -> None:
         msg = self.format(record)

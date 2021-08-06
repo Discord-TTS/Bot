@@ -9,7 +9,7 @@ import discord
 from discord.ext import commands
 
 from .classes import CommonCog, TypedGuildContext
-from .funcs import to_thread
+from .funcs import to_thread, group_by
 from .views import BoolView, ChannelSelector, GenericView
 
 
@@ -35,7 +35,11 @@ def make_fancy(
             return await func(self, ctx, value)
 
         if type_to_convert == "TextChannel":
-            select_view = GenericView.from_item(ChannelSelector, ctx)
+            select_view = GenericView(ctx)
+            for channels in group_by(ctx.guild.text_channels, 25):
+                channels = [c for c in channels if c is not None]
+                select_view.add_item(ChannelSelector(ctx, channels))
+
             select_view.message = await ctx.reply("Select a channel!", view=select_view) # type: ignore
 
         elif type_to_convert == "bool":

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Coroutine, Type, cast
+from typing import Any, Coroutine, Iterable, List, Type, cast
 
 import discord
 
@@ -72,33 +72,37 @@ class GenericItemMixin:
     view: GenericView
 
 class ChannelSelector(GenericItemMixin, discord.ui.Select):
-    def __init__(self, ctx: TypedGuildContext, *args: Any, **kwargs: Any):
-        self.ctx = ctx
-        self.channels = ctx.guild.text_channels
+    def __init__(self,
+        ctx: TypedGuildContext,
+        channels: Iterable[discord.abc.GuildChannel],
+    *args: Any, **kwargs: Any):
 
+        self.ctx = ctx
+        self.channels = channels
         discord.ui.Select.__init__(self, *args, **kwargs, options=[
             discord.SelectOption(
                 label=f"""#{
-                    (channel.name[:20] + '...')
+                    (channel.name[:21] + '...')
                     if len(channel.name) >= 25
                     else channel.name
                 }""",
                 value=str(channel.id)
             )
-            for channel in self.channels
+            for channel in channels
         ])
 
     async def callback(self, interaction: discord.Interaction):
-        channel = self.ctx.guild.get_channel(int(self.values[0]))
+        channel_id = int(self.values[0])
+        channel = self.ctx.guild.get_channel(channel_id)
 
-        if channel is None:
+        if channel is None and channel_id in [c.id for c in self.channels]:
             self.ctx.bot.logger.error(f"Couldn't find channel: {channel}")
 
-            err = f"Sorry, but that channel has been deleted!"
+            err = "Sorry, but that channel has been deleted!"
             await interaction.response.send_message(err, ephemeral=True)
 
-            new_view = GenericView.from_item(self.__class__, self.ctx)
-            await self.view.message.edit(view=new_view)
+            self.options = [option for option in self.options if option.value != self.values[0]]
+            await self.view.message.edit(view=self.view)
         else:
             await self.view.recall_command(channel)
             await self.view.message.delete()

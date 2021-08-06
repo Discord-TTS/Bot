@@ -59,7 +59,11 @@ class TTSAudioMaker:
             if audio is None:
                 return None, None
 
-            file_length = await to_thread(self.get_duration, audio, mode)
+            try:
+                file_length = await to_thread(self.get_duration, audio, mode)
+            except mutagen.HeaderNotFoundError:
+                return None, None
+
             if file_length > max_length:
                 return self.bot.log("on_above_max_length"), None
 
@@ -89,7 +93,7 @@ class TTSAudioMaker:
     def get_duration(self, audio_data: bytes, mode: Literal["mp3", "wav"]) -> float:
         audio_file = BytesIO(audio_data)
         if mode == "mp3":
-            return mutagen.MP3(BytesIO(audio_data)).info.length
+            return mutagen.MP3(audio_file).info.length
 
         segment = AudioSegment.from_file_using_temporary_files(audio_file)
         return len(segment) / 1000 # type: ignore

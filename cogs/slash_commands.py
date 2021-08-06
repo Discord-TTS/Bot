@@ -6,13 +6,14 @@ import logging
 from functools import partial
 from io import BytesIO
 from operator import itemgetter
-from typing import Callable, TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
+from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple,
+                    Union, cast)
 
 import discord
 import orjson
 import utils
 from discord.ext import commands
-from discord.ext.commands.core import unwrap_function, get_signature_parameters
+from discord.ext.commands.core import get_signature_parameters, unwrap_function
 from discord.http import Route
 from discord.types.interactions import (
     ApplicationCommandInteractionData as SlashCommandData,
@@ -136,6 +137,13 @@ async def _parse_arguments(ctx: utils.TypedContext, callback=None):
     if ctx.interaction is None or callback is None:
         await callback(ctx)
 
+async def defer_task(ctx: utils.TypedContext):
+    assert ctx.interaction is not None
+
+    if not ctx.interaction.response.is_done():
+        await ctx.interaction.response.defer()
+        ctx.defered = True # type: ignore
+
 def setup(bot: TTSBot):
     bot.add_cog(SlashCommands(bot))
 
@@ -184,7 +192,7 @@ class SlashCommands(utils.CommonCog):
 
         assert interaction.user is not None
         assert interaction.channel is not None
-        assert isinstance(interaction.channel, (discord.TextChannel, discord.DMChannel))
+        assert isinstance(interaction.channel, (discord.TextChannel, discord.DMChannel, discord.Thread))
 
         interaction.data = cast(SlashCommandData, interaction.data)
 
@@ -216,6 +224,7 @@ class SlashCommands(utils.CommonCog):
         message.clean_content = message.content # type: ignore
 
         ctx = await self.bot.get_context(message)
+        self.bot.loop.call_later(2.5, self.bot.create_task, defer_task(ctx))
         if ctx.command:
             ctx.prefix = "/"
             ctx.interaction = interaction
@@ -238,8 +247,9 @@ class SlashCommands(utils.CommonCog):
             except commands.CommandError as err:
                 await ctx.command.dispatch_error(ctx, err)
             else:
-                if not ctx.interaction.response.is_done():
-                    await interaction.response.send_message(f"Finished `{command_name}`!")
+                defered = getattr(ctx, "defered", False)
+                if defered or not ctx.interaction.response.is_done():
+                    await ctx.send(f"Finished `{command_name}`!")
         else:
             self.bot.log("on_unknown_slash_command")
-            await interaction.response.send_message("I cannot find this command! Please wait 1 hour if the bot has just updated")
+            await ctx.send("I cannot find this command! Please wait 1 hour if the bot has just updated")

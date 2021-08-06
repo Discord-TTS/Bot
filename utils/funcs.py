@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import sys
 from inspect import cleandoc
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
-                    Sequence, Type, TypeVar, Union, overload)
+from itertools import zip_longest
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Generator,
+                    Iterable, Literal, Optional, Sequence, Tuple, Type,
+                    TypeVar, Union, overload)
 
 import orjson
 
@@ -26,6 +28,10 @@ if TYPE_CHECKING:
 
 
 _sep = OPTION_SEPERATORS[0]
+
+def group_by(iterable: Iterable[_T], by:int) -> Generator[Tuple[_T], None, None]:
+    "Splits an iterable into tuples of `by` length"
+    yield from zip_longest(*[iter(iterable)]*by)
 
 def construct_unslotted(cls: Type[_T], *args, **kwargs) -> _T:
     "Constructs cls without any slots, allowing attribute addition"

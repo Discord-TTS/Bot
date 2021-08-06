@@ -19,22 +19,21 @@ import aiohttp
 import orjson
 import requests
 import websockets
+
 import utils
 
 config = ConfigParser()
 config.read("config.ini")
 
+
 if TYPE_CHECKING:
-    from utils.websocket_types import *
     from concurrent.futures import Future
+    from utils.websocket_types import *
 
     _T = TypeVar("_T")
     _CLUSTER_ARG = Tuple[int, int, Tuple[int]]
     _CLUSTER_RET = Tuple[int, int, _CLUSTER_ARG]
     _WSSP = websockets.WebSocketServerProtocol
-
-def group_by(iterable: Iterable[_T], by:int) -> Iterable[Tuple[_T]]:
-    yield from zip_longest(*[iter(iterable)]*by)
 
 
 def make_user_agent():
@@ -150,7 +149,7 @@ class ClusterManager:
 
         logger.info(f"Launching {cluster_count} clusters to handle {shard_count} shards with {shards_per_cluster} per cluster.")
 
-        all_shards = group_by(range(shard_count), shards_per_cluster)
+        all_shards = utils.group_by(range(shard_count), shards_per_cluster)
         for cluster_id, shards in enumerate(all_shards):
             shards = [s for s in shards if s is not None]
             args = (cluster_id, shard_count, shards)
