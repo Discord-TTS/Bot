@@ -35,7 +35,7 @@ Now we want to clone the bot files from GitHub onto the machine we are hosting o
 
 Before we clone, we want to ensure that we are in the folder where we want our bot files to be. In this example, we will be using the "home" folder. If you are not already in the root directory, simply type `cd` to return to the root directory. Next, run `cd /home` to be in the home directory.
 
-Finally, we will clone the GitHub repository by running `git clone -b premium https://github.com/uwuscutely/Discord-TTS-Bot.git`.
+Finally, we will clone the GitHub repository by running `git clone -b premium https://github.com/Gnome-py/Discord-TTS-Bot.git`.
 
 ### Obtaining your Google Application Credentials
 
@@ -48,7 +48,7 @@ Finally, we will clone the GitHub repository by running `git clone -b premium ht
 
 ### Creating and Inviting Your Bot
 
-Head over to https://discord.com/developers/applications and create a new application. Next, click "Bot" from the menu on the left and add a bot. Under the "Privileged Gateway Intents" section, enable "Server Memebers Intent". Here you can also change your bot's username and profile picture. 
+Head over to https://discord.com/developers/applications and create a new application. Next, click "Bot" from the menu on the left and add a bot. Under the "Privileged Gateway Intents" section, enable "Server Members Intent". Here you can also change your bot's username and profile picture. 
 
 Next, we will invite the bot to the main Discord server you would like to operate the bot out of. Click OAuth2 on the left. Under scopes, select "bot" and under permissions select "Administrator". Now, copy and paste the generated link into a new tab on your browser. Select the server you would like to invite the bot to and authorize.
 
@@ -62,7 +62,7 @@ Now that most of the bot files are in place and dependencies are installed. We c
 
 Locate `config-docker.ini` within your bot files and rename it to `config.ini`. Then fill it out using the instructions in each section of the config. Remember to save the file.
 
-Next rename `docker-compose-example-premium.yml` to `docker-compose.yml`
+Next rename `docker-compose-example.yml` to `docker-compose.yml`
 
 ### Starting the Bot
 
