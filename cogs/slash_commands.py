@@ -13,7 +13,8 @@ import discord
 import orjson
 import utils
 from discord.ext import commands
-from discord.ext.commands.core import get_signature_parameters, unwrap_function
+from discord.ext.commands.core import (get_converter, get_signature_parameters,
+                                       run_converters, unwrap_function)
 from discord.http import Route
 from discord.types.interactions import (
     ApplicationCommandInteractionData as SlashCommandData,
@@ -64,17 +65,25 @@ def parse_param(name: str, param: inspect.Parameter) -> Optional[Dict[str, Any]]
         return
 
     # Unwraps Union types and similar to a tuple of their types
-    param_types = getattr(param.annotation, "__args__", (param.annotation,)) # type: Tuple[type]
-
-    # if all(not isinstance(t, type) for t in param_types):
-        # TODO: implement option["choices"]
+    param_types: Union[Tuple[type, ...], Tuple[object, ...]] = getattr(
+        param.annotation, "__args__", (param.annotation,)
+    )
 
     option = {
         "type": None,
         "name": name,
         "required": NoneType not in param_types,
-        "description": f"Type(s): {', '.join(t.__name__ for t in param_types)}",
     }
+
+    if all(not isinstance(t, type) for t in param_types):
+        param_types = cast(Tuple[object, ...], param_types)
+        option["choices"] = [{
+            "name": literal_value,
+            "value": literal_value
+        } for literal_value in param_types]
+
+    param_types = tuple(t if isinstance(t, type) else type(t) for t in param_types)
+    option["description"] = f"Type(s): {', '.join(t.__name__ for t in param_types)}"
 
     for original, num in type_lookup.items():
         for param_type in param_types:
@@ -117,13 +126,20 @@ async def convert_params(
 
         cleaned_value = option.get("value")
         ctx.bot.logger.debug(f"Cleaned value {cleaned_value} {type(cleaned_value)} | Option Type {option['type']}")
-        if option["type"] == 6:
+
+        if option["type"] == 3:
+            param = ctx.command.params[option["name"]]
+            converter = get_converter(param)
+
+            if converter != str:
+                coro = run_converters(ctx, converter, option["value"], param)
+                cleaned_value = await coro
+        elif option["type"] == 6:
             cleaned_value = await fetch_user(int(option["value"]))
         elif option["type"] == 7:
             cleaned_value = get_channel(int(option["value"]))
         elif option["type"] == 8:
             cleaned_value = get_role(int(option["value"]))
-
         elif option["type"] == 9:
             cleaned_value = discord.Object(int(option["value"]))
 

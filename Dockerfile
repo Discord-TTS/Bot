@@ -1,6 +1,7 @@
 FROM python:latest
+RUN pip install -U pip
 
-RUN apt-get update && apt-get install -y ffmpeg espeak make gcc git
+RUN apt-get update && apt-get upgrade -y && apt-get install -y ffmpeg espeak make gcc git
 
 RUN git clone https://github.com/vishnubob/wait-for-it wait-for-it && \
     cd wait-for-it && chmod +x wait-for-it.sh && mv wait-for-it.sh / && \
@@ -15,8 +16,9 @@ RUN git clone https://github.com/numediart/MBROLA MBROLA && \
     cd / && rm -rf MBROLA
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -U -r requirements.txt uvloop jishaku
-RUN pip install --no-cache-dir -U ./aiohttp-git[speedups] && rm -rf aiohttp-git
+RUN pip install -U -r requirements.txt uvloop jishaku && \
+    pip install -U ./aiohttp-git[speedups] && \
+    rm -rf aiohttp-git && pip cache purge
 
 RUN python3 -u -m voxpopuli.voice_install all
 

@@ -28,18 +28,18 @@ class CommonCog(commands.Cog):
     def __init__(self, bot: TTSBot):
         self.bot = bot
 
+class ClearableQueue(asyncio.Queue[_T]):
+    _queue: collections.deque[_T]
+
+    def clear(self):
+        self._queue.clear()
+
 class SafeDict(dict[str, int]):
     def add(self, event: str):
         if event not in self:
             self[event] = 0
 
         self[event] += 1
-
-class ClearableQueue(asyncio.Queue[_T]):
-    _queue: collections.deque[_T]
-
-    def clear(self):
-        self._queue.clear()
 
 class TTSAudioMaker:
     def __init__(self, bot: TTSBot):

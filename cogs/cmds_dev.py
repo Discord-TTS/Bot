@@ -1,8 +1,7 @@
 from __future__ import annotations
-import asyncio
 
 from inspect import cleandoc
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import discord
 from discord.ext import commands
