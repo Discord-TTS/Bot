@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Coroutine, Iterable, List, Type, cast
+from typing import Any, Coroutine, Iterable, Type, cast
 
 import discord
 

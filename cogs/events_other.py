@@ -88,15 +88,15 @@ class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: utils.TypedGuild):
-        _, prefix, owner = await asyncio.gather(
+        _, owner, settings = await asyncio.gather(
             self.bot.channels["servers"].send(f"Just joined {guild}! I am now in {len(self.bot.guilds)} different servers!"),
-            self.bot.settings.get(guild, ["prefix"]),
-            guild.fetch_member(guild.owner_id)
+            guild.fetch_member(guild.owner_id),
+            self.bot.settings.get(guild.id),
         )
 
         embed = discord.Embed(
             title=f"Welcome to {self.bot.user.name}!",
-            description=WELCOME_MESSAGE.format(guild=guild, prefix=prefix[0])
+            description=WELCOME_MESSAGE.format(guild=guild, prefix=settings["prefix"])
         ).set_footer(
             text="Support Server: https://discord.gg/zWPWwQC | Bot Invite: https://bit.ly/TTSBot"
         ).set_author(name=str(owner), icon_url=owner.avatar.url)
@@ -114,10 +114,9 @@ class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild):
-        await asyncio.gather(
-            self.bot.settings.remove(guild),
-            self.bot.channels["servers"].send(f"Just got kicked from {guild}. I am now in {len(self.bot.guilds)} servers")
-        )
+        del self.bot.settings[guild.id]
+        await self.bot.channels["servers"].send(f"Just got kicked from {guild}. I am now in {len(self.bot.guilds)} servers")
+
 
 
     # IPC events that have been plugged into bot.dispatch

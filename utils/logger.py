@@ -3,12 +3,12 @@ import configparser
 import logging
 from logging import ERROR, WARNING
 from typing import Dict, List, Union
-from utils.funcs import group_by
 
 import aiohttp
 import discord
 from discord.ext import tasks
 
+from .funcs import group_by
 from .constants import DEFAULT_AVATAR_URL
 
 config = configparser.ConfigParser()

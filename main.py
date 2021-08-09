@@ -8,7 +8,7 @@ from os import listdir
 from signal import SIGHUP, SIGINT, SIGTERM
 from time import monotonic
 from typing import (Set, TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
-                    Optional, TypeVar, Union, cast)
+                    Optional, Tuple, TypeVar, Union, cast)
 
 import aiohttp
 import aioredis
@@ -49,10 +49,10 @@ class TTSBot(_commands.AutoShardedBot):
         from extensions import cache_handler, database_handler
         from player import TTSVoicePlayer
 
-        settings: database_handler.GeneralSettings
-        userinfo: database_handler.UserInfoHandler
-        nicknames: database_handler.NicknameHandler
         cache: cache_handler.CacheHandler
+        settings: database_handler.TableHandler[int]
+        userinfo: database_handler.TableHandler[int]
+        nicknames: database_handler.TableHandler[Tuple[int, int]]
 
         analytics_buffer: utils.SafeDict
         cache_db: aioredis.Redis
@@ -91,12 +91,23 @@ class TTSBot(_commands.AutoShardedBot):
         super().__init__(*args, **kwargs) # type: ignore
 
 
+    def handle_error(self, task: asyncio.Task):
+        try:
+            exception = task.exception()
+        except (asyncio.CancelledError, RecursionError):
+            return
+
+        if exception is not None:
+            self.create_task(self.on_error("task", exception))
+
+    def create_task(self, coro: Awaitable[_T], *args: Any, **kwargs: Any) -> asyncio.Task[_T]:
+        task = self.loop.create_task(coro, *args, **kwargs)
+        task.add_done_callback(self.handle_error)
+        return task
+
 
     def log(self, event: str) -> None:
         self.analytics_buffer.add(event)
-
-    def create_task(self, *args: Any, **kwargs: Any) -> None:
-        self.tasks.put_nowait(self.loop.create_task(*args, **kwargs))
 
     def get_support_server(self) -> Optional[discord.Guild]:
         return self.get_guild(int(self.config["Main"]["main_server"]))
@@ -154,7 +165,7 @@ class TTSBot(_commands.AutoShardedBot):
     @staticmethod
     async def command_prefix(bot: TTSBot, message: discord.Message) -> str:
         if message.guild:
-            return (await bot.settings.get(message.guild, ["prefix"]))[0]
+            return (await bot.settings.get(message.guild.id))["prefix"]
 
         return "-"
 

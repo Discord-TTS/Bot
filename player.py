@@ -229,7 +229,7 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
             await channel.send(embed=await self._get_embed())
 
     async def _get_embed(self):
-        prefix = self.prefix or (await self.bot.settings.get(self.guild, ["prefix"]))[0]
+        prefix = self.prefix or self.bot.settings[self.guild.id].get("prefix", "-")
 
         return discord.Embed(
             title="TTS Bot has been blocked by Google",

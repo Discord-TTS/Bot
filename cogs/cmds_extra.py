@@ -48,12 +48,12 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             not ctx.interaction
             and ctx.guild is not None
             and ctx.guild.voice_client
-            and (await self.bot.settings.get(ctx.guild, ["channel"]))[0] == ctx.channel.id
+            and self.bot.settings[ctx.guild.id]["channel"] == ctx.channel.id
         ):
             return # probably in VC, just let on_message do TTS
 
         author_name = "".join(filter(str.isalnum, ctx.author.name))
-        lang = await self.bot.userinfo.get("lang", ctx.author, "en")
+        lang = (await self.bot.userinfo.get(ctx.author.id)).get("lang", "en")
 
         audio, _ = await utils.TTSAudioMaker(self.bot).get_tts(
             lang=lang,
@@ -136,7 +136,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
     @commands.command()
     async def channel(self, ctx: utils.TypedGuildContext):
         "Shows the current setup channel!"
-        channel = (await self.bot.settings.get(ctx.guild, ["channel"]))[0]
+        channel = self.bot.settings[ctx.guild.id]["channel"]
 
         if channel == ctx.channel.id:
             await ctx.send("You are in the right channel already!")
@@ -174,7 +174,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
         if suggestion.lower().replace("*", "") == "suggestion":
             return await ctx.send("Hey! You are meant to replace `*suggestion*` with your actual suggestion!")
 
-        if not await self.bot.userinfo.get("blocked", ctx.author, default=False):
+        if not (await self.bot.userinfo.get(ctx.author.id)).get("blocked", False):
             files = [await attachment.to_file() for attachment in ctx.message.attachments]
 
             author_name = str(ctx.author)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, time, timedelta
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
-from utils.websocket_types import WSGenericJSON
 
 import discord
 import orjson
@@ -14,6 +13,7 @@ import utils
 
 if TYPE_CHECKING:
     from main import TTSBot
+    from utils.websocket_types import WSGenericJSON
 
 
 sep = utils.OPTION_SEPERATORS[1]
@@ -61,12 +61,6 @@ class Loops(utils.CommonCog):
         for task in self.tasks:
             task.cancel()
 
-
-    @tasks.loop()
-    @utils.decos.handle_errors
-    async def catch_task_errors(self):
-        "Makes sure asyncio.Task errors are handled"
-        await (await self.bot.tasks.get())
 
     @tasks.loop()
     @utils.decos.handle_errors

@@ -1,152 +1,186 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from collections import defaultdict
+from typing import (Literal, Optional, TYPE_CHECKING, Any, Dict, Generic, Iterable, List, Tuple,
+                    TypeVar, Union)
 
-import asyncpg
-from utils import data_to_ws_json
+from discord.ext import tasks
+
+import utils
+
+
+_T = TypeVar("_T")
+_DK = TypeVar("_DK")
+_CACHE_ITEM = Dict[Literal[
+    "channel", "xsaid", "bot_ignore", "auto_join",
+    "msg_length", "repeated_chars", "prefix",
+    "blocked", "lang", "name", "default_lang"
+], Any]
 
 if TYPE_CHECKING:
-    from discord import Guild, User, Member
-    from typing_extensions import TypeVar
-
     from main import TTSBot
 
-    Return = TypeVar("Return")
-    User = Union[User, Member]
+
+def _unpack_id(identifer: Union[Iterable[_T], _T]) -> Tuple[_T, ...]:
+    return tuple(identifer) if isinstance(identifer, Iterable) else (identifer,)
 
 def setup(bot: TTSBot):
-    bot.settings = GeneralSettings(bot)
-    bot.userinfo = UserInfoHandler(bot)
-    bot.nicknames = NicknameHandler(bot)
+    bot.settings, bot.userinfo, bot.nicknames = (
+        TableHandler(bot, broadcast=True, default_id=0,
+        select="SELECT * FROM guilds WHERE guild_id = $1",
+        delete="DELETE FROM guilds WHERE guild_id = $1",
+        insert="""
+            INSERT INTO guilds(guild_id, {setting})
+            VALUES($1, $2)
 
+            ON CONFLICT (guild_id)
+            DO UPDATE SET {setting} = EXCLUDED.{setting}
+        """,
+    ), TableHandler(bot, broadcast=False, default_id=0,
+        select="SELECT * FROM userinfo WHERE user_id = $1",
+        delete="DELETE FROM userinfo WHERE user_id = $1",
+        insert="""
+            INSERT INTO userinfo(user_id, {setting})
+            VALUES($1, $2)
 
-_DK = Union[int, Tuple[int, ...]]
-class CacheWriter:
-    def __init__(self, db_handler: HandlesDB, *cache_id, broadcast: bool) -> None:
-        self.handler = db_handler
-        self.broadcast = broadcast
-        self.websocket = db_handler.bot.websocket
-        self.cache_id: _DK = cache_id if len(cache_id) > 1 else cache_id[0]
+            ON CONFLICT (user_id)
+            DO UPDATE SET {setting} = EXCLUDED.{setting}
+        """,
+    ), TableHandler(bot, broadcast=False, default_id=(0, 0),
+        select="SELECT * from nicknames WHERE guild_id = $1 and user_id = $2",
+        delete="DELETE FROM nicknames WHERE guild_id = $1 and user_id = $2",
+        insert="""
+            INSERT INTO nicknames(guild_id, user_id, {setting})
+            VALUES($1, $2, $3)
 
-    async def __aenter__(self):
-        self.handler._do_not_cache.append(self.cache_id)
+            ON CONFLICT (guild_id, user_id)
+            DO UPDATE SET {setting} = EXCLUDED.{setting}
+        """,
+    ))
 
-    async def __aexit__(self, etype, error, tb):
-        self.handler._cache.pop(self.cache_id, None)
-        self.handler._do_not_cache.remove(self.cache_id)
-        if error is not None or self.websocket is None or not self.broadcast:
-            return
-
-        await self.websocket.send(
-            data_to_ws_json("SEND", target="*", **{
-                "c": "invalidate_cache",
-                "a": {"id": self.cache_id},
-            })
-        )
-
-class HandlesDB:
-    def __init__(self, bot: TTSBot):
+class TableHandler(Generic[_DK]):
+    def __init__(self, bot: TTSBot, select: str, insert: str, delete: str, default_id: _DK, broadcast: bool):
         self.bot = bot
         self.pool = bot.pool
         bot.add_listener(self.on_invalidate_cache)
 
-        self._do_not_cache: List[_DK] = []
-        self._cache: Dict[_DK, Optional[asyncpg.Record]] = {}
+        self.broadcast = broadcast
+        self.select_query = select
+        self.insert_query = insert
+        self.delete_query = delete
+        self.default_id = default_id
+
+        self._starting_write = False
+        self._not_fully_fetched: List[_DK] = []
+        self._cache: Dict[_DK, _CACHE_ITEM] = {}
+        self.defaults: Optional[_CACHE_ITEM] = None
+
+        self._write_deltas: defaultdict[_DK, _CACHE_ITEM] = defaultdict(dict)
+        self._write_tasks: defaultdict[_DK, List[asyncio.Future[None]]] = defaultdict(list)
 
 
-    async def fetchrow(self, query: str, id: _DK, *args: Any) -> Optional[asyncpg.Record]:
-        if id not in self._cache or id in self._do_not_cache:
-            if isinstance(id, tuple):
-                self._cache[id] = await self.pool.fetchrow(query, *id)
-            else:
-                self._cache[id] = await self.pool.fetchrow(query, id, *args)
+    async def on_invalidate_cache(self, identifier: _DK):
+        if isinstance(identifier, list):
+            identifier = tuple(identifier) # type: ignore
 
-        return self._cache[id]
+        self._cache.pop(identifier, None) # type: ignore
 
-    async def on_invalidate_cache(self, id: Union[_DK, List[int]]):
-        if isinstance(id, list):
-            id = (*id,)
+    async def _fetch_defaults(self) -> _CACHE_ITEM:
+        row = await self.bot.pool.fetchrow(self.select_query, *_unpack_id(self.default_id))
+        assert row is not None
 
-        self._cache.pop(id, None)
+        self.defaults = dict(row)
+        return self.defaults
 
-class GeneralSettings(HandlesDB):
-    DEFAULT_SETTINGS: asyncio.Task[asyncpg.Record]
-    def __init__(self, bot: TTSBot, *args: Any, **kwargs: Any):
-        super().__init__(bot, *args, **kwargs)
-        self.DEFAULT_SETTINGS = asyncio.create_task( # type: ignore
-            bot.pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
+
+    def __getitem__(self, identifer: _DK):
+        if identifer not in self._not_fully_fetched:
+            return self._cache[identifer] # type: ignore
+
+        raise KeyError
+
+    def __setitem__(self, identifier: _DK, new_settings: _CACHE_ITEM):
+        if identifier not in self._cache:
+            self._cache[identifier] = {}
+            self._not_fully_fetched.append(identifier)
+
+        self._cache[identifier].update(new_settings)
+        self._write_deltas[identifier].update(new_settings)
+
+        self._write_tasks[identifier].append(asyncio.Future())
+        if not self.insert_writes.is_running() and not self._starting_write:
+            self._starting_write = True
+            self.insert_writes.start()
+
+    def __delitem__(self, identifier: _DK):
+        del self._cache[identifier]
+        self.bot.create_task(self.bot.pool.execute(
+            self.delete_query, identifier
+        ))
+
+
+    async def get(self, identifer: _DK) -> _CACHE_ITEM:
+        try:
+            return self[identifer]
+        except KeyError:
+            return await self._fill_cache(identifer)
+
+    async def set(self, identifer: _DK, new_settings: _CACHE_ITEM):
+        self[identifer] = new_settings
+        await self._write_tasks[identifer][-1]
+
+
+    @tasks.loop(count=1)
+    async def insert_writes(self):
+        await asyncio.sleep(1)
+        self._starting_write = False
+        exceptions = [err for err in await asyncio.gather(*(
+            self._insert_write(pending_id)
+            for pending_id in self._write_tasks.keys()
+        ), return_exceptions=True) if err is not None]
+
+        self.bot.logger.debug(
+            f"Inserted {len(self._write_tasks.keys())} change(s)"
+            f" with {len(exceptions)} errors"
         )
 
+        self._write_deltas = defaultdict(dict)
+        self._write_tasks = defaultdict(list)
 
-    async def remove(self, guild: Guild):
-        await self.pool.execute("DELETE FROM guilds WHERE guild_id = $1;", guild.id)
+        await asyncio.gather(*(
+            self.bot.on_error("insert_writes", err)
+            for err in exceptions
+        ))
 
-    async def get(self, guild: Guild, settings: List[str]) -> List[Any]:
-        row = await self.fetchrow("SELECT * from guilds WHERE guild_id = $1", guild.id)
+    async def _insert_write(self, raw_identifier: _DK):
+        identifier = _unpack_id(raw_identifier)
+        queries: defaultdict[str, List[Tuple[Any, ...]]] = defaultdict(list)
 
-        if row:
-            return [row[current_setting] for current_setting in settings]
+        for setting, value in self._write_deltas.pop(raw_identifier).items():
+            query = self.insert_query.format(setting=setting)
+            queries[query].append((*identifier, value, ))
 
-        defaults = await self.DEFAULT_SETTINGS
-        return [defaults[setting] for setting in settings]
+        async with self.pool.acquire() as conn:
+            for query, args in queries.items():
+                await conn.executemany(query, args)
 
-    async def set(self, guild: Guild, setting: str, value: Any):
-        async with CacheWriter(self, guild.id, broadcast=False):
-            await self.pool.execute(f"""
-                INSERT INTO guilds(guild_id, {setting}) VALUES($1, $2)
-
-                ON CONFLICT (guild_id)
-                DO UPDATE SET {setting} = EXCLUDED.{setting};""",
-                guild.id, value
+        if self.bot.websocket is not None and self.broadcast:
+            await self.bot.websocket.send(
+                utils.data_to_ws_json("SEND", target="*", **{
+                    "c": "invalidate_cache",
+                    "a": {"identifer": raw_identifier},
+                })
             )
 
-class UserInfoHandler(HandlesDB):
-    async def get(self, value: str, user: User, default: Return) -> Return:
-        row = await self.fetchrow("SELECT * FROM userinfo WHERE user_id = $1", user.id)
-        try:
-            return row[value] or default # type: ignore
-        except (KeyError, TypeError):
-            return default
+        for fut in self._write_tasks[raw_identifier]:
+            fut.set_result(None)
 
-    async def set(self, setting: str, user: User, value: Union[str, bool]) -> None:
-        if isinstance(value, str):
-            value = value.lower().split("-")[0]
+    async def _fill_cache(self, identifier: _DK) -> _CACHE_ITEM:
+        record = await self.pool.fetchrow(self.select_query, *_unpack_id(identifier))
+        if record is None:
+            self._cache[identifier] = self.defaults or await self._fetch_defaults()
+        else:
+            self._cache[identifier] = dict(record)
 
-        async with CacheWriter(self, user.id, broadcast=True):
-            await self.pool.execute(f"""
-                INSERT INTO userinfo(user_id, {setting})
-                VALUES($1, $2)
-
-                ON CONFLICT (user_id)
-                DO UPDATE SET {setting} = EXCLUDED.{setting};""",
-                user.id, value
-            )
-
-    async def block(self, user: User) -> None:
-        await self.set("blocked", user, True)
-
-    async def unblock(self, user: User) -> None:
-        await self.set("blocked", user, False)
-
-class NicknameHandler(HandlesDB):
-    async def get(self, guild: Guild, user: User) -> str:
-        row = await self.fetchrow("SELECT * FROM nicknames WHERE guild_id = $1 AND user_id = $2", (guild.id, user.id))
-        return row["name"] if row else user.display_name
-
-    async def set(self, guild: Guild, user: User, nickname: str) -> None:
-        try:
-            async with CacheWriter(self, guild.id, user.id, broadcast=False):
-                await self.pool.execute("""
-                    INSERT INTO nicknames(guild_id, user_id, name)
-                    VALUES($1, $2, $3)
-
-                    ON CONFLICT (guild_id, user_id)
-                    DO UPDATE SET name = EXCLUDED.name;""",
-                    guild.id, user.id, nickname
-                )
-        except asyncpg.exceptions.ForeignKeyViolationError:
-            # Fixes non-existing userinfo and retries inserting into nicknames.
-            # Avoids recursion due to user_id being a pkey, so userinfo insert will error if the foreign key error happens twice.
-            await self.pool.execute("INSERT INTO userinfo(user_id) VALUES($1);", user.id)
-            return await self.set(guild, user, nickname)
+        return self._cache[identifier]

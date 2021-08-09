@@ -26,10 +26,10 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     async def block(self, ctx: utils.TypedContext, user: discord.User, notify: bool = False):
-        if await self.bot.userinfo.get("blocked", user, default=False):
+        if (await self.bot.userinfo.get(user.id)).get("blocked", False):
             return await ctx.send(f"{user} | {user.id} is already blocked!")
 
-        await self.bot.userinfo.block(user)
+        await self.bot.userinfo.set(user.id, {"blocked": True})
 
         await ctx.send(f"Blocked {user} | {user.id}")
         if notify:
@@ -37,10 +37,10 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     async def unblock(self, ctx: utils.TypedContext, user: discord.User, notify: bool = False):
-        if not await self.bot.userinfo.get("blocked", user, default=False):
+        if not (await self.bot.userinfo.get(user.id)).get("blocked", False):
             return await ctx.send(f"{user} | {user.id} isn't blocked!")
 
-        await self.bot.userinfo.unblock(user)
+        await self.bot.userinfo.set(user.id, {"blocked": False})
 
         await ctx.send(f"Unblocked {user} | {user.id}")
         if notify:

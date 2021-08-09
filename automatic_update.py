@@ -71,15 +71,14 @@ async def do_normal_updates(bot: TTSBot):
 # All updates added from here
 @add_to_updates("normal")
 async def add_default_column(bot: TTSBot) -> bool:
-    result = await bot.settings.DEFAULT_SETTINGS
-    if result is not None:
-        # Default column already created
-        return False
-
-    await bot.conn.execute("INSERT INTO guilds(guild_id) VALUES(0)")
-    bot.settings.DEFAULT_SETTINGS = _update_defaults(bot)
-
-    return True
+    return not (await asyncio.gather(bot.conn.execute(
+            "INSERT INTO guilds(guild_id) VALUES(0) ON CONFLICT (guild_id) DO NOTHING"
+        ), bot.pool.execute(
+            "INSERT INTO userinfo(user_id) VALUES(0) ON CONFLICT (user_id) DO NOTHING"
+        ), bot.pool.execute(
+            "INSERT INTO nicknames(guild_id, user_id) VALUES(0, 0) ON CONFLICT (guild_id, user_id) DO NOTHING"
+        ),
+    ))
 
 @add_to_updates("normal")
 async def add_analytics(bot: TTSBot) -> bool:

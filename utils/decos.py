@@ -9,7 +9,7 @@ import discord
 from discord.ext import commands
 
 from .classes import CommonCog, TypedGuildContext
-from .funcs import to_thread, group_by
+from .funcs import group_by, to_thread
 from .views import BoolView, ChannelSelector, GenericView
 
 

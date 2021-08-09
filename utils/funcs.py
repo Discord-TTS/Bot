@@ -12,8 +12,8 @@ from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Generator,
 
 import orjson
 
-from utils.constants import OPTION_SEPERATORS, READABLE_TYPE
-from utils.websocket_types import WS_TARGET
+from .constants import OPTION_SEPERATORS, READABLE_TYPE
+from .websocket_types import WS_TARGET
 
 if TYPE_CHECKING:
     import re

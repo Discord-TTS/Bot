@@ -47,26 +47,24 @@ class MainEvents(utils.CommonCog):
             return
 
         # Get settings
-        repeated_limit, bot_ignore, max_length, autojoin, channel, prefix, xsaid = await self.bot.settings.get(
-            message.guild,
-            settings=[
-                "repeated_chars",
-                "bot_ignore",
-                "msg_length",
-                "auto_join",
-                "channel",
-                "prefix",
-                "xsaid",
-            ]
-        )
+        settings = await self.bot.settings.get(message.guild.id)
+        userinfo = await self.bot.userinfo.get(message.author.id)
 
-        message_clean = utils.removeprefix(
-            message.clean_content.lower(), f"{prefix}tts"
-        )
+        prefix: str = settings["prefix"]
+        channel: int = settings["channel"]
+        autojoin: bool = settings["auto_join"]
+        bot_ignore: bool = settings["bot_ignore"]
+        default_lang: str = settings["default_lang"]
+        repeated_limit: int = settings["repeated_chars"]
+
+        lang: str = userinfo.get("lang", None) or default_lang or "en"
 
         # Check if a setup channel
         if message.channel.id != channel:
             return
+
+        message_clean = message.clean_content.lower()
+        message_clean = utils.removeprefix(message_clean, f"{prefix}tts")
 
         if len(message_clean) >= 1500:
             return
@@ -96,17 +94,6 @@ class MainEvents(utils.CommonCog):
         if TYPE_CHECKING:
             message.guild.voice_client = cast(TTSVoicePlayer, message.guild.voice_client)
 
-        # Get lang
-        guild_lang = None
-        user_lang = cast(str, await self.bot.userinfo.get(
-            "lang", message.author, default=None
-        ))
-        if not user_lang:
-            guild_lang = cast(str, (await self.bot.settings.get(
-                message.guild, ["default_lang"]
-            ))[0])
-
-        lang = user_lang or guild_lang or "en"
 
         # Emoji filter
         message_clean = utils.EMOJI_REGEX.sub(utils.emoji_match_to_cleaned, message_clean)
@@ -134,8 +121,10 @@ class MainEvents(utils.CommonCog):
 
         contained_url = message_clean != with_urls
         # Toggleable xsaid and attachment + links detection
-        if xsaid:
-            said_name = await self.bot.nicknames.get(message.guild, message.author)
+        if settings["xsaid"]:
+            nicknames = await self.bot.nicknames.get((message.guild.id, message.author.id))
+            said_name: str = nicknames.get("name", message.author.display_name)
+
             file_format = utils.exts_to_format(message.attachments)
 
             if contained_url:
@@ -178,7 +167,7 @@ class MainEvents(utils.CommonCog):
 
         # Adds filtered message to queue
         await message.guild.voice_client.queue(
-            message_clean, lang, channel, prefix, max_length
+            message_clean, lang, channel, prefix, settings["msg_length"]
         )
 
 

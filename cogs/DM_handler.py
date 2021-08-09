@@ -61,7 +61,7 @@ class DMHandler(utils.CommonCog):
                 self.bot.logger.info(f"{message.author} just got the 'dont ask to ask' message")
                 await message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
 
-            elif not await self.bot.userinfo.get("blocked", message.author, default=False):
+            elif not (await self.bot.userinfo.get(message.author.id)).get("blocked", False):
                 files = [await attachment.to_file() for attachment in message.attachments]
 
                 author_name = str(message.author)

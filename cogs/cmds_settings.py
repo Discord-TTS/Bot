@@ -4,7 +4,7 @@ import asyncio
 import re
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import List, Set, TYPE_CHECKING, Dict, Optional, Type
+from typing import Set, TYPE_CHECKING, Dict, Optional
 
 import discord
 from discord.ext import commands
@@ -32,26 +32,16 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     @commands.command()
     async def settings(self, ctx: utils.TypedGuildContext):
         "Displays the current settings!"
-        lang, nickname = await asyncio.gather(
-            self.bot.userinfo.get("lang", ctx.author, default="en"),
-            self.bot.nicknames.get(ctx.guild, ctx.author)
+        guild_settings = self.bot.settings[ctx.guild.id]
+        userinfo, nickname = await asyncio.gather(
+            self.bot.userinfo.get(ctx.author.id),
+            self.bot.nicknames.get((ctx.guild.id, ctx.author.id))
         )
 
-        xsaid, prefix, channel, auto_join, bot_ignore, msg_length, default_lang, repeated_chars = await self.bot.settings.get(
-            ctx.guild,
-            settings=[
-                "xsaid",
-                "prefix",
-                "channel",
-                "auto_join",
-                "bot_ignore",
-                "msg_length",
-                "default_lang",
-                "repeated_chars"
-            ]
-        )
+        lang = userinfo.get("lang", "en")
+        nickname = nickname.get("name", ctx.author.display_name)
 
-        channel = ctx.guild.get_channel(channel)
+        channel = ctx.guild.get_channel(guild_settings["channel"])
         channel_name = channel.name if channel else "has not been setup yet"
 
         if nickname == ctx.author.display_name:
@@ -61,16 +51,16 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         sep1, sep2, sep3 = utils.OPTION_SEPERATORS
         server_settings = cleandoc(f"""
             {sep1} Setup Channel: `#{channel_name}`
-            {sep1} Auto Join: `{auto_join}`
-            {sep1} Command Prefix: `{prefix}`
+            {sep1} Auto Join: `{guild_settings['auto_join']}`
+            {sep1} Command Prefix: `{guild_settings['prefix']}`
         """)
         tts_settings = cleandoc(f"""
-            {sep2} <User> said: message `{xsaid}`
-            {sep2} Ignore bot's messages: `{bot_ignore}`
-            {sep2} Default Server Language: `{default_lang}`
+            {sep2} <User> said: message `{guild_settings['xsaid']}`
+            {sep2} Ignore bot's messages: `{guild_settings['bot_ignore']}`
+            {sep2} Default Server Language: `{guild_settings['default_lang']}`
 
-            {sep2} Max Time to Read: `{msg_length} seconds`
-            {sep2} Max Repeated Characters: `{repeated_chars}`
+            {sep2} Max Time to Read: `{guild_settings['msg_length']} seconds`
+            {sep2} Max Repeated Characters: `{guild_settings['repeated_chars']}`
         """)
         user_settings = cleandoc(f"""
             {sep3} Language: `{lang}`
@@ -99,7 +89,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     @utils.decos.make_fancy
     async def xsaid(self, ctx: utils.TypedGuildContext, value: bool):
         "Makes the bot say \"<user> said\" before each message"
-        await self.bot.settings.set(ctx.guild, "xsaid", value)
+        self.bot.settings[ctx.guild.id] = {"xsaid": value}
         await ctx.reply(f"xsaid is now: {to_enabled[value]}")
 
     @set.command(aliases=["auto_join"])
@@ -107,7 +97,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     @utils.decos.make_fancy
     async def autojoin(self, ctx: utils.TypedGuildContext, value: bool):
         "If you type a message in the setup channel, the bot will join your vc"
-        await self.bot.settings.set(ctx.guild, "auto_join", value)
+        self.bot.settings[ctx.guild.id] = {"auto_join": value}
         await ctx.reply(f"Auto Join is now: {to_enabled[value]}")
 
     @set.command(aliases=["bot_ignore", "ignore_bots", "ignorebots"])
@@ -115,7 +105,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     @utils.decos.make_fancy
     async def botignore(self, ctx: utils.TypedGuildContext, value: bool):
         "Messages sent by bots and webhooks are not read"
-        await self.bot.settings.set(ctx.guild, "bot_ignore", value)
+        self.bot.settings[ctx.guild.id] = {"bot_ignore": value}
         await ctx.reply(f"Ignoring Bots is now: {to_enabled[value]}")
 
 
@@ -126,7 +116,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         if language not in tts_langs:
             return await ctx.send(f"Invalid voice, do `{ctx.prefix}voices`")
 
-        await self.bot.settings.set(ctx.guild, "default_lang", language)
+        self.bot.settings[ctx.guild.id] = {"default_lang": language}
         await ctx.send(f"Default language for this server is now: {language}")
 
     @set.command()
@@ -136,7 +126,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         if len(prefix) > 5 or prefix.count(" ") > 1:
             return await ctx.send("**Error**: Invalid Prefix! Please use 5 or less characters with maximum 1 space.")
 
-        await self.bot.settings.set(ctx.guild, "prefix", prefix)
+        self.bot.settings[ctx.guild.id] = {"prefix": prefix}
         await ctx.send(f"Command Prefix is now: {prefix}")
 
     @set.command(aliases=["nick_name", "nickname", "name"])
@@ -149,15 +139,12 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         if user != ctx.author and not ctx.author_permissions().administrator:
             return await ctx.send("Error: You need admin to set other people's nicknames!")
 
-        if not nickname:
-            raise commands.UserInputError(ctx.message.content)
-
         if "<" in nickname and ">" in nickname:
             await ctx.send("Hey! You can't have mentions/emotes in your nickname!")
         elif not re.match(r"^(\w|\s)+$", nickname):
             await ctx.send("Hey! Please keep your nickname to only letters, numbers, and spaces!")
         else:
-            await self.bot.nicknames.set(ctx.guild, user, nickname)
+            self.bot.nicknames[(ctx.guild.id, user.id)] = {"name": nickname}
             await ctx.send(embed=discord.Embed(title="Nickname Change", description=f"Changed {user.name}'s nickname to {nickname}"))
 
     @set.command(aliases=("length", "max_length", "max_msg_length", "msglength", "maxlength", "msg_length"))
@@ -168,7 +155,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         if length < 20:
             return await ctx.send("Hey! You can't set the Max Time to Read below 20 seconds!")
 
-        await self.bot.settings.set(ctx.guild, "msg_length", length)
+        self.bot.settings[ctx.guild.id] = {"msg_length": length}
         await ctx.send(f"Max Time to Read (in seconds) is now: {length}")
 
     @set.command(aliases=("repeated_characters", "repeated_letters", "chars"))
@@ -179,7 +166,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         if chars < 5 and chars != 0:
             return await ctx.send("Hey! You can't set max repeated chars below 5!")
 
-        await self.bot.settings.set(ctx.guild, "repeated_chars", chars)
+        self.bot.settings[ctx.guild.id] = {"repeated_chars": chars}
         await ctx.send(f"Max repeated characters is now: {chars}")
 
 
@@ -196,8 +183,6 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     @utils.decos.make_fancy
     async def setup(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel):
         "Setup the bot to read messages from `<channel>`"
-        await self.bot.settings.set(ctx.guild, "channel", channel.id)
-
         embed = discord.Embed(
             title="TTS Bot has been setup!",
             description=cleandoc(f"""
@@ -209,6 +194,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         embed.set_thumbnail(url=self.bot.user.avatar.url)
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
 
+        self.bot.settings[ctx.guild.id] = {"channel": channel.id}
         await ctx.send(embed=embed)
 
     @commands.bot_has_permissions(send_messages=True)
@@ -216,7 +202,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     async def voice(self, ctx: utils.TypedGuildContext, lang: str):
         "Changes the language your messages are read in, full list in `-voices`"
         if lang in tts_langs:
-            await self.bot.userinfo.set("lang", ctx.author, lang)
+            self.bot.userinfo[ctx.author.id] = {"lang": lang}
             await ctx.send(f"Changed your voice to: {langs_lookup[lang]}")
         else:
             await ctx.send(f"Invalid voice, do `{ctx.prefix}voices`")
@@ -228,8 +214,11 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         if lang in tts_langs:
             return await self.voice(ctx, lang)
 
-        lang = (await self.bot.userinfo.get("lang", ctx.author, default="en")).split("-")[0]
+        userinfo = await self.bot.userinfo.get(ctx.author.id)
+        lang = userinfo.get("lang", "en").split("-")[0]
         langs_string = str(tts_langs).strip("{}")
+
+        assert lang is not None
 
         embed = discord.Embed(title="TTS Bot Languages")
         embed.set_footer(text=pick_random(utils.FOOTER_MSGS))

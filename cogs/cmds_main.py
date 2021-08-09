@@ -21,10 +21,11 @@ def setup(bot: TTSBot):
 
 class MainCommands(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
-    async def cog_check(self, ctx: utils.TypedGuildContext) -> bool:
-        channel = (await self.bot.settings.get(ctx.guild, ["channel"]))[0]
-        return ctx.channel.id == channel
+    def cog_check(self, ctx: utils.TypedContext) -> bool:
+        if ctx.guild is None:
+            return False
 
+        return ctx.channel.id == self.bot.settings[ctx.guild.id]["channel"]
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.cooldown(1, 10, commands.BucketType.guild)
