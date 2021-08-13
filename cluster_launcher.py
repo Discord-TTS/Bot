@@ -10,53 +10,38 @@ import time
 import uuid
 from configparser import ConfigParser
 from functools import partial
-from itertools import zip_longest
 from signal import SIGHUP, SIGINT, SIGKILL, SIGTERM
-from typing import (TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple,
-                    TypeVar, Union)
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import aiohttp
 import orjson
-import requests
 import websockets
+from discord.http import Route
 
 import utils
 
 config = ConfigParser()
 config.read("config.ini")
 
-
 if TYPE_CHECKING:
     from concurrent.futures import Future
     from utils.websocket_types import *
 
-    _T = TypeVar("_T")
     _CLUSTER_ARG = Tuple[int, int, Tuple[int]]
-    _CLUSTER_RET = Tuple[int, int, _CLUSTER_ARG]
     _WSSP = websockets.WebSocketServerProtocol
 
 
 def make_user_agent():
     first = "DiscordBot (https://github.com/Gnome-py/Discord-TTS-Bot Rolling)"
-    versions = "Python/{sysver} requests/{requestsver}".format(
+    versions = "Python/{sysver} aiohttp/{aiohttpver}".format(
         sysver=".".join(str(i) for i in sys.version_info[:3]),
-        requestsver=requests.__version__
+        aiohttpver=aiohttp.__version__
     )
 
     return f"{first} {versions}"
 
-def fetch_num_shards() -> int:
-    response = requests.get(
-        "https://discord.com/api/v7/gateway/bot",
-        headers={
-            "Authorization": "Bot " + config["Main"]["Token"],
-            "User-Agent": make_user_agent()
-        }
-    )
-    response.raise_for_status()
-    return response.json()["shards"]
 
-def run_bot(cluster_id: int, total_shard_count: int, shards: List[int]) -> _CLUSTER_RET:
+def run_bot(cluster_id: int, total_shard_count: int, shards: List[int]):
     """This function is run from the bot process"""
     import asyncio
     import sys
@@ -72,7 +57,12 @@ def run_bot(cluster_id: int, total_shard_count: int, shards: List[int]) -> _CLUS
         sys.exit(return_code)
 
 class ClusterManager:
-    def __init__(self, websocket_host: str, websocket_port: int) -> None:
+    def __init__(self,
+        session: aiohttp.ClientSession,
+        websocket_host: str, websocket_port: int
+    ) -> None:
+
+        self.session = session
         self.websocket_port = websocket_port
         self.websocket_host = websocket_host
 
@@ -96,6 +86,16 @@ class ClusterManager:
     async def __aexit__(self, *_: Any, **__: Any):
         if not self.shutting_down:
             await self.shutdown()
+
+
+    async def fetch_num_shards(self) -> int:
+        headers = {
+            "Authorization": "Bot " + config["Main"]["Token"],
+            "User-Agent": make_user_agent()
+        }
+        async with self.session.get(f"{Route.BASE}/gateway/bot", headers=headers) as resp:
+            resp.raise_for_status()
+            return (await resp.json())["shards"]
 
 
     def signal_handler(self, signal: int):
@@ -142,7 +142,7 @@ class ClusterManager:
 
     async def start(self):
         shards_per_cluster = int(config["Clustering"]["shards_per_cluster"])
-        shard_count = int(config["Clustering"].get("shard_count") or fetch_num_shards())
+        shard_count = int(config["Clustering"].get("shard_count") or await self.fetch_num_shards())
 
         full_clusters, last_cluster_shards = divmod(shard_count, shards_per_cluster)
         cluster_count = full_clusters + int(bool(last_cluster_shards))
@@ -303,7 +303,7 @@ async def main():
 
     async with aiohttp.ClientSession() as session:
         logger = utils.setup_logging(level=config["Main"]["log_level"], session=session, prefix="`[Launcher]`: ")
-        async with ClusterManager(host, port) as manager:
+        async with ClusterManager(session, host, port) as manager:
             try:
                 await manager.keep_alive
             except asyncio.CancelledError:

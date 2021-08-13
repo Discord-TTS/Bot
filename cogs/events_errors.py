@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from io import StringIO
 from sys import exc_info
 from traceback import format_exception
-from typing import Any, TYPE_CHECKING, Optional, cast
-
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, cast
 
 import discord
+import psutil
 from discord.ext import commands
 
 import utils
@@ -15,8 +14,11 @@ import utils
 
 if TYPE_CHECKING:
     from main import TTSBot
+    from player import TTSVoicePlayer
 
 
+BLANK = ("\u200B", "\u200B", True)
+RED = discord.Colour.from_rgb(255, 0, 0)
 def setup(bot: TTSBot):
     cog = ErrorEvents(bot)
 
@@ -37,14 +39,12 @@ class ErrorEvents(utils.CommonCog):
                 return
 
             if not permissions.embed_links:
-                return await ctx.reply(
-                    "An Error Occurred! Please give me embed links permissions so I can tell you more!",
-                    ephemeral=True
-                )
+                msg = "An Error Occurred! Please give me embed links permissions so I can tell you more!"
+                return await ctx.reply(msg, ephemeral=True)
 
         error_embed = discord.Embed(
+            colour=RED,
             title="An Error Occurred!",
-            colour=discord.Colour.from_rgb(255, 0, 0),
             description=f"Sorry but {error}, to fix this, please {fix}!"
         ).set_author(
             name=ctx.author.display_name,
@@ -55,41 +55,92 @@ class ErrorEvents(utils.CommonCog):
 
         return await ctx.reply(embed=error_embed, ephemeral=True)
 
+    async def send_unhandled_msg(self,
+        event: str,
+        traceback: str,
+        extra_fields: List[Tuple[Any, Any, bool]],
+        author_name: Optional[str] = None,
+        icon_url: Optional[str] = None,
+    ):
+        fields = [
+            ("Event", event, True),
+            ("Bot User", self.bot.user, True),
+            BLANK, *extra_fields,
+            ("Ram Usage", f"{psutil.virtual_memory().percent}%", True),
+            ("Running Task Count", len(asyncio.all_tasks()),     True),
+            ("Local Thread Count", psutil.Process().num_threads(), True),
+        ]
+        if self.bot.cluster_id is not None:
+            fields.extend((
+                ("Cluster ID", self.bot.cluster_id, True),
+                ("Handling Shards", self.bot.shard_ids, True)
+            ))
+
+        traceback = f"```\n{traceback}```"
+        error_msg = discord.Embed(title=traceback.split("\n")[-2], colour=RED)
+        if author_name is not None:
+            if icon_url is None:
+                error_msg.set_author(name=author_name)
+            else:
+                error_msg.set_author(name=author_name, icon_url=icon_url)
+
+        for name, value, inline in fields:
+            value = value if value == "\u200B" else f"`{value}`"
+            error_msg.add_field(name=name, value=value, inline=inline)
+
+        view = utils.ShowTracebackView(traceback)
+        self.bot.channels["errors"]._state = self.bot._connection
+        await self.bot.channels["errors"].send(embed=error_msg, view=view)
+
 
     async def on_error(self, event_method: str, error: Optional[BaseException] = None, *targs: Any, **_):
-        info = "No Info"
         args = list(targs)
-        event = event_method
-
         if isinstance(error, BaseException):
             etype, value, tb = type(error), error, error.__traceback__
         else:
             args.insert(0, error)
             etype, value, tb = exc_info()
 
-        if event == "on_message":
-            message: discord.Message = args[0]
+        if etype == BlockingIOError and "Resource temporarily unavailable" in str(value):
+            self.bot.logger.error("BlockingIOError: Resource temporarily unavailable, killing everything!")
+            return await self.bot.close(utils.KILL_EVERYTHING)
 
-            if message.guild is None:
-                info = f"DM support | Sent by {message.author}"
-            else:
-                info = f"General TTS | Sent by {message.author} in {message.guild} | {message.guild.id}"
+        icon_url: Optional[str] = None
+        author_name: Optional[str] = None
+        fields: List[Tuple[Any, Any, bool]] = [] # name, value, inline
 
-        elif event in {"on_guild_join", "on_guild_remove"}:
+        if event_method == "on_message":
+            message: utils.TypedMessage = args[0]
+            if message.guild:
+                fields.extend((
+                    ("Guild Name", message.guild.name, True),
+                    ("Guild ID", message.guild.id, True),
+                ))
+
+            fields.append(("Channel Type", type(message.channel).__name__, True))
+            author_name, icon_url = str(message.author), message.author.avatar.url
+
+        elif event_method in {"on_guild_join", "on_guild_remove"}:
             guild: discord.Guild = args[0]
-            info = f"Guild = {guild} | {guild.id}"
+            author_name, icon_url = guild.name, getattr(guild.icon, "url", None)
 
-        cluster_info = None
-        if self.bot.cluster_id is not None:
-            cluster_info = f"Cluster ID {self.bot.cluster_id} | Shards {self.bot.shard_ids}"
+        elif event_method in {"play_audio", "fill_audio_buffer"}:
+            vc: TTSVoicePlayer = args[0]
 
-        error_message = f"Event: `{event}`\nInfo: `{info}`\nCluster Info: `{cluster_info}`"
-        formatted_err = f"```{''.join(format_exception(etype, value, tb))}```"
+            guild = vc.guild
+            fields.append(("VC Repr", repr(vc), False))
+            author_name, icon_url = guild.name, getattr(guild.icon, "url", None)
 
-        await self.bot.channels["errors"].send(f"{error_message} {formatted_err}")
+        await self.send_unhandled_msg(
+            icon_url=icon_url,
+            event=event_method,
+            extra_fields=fields,
+            author_name=author_name,
+            traceback="".join(format_exception(etype, value, tb)),
+        )
 
     @commands.Cog.listener()
-    async def on_command_error(self, ctx: utils.TypedContext, error: commands.CommandError):
+    async def on_command_error(self, ctx: utils.TypedContext, error: commands.CommandError): # sourcery no-metrics skip
         command = f"`{ctx.prefix}{ctx.command}`"
         error = getattr(error, "original", error)
 
@@ -136,7 +187,7 @@ class ErrorEvents(utils.CommonCog):
         elif isinstance(error, commands.NoPrivateMessage):
             await self.send_error(
                 ctx, error=f"{command} cannot be used in private messages",
-                fix=f"try running it on a server with {self.bot.user} in"
+                fix=f"try running it on a server with {self.bot.user.name} in"
             )
 
         elif isinstance(error, commands.MissingPermissions):
@@ -147,10 +198,9 @@ class ErrorEvents(utils.CommonCog):
             )
 
         elif isinstance(error, commands.BotMissingPermissions):
-            missing_perms = ", ".join(error.missing_permissions)
             await self.send_error(ctx,
                 error=f"I cannot run {command} as I am missing permissions",
-                fix=f"give me {missing_perms}"
+                fix=f"give me {', '.join(error.missing_permissions)}"
             )
 
         elif isinstance(error, commands.CheckFailure):
@@ -170,21 +220,33 @@ class ErrorEvents(utils.CommonCog):
             self.bot.logger.error(f"`asyncio.TimeoutError:` Unhandled in {ctx.command.qualified_name}")
 
         else:
-            self.bot.create_task(self.send_error(ctx, error="an unknown error occured"))
+            traceback = "".join(format_exception(type(error), error, error.__traceback__))
+            fields = [
+                ("Command", ctx.command.qualified_name, True),
+                ("Slash Command", ctx.interaction is not None, True),
+            ]
 
-            context_part = f"{ctx.author} caused an error with the message: {ctx.message.clean_content}"
-            error_traceback = "".join(format_exception(type(error), error, error.__traceback__))
-            full_error = f"{context_part}\n```{error_traceback}```"
-
-            if len(full_error) < 2000:
-                await self.bot.channels["errors"].send(full_error)
+            channel = ("Channel Type", type(ctx.channel).__name__, True)
+            if ctx.guild is not None:
+                fields.extend((
+                    BLANK,
+                    ("Guild Name", ctx.guild.name, True),
+                    ("Guild ID", ctx.guild.id, True),
+                    channel
+                ))
             else:
-                await self.bot.channels["errors"].send(
-                    file=discord.File(
-                        StringIO(full_error), # type: ignore
-                        filename="long error.txt"
-                    )
+                fields.append(channel)
+
+            await asyncio.gather(
+                self.send_error(ctx, error="an unknown error occured"),
+                self.send_unhandled_msg(
+                    event="command",
+                    extra_fields=fields,
+                    traceback=traceback,
+                    author_name=str(ctx.author),
+                    icon_url=ctx.author.avatar.url,
                 )
+            )
 
     @commands.Cog.listener()
     async def on_interaction_error(self,
@@ -193,7 +255,7 @@ class ErrorEvents(utils.CommonCog):
         interaction: discord.Interaction
     ) -> None:
 
-        context_part = f"{interaction.user} caused an error on {item.__class__.__name__} with the interaction: {interaction}"
+        context_part = f"{interaction.user} caused an error with a {item.__class__.__name__} with the interaction: {interaction}"
         error_traceback = "".join(format_exception(type(error), error, error.__traceback__))
         full_error = f"{context_part}\n```{error_traceback}```"
         await self.bot.channels["errors"].send(full_error)

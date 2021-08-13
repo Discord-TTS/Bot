@@ -8,6 +8,17 @@ from .classes import TypedGuildContext, TypedMessage
 
 
 class GenericView(discord.ui.View):
+    @classmethod
+    def from_item(cls,
+        item: Type[discord.ui.Item[GenericView]],
+        *args: Any, **kwargs: Any
+    ):
+        self = cls()
+        self.add_item(item(*args, **kwargs))
+        return self
+
+
+class CommandView(GenericView):
     message: TypedMessage
     def __init__(self, ctx: TypedGuildContext, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -35,23 +46,20 @@ class GenericView(discord.ui.View):
         self.ctx.bot.dispatch("interaction_error", *args)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        assert interaction.user is not None
-        assert interaction.channel is not None
         assert isinstance(interaction.user, discord.Member)
 
         if interaction.user != self.ctx.author:
             await interaction.response.send_message("You don't own this interaction!", ephemeral=True)
             return False
 
-        permissions = interaction.channel.permissions_for(interaction.user)
-        if not permissions.administrator:
+        if interaction.guild is not None and not interaction.permissions.administrator:
             await interaction.response.send_message("You don't have permission use this interaction!", ephemeral=True)
             return False
 
         return True
 
 
-class BoolView(GenericView):
+class BoolView(CommandView):
     @discord.ui.button(label="True", style=discord.ButtonStyle.success)
     async def yes(self, *_):
         await self.recall_command(True)
@@ -68,10 +76,18 @@ class BoolView(GenericView):
 
         self.ctx.bot.create_task(self.message.edit(view=self))
 
-class GenericItemMixin:
-    view: GenericView
+class ShowTracebackView(discord.ui.View):
+    def __init__(self, traceback: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.traceback = traceback
 
-class ChannelSelector(GenericItemMixin, discord.ui.Select):
+    @discord.ui.button(label="Show Traceback", style=discord.ButtonStyle.danger)
+    async def show_tb(self, _, interaction: discord.Interaction):
+        await interaction.response.send_message(self.traceback, ephemeral=True)
+
+
+class ChannelSelector(discord.ui.Select):
+    view: CommandView
     def __init__(self,
         ctx: TypedGuildContext,
         channels: Iterable[discord.abc.GuildChannel],
@@ -79,7 +95,7 @@ class ChannelSelector(GenericItemMixin, discord.ui.Select):
 
         self.ctx = ctx
         self.channels = channels
-        discord.ui.Select.__init__(self, *args, **kwargs, options=[
+        super().__init__(*args, **kwargs, options=[
             discord.SelectOption(
                 label=f"""#{
                     (channel.name[:21] + '...')
@@ -93,8 +109,8 @@ class ChannelSelector(GenericItemMixin, discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         channel_id = int(self.values[0])
-        channel = self.ctx.guild.get_channel(channel_id)
 
+        channel = self.ctx.guild.get_channel(channel_id)
         if channel is None and channel_id in [c.id for c in self.channels]:
             self.ctx.bot.logger.error(f"Couldn't find channel: {channel}")
 

@@ -92,11 +92,14 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
 
     def __repr__(self):
         c = self.channel.id
+        is_playing = self.is_playing()
+        is_connected = self.is_connected()
+
         abufferlen = self.audio_buffer.qsize()
         mqueuelen = self.message_queue.qsize()
-        playing_audio = not self.currently_playing.is_set()
+        waiting = not self.currently_playing.is_set()
 
-        return f"<TTSVoicePlayer: {c=} {playing_audio=} {mqueuelen=} {abufferlen=}>"
+        return f"<TTSVoicePlayer: {c=} {is_connected=} {is_playing=} {waiting=} {mqueuelen=} {abufferlen=}>"
 
 
     async def disconnect(self, *, force: bool = False) -> None:
@@ -111,7 +114,7 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
         self.linked_channel = linked_channel
 
         await self.message_queue.put((text, lang))
-        if not self.fill_audio_buffer.is_running:
+        if not self.fill_audio_buffer.is_running():
             self.fill_audio_buffer.start()
 
     def skip(self):
@@ -224,7 +227,7 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
         if not channel:
             return
 
-        permissions = channel.permissions_for(guild.me)
+        permissions: discord.Permissions = channel.permissions_for(guild.me)
         if permissions.send_messages and permissions.embed_links:
             await channel.send(embed=await self._get_embed())
 
@@ -260,6 +263,6 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
 
         exceptions = [err for err in exceptions if err is not None]
         return await asyncio.gather(*(
-            self.bot.on_error("play_audio", exception)
+            self.bot.on_error("play_audio", exception, self)
             for exception in exceptions
         ))

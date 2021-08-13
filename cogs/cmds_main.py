@@ -38,7 +38,7 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
 
         voice_client = ctx.guild.voice_client
         voice_channel = ctx.author.voice.channel
-        permissions = voice_channel.permissions_for(ctx.guild.me)
+        permissions: discord.Permissions = voice_channel.permissions_for(ctx.guild.me)
 
         if not permissions.view_channel:
             return await ctx.send("Error: Missing Permission to view your voice channel!")
@@ -47,11 +47,12 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
             return await ctx.send("Error: I do not have permssion to speak!")
 
         if voice_client:
-            if voice_client == voice_channel:
-                await ctx.send("Error: I am already in your voice channel!")
+            if voice_client.channel == voice_channel:
+                vc_mention = "your voice channel"
             else:
-                await ctx.send(f"Error: I am in {voice_client.channel.mention}!")
-            return
+                vc_mention = voice_client.channel.mention
+
+            return await ctx.send(f"Error: I am already in {vc_mention}!")
 
         join_embed = discord.Embed(
             title="Joined your voice channel!",

@@ -208,13 +208,22 @@ class SlashCommands(utils.CommonCog):
 
         assert interaction.user is not None
         assert interaction.channel is not None
-        assert isinstance(interaction.channel, (discord.TextChannel, discord.DMChannel, discord.Thread))
+
+        if not isinstance(interaction.channel, (
+            discord.TextChannel, discord.DMChannel,
+            discord.Thread, discord.PartialMessageable,
+        )):
+            msg = "Sorry, but this channel type is unsupported for commands!"
+            log_msg = f"Slash Command invoked in unsupported channel type: {type(interaction.channel)}"
+
+            self.bot.logger.error(log_msg)
+            return await interaction.response.send_message(msg, ephemeral=True)
 
         interaction.data = cast(SlashCommandData, interaction.data)
+        self.bot.logger.debug(f"Interaction: {interaction.data}")
 
         command_name = interaction.data["name"]
         command_options = interaction.data.get("options") or []
-        self.bot.logger.debug(f"Interaction: {interaction.data}")
 
         # I am going to hell for this
         message = cast(discord.Message, utils.construct_unslotted(

@@ -127,6 +127,9 @@ class TypedContext(commands.Context):
         reference = kwargs.pop("reference", None)
 
         if self.interaction is None:
+            if isinstance(reference, discord.Message):
+                reference = reference.to_reference(fail_if_not_exists=False)
+
             kwargs.pop("ephemeral", False)
             send = partial(super().send, reference=reference)
         elif not (self.interaction.response.is_done() or return_msg or "file" in kwargs):
@@ -148,6 +151,9 @@ class TypedGuildContext(TypedContext):
     channel: discord.TextChannel
 
     def author_permissions(self) -> discord.Permissions:
+        if self.interaction is not None:
+            return self.interaction.permissions
+
         return self.channel.permissions_for(self.author)
     def bot_permissions(self) -> discord.Permissions:
         return self.channel.permissions_for(self.guild.me)
@@ -160,14 +166,12 @@ class TypedGuildContext(TypedContext):
 
 
 class TypedMessage(discord.Message):
-    content: str
     guild: Optional[TypedGuild]
     author: Union[TypedMember, discord.User]
 
 class TypedGuildMessage(TypedMessage):
     guild: TypedGuild
-    author: TypedMember
-    channel: discord.TextChannel
+    channel: Union[discord.TextChannel, discord.Thread]
 
 
 class TypedMember(discord.Member):

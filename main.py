@@ -7,16 +7,16 @@ from configparser import ConfigParser
 from os import listdir
 from signal import SIGHUP, SIGINT, SIGTERM
 from time import monotonic
-from typing import (Set, TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
-                    Optional, Tuple, TypeVar, Union, cast)
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
+                    Optional, Set, Tuple, TypeVar, Union, cast)
 
 import aiohttp
 import aioredis
 import asyncgTTS
 import asyncpg
 import discord
-from discord.ext import commands as _commands
 import websockets
+from discord.ext import commands as _commands
 
 import automatic_update
 import utils
@@ -196,7 +196,9 @@ class TTSBot(_commands.AutoShardedBot):
         # Fill up bot.channels, as a load of webhooks
         for channel_name, webhook_url in self.config["Webhook URLs"].items():
             self.channels[channel_name] = discord.Webhook.from_url(
-                webhook_url, session=self.session, bot_token=self.http.token
+                url=webhook_url,
+                session=self.session,
+                bot_token=self.http.token
             )
 
         # Load all of /cogs and /extensions
@@ -207,10 +209,9 @@ class TTSBot(_commands.AutoShardedBot):
         if self.shard_ids is not None:
             prefix = f"`[Cluster] [ID {self.cluster_id}] [Shards {len(self.shard_ids)}]`: "
             self.websocket = await self.create_websocket()
-            kwargs["reconnect"] = True
         else:
-            prefix = ""
             self.websocket = None
+            prefix = ""
 
         self.logger = utils.setup_logging(config["Main"]["log_level"], prefix, self.session)
         self.logger.info("Starting TTS Bot!")

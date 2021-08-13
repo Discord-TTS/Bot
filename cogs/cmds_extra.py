@@ -3,10 +3,8 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from functools import partial
 from inspect import cleandoc
 from io import BytesIO
-from os import getpid
 from typing import TYPE_CHECKING, cast
 
 import discord
@@ -84,7 +82,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             total_voice_clients = len(self.bot.voice_clients)
             total_guild_count = len(guilds)
 
-            raw_ram_usage = Process(getpid()).memory_info().rss
+            raw_ram_usage = Process().memory_info().rss
         else:
             ws_uuid = uuid.uuid4()
             to_fetch = ["guild_count", "member_count", "voice_count"]
@@ -101,7 +99,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
                 error_msg = "the bot timed out fetching this info"
                 return await cog.send_error(ctx, error_msg)
 
-            raw_ram_usage = await utils.to_thread(partial(get_ram_recursive, Process(getpid()).parent()))
+            raw_ram_usage = await utils.to_thread(get_ram_recursive, Process().parent())
             total_voice_clients = sum(resp["voice_count"] for resp in responses)
             total_guild_count = sum(resp["guild_count"] for resp in responses)
             total_members = sum(resp["member_count"] for resp in responses)
