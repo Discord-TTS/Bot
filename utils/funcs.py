@@ -6,9 +6,8 @@ import asyncio
 import sys
 from inspect import cleandoc
 from itertools import zip_longest
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Generator,
-                    Iterable, Literal, Optional, Sequence, Tuple, Type,
-                    TypeVar, Union, overload)
+from typing import (TYPE_CHECKING, Any, Callable, Generator, Iterable,
+                    Optional, Sequence, Tuple, Type, TypeVar, Union)
 
 import orjson
 
@@ -80,38 +79,6 @@ async def get_redis_info(cache_db: aioredis.Redis) -> str:
         {_sep} `Key Hits:      {hits}`
         {_sep} `Key Misses:    {misses}`
     """)
-
-@overload
-def to_async(
-    coro: Awaitable[_R],
-    loop: Optional[asyncio.AbstractEventLoop] = None,
-    return_result: Literal[True] = True
-) -> _R: ...
-@overload
-def to_async(
-    coro: Awaitable[Any],
-    loop: Optional[asyncio.AbstractEventLoop] = None,
-    return_result: Literal[False] = False
-) -> None: ...
-
-def to_async(
-    coro: Awaitable[Union[_R, Any]],
-    loop: Optional[asyncio.AbstractEventLoop] = None,
-    return_result: bool = True
-) -> Optional[_R]:
-    """Gets to an async env and returns the coro's result
-    Notes: Can be used for swapping threads, if loop is passed."""
-
-    if not loop:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            raise RuntimeError
-
-        result = loop.run_until_complete(coro)
-        return result if return_result else None
-
-    future = asyncio.run_coroutine_threadsafe(coro, loop)
-    return future.result() if return_result else None
 
 
 if sys.version_info >= (3, 9):
