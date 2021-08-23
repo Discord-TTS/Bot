@@ -26,11 +26,6 @@ def _update_config(config: ConfigParser):
     with open("config.ini", "w") as config_file:
         config.write(config_file)
 
-def _update_defaults(bot: TTSBot) -> asyncio.Task[Record]:
-    return bot.loop.create_task( # type: ignore
-        bot.conn.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
-    )
-
 
 def add_to_updates(type: Literal["early", "normal"]) -> Callable[[_UF], _UF]:
     def deco(func: _UF) -> _UF:
@@ -71,15 +66,13 @@ async def do_normal_updates(bot: TTSBot):
 # All updates added from here
 @add_to_updates("normal")
 async def add_default_column(bot: TTSBot) -> bool:
-    return not (await asyncio.gather(
-        bot.pool.execute(
-            "INSERT INTO guilds(guild_id) VALUES(0) ON CONFLICT (guild_id) DO NOTHING"
-        ), bot.pool.execute(
-            "INSERT INTO userinfo(user_id) VALUES(0) ON CONFLICT (user_id) DO NOTHING"
-        ), bot.pool.execute(
-            "INSERT INTO nicknames(guild_id, user_id) VALUES(0, 0) ON CONFLICT (guild_id, user_id) DO NOTHING"
-        ),
-    ))
+    await asyncio.gather( # We have to insert these 2 first, because otherwise the foreign key with nicknames errors
+        bot.pool.execute("INSERT INTO guilds(guild_id) VALUES(0) ON CONFLICT (guild_id) DO NOTHING"),
+        bot.pool.execute("INSERT INTO userinfo(user_id) VALUES(0) ON CONFLICT (user_id) DO NOTHING")
+    )
+
+    await bot.conn.execute("INSERT INTO nicknames(guild_id, user_id) VALUES(0, 0) ON CONFLICT (guild_id, user_id) DO NOTHING")
+    return False
 
 @add_to_updates("normal")
 async def add_analytics(bot: TTSBot) -> bool:
