@@ -7,8 +7,8 @@ from configparser import ConfigParser
 from os import listdir
 from signal import SIGHUP, SIGINT, SIGTERM
 from time import monotonic
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
-                    Optional, Set, Tuple, TypeVar, Union, cast)
+from typing import (TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple,
+                    TypeVar, Union, cast)
 
 import aiohttp
 import aioredis
@@ -61,11 +61,8 @@ class TTSBot(_commands.AutoShardedBot):
         blocked: bool # Handles if to be on gtts or espeak
         pool: Pool
 
-        get_command: Callable[[str], Optional[_commands.Command]]
         voice_clients: List[TTSVoicePlayer]
-        commands: Set[utils.TypedCommand]
         user: discord.ClientUser
-        shard_ids: List[int]
 
         conn: asyncpg.pool.PoolConnectionProxy[asyncpg.Record]
         del cache_handler, database_handler, TTSVoicePlayer

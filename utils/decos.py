@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from functools import wraps
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Optional, TypeVar,
-                    Union, cast)
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Coroutine,
+                    Optional, TypeVar, Union, cast)
 
 import discord
 from discord.ext import commands
@@ -19,12 +19,11 @@ if TYPE_CHECKING:
     _R = TypeVar("_R")
     _P = ParamSpec("_P")
 
-
-error_lookup = {"bool": commands.BadBoolArgument, "discord.TextChannel": commands.ChannelNotFound}
+error_lookup = {"bool": commands.BadBoolArgument, "TextChannel": commands.ChannelNotFound}
 
 def make_fancy(
     func: Callable[[CommonCog, TypedGuildContext, Any], Awaitable[_R]]
-) -> Callable[[CommonCog, TypedGuildContext, Optional[Union[discord.TextChannel, bool]]], Awaitable[Optional[_R]]]:
+) -> Callable[[CommonCog, TypedGuildContext, Optional[Union[discord.TextChannel, bool]]], Coroutine[Any, Any, Optional[_R]]]:
 
     async def wrapper(self: CommonCog, ctx: TypedGuildContext, value: Optional[Union[discord.TextChannel, bool]] = None) -> Optional[_R]:
         type_to_convert: str = [*func.__annotations__.values()][1].split(".")[-1]
@@ -55,7 +54,7 @@ def make_fancy(
 
     return wrapper
 
-def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, Awaitable[Optional[_R]]]:
+def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, Coroutine[Any, Any, Optional[_R]]]:
     async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Optional[_R]:
         try:
             return await func(*args, **kwargs)
@@ -69,8 +68,8 @@ def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, A
         return None
     return wraps(func)(wrapper)
 
-def run_in_executor(func: Callable[_P, _R]) -> Callable[_P, Awaitable[_R]]:
-    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Awaitable[_R]:
+def run_in_executor(func: Callable[_P, _R]) -> Callable[_P, Coroutine[Any, Any, _R]]:
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Coroutine[Any, Any, _R]:
         return to_thread(func, *args, **kwargs)
 
     return wraps(func)(wrapper)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from functools import partial
 from io import BytesIO
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, List, Literal,
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal,
                     Optional, Tuple, TypeVar, Union, overload)
 
 import discord
@@ -100,19 +100,18 @@ class TTSAudioMaker:
 
 
 # Typed Classes for silencing type errors.
-TextChannel = Union[discord.TextChannel, discord.DMChannel]
 VoiceChannel = Union[discord.VoiceChannel, discord.StageChannel]
+GuildTextChannel = Union[discord.TextChannel, discord.Thread]
+TextChannel = Union[GuildTextChannel, discord.DMChannel]
 class TypedContext(commands.Context):
     bot: TTSBot
     prefix: str
     cog: CommonCog
-    args: List[Any]
     channel: TextChannel
     message: TypedMessage
+    command: commands.Command
     guild: Optional[TypedGuild]
     author: Union[discord.User, TypedMember]
-    command: Union[TypedCommand, commands.Group]
-    invoked_subcommand: Optional[commands.Command]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -148,7 +147,7 @@ class TypedContext(commands.Context):
 class TypedGuildContext(TypedContext):
     guild: TypedGuild
     author: TypedMember
-    channel: discord.TextChannel
+    channel: GuildTextChannel
 
     def author_permissions(self) -> discord.Permissions:
         if self.interaction is not None:
@@ -168,10 +167,11 @@ class TypedGuildContext(TypedContext):
 class TypedMessage(discord.Message):
     guild: Optional[TypedGuild]
     author: Union[TypedMember, discord.User]
+    reference: Optional[TypedMessageReference]
 
 class TypedGuildMessage(TypedMessage):
     guild: TypedGuild
-    channel: Union[discord.TextChannel, discord.Thread]
+    channel: GuildTextChannel
 
 
 class TypedMember(discord.Member):
@@ -184,13 +184,12 @@ class TypedGuild(discord.Guild):
     voice_client: Optional[TTSVoicePlayer]
     fetch_member: Callable[[int], Awaitable[TypedMember]]
 
+
 class TypedVoiceState(discord.VoiceState):
     channel: VoiceChannel
 
 class TypedDMChannel(discord.DMChannel):
     recipient: discord.User
 
-class TypedCommand(commands.Command):
-    name: str
-    help: Optional[str]
-    qualified_name: str
+class TypedMessageReference(discord.MessageReference):
+    resolved: Optional[Union[TypedMessage, discord.DeletedReferencedMessage]]

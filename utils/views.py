@@ -39,7 +39,7 @@ class CommandView(GenericView):
 
     def recall_command(self, *args: Any) -> Coroutine[Any, Any, Any]:
         self.stop()
-        return self.ctx.command(*self._clean_args(*self.ctx.args), *args)
+        return self.ctx.command(*self._clean_args(*self.ctx.args), *args) # type: ignore
 
 
     async def on_error(self, *args: Any) -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from inspect import cleandoc
-from typing import TYPE_CHECKING, List, cast
+from typing import TYPE_CHECKING, List
 
 import discord
 import utils
@@ -77,14 +77,15 @@ class OtherEvents(utils.CommonCog):
             ):
                 return
 
-            dm_command = cast(commands.Command, self.bot.get_command("dm"))
-            ctx = await self.bot.get_context(message)
+            dm_command = self.bot.get_command("dm")
+            assert dm_command is not None
 
+            ctx = await self.bot.get_context(message)
             real_user = await self.bot.user_from_dm(dm_message.author.name)
             if not real_user:
                 return
 
-            await dm_command(ctx, real_user, message=message.content)
+            await dm_command(ctx, real_user, message=message.content) # type: ignore
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: utils.TypedGuild):
@@ -133,11 +134,11 @@ class OtherEvents(utils.CommonCog):
         await self.bot.close(utils.RESTART_CLUSTER)
 
     @commands.Cog.listener()
-    async def on_reload(self, cog: str):
+    async def on_reload(self, cog: str, *args):
         self.bot.reload_extension(cog)
 
     @commands.Cog.listener()
-    async def on_change_log_level(self, level: str):
+    async def on_change_log_level(self, level: str, *args):
         level = level.upper()
         self.bot.logger.setLevel(level)
         for handler in self.bot.logger.handlers:
@@ -151,7 +152,7 @@ class OtherEvents(utils.CommonCog):
         await self.bot.websocket.send(wsjson) # type: ignore
 
     @commands.Cog.listener()
-    async def on_ofs_add(self, owner_id: int):
+    async def on_ofs_add(self, owner_id: int, *args):
         support_server: discord.Guild = self.bot.get_support_server() # type: ignore
         role = support_server.get_role(703307566654160969)
         if not role:

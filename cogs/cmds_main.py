@@ -111,7 +111,7 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
         vc.skip()
         await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
 
-    @skip.after_invoke
+    @skip.after_invoke # type: ignore (pylance not accepting subclasses)
     async def reset_cooldown(self, ctx: utils.TypedGuildContext):
         if ctx.author_permissions().administrator:
             self.skip.reset_cooldown(ctx)

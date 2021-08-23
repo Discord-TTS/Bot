@@ -99,9 +99,9 @@ def parse_param(name: str, param: inspect.Parameter) -> Optional[Dict[str, Any]]
 
     return option
 
-def unpack_group(group: commands.Group, subcommands: List[str]) -> utils.TypedCommand:
+def unpack_group(group: commands.Group, subcommands: List[str]) -> commands.Command:
     for subcommand in subcommands:
-        group = group.all_commands[subcommand]
+        group = group.all_commands[subcommand] # type: ignore
 
     return group # type: ignore
 

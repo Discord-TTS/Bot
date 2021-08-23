@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta
-from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
+import datetime
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 import discord
 import orjson
@@ -31,16 +31,6 @@ get_commands = """
     ORDER BY count DESC
     LIMIT 10
 """
-
-
-def sleep_until(time: time) -> Awaitable[None]:
-    now = datetime.utcnow()
-    date = now.date()
-    if now.time() > time:
-        date += timedelta(days=1)
-
-    then = datetime.combine(date, time)
-    return discord.utils.sleep_until(then)
 
 
 def setup(bot: TTSBot):
@@ -109,21 +99,15 @@ class Loops(utils.CommonCog):
         await self.bot.pool.executemany(query, rows)
         self.bot.analytics_buffer = utils.SafeDict()
 
-    @tasks.loop(minutes=10)
+    @tasks.loop(time=datetime.time(hour=12))
     @utils.decos.handle_errors
-    async def send_analytics_msg(self, wait: bool = True):
+    async def send_analytics_msg(self):
         if self.bot.cluster_id not in {None, 0}:
             return self.send_analytics_msg.cancel()
 
-        if wait:
-            midday = time(hour=12)
-            await sleep_until(midday)
-
         max_len = 0
-        yesterday = datetime.today() - timedelta(days=1)
-        sections: Dict[str, List[List[str]]] = {
-            "Commands:": [], "Events:": []
-        }
+        yesterday = datetime.datetime.today() - datetime.timedelta(days=1)
+        sections: Dict[str, List[List[str]]] = {"Commands:": [], "Events:": []}
 
         embed = discord.Embed(
             title="TTS Bot Analytics",
