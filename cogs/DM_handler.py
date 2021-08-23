@@ -70,7 +70,7 @@ class DMHandler(utils.CommonCog):
                     files=files,
                     content=message.content,
                     avatar_url=message.author.avatar.url,
-                    username=author_name[:32 - len(author_id)] + author_id,
+                    username=author_name + author_id,
                 )
 
         else:
