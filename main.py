@@ -198,11 +198,7 @@ class TTSBot(_commands.AutoShardedBot):
                 bot_token=self.http.token
             )
 
-        # Load all of /cogs and /extensions
-        self.load_extensions("cogs")
-        self.load_extensions("extensions")
-
-        # Send starting message and actually start the bot
+        # Create websocket and other clustering specific stuff
         if self.shard_ids is not None:
             prefix = f"`[Cluster] [ID {self.cluster_id}] [Shards {len(self.shard_ids)}]`: "
             self.websocket = await self.create_websocket()
@@ -210,6 +206,11 @@ class TTSBot(_commands.AutoShardedBot):
             self.websocket = None
             prefix = ""
 
+        # Load all of /cogs and /extensions
+        self.load_extensions("cogs")
+        self.load_extensions("extensions")
+
+        # Send starting message and actually start the bot
         self.logger = utils.setup_logging(config["Main"]["log_level"], prefix, self.session)
         self.logger.info("Starting TTS Bot!")
 

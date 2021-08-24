@@ -1,26 +1,19 @@
 from __future__ import annotations
 
-import asyncio
 import time
-import uuid
 from inspect import cleandoc
 from io import BytesIO
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 from psutil import Process
 
 import utils
-from utils.websocket_types import *
 
 
 if TYPE_CHECKING:
     from main import TTSBot
-
-    from events_errors import ErrorEvents
-else:
-    ErrorEvents = None
 
 
 start_time = time.monotonic()
@@ -46,9 +39,12 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             not ctx.interaction
             and ctx.guild is not None
             and ctx.guild.voice_client
+            and isinstance(ctx.author, discord.Member)
+            and ctx.author.voice
+            and ctx.guild.voice_client.channel == ctx.author.voice.channel
             and self.bot.settings[ctx.guild.id]["channel"] == ctx.channel.id
         ):
-            return # probably in VC, just let on_message do TTS
+            return await ctx.reply(f"You don't need to include the `{ctx.prefix}tts` for messages to be said!")
 
         author_name = "".join(filter(str.isalnum, ctx.author.name))
         lang = (await self.bot.userinfo.get(ctx.author.id)).get("lang", "en")
@@ -84,20 +80,9 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
 
             raw_ram_usage = Process().memory_info().rss
         else:
-            ws_uuid = uuid.uuid4()
-            to_fetch = ["guild_count", "member_count", "voice_count"]
-            wsjson = utils.data_to_ws_json("REQUEST", target="*", info=to_fetch, nonce=ws_uuid)
-
-            await self.bot.websocket.send(wsjson)
-            try:
-                check = lambda _, nonce: uuid.UUID(nonce) == ws_uuid
-                responses, _ = await self.bot.wait_for(timeout=10, check=check, event="response",)
-            except asyncio.TimeoutError:
-                cog = cast(ErrorEvents, self.bot.get_cog("ErrorEvents"))
-                self.bot.logger.error("Timed out fetching botstats!")
-
-                error_msg = "the bot timed out fetching this info"
-                return await cog.send_error(ctx, error_msg)
+            responses = await ctx.request_ws_data("guild_count", "member_count", "voice_count")
+            if responses is None:
+                return
 
             raw_ram_usage = await utils.to_thread(get_ram_recursive, Process().parent())
             total_voice_clients = sum(resp["voice_count"] for resp in responses)

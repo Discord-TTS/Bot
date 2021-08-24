@@ -118,7 +118,7 @@ class ChannelSelector(discord.ui.Select):
             await interaction.response.send_message(err, ephemeral=True)
 
             self.options = [option for option in self.options if option.value != self.values[0]]
-            await self.view.message.edit(view=self.view)
+            self.view.message = await self.view.message.edit(view=self.view) # type: ignore
         else:
             await self.view.recall_command(channel)
             await self.view.message.delete()

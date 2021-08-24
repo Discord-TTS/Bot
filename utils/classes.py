@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from functools import partial
 from io import BytesIO
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal,
-                    Optional, Tuple, TypeVar, Union, overload)
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Literal,
+                    Optional, Tuple, TypeVar, Union, cast, overload)
 
 import discord
 import voxpopuli
@@ -12,8 +13,9 @@ from discord.ext import commands
 from mutagen import mp3 as mutagen
 from pydub import AudioSegment
 
-from .constants import GTTS_ESPEAK_DICT
-from .funcs import to_thread
+from .constants import GTTS_ESPEAK_DICT, RED
+from .funcs import data_to_ws_json, to_thread
+from .websocket_types import WS_TARGET
 
 _T = TypeVar("_T")
 if TYPE_CHECKING:
@@ -117,6 +119,54 @@ class TypedContext(commands.Context):
         super().__init__(*args, **kwargs)
         self.interaction: Optional[discord.Interaction] = None
 
+    async def send_error(self, error: str,
+        fix: str = "get in contact with us via the support server for help",
+    ) -> Optional[discord.Message]:
+
+        if self.guild:
+            self = cast(TypedGuildContext, self)
+            permissions = self.bot_permissions()
+
+            if not permissions.send_messages:
+                return
+
+            if not permissions.embed_links:
+                msg = "An Error Occurred! Please give me embed links permissions so I can tell you more!"
+                return await self.reply(msg, ephemeral=True)
+
+        error_embed = discord.Embed(
+            colour=RED,
+            title="An Error Occurred!",
+            description=f"Sorry but {error}, to fix this, please {fix}!"
+        ).set_author(
+            name=self.author.display_name,
+            icon_url=self.author.avatar.url
+        ).set_footer(
+            text="Support Server: https://discord.gg/zWPWwQC"
+        )
+
+        return await self.reply(embed=error_embed, ephemeral=True)
+
+    # I wish this could be data: List[_T] -> ...Dict[_T, Any] but no, typing bad
+    async def request_ws_data(self, *to_request: str, target: WS_TARGET = "*", args: Dict[str, Dict[str, Any]] = None) -> Optional[List[Dict[str, Any]]]:
+        assert self.bot.websocket is not None
+
+        args = args or {}
+        ws_uuid = uuid.uuid4()
+        wsjson = data_to_ws_json(
+            command="REQUEST", target=target,
+            info=to_request, args=args, nonce=ws_uuid
+        )
+
+        await self.bot.websocket.send(wsjson)
+        try:
+            check = lambda _, nonce: uuid.UUID(nonce) == ws_uuid
+            return (await self.bot.wait_for(timeout=10, check=check, event="response"))[0]
+        except asyncio.TimeoutError:
+            self.bot.logger.error("Timed out requesting data from WS!")
+            await self.send_error("the bot timed out fetching this info")
+
+
     @overload
     async def send(self, *args: Any, return_msg: Literal[False] = False, **kwargs: Any) -> None: ...
     @overload
@@ -187,9 +237,6 @@ class TypedGuild(discord.Guild):
 
 class TypedVoiceState(discord.VoiceState):
     channel: VoiceChannel
-
-class TypedDMChannel(discord.DMChannel):
-    recipient: discord.User
 
 class TypedMessageReference(discord.MessageReference):
     resolved: Optional[Union[TypedMessage, discord.DeletedReferencedMessage]]

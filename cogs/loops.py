@@ -4,8 +4,6 @@ import datetime
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
 import discord
-import orjson
-import websockets
 from discord.ext import tasks
 
 import utils
@@ -13,7 +11,6 @@ import utils
 
 if TYPE_CHECKING:
     from main import TTSBot
-    from utils.websocket_types import WSGenericJSON
 
 
 sep = utils.OPTION_SEPERATORS[1]
@@ -50,34 +47,6 @@ class Loops(utils.CommonCog):
     def cog_unload(self):
         for task in self.tasks:
             task.cancel()
-
-
-    @tasks.loop()
-    @utils.decos.handle_errors
-    async def websocket_client(self):
-        if self.bot.websocket is None:
-            return self.websocket_client.stop()
-
-        try:
-            async for msg in self.bot.websocket:
-                wsjson: WSGenericJSON = orjson.loads(msg)
-                self.bot.dispatch("websocket_msg", msg)
-
-                args = [*wsjson["a"].values()]
-                if wsjson.get("t", None):
-                    args.append(wsjson["t"])
-
-                command = wsjson["c"].lower()
-                self.bot.dispatch(command, *args)
-        except websockets.ConnectionClosed as error:
-            disconnect_msg = f"Websocket disconnected with code `{error.code}: {error.reason}`"
-            try:
-                self.bot.websocket = await self.bot.create_websocket()
-            except Exception as new_error:
-                self.bot.websocket = None
-                self.bot.logger.error(f"{disconnect_msg} and failed to reconnect: {new_error}")
-            else:
-                self.bot.logger.warning(f"{disconnect_msg} and was able to reconnect!")
 
 
     @tasks.loop(seconds=60)

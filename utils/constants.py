@@ -1,11 +1,14 @@
 import re as _re
 from typing import Tuple, Union
 
+import discord as _discord
+
 KILL_EVERYTHING = 0
 RESTART_CLUSTER = 1
 DO_NOT_RESTART_CLUSTER = 2
 
 NETURAL_COLOUR = 0x3498db
+RED = _discord.Colour.from_rgb(255, 0, 0)
 AUDIODATA = Tuple[bytes, Union[int, float]]
 DEFAULT_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/{}.png"
 

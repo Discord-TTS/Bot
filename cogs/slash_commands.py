@@ -203,6 +203,7 @@ class SlashCommands(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
+        self.bot.logger.debug(f"Interaction: {interaction.data}")
         if interaction.type != discord.InteractionType.application_command:
             return
 
@@ -220,10 +221,8 @@ class SlashCommands(utils.CommonCog):
             return await interaction.response.send_message(msg, ephemeral=True)
 
         interaction.data = cast(SlashCommandData, interaction.data)
-        self.bot.logger.debug(f"Interaction: {interaction.data}")
-
-        command_name = interaction.data["name"]
         command_options = interaction.data.get("options") or []
+        command_name = interaction.data["name"]
 
         # I am going to hell for this
         message = cast(discord.Message, utils.construct_unslotted(

@@ -17,33 +17,10 @@ if TYPE_CHECKING:
 def setup(bot: TTSBot):
     bot.add_cog(OwnerCommands(bot))
 
+is_owner = commands.is_owner()
 class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
     "TTS Bot commands meant only for the bot owner."
-
-    @commands.command()
-    @commands.is_owner()
-    @commands.bot_has_permissions(send_messages=True, manage_messages=True, manage_webhooks=True)
-    async def sudo(self, ctx: utils.TypedContext, user: Union[discord.User, str], *, message: str):
-        """mimics another user"""
-        await ctx.message.delete()
-
-        if isinstance(user, str):
-            avatar = "https://cdn.discordapp.com/.png"
-        else:
-            avatar = user.avatar.url
-            user = user.display_name
-
-        if not isinstance(ctx.channel, discord.TextChannel):
-            return
-
-        webhooks = await ctx.channel.webhooks()
-        if len(webhooks) == 0:
-            webhook = await ctx.channel.create_webhook(name="Temp Webhook For -sudo")
-            await webhook.send(message, username=user, avatar_url=avatar)
-            await webhook.delete()
-        else:
-            webhook = webhooks[0]
-            await webhook.send(message, username=user, avatar_url=avatar)
+    cog_check = lambda _, ctx: is_owner.predicate(ctx)
 
     @commands.command(aliases=("log_level", "logger", "loglevel"))
     @commands.is_owner()
@@ -93,16 +70,6 @@ class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
                 self.bot.config.write(configfile)
 
             await ctx.send(f"Removed {user} | {user.id} from the trusted members")
-
-    @commands.command()
-    @commands.is_owner()
-    @commands.guild_only()
-    @commands.bot_has_permissions(send_messages=True)
-    async def say(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel, *, to_say: str):
-        if ctx.bot_permissions().manage_messages:
-            await ctx.message.delete()
-
-        await channel.send(to_say)
 
     @commands.command(aliases=("rc", "reload"))
     @commands.is_owner()

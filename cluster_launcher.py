@@ -49,6 +49,22 @@ def run_bot(cluster_id: int, total_shard_count: int, shards: List[int]):
     import utils
     from main import main
 
+    class UnbufferedStdout(object):
+        def __init__(self, stream):
+            self.stream = stream
+        def __getattr__(self, attr):
+            return getattr(self.stream, attr)
+
+        def write(self, *args, **kwargs):
+            self.stream.write(*args, **kwargs)
+            self.stream.flush()
+
+        def writelines(self, *args, **kwargs):
+            self.stream.writelines(*args, **kwargs)
+            self.stream.flush()
+
+    sys.stdout = UnbufferedStdout(sys.stdout)
+
     try:
         return_code = asyncio.run(main(cluster_id, total_shard_count, shards))
     except:
@@ -181,15 +197,15 @@ class ClusterManager:
         self.keep_alive.cancel()
 
         try:
-            await asyncio.wait_for(self.keep_alive, timeout=3)
+            await asyncio.wait_for(self.keep_alive, timeout=5)
         except asyncio.TimeoutError:
             logger.error("Timed out on shutdown, force killing!")
-            sys.exit()
 
 
     async def _get_from_clusters(self,
         info: List[str],
         nonce: Union[str, uuid.UUID],
+        args: Dict[str, Dict[str, Any]] = None,
         target: WS_TARGET = "*"
     ) -> List[Dict[str, Any]]:
 
@@ -198,10 +214,13 @@ class ClusterManager:
         self.pending_responses[nonce] = asyncio.Queue()
 
         request_json = {"c": "request", "a": {"info": info, "nonce": nonce}}
+        if args is not None:
+            request_json["a"]["args"] = args
+
         send_all = {"c": "send", "a": request_json, "t": target}
         await self.send_handler(None, send_all) # type: ignore
 
-        for i in self.monitors.keys():
+        for i in range(len(self.monitors) if target == "*" else 1):
             logger.debug(f"Waiting for response {i}")
             responses.append(await self.pending_responses[nonce].get())
 
@@ -234,9 +253,12 @@ class ClusterManager:
 
     async def request_handler(self, connection: _WSSP, request: WSRequestJSON):
         nonce = request["a"]["nonce"]
-        to_get = request["a"]["info"]
-        target = request.get("t", "*")
-        responses = await self._get_from_clusters(to_get, nonce, target=target)
+        responses = await self._get_from_clusters(
+            nonce=nonce,
+            info=request["a"]["info"],
+            target=request.get("t", "*"),
+            args=request["a"].get("args"),
+        )
 
         response_json = utils.data_to_ws_json(command="RESPONSE", target=nonce, responses=responses)
         await connection.send(response_json)

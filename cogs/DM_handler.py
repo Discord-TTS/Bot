@@ -70,6 +70,7 @@ class DMHandler(utils.CommonCog):
                     files=files,
                     content=message.content,
                     avatar_url=message.author.avatar.url,
+                    allowed_mentions=discord.AllowedMentions.none(),
                     username=author_name[:32 - len(author_id)] + author_id,
                 )
 
@@ -92,6 +93,8 @@ class DMHandler(utils.CommonCog):
             await dm_message.pin()
 
     @commands.Cog.listener()
-    async def on_private_channel_pins_update(self, channel: utils.TypedDMChannel, _):
+    async def on_private_channel_pins_update(self, channel: discord.DMChannel, _):
+        assert channel.recipient is not None
+
         welcomed = any(map(self.is_welcome_message, await channel.pins()))
         self.is_welcomed[channel.recipient.id] = welcomed

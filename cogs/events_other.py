@@ -2,23 +2,17 @@ from __future__ import annotations
 
 import asyncio
 from inspect import cleandoc
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 import discord
-import utils
 from discord.ext import commands
+
+import utils
 
 
 if TYPE_CHECKING:
     from main import TTSBot
 
-
-data_lookup = {
-    "guild_count":  lambda b: len(b.guilds),
-    "voice_count":  lambda b: len(b.voice_clients),
-    "member_count": lambda b: sum(guild.member_count for guild in b.guilds),
-    "has_support":  lambda b: None if b.get_support_server() is None else b.cluster_id,
-}
 
 WELCOME_MESSAGE = cleandoc("""
     Hello! Someone invited me to your server `{guild}`!
@@ -38,7 +32,6 @@ def setup(bot: TTSBot):
     bot.add_cog(OtherEvents(bot))
 
 class OtherEvents(utils.CommonCog):
-
     @commands.Cog.listener()
     async def on_message(self, message: utils.TypedGuildMessage):
         if message.guild is None or message.author.bot:
@@ -106,7 +99,7 @@ class OtherEvents(utils.CommonCog):
         except discord.errors.HTTPException: pass
 
         if self.bot.websocket is None or self.bot.get_support_server() is not None:
-            return await self.on_ofs_add(owner.id)
+            return self.bot.dispatch("ofs_add", owner.id)
 
         json = {"c": "ofs_add", "a": {"owner_id": owner.id}}
         wsjson = utils.data_to_ws_json("SEND", target="support", **json)
@@ -117,51 +110,3 @@ class OtherEvents(utils.CommonCog):
     async def on_guild_remove(self, guild: discord.Guild):
         del self.bot.settings[guild.id]
         await self.bot.channels["servers"].send(f"Just got kicked from {guild}. I am now in {len(self.bot.guilds)} servers")
-
-
-
-    # IPC events that have been plugged into bot.dispatch
-    @commands.Cog.listener()
-    async def on_websocket_msg(self, msg: str):
-        self.bot.logger.debug(f"Recieved Websocket message: {msg}")
-
-    @commands.Cog.listener()
-    async def on_close(self):
-        await self.bot.close(utils.KILL_EVERYTHING)
-
-    @commands.Cog.listener()
-    async def on_restart(self):
-        await self.bot.close(utils.RESTART_CLUSTER)
-
-    @commands.Cog.listener()
-    async def on_reload(self, cog: str, *args):
-        self.bot.reload_extension(cog)
-
-    @commands.Cog.listener()
-    async def on_change_log_level(self, level: str, *args):
-        level = level.upper()
-        self.bot.logger.setLevel(level)
-        for handler in self.bot.logger.handlers:
-            handler.setLevel(level)
-
-    @commands.Cog.listener()
-    async def on_request(self, info: List[str], nonce: str, *args):
-        data = {to_get: data_lookup[to_get](self.bot) for to_get in info}
-        wsjson = utils.data_to_ws_json("RESPONSE", target=nonce, **data)
-
-        await self.bot.websocket.send(wsjson) # type: ignore
-
-    @commands.Cog.listener()
-    async def on_ofs_add(self, owner_id: int, *args):
-        support_server: discord.Guild = self.bot.get_support_server() # type: ignore
-        role = support_server.get_role(703307566654160969)
-        if not role:
-            return
-
-        try:
-            owner_member = await support_server.fetch_member(owner_id)
-        except discord.HTTPException:
-            return
-
-        await owner_member.add_roles(role)
-        self.bot.logger.info(f"Added OFS role to {owner_member}")

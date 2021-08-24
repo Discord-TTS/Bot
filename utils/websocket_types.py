@@ -11,7 +11,6 @@ __all__ = (
     "WSClientResponseJSON",
 )
 
-
 WS_TARGET = Union[Literal["*", "support"], int]
 class EmptyDict(TypedDict): ...
 
@@ -38,6 +37,7 @@ class WSKillJSON(TypedDict):
 
 class WSRequestArgs(TypedDict):
     info: List[str]
+    args: Dict[str, Dict[str, Any]] # {"run_code": {"code": "print('hello world')"}}
     nonce: str
 
 class WSRequestJSON(TypedDict):

@@ -170,10 +170,12 @@ class TableHandler(Generic[_DK]):
         settings = [*self.pkey_columns, *no_id_settings]
         values   = [*identifer, *no_id_values]
 
-        await self.pool.execute(*sql(self.insert_query,
+        query = sql(self.insert_query,
             sql.list(settings), sql.list(values),
             sql.list(no_id_settings), sql.list(no_id_values)
-        ))
+        )
+        self.bot.logger.debug(f"query: {list(query)}")
+        await self.pool.execute(*query)
 
         task.waiter.set_result(None)
         if self.bot.websocket is not None and self.broadcast:
