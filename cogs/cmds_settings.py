@@ -181,8 +181,9 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     @commands.guild_only()
     @commands.command()
     @utils.decos.make_fancy
-    async def setup(self, ctx: utils.TypedGuildContext, channel: discord.TextChannel):
+    async def setup(self, ctx: utils.TypedGuildContext, value: discord.TextChannel):
         "Setup the bot to read messages from `<channel>`"
+        channel = value
         embed = discord.Embed(
             title="TTS Bot has been setup!",
             description=cleandoc(f"""
@@ -215,10 +216,10 @@ class SettingCommands(utils.CommonCog, name="Settings"):
             return await self.voice(ctx, lang)
 
         userinfo = await self.bot.userinfo.get(ctx.author.id)
-        lang = userinfo.get("lang", "en").split("-")[0]
         langs_string = str(tts_langs).strip("{}")
-
-        assert lang is not None
+        lang = userinfo.get("lang")
+        if lang is None:
+            lang = "en"
 
         embed = discord.Embed(title="TTS Bot Languages")
         embed.set_footer(text=pick_random(utils.FOOTER_MSGS))

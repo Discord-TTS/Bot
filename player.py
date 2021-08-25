@@ -83,6 +83,10 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
     @utils.decos.handle_errors
     async def play_audio(self):
         audio, length = await self.audio_buffer.get()
+        if not self.is_connected():
+            self.play_audio.stop()
+            return await self.disconnect(force=True)
+
         source = discord.FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"')
 
         try:
@@ -99,7 +103,6 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
     @utils.decos.handle_errors
     async def fill_audio_buffer(self):
         text, lang = await self.message_queue.get()
-        lang = lang.split("-")[0]
 
         try:
             audio, length = await self.get_tts(text, lang, self.max_length)

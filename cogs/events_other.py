@@ -108,5 +108,7 @@ class OtherEvents(utils.CommonCog):
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild):
-        del self.bot.settings[guild.id]
+        if guild.id in self.bot.settings:
+            del self.bot.settings[guild.id]
+
         await self.bot.channels["servers"].send(f"Just got kicked from {guild}. I am now in {len(self.bot.guilds)} servers")

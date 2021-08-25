@@ -142,13 +142,13 @@ GUILDS_CREATE = """
         msg_length     smallint   DEFAULT 30,
         repeated_chars smallint   DEFAULT 0,
         prefix         varchar(6) DEFAULT '-',
-        default_lang   varchar(3)
+        default_lang   varchar(5)
     );"""
 USERINFO_CREATE = """
     CREATE TABLE userinfo (
         user_id  bigint     PRIMARY KEY,
         blocked  bool       DEFAULT False,
-        lang     varchar(4)
+        lang     varchar(5)
     );"""
 NICKNAMES_CREATE = """
     CREATE TABLE nicknames (

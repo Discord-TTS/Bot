@@ -124,6 +124,9 @@ class TableHandler(Generic[_DK]):
             self.delete_query, identifier
         ))
 
+    def __contains__(self, identifier: _DK):
+        return identifier not in self._not_fully_fetched and identifier in self._cache
+
 
     async def get(self, identifer: _DK) -> _CACHE_ITEM:
         try:
