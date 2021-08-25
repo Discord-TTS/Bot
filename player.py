@@ -3,71 +3,16 @@ from __future__ import annotations
 import asyncio
 from functools import partial
 from inspect import cleandoc
-from io import BytesIO
-from shlex import split
-from subprocess import PIPE, Popen
 from typing import TYPE_CHECKING, Optional, Tuple, cast
 
 import asyncgTTS
 import discord
 from discord.ext import tasks
-from discord.opus import Encoder
 
 import utils
 
-
 if TYPE_CHECKING:
     from main import TTSBot
-
-
-class FFmpegPCMAudio(discord.AudioSource):
-    """Reimplementation of discord.FFmpegPCMAudio with source: bytes support
-    Original Source: https://github.com/Rapptz/discord.py/issues/5192"""
-
-    def __init__(self, source, *, executable="ffmpeg", pipe=False, stderr=None, before_options=None, options=None):
-        args = [executable]
-        if isinstance(before_options, str):
-            args.extend(split(before_options))
-
-        args.append("-i")
-        args.append("-" if pipe else source)
-        args.extend(("-f", "s16le", "-ar", "48000", "-ac", "2", "-loglevel", "warning"))
-
-        if isinstance(options, str):
-            args.extend(split(options))
-
-        args.append("pipe:1")
-
-        self._stdout = None
-        self._process = None
-        self._stderr = stderr
-        self._process_args = args
-        self._stdin = source if pipe else None
-
-    def _create_process(self) -> BytesIO:
-        stdin, stderr, args = self._stdin, self._stderr, self._process_args
-        self._process = Popen(args, stdin=PIPE, stdout=PIPE, stderr=stderr)
-        return BytesIO(self._process.communicate(input=stdin)[0])
-
-    def read(self) -> bytes:
-        if self._stdout is None:
-            # This function runs in a voice thread, so we can afford to block
-            # it and make the process now instead of in the main thread
-            self._stdout = self._create_process()
-
-        ret = self._stdout.read(Encoder.FRAME_SIZE)
-        return ret if len(ret) == Encoder.FRAME_SIZE else b""
-
-    def cleanup(self):
-        process = self._process
-        if process is None:
-            return
-
-        process.kill()
-        if process.poll() is None:
-            process.communicate()
-
-        self._process = None
 
 
 _MessageQueue = Tuple[str, str]
@@ -138,7 +83,7 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
     @utils.decos.handle_errors
     async def play_audio(self):
         audio, length = await self.audio_buffer.get()
-        source = FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"')
+        source = discord.FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"')
 
         try:
             await asyncio.wait_for(self.play(source), timeout=length+5)
@@ -194,15 +139,14 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
     # easygTTS -> espeak handling
     async def _handle_rl(self):
         self.bot.logger.warning("Swapping to espeak")
-
         self.bot.create_task(self._handle_rl_reset())
-        if not self.bot.sent_fallback:
-            self.bot.sent_fallback = True
+        if self.bot.sent_fallback:
+            return
 
-            await asyncio.gather(*(
-                vc._send_fallback() for vc in self.bot.voice_clients
-            ))
-            self.bot.logger.info("Fallback/RL messages have been sent.")
+        self.bot.sent_fallback = True
+
+        await asyncio.gather(*(vc._send_fallback() for vc in self.bot.voice_clients))
+        self.bot.logger.info("Fallback/RL messages have been sent.")
 
     async def _handle_rl_reset(self):
         await asyncio.sleep(3601)

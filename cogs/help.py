@@ -83,7 +83,7 @@ class FancyHelpCommand(commands.HelpCommand):
             colour=NETURAL_COLOUR
         )
 
-        embed.set_author(name=self.context.author.display_name, icon_url=self.context.author.avatar.url)
+        embed.set_author(name=self.context.author.display_name, icon_url=self.context.author.display_avatar.url)
         embed.set_footer(text=self.get_ending_note())
         await self.get_destination().send(embed=embed)
 

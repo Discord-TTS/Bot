@@ -58,8 +58,8 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
             title="Joined your voice channel!",
             description="Just type normally and TTS Bot will say your messages!"
         )
-        join_embed.set_thumbnail(url=self.bot.user.avatar.url)
-        join_embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        join_embed.set_thumbnail(url=self.bot.user.display_avatar.url)
+        join_embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
         try:

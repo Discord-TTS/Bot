@@ -123,7 +123,7 @@ class MainEvents(utils.CommonCog):
         # Toggleable xsaid and attachment + links detection
         if settings["xsaid"]:
             nicknames = await self.bot.nicknames.get((message.guild.id, message.author.id))
-            said_name: str = nicknames.get("name", message.author.display_name)
+            said_name: str = nicknames.get("name") or message.author.display_name
 
             file_format = utils.exts_to_format(message.attachments)
 

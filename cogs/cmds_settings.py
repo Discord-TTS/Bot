@@ -191,8 +191,8 @@ class SettingCommands(utils.CommonCog, name="Settings"):
             """)
         )
         embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        embed.set_thumbnail(url=self.bot.user.display_avatar.url)
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
 
         self.bot.settings[ctx.guild.id] = {"channel": channel.id}
         await ctx.send(embed=embed)
@@ -224,6 +224,6 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
         embed.add_field(name="Currently Supported Languages", value=langs_string)
         embed.add_field(name="Current Language used", value=f"{langs_lookup[lang]} | {lang}")
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
 
         await ctx.send(embed=embed)

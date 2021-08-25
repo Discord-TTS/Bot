@@ -88,7 +88,7 @@ class ErrorEvents(utils.CommonCog):
                 ))
 
             fields.append(("Channel Type", type(message.channel).__name__, True))
-            author_name, icon_url = str(message.author), message.author.avatar.url
+            author_name, icon_url = str(message.author), message.author.display_avatar.url
 
         elif event_method in {"on_guild_join", "on_guild_remove"}:
             guild: discord.Guild = args[0]
@@ -214,7 +214,7 @@ class ErrorEvents(utils.CommonCog):
                     extra_fields=fields,
                     traceback=traceback,
                     author_name=str(ctx.author),
-                    icon_url=ctx.author.avatar.url,
+                    icon_url=ctx.author.display_avatar.url,
                 )
             )
 

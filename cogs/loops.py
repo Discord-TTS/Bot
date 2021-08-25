@@ -37,6 +37,7 @@ class Loops(utils.CommonCog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.run_once = False
         # This is a sin, adds all tasks to self.tasks and starts them
         attrs = (getattr(self, str_attr) for str_attr in dir(self))
         self.tasks = [attr for attr in attrs if isinstance(attr, tasks.Loop)]
@@ -73,6 +74,10 @@ class Loops(utils.CommonCog):
     async def send_analytics_msg(self):
         if self.bot.cluster_id not in {None, 0}:
             return self.send_analytics_msg.cancel()
+
+        if not self.run_once:
+            self.run_once = True
+            return
 
         max_len = 0
         yesterday = datetime.datetime.today() - datetime.timedelta(days=1)

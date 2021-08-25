@@ -93,7 +93,7 @@ class OtherEvents(utils.CommonCog):
             description=WELCOME_MESSAGE.format(guild=guild, prefix=settings["prefix"])
         ).set_footer(
             text="Support Server: https://discord.gg/zWPWwQC | Bot Invite: https://bit.ly/TTSBot"
-        ).set_author(name=str(owner), icon_url=owner.avatar.url)
+        ).set_author(name=str(owner), icon_url=owner.display_avatar.url)
 
         try: await owner.send(embed=embed)
         except discord.errors.HTTPException: pass

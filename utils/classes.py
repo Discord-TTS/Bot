@@ -13,7 +13,7 @@ from discord.ext import commands
 from mutagen import mp3 as mutagen
 from pydub import AudioSegment
 
-from .constants import GTTS_ESPEAK_DICT, RED
+from .constants import GTTS_ESPEAK_DICT, RED, AUDIODATA
 from .funcs import data_to_ws_json, to_thread
 from .websocket_types import WS_TARGET
 
@@ -47,7 +47,7 @@ class TTSAudioMaker:
     def __init__(self, bot: TTSBot):
         self.bot = bot
 
-    async def get_tts(self, text: str, lang: str, max_length: Union[float, int]) -> Union[Tuple[bytes, float], Tuple[None, None]]:
+    async def get_tts(self, text: str, lang: str, max_length: Union[float, int]) -> Union[AUDIODATA, Tuple[None, None]]:
         mode = "wav" if self.bot.blocked else "mp3"
         audio = await self.bot.cache.get((mode, text, lang))
         if audio is None:
@@ -62,7 +62,8 @@ class TTSAudioMaker:
                 return None, None
 
             try:
-                file_length = await to_thread(self.get_duration, audio, mode)
+                audio_file = BytesIO(audio)
+                file_length = await to_thread(self.get_duration, audio_file, mode)
             except mutagen.HeaderNotFoundError:
                 return None, None
 
@@ -71,9 +72,11 @@ class TTSAudioMaker:
 
             await self.bot.cache.set((mode, text, lang), audio)
         else:
-            file_length = await to_thread(self.get_duration, audio, mode)
+            audio_file = BytesIO(audio)
+            file_length = await to_thread(self.get_duration, audio_file, mode)
 
-        return audio, file_length
+        audio_file.seek(0)
+        return audio_file, file_length
 
 
     async def get_gtts(self, text: str, lang: str) -> bytes:
@@ -92,8 +95,7 @@ class TTSAudioMaker:
         return wav
 
 
-    def get_duration(self, audio_data: bytes, mode: Literal["mp3", "wav"]) -> float:
-        audio_file = BytesIO(audio_data)
+    def get_duration(self, audio_file: BytesIO, mode: Literal["mp3", "wav"]) -> float:
         if mode == "mp3":
             return mutagen.MP3(audio_file).info.length
 
@@ -140,7 +142,7 @@ class TypedContext(commands.Context):
             description=f"Sorry but {error}, to fix this, please {fix}!"
         ).set_author(
             name=self.author.display_name,
-            icon_url=self.author.avatar.url
+            icon_url=self.author.display_avatar.url
         ).set_footer(
             text="Support Server: https://discord.gg/zWPWwQC"
         )
@@ -227,7 +229,6 @@ class TypedGuildMessage(TypedMessage):
 class TypedMember(discord.Member):
     guild: TypedGuild
     voice: TypedVoiceState
-    avatar: discord.Asset
 
 class TypedGuild(discord.Guild):
     owner_id: int

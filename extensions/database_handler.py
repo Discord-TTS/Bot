@@ -39,54 +39,45 @@ def _unpack_id(identifer: Union[Iterable[_T], _T]) -> Tuple[_T, ...]:
 
 def setup(bot: TTSBot):
     bot.settings, bot.userinfo, bot.nicknames = (
-        TableHandler(bot, broadcast=True, default_id=0, pkey_columns=("guild_id",),
-        select="SELECT * FROM guilds WHERE guild_id = $1",
-        delete="DELETE FROM guilds WHERE guild_id = $1",
-        insert="""
-            INSERT INTO guilds({})
-            VALUES({})
-
-            ON CONFLICT (guild_id)
-            DO UPDATE SET ({}) = ({})
-        """,
-    ), TableHandler(bot, broadcast=False, default_id=0, pkey_columns=("user_id",),
-        select="SELECT * FROM userinfo WHERE user_id = $1",
-        delete="DELETE FROM userinfo WHERE user_id = $1",
-        insert="""
-            INSERT INTO userinfo({})
-            VALUES({})
-
-            ON CONFLICT (user_id)
-            DO UPDATE SET ({}) = ({})
-        """,
-    ), TableHandler(bot, broadcast=False, default_id=(0, 0), pkey_columns=("guild_id", "user_id"),
-        select="SELECT * from nicknames WHERE guild_id = $1 and user_id = $2",
-        delete="DELETE FROM nicknames WHERE guild_id = $1 and user_id = $2",
-        insert="""
-            INSERT INTO nicknames({})
-            VALUES({})
-
-            ON CONFLICT (guild_id, user_id)
-            DO UPDATE SET ({}) = ({})
-        """,
+        TableHandler[int](bot,
+            table_name="guilds", broadcast=True, pkey_columns=("guild_id",),
+            select="SELECT * FROM guilds WHERE guild_id = $1",
+            delete="DELETE FROM guilds WHERE guild_id = $1",
+    ),  TableHandler[int](bot,
+            table_name="userinfo", broadcast=False, pkey_columns=("user_id",),
+            select="SELECT * FROM userinfo WHERE user_id = $1",
+            delete="DELETE FROM userinfo WHERE user_id = $1",
+    ),  TableHandler[Tuple[int, int]](bot,
+            table_name="nicknames", broadcast=False, pkey_columns=("guild_id", "user_id"),
+            select="SELECT * from nicknames WHERE guild_id = $1 and user_id = $2",
+            delete="DELETE FROM nicknames WHERE guild_id = $1 and user_id = $2",
     ))
 
 
 class TableHandler(Generic[_DK]):
-    def __init__(self,
-        bot: TTSBot, broadcast: bool,
-        select: str, insert: str, delete: str,
-        default_id: _DK, pkey_columns: Tuple[str, ...]
+    def __init__(self, bot: TTSBot,
+        broadcast: bool, select: str, delete: str,
+        table_name: str, pkey_columns: Tuple[str, ...]
     ):
         self.bot = bot
         self.pool = bot.pool
 
         self.broadcast = broadcast
         self.select_query = select
-        self.insert_query = insert
         self.delete_query = delete
-        self.default_id = default_id
         self.pkey_columns = tuple(sql(pkey) for pkey in pkey_columns)
+        self.default_id = 0 if len(pkey_columns) == 1 else (0,) * len(pkey_columns)
+
+        generic_insert_query = """
+            INSERT INTO {}({{}})
+            VALUES({{}})
+
+            ON CONFLICT ({})
+            {}
+        """
+
+        self.single_insert_query = generic_insert_query.format(table_name, ", ".join(pkey_columns), "DO UPDATE SET {} = {}")
+        self.multi_insert_query = generic_insert_query.format(table_name, ", ".join(pkey_columns), "DO UPDATE SET ({}) = ({})")
 
         self._not_fully_fetched: List[_DK] = []
         self._cache: Dict[_DK, _CACHE_ITEM] = {}
@@ -170,7 +161,13 @@ class TableHandler(Generic[_DK]):
         settings = [*self.pkey_columns, *no_id_settings]
         values   = [*identifer, *no_id_values]
 
-        query = sql(self.insert_query,
+        if len(no_id_settings) == 1:
+            unformatted_query = self.single_insert_query
+        else:
+            unformatted_query = self.multi_insert_query
+
+        query = sql(
+            unformatted_query,
             sql.list(settings), sql.list(values),
             sql.list(no_id_settings), sql.list(no_id_values)
         )

@@ -50,7 +50,7 @@ def setup(bot: ClusteredTTSBot):
 class Clustering(utils.CommonCog):
     def __init__(self, bot: ClusteredTTSBot):
         super().__init__(bot)
-        
+
         self.bot = bot
         self.websocket_client.start()
 

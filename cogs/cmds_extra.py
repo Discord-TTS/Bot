@@ -59,7 +59,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             return await ctx.reply("Failed to generate TTS!", ephemeral=True)
 
         await ctx.reply("Generated some TTS!", file=discord.File(
-            fp=BytesIO(audio), filename=(
+            fp=audio, filename=(
                 f"{author_name}-{ctx.message.id}" +
                 ("-espeak.wav" if self.bot.blocked else "-gtts.mp3")
             )
@@ -110,7 +110,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
                     {sep1} {raw_ram_usage / 1024 ** 2:.1f}MB of RAM
                 and can be used by {total_members:,} people!
             """)
-        ).set_footer(text=footer).set_thumbnail(url=self.bot.user.avatar.url)
+        ).set_footer(text=footer).set_thumbnail(url=self.bot.user.display_avatar.url)
 
         await ctx.send(embed=embed)
 
@@ -165,7 +165,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             await self.bot.channels["suggestions"].send(
                 files=files,
                 content=suggestion,
-                avatar_url=ctx.author.avatar.url,
+                avatar_url=ctx.author.display_avatar.url,
                 username=author_name[:32 - len(author_id)] + author_id,
             )
 

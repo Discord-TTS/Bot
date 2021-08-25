@@ -1,4 +1,5 @@
 import re as _re
+from io import BytesIO as _BytesIO
 from typing import Tuple, Union
 
 import discord as _discord
@@ -9,7 +10,7 @@ DO_NOT_RESTART_CLUSTER = 2
 
 NETURAL_COLOUR = 0x3498db
 RED = _discord.Colour.from_rgb(255, 0, 0)
-AUDIODATA = Tuple[bytes, Union[int, float]]
+AUDIODATA = Tuple[_BytesIO, Union[int, float]]
 DEFAULT_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/{}.png"
 
 EMOJI_REGEX = _re.compile(r"<(a?):(.+):(\d+)>")
