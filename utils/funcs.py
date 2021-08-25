@@ -12,7 +12,6 @@ from typing import (TYPE_CHECKING, Any, Callable, Generator, Iterable,
 import orjson
 
 from .constants import OPTION_SEPERATORS, READABLE_TYPE
-from .websocket_types import WS_TARGET
 
 if TYPE_CHECKING:
     import re
@@ -21,6 +20,7 @@ if TYPE_CHECKING:
     import discord
     from typing_extensions import ParamSpec
 
+    from .websocket_types import WS_TARGET
     _P = ParamSpec("_P")
     _R = TypeVar("_R")
     _T = TypeVar("_T")

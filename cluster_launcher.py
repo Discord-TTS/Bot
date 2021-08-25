@@ -15,22 +15,25 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import aiohttp
 import orjson
+import psutil
 import websockets
+from discord.ext import tasks
 from discord.http import Route
 
 import utils
 
-config = ConfigParser()
-config.read("config.ini")
-
 if TYPE_CHECKING:
     from concurrent.futures import Future
-    from utils.websocket_types import *
+    from utils.websocket_types import (WS_TARGET, WSClientResponseJSON,
+                                       WSGenericJSON, WSKillJSON,
+                                       WSRequestJSON, WSSendJSON)
 
     _CLUSTER_ARG = Tuple[int, int, Tuple[int]]
     _WSSP = websockets.WebSocketServerProtocol
 
 
+config = ConfigParser()
+config.read("config.ini")
 def make_user_agent():
     first = "DiscordBot (https://github.com/Gnome-py/Discord-TTS-Bot Rolling)"
     versions = "Python/{sysver} aiohttp/{aiohttpver}".format(
@@ -86,7 +89,7 @@ class ClusterManager:
         self.loop = asyncio.get_running_loop()
         self.support_cluster: Optional[int] = None
 
-        self.processes: Dict[int, Optional[int]] = {}
+        self.processes: Dict[int, int] = {}
         self.monitors: Dict[int, asyncio.Task[Optional[Future[None]]]] = {}
 
         self.websockets: Dict[int, websockets.WebSocketServerProtocol] = {}
@@ -125,7 +128,9 @@ class ClusterManager:
         process = multiprocessing.Process(target=run_bot, args=cluster_args)
         while not self.shutting_down:
             process.start() # start bot
+            assert process.pid is not None
             self.processes[cluster_id] = process.pid # store PID so can be killed later
+
             process.join() # wait until finished
 
             while process.exitcode is None:
@@ -181,6 +186,7 @@ class ClusterManager:
             ):
                 await asyncio.gather(*self.monitors.values())
 
+        self.keep_clusters_alive.start()
         self.keep_alive = self.loop.create_task(keep_alive())
 
     async def shutdown(self, *_: Any, **__: Any):
@@ -204,12 +210,12 @@ class ClusterManager:
 
     async def _get_from_clusters(self,
         info: List[str],
-        nonce: Union[str, uuid.UUID],
+        nonce: Union[str, uuid.UUID] = None,
         args: Dict[str, Dict[str, Any]] = None,
         target: WS_TARGET = "*"
     ) -> List[Dict[str, Any]]:
 
-        nonce = str(nonce)
+        nonce = str(nonce or uuid.uuid4())
         responses: List[Dict[str, Any]] = []
         self.pending_responses[nonce] = asyncio.Queue()
 
@@ -222,7 +228,11 @@ class ClusterManager:
 
         for i in range(len(self.monitors) if target == "*" else 1):
             logger.debug(f"Waiting for response {i}")
-            responses.append(await self.pending_responses[nonce].get())
+            try:
+                responses.append(await self.pending_responses[nonce].get())
+            except asyncio.CancelledError:
+                del self.pending_responses[nonce]
+                raise
 
         logger.debug(f"Got {responses} from clusters")
         del self.pending_responses[nonce]
@@ -235,20 +245,59 @@ class ClusterManager:
 
         tasks: List[asyncio.Task[Any]] = []
         self.websockets[cluster_id] = connection
-        async for msg in connection:
-            logger.debug(f"Recieved msg from cluster {cluster_id}: {msg}")
+        try:
+            async for msg in connection:
+                logger.debug(f"Recieved msg from cluster {cluster_id}: {msg}")
 
-            json_msg: WSGenericJSON = orjson.loads(msg)
-            command = json_msg["c"]
+                json_msg: WSGenericJSON = orjson.loads(msg)
+                command = json_msg["c"]
 
-            handler = getattr(self, f"{command}_handler", None)
-            if handler is None:
-                logger.error(f"Websocket sent unknown command: {command}")
-            else:
-                handler_coro = handler(connection, request=json_msg)
-                tasks.append(self.loop.create_task(handler_coro))
+                handler = getattr(self, f"{command}_handler", None)
+                if handler is None:
+                    logger.error(f"Websocket sent unknown command: {command}")
+                else:
+                    handler_coro = handler(connection, request=json_msg)
+                    tasks.append(self.loop.create_task(handler_coro))
+        except websockets.ConnectionClosed:
+            logger.error(f"{cluster_id} closed websocket connection!")
+        finally:
+            await asyncio.gather(*tasks)
 
-        await asyncio.gather(*tasks)
+    @tasks.loop(minutes=1)
+    async def keep_clusters_alive(self):
+        await asyncio.gather(*(
+            self.check_cluster(cluster_id, pid)
+            for cluster_id, pid in self.processes.items()
+        ))
+    @keep_clusters_alive.before_loop
+    async def wait_before_start(self):
+        await asyncio.sleep(10)
+
+    async def check_cluster(self, cluster_id: int, pid: int):
+        process = psutil.Process(pid)
+        websocket = self.websockets.get(cluster_id)
+        if websocket is None:
+            logger.error(f"Cluster ID {cluster_id} doesn't have a websocket! Killing and restarting.")
+            return process.kill()
+
+        try:
+            coro = self._get_from_clusters(["ping"], target=cluster_id)
+            await asyncio.wait_for(coro, timeout=10)
+        except (asyncio.TimeoutError, websockets.WebSocketException):
+            logger.warning(f"Cluster {cluster_id} didn't respond to ping in 10 seconds, restarting safely!")
+            ws_json = utils.data_to_ws_json(command="RESTART", target=cluster_id)
+            try:
+                await websocket.send(ws_json)
+                await asyncio.sleep(15)
+            except websockets.WebSocketException:
+                pass
+
+            if not process.is_running():
+                # Cluster has been killed and hopefully restarted by watcher.
+                return
+
+            logger.warning(f"{cluster_id} wasn't restarted by websocket message, killing!")
+            return process.kill()
 
 
     async def request_handler(self, connection: _WSSP, request: WSRequestJSON):

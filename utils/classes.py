@@ -15,7 +15,6 @@ from pydub import AudioSegment
 
 from .constants import GTTS_ESPEAK_DICT, RED, AUDIODATA
 from .funcs import data_to_ws_json, to_thread
-from .websocket_types import WS_TARGET
 
 _T = TypeVar("_T")
 if TYPE_CHECKING:
@@ -23,6 +22,7 @@ if TYPE_CHECKING:
 
     from main import TTSBot
     from player import TTSVoicePlayer
+    from .websocket_types import WS_TARGET
 
 
 # Cleanup classes

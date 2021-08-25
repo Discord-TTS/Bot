@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Any, Coroutine, Dict, List, Protocol, Union
 
 import discord
 import orjson
-import utils
 import websockets
 from discord.ext import commands, tasks
 from discord.utils import maybe_coroutine
+
+import utils
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
         websocket: websockets.WebSocketClientProtocol
 
     class RequestDataFunction(Protocol):
-        def __call__(self, b: ClusteredTTSBot, *_) -> Union[Any, Coroutine[Any, Any, Any]]: ...
+        def __call__(self, b: ClusteredTTSBot, *_) -> Union[utils.JSON_IN, Coroutine[Any, Any, utils.JSON_IN]]: ...
 
 
 async def code_runner(b: ClusteredTTSBot, code: str, *_):
@@ -30,6 +31,7 @@ async def code_runner(b: ClusteredTTSBot, code: str, *_):
 
 data_lookup: Dict[str, RequestDataFunction] = {
     "run_code": code_runner,
+    "ping": lambda *_: "pong",
     "guild_count":  lambda b, *_: len(b.guilds),
     "voice_count":  lambda b, *_: len(b.voice_clients),
     "member_count": lambda b, *_: sum(guild.member_count for guild in b.guilds),
@@ -97,11 +99,11 @@ class Clustering(utils.CommonCog):
         self.bot.logger.debug(f"Recieved Websocket message: {msg}")
 
     @commands.Cog.listener()
-    async def on_close(self):
+    async def on_close(self, *_):
         await self.bot.close(utils.KILL_EVERYTHING)
 
     @commands.Cog.listener()
-    async def on_restart(self):
+    async def on_restart(self, *_):
         await self.bot.close(utils.RESTART_CLUSTER)
 
     @commands.Cog.listener()
@@ -116,8 +118,8 @@ class Clustering(utils.CommonCog):
             handler.setLevel(level)
 
     @commands.Cog.listener()
-    async def on_request(self, info: List[str], nonce: str, args: Dict[str, Dict[str, Any]], *_):
-        returns = {}
+    async def on_request(self, info: List[str], nonce: str, args: Dict[str, Dict[str, Any]] = {}, *_):
+        returns: Dict[str, utils.JSON_IN] = {}
         for key in info:
             func, kwargs = data_lookup[key], args.get(key, {})
             returns[key] = await maybe_coroutine(func, self.bot, **kwargs)

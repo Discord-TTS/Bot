@@ -1,31 +1,68 @@
-import re as _re
-from io import BytesIO as _BytesIO
-from typing import Tuple, Union
+import datetime
+import re
+import uuid
+from io import BytesIO
+from typing import Tuple, TypedDict, Union
 
-import discord as _discord
+import discord
+import numpy
 
+__all__ = (
+    "RED",
+    "JSON_IN",
+    "JSON_OUT",
+    "ACRONYMS",
+    "AUDIODATA",
+    "EMOJI_REGEX",
+    "FOOTER_MSGS",
+    "GUILDS_CREATE",
+    "READABLE_TYPE",
+    "DB_SETUP_QUERY",
+    "NETURAL_COLOUR",
+    "KILL_EVERYTHING",
+    "RESTART_CLUSTER",
+    "USERINFO_CREATE",
+    "GTTS_ESPEAK_DICT",
+    "NICKNAMES_CREATE",
+    "ANALYTICS_CREATE",
+    "OPTION_SEPERATORS",
+    "DEFAULT_AVATAR_URL",
+    "REGEX_REPLACEMENTS",
+    "ID_IN_BRACKETS_REGEX",
+    "DO_NOT_RESTART_CLUSTER",
+)
+
+# Emums
 KILL_EVERYTHING = 0
 RESTART_CLUSTER = 1
 DO_NOT_RESTART_CLUSTER = 2
 
-NETURAL_COLOUR = 0x3498db
-RED = _discord.Colour.from_rgb(255, 0, 0)
-AUDIODATA = Tuple[_BytesIO, Union[int, float]]
-DEFAULT_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/{}.png"
-
-EMOJI_REGEX = _re.compile(r"<(a?):(.+):(\d+)>")
-ID_IN_BRACKETS_REGEX = _re.compile(r"\((\d+)\)")
-
+# Regexes
+EMOJI_REGEX = re.compile(r"<(a?):(.+):(\d+)>")
+ID_IN_BRACKETS_REGEX = re.compile(r"\((\d+)\)")
 _PRE_REGEX_REPLACEMENTS = {
     r"\|\|.*?\|\|": ". spoiler avoided.",
     r"```.*?```": ". code block.",
     r"`.*?`": ". code snippet.",
 }
 REGEX_REPLACEMENTS = {
-    _re.compile(key, _re.DOTALL): value
+    re.compile(key, re.DOTALL): value
     for key, value in _PRE_REGEX_REPLACEMENTS.items()
 }
 
+# Types
+AUDIODATA = Tuple[BytesIO, Union[int, float]]
+JSON_OUT = Union[dict, list, int, float, str, bool, None]
+JSON_IN = Union[
+    JSON_OUT, tuple, TypedDict, datetime.datetime,
+    datetime.date, datetime.time, uuid.UUID, numpy.ndarray,
+]
+
+
+# Everything else
+NETURAL_COLOUR = 0x3498db
+RED = discord.Colour.from_rgb(255, 0, 0)
+DEFAULT_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/{}.png"
 OPTION_SEPERATORS = (
     ":small_orange_diamond:",
     ":small_blue_diamond:",
