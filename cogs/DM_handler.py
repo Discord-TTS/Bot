@@ -69,9 +69,9 @@ class DMHandler(utils.CommonCog):
                 await self.bot.channels["dm_logs"].send(
                     files=files,
                     content=message.content,
+                    username=author_name + author_id,
                     avatar_url=message.author.display_avatar.url,
                     allowed_mentions=discord.AllowedMentions.none(),
-                    username=author_name[:32 - len(author_id)] + author_id,
                 )
 
         else:
