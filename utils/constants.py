@@ -1,36 +1,8 @@
-import datetime
 import re
-import uuid
 from io import BytesIO
-from typing import Tuple, TypedDict, Union
+from typing import TYPE_CHECKING, Tuple, TypedDict, Union
 
 import discord
-import numpy
-
-__all__ = (
-    "RED",
-    "JSON_IN",
-    "JSON_OUT",
-    "ACRONYMS",
-    "AUDIODATA",
-    "EMOJI_REGEX",
-    "FOOTER_MSGS",
-    "GUILDS_CREATE",
-    "READABLE_TYPE",
-    "DB_SETUP_QUERY",
-    "NETURAL_COLOUR",
-    "KILL_EVERYTHING",
-    "RESTART_CLUSTER",
-    "USERINFO_CREATE",
-    "GTTS_ESPEAK_DICT",
-    "NICKNAMES_CREATE",
-    "ANALYTICS_CREATE",
-    "OPTION_SEPERATORS",
-    "DEFAULT_AVATAR_URL",
-    "REGEX_REPLACEMENTS",
-    "ID_IN_BRACKETS_REGEX",
-    "DO_NOT_RESTART_CLUSTER",
-)
 
 # Emums
 KILL_EVERYTHING = 0
@@ -52,11 +24,16 @@ REGEX_REPLACEMENTS = {
 
 # Types
 AUDIODATA = Tuple[BytesIO, Union[int, float]]
-JSON_OUT = Union[dict, list, int, float, str, bool, None]
-JSON_IN = Union[
-    JSON_OUT, tuple, TypedDict, datetime.datetime,
-    datetime.date, datetime.time, uuid.UUID, numpy.ndarray,
-]
+if TYPE_CHECKING:
+    import datetime
+    import uuid
+
+    import numpy
+    JSON_OUT = Union[dict, list, int, float, str, bool, None]
+    JSON_IN = Union[
+        JSON_OUT, tuple, TypedDict, datetime.datetime,
+        datetime.date, datetime.time, uuid.UUID, numpy.ndarray,
+    ]
 
 
 # Everything else
