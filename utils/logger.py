@@ -7,7 +7,6 @@ import aiohttp
 import discord
 from discord.ext import tasks
 
-from .funcs import group_by
 from .constants import DEFAULT_AVATAR_URL
 
 config = configparser.ConfigParser()
@@ -28,7 +27,6 @@ class CacheFixedLogger(logging.Logger):
         self._cache.clear()
 
 class WebhookHandler(logging.StreamHandler):
-    webhook: discord.Webhook
     def __init__(self, prefix: str, session: aiohttp.ClientSession, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -58,7 +56,7 @@ class WebhookHandler(logging.StreamHandler):
                 content="".join(l for l in message if l is not None),
                 avatar_url=avatars.get(severity, unknown_avatar_url),
             )
-            for message in group_by(message, 2000)
+            for message in discord.utils.as_chunks(message, 2000)
         ))
 
     @tasks.loop(seconds=1)

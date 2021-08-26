@@ -5,6 +5,7 @@ import dataclasses
 from collections import defaultdict
 from typing import (TYPE_CHECKING, Any, Generic, Iterable, Literal, Optional, Tuple,
                     TypeVar, Union, cast)
+import discord
 
 from discord.ext import tasks
 from sql_athame import sql

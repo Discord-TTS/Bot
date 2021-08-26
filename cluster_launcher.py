@@ -19,6 +19,7 @@ import psutil
 import websockets
 from discord.ext import tasks
 from discord.http import Route
+from discord.utils import as_chunks
 
 import utils
 
@@ -170,9 +171,8 @@ class ClusterManager:
 
         logger.info(f"Launching {cluster_count} clusters to handle {shard_count} shards with {shards_per_cluster} per cluster.")
 
-        all_shards = utils.group_by(range(shard_count), shards_per_cluster)
+        all_shards = as_chunks(range(shard_count), shards_per_cluster)
         for cluster_id, shards in enumerate(all_shards):
-            shards = [s for s in shards if s is not None]
             args = (cluster_id, shard_count, shards)
 
             cluster_watcher_func = partial(self.cluster_watcher, args)
@@ -195,9 +195,7 @@ class ClusterManager:
 
         self.shutting_down = True
         logger.warning("Shutting all clusters down")
-
-        wsrequest = {"c": "send", "a": {"c": "close", "a": {}}, "t": "*"} # type: ignore
-        await self.send_handler(None, wsrequest) # type: ignore
+        await self.send_handler(None, {"c": "send", "a": {"c": "close", "a": {}}, "t": "*"})
 
         logger.info("Kiilled all processes, and cancelling keep alive. Bye!")
         self.keep_alive.cancel()

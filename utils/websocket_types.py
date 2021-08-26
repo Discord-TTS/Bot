@@ -15,10 +15,12 @@ WS_TARGET = Union[Literal["*", "support"], int]
 class EmptyDict(TypedDict): ...
 
 
-class WSGenericJSON(TypedDict):
+class WSOptionalGenericJSON(TypedDict, total=False):
+    t: WS_TARGET
+
+class WSGenericJSON(WSOptionalGenericJSON, TypedDict):
     c: str
     a: Any
-    t: WS_TARGET
 
 class WSSendJSON(TypedDict):
     c: Literal["send"]

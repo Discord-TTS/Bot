@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import asyncio
 from functools import wraps
 from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Coroutine,
                     Optional, TypeVar, Union, cast)
 
 import discord
+from discord.utils import as_chunks
 from discord.ext import commands
 
 from .classes import CommonCog, TypedGuildContext
-from .funcs import group_by, to_thread
+from .funcs import to_thread
 from .views import BoolView, ChannelSelector, CommandView
 
 
@@ -35,8 +35,7 @@ def make_fancy(
 
         if type_to_convert == "TextChannel":
             select_view = CommandView(ctx)
-            for channels in group_by(ctx.guild.text_channels, 25):
-                channels = [c for c in channels if c is not None]
+            for channels in as_chunks(ctx.guild.text_channels, 25):
                 select_view.add_item(ChannelSelector(ctx, channels))
 
             select_view.message = await ctx.reply("Select a channel!", view=select_view) # type: ignore
