@@ -32,6 +32,17 @@ class ErrorEvents(utils.CommonCog):
         author_name: Optional[str] = None,
         icon_url: Optional[str] = None,
     ):
+        error_webhook = self.bot.channels["errors"]
+        row = await self.bot.pool.fetchrow("""
+            UPDATE errors SET occurrences = occurrences + 1
+            WHERE traceback = $1
+            RETURNING *
+        """, traceback)
+        if row is not None:
+            err_msg = await error_webhook.fetch_message(row["message_id"])
+            err_msg.embeds[0].set_footer(text=f"This error has occurred {row['occurrences']} times!")
+            return await err_msg.edit(embeds=err_msg.embeds)
+
         fields = [
             ("Event", event, True),
             ("Bot User", self.bot.user, True),
@@ -46,8 +57,7 @@ class ErrorEvents(utils.CommonCog):
                 ("Handling Shards", self.bot.shard_ids, True)
             ))
 
-        traceback = f"```\n{traceback}```"
-        error_msg = discord.Embed(title=traceback.split("\n")[-2], colour=utils.RED)
+        error_msg = discord.Embed(title=traceback.split("\n")[-1], colour=utils.RED)
         if author_name is not None:
             if icon_url is None:
                 error_msg.set_author(name=author_name)
@@ -58,9 +68,20 @@ class ErrorEvents(utils.CommonCog):
             value = value if value == "\u200B" else f"`{value}`"
             error_msg.add_field(name=name, value=value, inline=inline)
 
-        view = utils.ShowTracebackView(traceback)
-        self.bot.channels["errors"]._state = self.bot._connection
-        await self.bot.channels["errors"].send(embed=error_msg, view=view)
+        view = utils.ShowTracebackView(f"```\n{traceback}```")
+        err_msg = await error_webhook.send(embed=error_msg, view=view, wait=True)
+        message_id = await self.bot.pool.fetchval("""
+            INSERT INTO errors(traceback, message_id)
+            VALUES($1, $2)
+
+            ON CONFLICT (traceback)
+            DO UPDATE SET occurrences = errors.occurrences + 1
+            RETURNING errors.message_id
+        """, traceback, err_msg.id)
+
+        assert message_id is not None
+        if message_id != err_msg.id:
+            await err_msg.delete()
 
 
     async def on_error(self, event_method: str, error: Optional[BaseException] = None, *targs: Any, **_):

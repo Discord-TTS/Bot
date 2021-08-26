@@ -175,9 +175,16 @@ ANALYTICS_CREATE = """
 
         PRIMARY KEY (event, is_command, date_collected)
     );"""
+ERRORS_CREATE = """
+    CREATE TABLE errors (
+        traceback   text    PRIMARY KEY,
+        message_id  bigint  NOT NULL,
+        occurrences int     DEFAULT 1
+    );"""
 
 DB_SETUP_QUERY = "\n".join((
     GUILDS_CREATE,
+    ERRORS_CREATE,
     USERINFO_CREATE,
     NICKNAMES_CREATE,
     ANALYTICS_CREATE

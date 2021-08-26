@@ -82,6 +82,23 @@ async def add_analytics(bot: TTSBot) -> bool:
     await bot.conn.execute(utils.ANALYTICS_CREATE)
     return True
 
+@add_to_updates("normal")
+async def add_log_level(bot: TTSBot) -> bool:
+    if "log_level" in bot.config["Main"]:
+        return False
+
+    bot.config["Main"]["log_level"] = "INFO"
+    _update_config(bot.config)
+    return True
+
+@add_to_updates("normal")
+async def add_errors(bot: TTSBot) -> bool:
+    if await bot.conn.fetchval("SELECT to_regclass('public.errors')"):
+        return False
+
+    await bot.conn.execute(utils.ERRORS_CREATE)
+    return True
+
 
 @add_to_updates("early")
 async def make_voxpopuli_async(_: TTSBot) -> bool:
@@ -141,14 +158,5 @@ async def cache_to_redis(bot: TTSBot) -> bool:
         return False
 
     bot.config["Redis Info"] = {"url": "redis://cache"}
-    _update_config(bot.config)
-    return True
-
-@add_to_updates("normal")
-async def add_log_level(bot: TTSBot) -> bool:
-    if "log_level" in bot.config["Main"]:
-        return False
-
-    bot.config["Main"]["log_level"] = "INFO"
     _update_config(bot.config)
     return True

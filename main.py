@@ -36,7 +36,6 @@ status = getattr(discord.Status, config["Activity"]["status"])
 allowed_mentions = discord.AllowedMentions(everyone=False, roles=False)
 cache_flags = discord.MemberCacheFlags(joined=False)
 
-# Custom prefix support
 
 if TYPE_CHECKING:
     _T = TypeVar("_T")
@@ -192,11 +191,13 @@ class TTSBot(_commands.AutoShardedBot):
 
         # Fill up bot.channels, as a load of webhooks
         for channel_name, webhook_url in self.config["Webhook URLs"].items():
-            self.channels[channel_name] = discord.Webhook.from_url(
+            webhook: discord.Webhook = discord.Webhook.from_url(
                 url=webhook_url,
                 session=self.session,
                 bot_token=self.http.token
             )
+            webhook._state = self._connection
+            self.channels[channel_name] = await webhook.fetch()
 
         # Create websocket and other clustering specific stuff
         if self.shard_ids is not None:
@@ -210,11 +211,18 @@ class TTSBot(_commands.AutoShardedBot):
         self.load_extensions("cogs")
         self.load_extensions("extensions")
 
-        # Send starting message and actually start the bot
+        # Setup logging and more migrations
         self.logger = utils.setup_logging(config["Main"]["log_level"], prefix, self.session)
-        self.logger.info("Starting TTS Bot!")
-
         await automatic_update.do_normal_updates(self)
+
+        # Add all persistent views
+        tracebacks = await self.pool.fetch("SELECT * from errors")
+        for row in tracebacks:
+            view = utils.ShowTracebackView(f"```{row['traceback']}```")
+            self.add_view(view, message_id=row["message_id"])
+
+        # Actually start the bot
+        self.logger.info("Starting TTS Bot!")
         await super().start(token, **kwargs)
 
 

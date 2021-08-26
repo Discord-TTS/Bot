@@ -78,10 +78,10 @@ class BoolView(CommandView):
 
 class ShowTracebackView(discord.ui.View):
     def __init__(self, traceback: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, timeout=None)
         self.traceback = traceback
 
-    @discord.ui.button(label="Show Traceback", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Show Traceback", style=discord.ButtonStyle.danger, custom_id="ShowTracebackView:show_tb")
     async def show_tb(self, _, interaction: discord.Interaction):
         await interaction.response.send_message(self.traceback, ephemeral=True)
 
