@@ -8,7 +8,6 @@ from discord.ext import commands
 
 import utils
 
-
 if TYPE_CHECKING:
     from main import TTSBot
 

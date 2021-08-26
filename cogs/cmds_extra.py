@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 from inspect import cleandoc
-from io import BytesIO
 from typing import TYPE_CHECKING
 
 import discord
@@ -10,7 +9,6 @@ from discord.ext import commands
 from psutil import Process
 
 import utils
-
 
 if TYPE_CHECKING:
     from main import TTSBot

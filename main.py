@@ -7,8 +7,8 @@ from configparser import ConfigParser
 from os import listdir
 from signal import SIGHUP, SIGINT, SIGTERM
 from time import monotonic
-from typing import (TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple,
-                    TypeVar, Union, cast)
+from typing import (TYPE_CHECKING, Any, Awaitable, Optional, TypeVar, Union,
+                    cast)
 
 import aiohttp
 import aioredis
@@ -51,7 +51,7 @@ class TTSBot(_commands.AutoShardedBot):
         cache: cache_handler.CacheHandler
         settings: database_handler.TableHandler[int]
         userinfo: database_handler.TableHandler[int]
-        nicknames: database_handler.TableHandler[Tuple[int, int]]
+        nicknames: database_handler.TableHandler[tuple[int, int]]
 
         analytics_buffer: utils.SafeDict
         cache_db: aioredis.Redis
@@ -60,7 +60,7 @@ class TTSBot(_commands.AutoShardedBot):
         blocked: bool # Handles if to be on gtts or espeak
         pool: Pool
 
-        voice_clients: List[TTSVoicePlayer]
+        voice_clients: list[TTSVoicePlayer]
         user: discord.ClientUser
 
         conn: asyncpg.pool.PoolConnectionProxy[asyncpg.Record]
@@ -77,7 +77,7 @@ class TTSBot(_commands.AutoShardedBot):
         self.session = session
         self.sent_fallback = False
         self.cluster_id = cluster_id
-        self.channels: Dict[str, discord.Webhook] = {}
+        self.channels: dict[str, discord.Webhook] = {}
         self.tasks: asyncio.Queue[Awaitable[Any]] = asyncio.Queue()
 
         self.status_code = utils.RESTART_CLUSTER
@@ -245,7 +245,7 @@ async def _real_main(
     session: aiohttp.ClientSession,
     cluster_id: Optional[int] = None,
     total_shard_count: Optional[int] = None,
-    shards_to_handle: Optional[List[int]] = None,
+    shards_to_handle: Optional[list[int]] = None,
 ) -> int:
     bot = TTSBot(
         config=config,

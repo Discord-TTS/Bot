@@ -6,8 +6,7 @@ import logging
 from functools import partial
 from io import BytesIO
 from operator import itemgetter
-from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple,
-                    Union, cast)
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union, cast
 
 import discord
 import orjson
@@ -21,7 +20,6 @@ from discord.types.interactions import (
     ApplicationCommandInteractionDataOption as SlashCommandOption
 )
 
-
 if TYPE_CHECKING:
     from main import TTSBot
 
@@ -33,7 +31,7 @@ type_lookup = {
 }
 
 
-def parse_options(command: commands.Command) -> List[Dict[str, Any]]:
+def parse_options(command: commands.Command) -> list[dict[str, Any]]:
     if isinstance(command, commands.Group):
         return [
             {
@@ -52,7 +50,7 @@ def parse_options(command: commands.Command) -> List[Dict[str, Any]]:
         for name, param in get_params(command).items()
     )), key=itemgetter("required"), reverse=True)
 
-def get_params(command: commands.Command) -> Dict[str, inspect.Parameter]:
+def get_params(command: commands.Command) -> dict[str, inspect.Parameter]:
     callback = command.callback
     func = cast(Callable, getattr(callback, "__original_func__", callback))
 
@@ -60,12 +58,12 @@ def get_params(command: commands.Command) -> Dict[str, inspect.Parameter]:
     globalns = getattr(unwrap, "__globals__", {})
     return get_signature_parameters(func, globalns)
 
-def parse_param(name: str, param: inspect.Parameter) -> Optional[Dict[str, Any]]:
+def parse_param(name: str, param: inspect.Parameter) -> Optional[dict[str, Any]]:
     if name in {"self", "ctx"}:
         return
 
     # Unwraps Union types and similar to a tuple of their types
-    param_types: Union[Tuple[type, ...], Tuple[object, ...]] = getattr(
+    param_types: Union[tuple[type, ...], tuple[object, ...]] = getattr(
         param.annotation, "__args__", (param.annotation,)
     )
 
@@ -76,7 +74,7 @@ def parse_param(name: str, param: inspect.Parameter) -> Optional[Dict[str, Any]]
     }
 
     if all(not isinstance(t, type) for t in param_types):
-        param_types = cast(Tuple[object, ...], param_types)
+        param_types = cast(tuple[object, ...], param_types)
         option["choices"] = [{
             "name": literal_value,
             "value": literal_value
@@ -99,7 +97,7 @@ def parse_param(name: str, param: inspect.Parameter) -> Optional[Dict[str, Any]]
 
     return option
 
-def unpack_group(group: commands.Group, subcommands: List[str]) -> commands.Command:
+def unpack_group(group: commands.Group, subcommands: list[str]) -> commands.Command:
     for subcommand in subcommands:
         group = group.all_commands[subcommand] # type: ignore
 
@@ -107,8 +105,8 @@ def unpack_group(group: commands.Group, subcommands: List[str]) -> commands.Comm
 
 async def convert_params(
     ctx: utils.TypedContext,
-    options: List[SlashCommandOption]
-) -> Tuple[List[Union[utils.CommonCog, utils.TypedContext]], Dict[str, Any]]:
+    options: list[SlashCommandOption]
+) -> tuple[list[Union[utils.CommonCog, utils.TypedContext]], dict[str, Any]]:
     if ctx.guild is None:
         get_channel = ctx.bot.get_channel
         fetch_user = ctx.bot.fetch_user

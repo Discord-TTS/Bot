@@ -3,22 +3,13 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 from collections import defaultdict
-from typing import (TYPE_CHECKING, Any, Dict, Generic, Iterable, List, Literal,
-                    Optional, Tuple, TypeVar, Union, cast)
+from typing import (TYPE_CHECKING, Any, Generic, Iterable, Literal, Optional,
+                    TypeVar, Union, cast)
 
 from discord.ext import tasks
 from sql_athame import sql
 
 import utils
-
-
-_T = TypeVar("_T")
-_DK = TypeVar("_DK")
-_CACHE_ITEM = Dict[Literal[
-    "channel", "xsaid", "bot_ignore", "auto_join",
-    "msg_length", "repeated_chars", "prefix",
-    "blocked", "lang", "name", "default_lang"
-], Any]
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -28,13 +19,21 @@ if TYPE_CHECKING:
     del SQLFormatter
 
 
+_T = TypeVar("_T")
+_DK = TypeVar("_DK")
+_CACHE_ITEM = dict[Literal[
+    "channel", "xsaid", "bot_ignore", "auto_join",
+    "msg_length", "repeated_chars", "prefix",
+    "blocked", "lang", "name", "default_lang"
+], Any]
+
 @dataclasses.dataclass
 class WriteTask:
     waiter: asyncio.Future[None] = dataclasses.field(default_factory=asyncio.Future)
     changes: _CACHE_ITEM = dataclasses.field(default_factory=dict)
 
 
-def _unpack_id(identifer: Union[Iterable[_T], _T]) -> Tuple[_T, ...]:
+def _unpack_id(identifer: Union[Iterable[_T], _T]) -> tuple[_T, ...]:
     return tuple(identifer) if isinstance(identifer, Iterable) else (identifer,)
 
 def setup(bot: TTSBot):
@@ -47,7 +46,7 @@ def setup(bot: TTSBot):
             table_name="userinfo", broadcast=False, pkey_columns=("user_id",),
             select="SELECT * FROM userinfo WHERE user_id = $1",
             delete="DELETE FROM userinfo WHERE user_id = $1",
-    ),  TableHandler[Tuple[int, int]](bot,
+    ),  TableHandler[tuple[int, int]](bot,
             table_name="nicknames", broadcast=False, pkey_columns=("guild_id", "user_id"),
             select="SELECT * from nicknames WHERE guild_id = $1 and user_id = $2",
             delete="DELETE FROM nicknames WHERE guild_id = $1 and user_id = $2",
@@ -57,7 +56,7 @@ def setup(bot: TTSBot):
 class TableHandler(Generic[_DK]):
     def __init__(self, bot: TTSBot,
         broadcast: bool, select: str, delete: str,
-        table_name: str, pkey_columns: Tuple[str, ...]
+        table_name: str, pkey_columns: tuple[str, ...]
     ):
         self.bot = bot
         self.pool = bot.pool
@@ -79,8 +78,8 @@ class TableHandler(Generic[_DK]):
         self.single_insert_query = generic_insert_query.format(table_name, ", ".join(pkey_columns), "DO UPDATE SET {} = {}")
         self.multi_insert_query = generic_insert_query.format(table_name, ", ".join(pkey_columns), "DO UPDATE SET ({}) = ({})")
 
-        self._not_fully_fetched: List[_DK] = []
-        self._cache: Dict[_DK, _CACHE_ITEM] = {}
+        self._not_fully_fetched: list[_DK] = []
+        self._cache: dict[_DK, _CACHE_ITEM] = {}
         self.defaults: Optional[_CACHE_ITEM] = None
         self._write_tasks: defaultdict[_DK, WriteTask] = defaultdict(WriteTask)
 

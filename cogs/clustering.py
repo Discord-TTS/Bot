@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import traceback
-from typing import TYPE_CHECKING, Any, Coroutine, Dict, List, Protocol, Union
+from typing import TYPE_CHECKING, Any, Coroutine, Protocol, Union
 
 import discord
 import orjson
@@ -29,7 +29,7 @@ async def code_runner(b: ClusteredTTSBot, code: str, *_):
     except Exception as error:
         return f"```{''.join(traceback.format_exception(type(error), error, error.__traceback__))}```"
 
-data_lookup: Dict[str, RequestDataFunction] = {
+data_lookup: dict[str, RequestDataFunction] = {
     "run_code": code_runner,
     "ping": lambda *_: "pong",
     "guild_count":  lambda b, *_: len(b.guilds),
@@ -118,8 +118,8 @@ class Clustering(utils.CommonCog):
             handler.setLevel(level)
 
     @commands.Cog.listener()
-    async def on_request(self, info: List[str], nonce: str, args: Dict[str, Dict[str, Any]] = {}, *_):
-        returns: Dict[str, utils.JSON_IN] = {}
+    async def on_request(self, info: list[str], nonce: str, args: dict[str, dict[str, Any]] = {}, *_):
+        returns: dict[str, utils.JSON_IN] = {}
         for key in info:
             func, kwargs = data_lookup[key], args.get(key, {})
             returns[key] = await maybe_coroutine(func, self.bot, **kwargs)

@@ -11,7 +11,6 @@ from discord.ext import commands
 import utils
 from player import TTSVoicePlayer
 
-
 if TYPE_CHECKING:
     from main import TTSBot
 

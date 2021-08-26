@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from functools import partial
 from inspect import cleandoc
-from typing import TYPE_CHECKING, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Optional, cast
 
 import asyncgTTS
 import discord
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from main import TTSBot
 
 
-_MessageQueue = Tuple[str, str]
+_MessageQueue = tuple[str, str]
 class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
     bot: TTSBot
     guild: discord.Guild

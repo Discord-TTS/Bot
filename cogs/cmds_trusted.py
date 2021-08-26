@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
 import utils
-
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -57,7 +56,7 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     async def dmhistory(self, ctx: utils.TypedContext, user: discord.User, amount: int = 10):
-        messages: List[str] = []
+        messages: list[str] = []
         async for message in user.history(limit=amount):
             if message.embeds:
                 if message.embeds[0].author:

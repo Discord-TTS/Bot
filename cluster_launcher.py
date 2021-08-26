@@ -11,7 +11,7 @@ import uuid
 from configparser import ConfigParser
 from functools import partial
 from signal import SIGHUP, SIGINT, SIGKILL, SIGTERM
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import aiohttp
 import orjson
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
                                        WSGenericJSON, WSKillJSON,
                                        WSRequestJSON, WSSendJSON)
 
-    _CLUSTER_ARG = Tuple[int, int, Tuple[int]]
+    _CLUSTER_ARG = tuple[int, int, tuple[int]]
     _WSSP = websockets.WebSocketServerProtocol
 
 
@@ -44,7 +44,7 @@ def make_user_agent():
     return f"{first} {versions}"
 
 
-def run_bot(cluster_id: int, total_shard_count: int, shards: List[int]):
+def run_bot(cluster_id: int, total_shard_count: int, shards: list[int]):
     """This function is run from the bot process"""
     import asyncio
     import sys
@@ -52,7 +52,7 @@ def run_bot(cluster_id: int, total_shard_count: int, shards: List[int]):
     import utils
     from main import main
 
-    class UnbufferedStdout(object):
+    class UnbufferedStdout:
         def __init__(self, stream):
             self.stream = stream
         def __getattr__(self, attr):
@@ -89,11 +89,11 @@ class ClusterManager:
         self.loop = asyncio.get_running_loop()
         self.support_cluster: Optional[int] = None
 
-        self.processes: Dict[int, int] = {}
-        self.monitors: Dict[int, asyncio.Task[Optional[Future[None]]]] = {}
+        self.processes: dict[int, int] = {}
+        self.monitors: dict[int, asyncio.Task[Optional[Future[None]]]] = {}
 
-        self.websockets: Dict[int, websockets.WebSocketServerProtocol] = {}
-        self.pending_responses: Dict[str, asyncio.Queue[Dict[str, Any]]] = {}
+        self.websockets: dict[int, websockets.WebSocketServerProtocol] = {}
+        self.pending_responses: dict[str, asyncio.Queue[dict[str, Any]]] = {}
 
         for sig in (SIGTERM, SIGINT, SIGHUP):
             self.loop.add_signal_handler(sig, self.signal_handler, sig)
@@ -209,14 +209,14 @@ class ClusterManager:
 
 
     async def _get_from_clusters(self,
-        info: List[str],
+        info: list[str],
         nonce: Union[str, uuid.UUID] = None,
-        args: Dict[str, Dict[str, Any]] = None,
+        args: dict[str, dict[str, Any]] = None,
         target: WS_TARGET = "*"
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
 
         nonce = str(nonce or uuid.uuid4())
-        responses: List[Dict[str, Any]] = []
+        responses: list[dict[str, Any]] = []
         self.pending_responses[nonce] = asyncio.Queue()
 
         request_json = {"c": "request", "a": {"info": info, "nonce": nonce}}
@@ -243,7 +243,7 @@ class ClusterManager:
         cluster_id = int("".join(c for c in cluster if c.isdigit()))
         logger.debug(f"New Websocket connection from cluster {cluster_id}")
 
-        tasks: List[asyncio.Task[Any]] = []
+        tasks: list[asyncio.Task[Any]] = []
         self.websockets[cluster_id] = connection
         try:
             async for msg in connection:

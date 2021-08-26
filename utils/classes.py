@@ -4,8 +4,8 @@ import asyncio
 import uuid
 from functools import partial
 from io import BytesIO
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Literal,
-                    Optional, Tuple, TypeVar, Union, cast, overload)
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
+                    TypeVar, Union, cast, overload)
 
 import discord
 import voxpopuli
@@ -13,18 +13,19 @@ from discord.ext import commands
 from mutagen import mp3 as mutagen
 from pydub import AudioSegment
 
-from .constants import GTTS_ESPEAK_DICT, RED, AUDIODATA
+from .constants import AUDIODATA, GTTS_ESPEAK_DICT, RED
 from .funcs import data_to_ws_json, to_thread
 
-_T = TypeVar("_T")
 if TYPE_CHECKING:
     import collections
 
     from main import TTSBot
     from player import TTSVoicePlayer
+
     from .websocket_types import WS_TARGET
 
 
+_T = TypeVar("_T")
 # Cleanup classes
 class CommonCog(commands.Cog):
     def __init__(self, bot: TTSBot):
@@ -47,7 +48,7 @@ class TTSAudioMaker:
     def __init__(self, bot: TTSBot):
         self.bot = bot
 
-    async def get_tts(self, text: str, lang: str, max_length: Union[float, int]) -> Union[AUDIODATA, Tuple[None, None]]:
+    async def get_tts(self, text: str, lang: str, max_length: Union[float, int]) -> Union[AUDIODATA, tuple[None, None]]:
         mode = "wav" if self.bot.blocked else "mp3"
         audio = await self.bot.cache.get((mode, text, lang))
         if audio is None:
@@ -150,7 +151,7 @@ class TypedContext(commands.Context):
         return await self.reply(embed=error_embed, ephemeral=True)
 
     # I wish this could be data: List[_T] -> ...Dict[_T, Any] but no, typing bad
-    async def request_ws_data(self, *to_request: str, target: WS_TARGET = "*", args: Dict[str, Dict[str, Any]] = None) -> Optional[List[Dict[str, Any]]]:
+    async def request_ws_data(self, *to_request: str, target: WS_TARGET = "*", args: dict[str, dict[str, Any]] = None) -> Optional[list[dict[str, Any]]]:
         assert self.bot.websocket is not None
 
         args = args or {}

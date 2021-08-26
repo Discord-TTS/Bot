@@ -3,14 +3,13 @@ from __future__ import annotations
 import asyncio
 from sys import exc_info
 from traceback import format_exception
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import discord
 import psutil
 from discord.ext import commands
 
 import utils
-
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -28,7 +27,7 @@ class ErrorEvents(utils.CommonCog):
     async def send_unhandled_msg(self,
         event: str,
         traceback: str,
-        extra_fields: List[Tuple[Any, Any, bool]],
+        extra_fields: list[tuple[Any, Any, bool]],
         author_name: Optional[str] = None,
         icon_url: Optional[str] = None,
     ):
@@ -98,7 +97,7 @@ class ErrorEvents(utils.CommonCog):
 
         icon_url: Optional[str] = None
         author_name: Optional[str] = None
-        fields: List[Tuple[Any, Any, bool]] = [] # name, value, inline
+        fields: list[tuple[Any, Any, bool]] = [] # name, value, inline
 
         if event_method == "on_message":
             message: utils.TypedMessage = args[0]

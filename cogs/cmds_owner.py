@@ -1,14 +1,13 @@
 from __future__ import annotations
+
 import asyncio
 import logging
-
 from typing import TYPE_CHECKING, Union
 
 import discord
 from discord.ext import commands
 
 import utils
-
 
 if TYPE_CHECKING:
     from main import TTSBot

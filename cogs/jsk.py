@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING, cast
+
+from typing import TYPE_CHECKING, Optional, cast
 
 from discord.ext import commands
-
 
 if TYPE_CHECKING:
     from main import TTSBot

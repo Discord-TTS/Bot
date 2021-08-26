@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Coroutine, Iterable, Type, cast
+from typing import Any, Coroutine, Iterable,  cast
 
 import discord
 
@@ -10,7 +10,7 @@ from .classes import TypedGuildContext, TypedMessage
 class GenericView(discord.ui.View):
     @classmethod
     def from_item(cls,
-        item: Type[discord.ui.Item[GenericView]],
+        item: type[discord.ui.Item[GenericView]],
         *args: Any, **kwargs: Any
     ):
         self = cls()
@@ -26,7 +26,7 @@ class CommandView(GenericView):
 
     @classmethod
     def from_item(cls,
-        item: Type[discord.ui.Item[GenericView]],
+        item: type[discord.ui.Item[GenericView]],
         ctx: TypedGuildContext, *args: Any, **kwargs: Any
     ):
         self = cls(ctx)

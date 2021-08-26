@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import random
 from inspect import cleandoc
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
 import utils
-
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -33,7 +32,7 @@ class DMHandler(utils.CommonCog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.is_welcomed: Dict[int, bool] = {}
+        self.is_welcomed: dict[int, bool] = {}
 
 
     def is_welcome_message(self, message: discord.Message) -> bool:

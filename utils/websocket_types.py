@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Literal, Union
 
 from typing_extensions import TypedDict
 
@@ -36,8 +36,8 @@ class WSKillJSON(TypedDict):
 
 
 class WSRequestArgs(TypedDict):
-    info: List[str]
-    args: Dict[str, Dict[str, Any]] # {"run_code": {"code": "print('hello world')"}}
+    info: list[str]
+    args: dict[str, dict[str, Any]] # {"run_code": {"code": "print('hello world')"}}
     nonce: str
 
 class WSRequestJSON(TypedDict):
@@ -48,5 +48,5 @@ class WSRequestJSON(TypedDict):
 
 class WSClientResponseJSON(TypedDict):
     c: Literal["response"]
-    a: Dict[str, Any]
+    a: dict[str, Any]
     t: str

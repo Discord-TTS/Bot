@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, TYPE_CHECKING, List, Mapping, Optional, Union
+from typing import Any, TYPE_CHECKING, Mapping, Optional, Union
 
 import discord
 from discord.ext import commands
+
 from utils import NETURAL_COLOUR
 
 if TYPE_CHECKING:
@@ -58,15 +59,15 @@ class FancyHelpCommand(commands.HelpCommand):
 
         known_cogs = [bot.get_cog(cog) for cog in known_cogs_names]
         unknown_cogs = [cog for cog in bot.cogs.values() if cog not in known_cogs]
-        cogs: List[commands.Cog] = known_cogs + unknown_cogs # type: ignore
+        cogs: list[commands.Cog] = known_cogs + unknown_cogs # type: ignore
 
-        mapping: Dict[Optional[commands.Cog], List[commands.Command]]
+        mapping: dict[Optional[commands.Cog], list[commands.Command]]
 
         mapping = {cog: cog.get_commands() for cog in cogs}
         mapping[None] = [c for c in bot.all_commands.values() if c.cog is None]
         return mapping
 
-    async def send_bot_help(self, mapping: Mapping[Optional[commands.Cog], List[commands.Command]]) -> None:
+    async def send_bot_help(self, mapping: Mapping[Optional[commands.Cog], list[commands.Command]]) -> None:
         description = ""
         for cog, commands in mapping.items():
             if cog is None:

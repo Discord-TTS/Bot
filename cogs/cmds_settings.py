@@ -4,7 +4,7 @@ import asyncio
 import re
 from inspect import cleandoc
 from random import choice as pick_random
-from typing import Set, TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Optional
 
 import discord
 from discord.ext import commands
@@ -12,14 +12,13 @@ from gtts.lang import tts_langs as _tts_langs
 
 import utils
 
-
 if TYPE_CHECKING:
     from main import TTSBot
 
 
-tts_langs: Set[str] = set(_tts_langs().keys())
+tts_langs: set[str] = set(_tts_langs().keys())
 to_enabled = {True: "Enabled", False: "Disabled"}
-langs_lookup: Dict[str, str] = {lang: name for lang, name in _tts_langs().items()}
+langs_lookup: dict[str, str] = {lang: name for lang, name in _tts_langs().items()}
 
 def setup(bot: TTSBot):
     bot.add_cog(SettingCommands(bot))

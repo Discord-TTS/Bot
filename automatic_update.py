@@ -41,8 +41,8 @@ def add_to_updates(type: Literal["early", "normal"]) -> Callable[[_UF], _UF]:
     return deco
 
 
-early_updates: List[_UF] = []
-normal_updates: List[_UF] = []
+early_updates: list[_UF] = []
+normal_updates: list[_UF] = []
 
 async def do_early_updates(bot: TTSBot):
     if bot.cluster_id not in {0, None}:

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import tasks
 
 import utils
-
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -61,7 +60,7 @@ class Loops(utils.CommonCog):
             DO UPDATE SET count = analytics.count + EXCLUDED.count
         ;"""
 
-        rows: List[Tuple[str, bool, int]] = []
+        rows: list[tuple[str, bool, int]] = []
         for raw_event, count in self.bot.analytics_buffer.items():
             event = utils.removeprefix(raw_event, "on_")
             rows.append((event, raw_event == event, count))
@@ -81,7 +80,7 @@ class Loops(utils.CommonCog):
 
         max_len = 0
         yesterday = datetime.datetime.today() - datetime.timedelta(days=1)
-        sections: Dict[str, List[List[str]]] = {"Commands:": [], "Events:": []}
+        sections: dict[str, list[list[str]]] = {"Commands:": [], "Events:": []}
 
         embed = discord.Embed(
             title="TTS Bot Analytics",
