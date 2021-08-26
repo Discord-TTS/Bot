@@ -35,15 +35,16 @@ def make_fancy(
 
         if type_to_convert == "TextChannel":
             select_view = CommandView(ctx)
-            for channels in as_chunks(ctx.guild.text_channels, 25):
+            for channels in as_chunks((channel
+                for channel in ctx.guild.text_channels
+                if (channel.permissions_for(ctx.guild.me).read_messages
+                    and channel.permissions_for(ctx.author).read_messages)
+            ), 25):
                 select_view.add_item(ChannelSelector(ctx, channels))
 
-            select_view.message = await ctx.reply("Select a channel!", view=select_view) # type: ignore
-
+            await ctx.reply("Select a channel!", view=select_view)
         elif type_to_convert == "bool":
-            bool_view = BoolView(ctx)
-            bool_view.message = await ctx.reply("What do you want to set this to?", view=bool_view) # type: ignore
-
+            await ctx.reply("What do you want to set this to?", view=BoolView(ctx))
         else:
             ctx.bot.logger.error(f"Unknown Conversion Type: {type_to_convert}")
 

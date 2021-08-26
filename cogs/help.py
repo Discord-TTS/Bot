@@ -26,11 +26,9 @@ class FancyHelpCommandCog(commands.Cog, name="Uncategoried"):
 
         bot.help_command = help_command
         bot.help_command.cog = self
-        bot.help_command.add_check(
-            commands.bot_has_permissions(
-                send_messages=True, embed_links=True
-            ).predicate # type: ignore
-        )
+
+        check = commands.bot_has_permissions(send_messages=True, embed_links=True)
+        bot.help_command.add_check(check.predicate)
 
 
 class FancyHelpCommand(commands.HelpCommand):
@@ -57,9 +55,9 @@ class FancyHelpCommand(commands.HelpCommand):
 
         known_cogs_names = ("Main Commands", "Settings", "Extra Commands")
 
-        known_cogs = [bot.get_cog(cog) for cog in known_cogs_names]
+        known_cogs = [cog for cog_name in known_cogs_names if (cog := bot.get_cog(cog_name)) is not None]
         unknown_cogs = [cog for cog in bot.cogs.values() if cog not in known_cogs]
-        cogs: list[commands.Cog] = known_cogs + unknown_cogs # type: ignore
+        cogs: list[commands.Cog] = known_cogs + unknown_cogs
 
         mapping: dict[Optional[commands.Cog], list[commands.Command]]
 

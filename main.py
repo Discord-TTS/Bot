@@ -8,7 +8,7 @@ from os import listdir
 from signal import SIGHUP, SIGINT, SIGTERM
 from time import monotonic
 from typing import (TYPE_CHECKING, Any, Awaitable, Optional, TypeVar, Union,
-                    cast)
+                    cast, overload)
 
 import aiohttp
 import aioredis
@@ -84,7 +84,7 @@ class TTSBot(_commands.AutoShardedBot):
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
 
         kwargs["command_prefix"] = self.command_prefix
-        super().__init__(*args, **kwargs) # type: ignore
+        return super().__init__(*args, **kwargs)
 
 
     def handle_error(self, task: asyncio.Task):
@@ -165,10 +165,16 @@ class TTSBot(_commands.AutoShardedBot):
 
         return "-"
 
-    async def get_context(self,
-        message: discord.Message
-    ) -> Union[utils.TypedContext, utils.TypedGuildContext]:
-        cls = utils.TypedGuildContext if message.guild else utils.TypedContext
+    @overload
+    async def get_context(self, message: discord.Message, cls: None = None) -> Union[utils.TypedGuildContext, utils.TypedContext]: ...
+
+    @overload
+    async def get_context(self, message: discord.Message, cls: type[_T]) -> _T: ...
+
+    async def get_context(self, message: discord.Message, cls=None):
+        if cls is None:
+            cls = utils.TypedGuildContext if message.guild else utils.TypedContext
+
         return await super().get_context(message, cls=cls)
 
     def close(self, status_code: Optional[int] = None) -> Awaitable[None]:

@@ -176,7 +176,9 @@ class TypedContext(commands.Context):
     async def send(self, *args: Any, return_msg: Literal[True] = True, **kwargs: Any) -> discord.Message: ...
 
     async def send(self,*args: Any, return_msg: bool = False, **kwargs: Any) -> Optional[discord.Message]:
+        view = kwargs.pop("view", None)
         reference = kwargs.pop("reference", None)
+        return_msg = return_msg if view is None else True
 
         if self.interaction is None:
             if isinstance(reference, discord.Message):
@@ -192,7 +194,12 @@ class TypedContext(commands.Context):
 
             send = partial(self.interaction.followup.send, wait=return_msg)
 
-        return await send(*args, **kwargs)
+        msg = await send(*args, **kwargs)
+        if view is not None:
+            view.message = msg
+
+        return msg
+
 
     def reply(self, *args: Any, **kwargs: Any):
         return self.send(*args, **kwargs)

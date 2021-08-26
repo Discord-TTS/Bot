@@ -112,7 +112,7 @@ class Loops(utils.CommonCog):
 
         embed.description = ""
         for section_name in lookup.values():
-            embed.description += section_name + "\n" # type: ignore
+            embed.description += section_name + "\n"
             for first, second in sections[section_name]:
                 embed.description += f"{first:<{max_len}} {second}\n"
 
