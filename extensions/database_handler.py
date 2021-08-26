@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 from collections import defaultdict
-from typing import (TYPE_CHECKING, Any, Generic, Iterable, Literal, Optional,
+from typing import (TYPE_CHECKING, Any, Generic, Iterable, Literal, Optional, Tuple,
                     TypeVar, Union, cast)
 
 from discord.ext import tasks
@@ -13,7 +13,7 @@ import utils
 
 if TYPE_CHECKING:
     from main import TTSBot
-    from sql_athame.base import SQLFormatter
+    from sql_athame.base import Fragment, SQLFormatter
 
     sql: SQLFormatter
     del SQLFormatter
@@ -75,8 +75,10 @@ class TableHandler(Generic[_DK]):
             {}
         """
 
-        self.single_insert_query = generic_insert_query.format(table_name, ", ".join(pkey_columns), "DO UPDATE SET {} = {}")
-        self.multi_insert_query = generic_insert_query.format(table_name, ", ".join(pkey_columns), "DO UPDATE SET ({}) = ({})")
+        args = table_name, ", ".join(pkey_columns)
+        self.multi_insert_query = generic_insert_query.format(*args, "DO UPDATE SET ({}) = ({})")
+        self.single_insert_query = generic_insert_query.format(*args, "DO UPDATE SET {} = {}")
+        self.ensure_row_query = generic_insert_query.format(*args, "DO NOTHING{}{}")
 
         self._not_fully_fetched: list[_DK] = []
         self._cache: dict[_DK, _CACHE_ITEM] = {}
@@ -147,19 +149,13 @@ class TableHandler(Generic[_DK]):
         if not self._write_tasks:
             return self.insert_writes.cancel()
 
-        amount_of_changes = len(self._write_tasks)
-        exceptions = [err for err in await asyncio.gather(*(
+        return await asyncio.gather(*(
             self._insert_write(pending_id)
             for pending_id in self._write_tasks.keys()
-        ), return_exceptions=True) if err is not None]
-
-        self.bot.logger.debug(f"Inserted {amount_of_changes} change(s) with {len(exceptions)} errors")
-        await asyncio.gather(*(self.bot.on_error("insert_writes", err) for err in exceptions))
+        ))
 
 
-    async def _insert_write(self, raw_id: _DK):
-        task = self._write_tasks.pop(raw_id)
-
+    def _get_query(self, raw_id: _DK, task: WriteTask) -> Tuple[Any, ...]:
         no_id_settings = [sql(setting) for setting in task.changes.keys()]
         no_id_values = [sql("{}", value) for value in task.changes.values()]
         identifer = [sql("{}", identifer) for identifer in _unpack_id(raw_id)]
@@ -167,20 +163,33 @@ class TableHandler(Generic[_DK]):
         settings = [*self.pkey_columns, *no_id_settings]
         values   = [*identifer, *no_id_values]
 
-        if len(no_id_settings) == 1:
+        amount_of_settings = len(no_id_settings)
+        if amount_of_settings == 1:
             unformatted_query = self.single_insert_query
+        elif amount_of_settings == 0:
+            unformatted_query = self.ensure_row_query
         else:
             unformatted_query = self.multi_insert_query
 
-        query = sql(
+        query = tuple(sql(
             unformatted_query,
             sql.list(settings), sql.list(values),
             sql.list(no_id_settings), sql.list(no_id_values)
-        )
-        self.bot.logger.debug(f"query: {list(query)}")
-        await self.pool.execute(*query)
+        ))
+        self.bot.logger.debug(f"query: {query}")
+        return query
 
-        task.waiter.set_result(None)
+    async def _insert_write(self, raw_id: _DK):
+        task = self._write_tasks.pop(raw_id)
+
+        try:
+            query = self._get_query(raw_id, task)
+            await self.pool.execute(*query)
+        except Exception as error:
+            task.waiter.set_exception(error)
+        else:
+            task.waiter.set_result(None)
+
         if self.bot.websocket is not None and self.broadcast:
             await self.bot.websocket.send(
                 utils.data_to_ws_json("SEND", target="*", **{
@@ -198,6 +207,9 @@ class TableHandler(Generic[_DK]):
             item = cast(_CACHE_ITEM, dict(record))
             for column in self.pkey_columns:
                 del item[list(column)[0]]
+
+        if identifier in self._not_fully_fetched:
+            self._not_fully_fetched.remove(identifier)
 
         self._cache[identifier] = item
         return item

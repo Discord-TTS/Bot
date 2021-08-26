@@ -10,13 +10,11 @@ from __future__ import annotations
 
 import asyncio
 from configparser import ConfigParser
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable, Literal, Optional
 
 import utils
 
-
 if TYPE_CHECKING:
-    from asyncpg import Record
     from main import TTSBot
 
     _UF = Callable[[TTSBot], Awaitable[Optional[bool]]]

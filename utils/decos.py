@@ -59,9 +59,6 @@ def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, C
         try:
             return await func(*args, **kwargs)
         except Exception as error:
-            if isinstance(error, (asyncio.CancelledError, RecursionError)):
-                raise
-
             self = cast(CommonCog, args[0])
             await self.bot.on_error(func.__name__, error)
 
