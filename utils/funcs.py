@@ -26,7 +26,6 @@ if TYPE_CHECKING:
 
 
 _sep = OPTION_SEPERATORS[0]
-
 def construct_unslotted(cls: type[_T], *args, **kwargs) -> _T:
     "Constructs cls without any slots, allowing attribute addition"
     return type(cls.__name__, (cls,), {})(*args, **kwargs) # type: ignore
@@ -74,17 +73,3 @@ async def get_redis_info(cache_db: aioredis.Redis) -> str:
         {_sep} `Key Hits:      {hits}`
         {_sep} `Key Misses:    {misses}`
     """)
-
-
-if sys.version_info >= (3, 9):
-    to_thread = asyncio.to_thread
-    removeprefix = str.removeprefix
-else:
-    # For the people running older than 3.9, these are some functions
-    # backported, may not be 100% accurate but get the job done.
-    async def to_thread(func: Callable[_P, _R]) -> _R:
-        "asyncio.to_thread but for older python versions"
-        return await asyncio.get_event_loop().run_in_executor(None, func)
-    def removeprefix(self: str, __prefix: str) -> str:
-        "str.removeprefix but for older python versions"
-        return self[len(__prefix):] if self.startswith(__prefix) else self

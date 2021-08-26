@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from functools import wraps
 from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Coroutine,
                     Optional, TypeVar, Union, cast)
@@ -9,7 +10,6 @@ from discord.utils import as_chunks
 from discord.ext import commands
 
 from .classes import CommonCog, TypedGuildContext
-from .funcs import to_thread
 from .views import BoolView, ChannelSelector, CommandView
 
 
@@ -66,6 +66,6 @@ def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, C
 
 def run_in_executor(func: Callable[_P, _R]) -> Callable[_P, Coroutine[Any, Any, _R]]:
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Coroutine[Any, Any, _R]:
-        return to_thread(func, *args, **kwargs)
+        return asyncio.to_thread(func, *args, **kwargs)
 
     return wraps(func)(wrapper)

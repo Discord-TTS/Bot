@@ -176,7 +176,7 @@ class ClusterManager:
             args = (cluster_id, shard_count, shards)
 
             cluster_watcher_func = partial(self.cluster_watcher, args)
-            self.monitors[cluster_id] = asyncio.Task(utils.to_thread(cluster_watcher_func))
+            self.monitors[cluster_id] = asyncio.Task(asyncio.to_thread(cluster_watcher_func))
 
         async def keep_alive():
             async with websockets.serve(

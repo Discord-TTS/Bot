@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from inspect import cleandoc
 from typing import TYPE_CHECKING
@@ -82,7 +83,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             if responses is None:
                 return
 
-            raw_ram_usage = await utils.to_thread(get_ram_recursive, Process().parent())
+            raw_ram_usage = await asyncio.to_thread(get_ram_recursive, Process().parent())
             total_voice_clients = sum(resp["voice_count"] for resp in responses)
             total_guild_count = sum(resp["guild_count"] for resp in responses)
             total_members = sum(resp["member_count"] for resp in responses)

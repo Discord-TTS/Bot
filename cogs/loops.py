@@ -62,7 +62,7 @@ class Loops(utils.CommonCog):
 
         rows: list[tuple[str, bool, int]] = []
         for raw_event, count in self.bot.analytics_buffer.items():
-            event = utils.removeprefix(raw_event, "on_")
+            event = raw_event.removeprefix("on_")
             rows.append((event, raw_event == event, count))
 
         await self.bot.pool.executemany(query, rows)

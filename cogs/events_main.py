@@ -63,7 +63,7 @@ class MainEvents(utils.CommonCog):
             return
 
         message_clean = message.clean_content.lower()
-        message_clean = utils.removeprefix(message_clean, f"{prefix}tts")
+        message_clean = message_clean.removeprefix(f"{prefix}tts")
 
         if len(message_clean) >= 1500:
             return

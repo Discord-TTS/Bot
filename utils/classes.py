@@ -14,7 +14,7 @@ from mutagen import mp3 as mutagen
 from pydub import AudioSegment
 
 from .constants import AUDIODATA, GTTS_ESPEAK_DICT, RED
-from .funcs import data_to_ws_json, to_thread
+from .funcs import data_to_ws_json
 
 if TYPE_CHECKING:
     import collections
@@ -64,7 +64,7 @@ class TTSAudioMaker:
 
             try:
                 audio_file = BytesIO(audio)
-                file_length = await to_thread(self.get_duration, audio_file, mode)
+                file_length = await asyncio.to_thread(self.get_duration, audio_file, mode)
             except mutagen.HeaderNotFoundError:
                 return None, None
 
@@ -74,7 +74,7 @@ class TTSAudioMaker:
             await self.bot.cache.set((mode, text, lang), audio)
         else:
             audio_file = BytesIO(audio)
-            file_length = await to_thread(self.get_duration, audio_file, mode)
+            file_length = await asyncio.to_thread(self.get_duration, audio_file, mode)
 
         audio_file.seek(0)
         return audio_file, file_length
