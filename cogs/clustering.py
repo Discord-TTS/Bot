@@ -49,7 +49,7 @@ def setup(bot: ClusteredTTSBot):
     from jishaku.repl import AsyncCodeExecutor, Scope
     bot.add_cog(Clustering(bot))
 
-class Clustering(utils.CommonCog):
+class Clustering(utils.CommonCog, command_attrs={"hidden": True}):
     def __init__(self, bot: ClusteredTTSBot):
         super().__init__(bot)
 

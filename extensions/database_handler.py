@@ -96,7 +96,11 @@ class TableHandler(Generic[_DK]):
         row = await self.bot.pool.fetchrow(self.select_query, *_unpack_id(self.default_id))
         assert row is not None
 
-        self.defaults = dict(row)
+        row = dict(row)
+        for column in self.pkey_columns:
+            del row[list(column)[0]]
+
+        self.defaults = cast(_CACHE_ITEM, row)
         return self.defaults
 
 
@@ -189,8 +193,11 @@ class TableHandler(Generic[_DK]):
     async def _fill_cache(self, identifier: _DK) -> _CACHE_ITEM:
         record = await self.pool.fetchrow(self.select_query, *_unpack_id(identifier))
         if record is None:
-            self._cache[identifier] = item = self.defaults or await self._fetch_defaults()
+            item = (self.defaults or await self._fetch_defaults()).copy()
         else:
-            self._cache[identifier] = item = cast(_CACHE_ITEM, dict(record))
+            item = cast(_CACHE_ITEM, dict(record))
+            for column in self.pkey_columns:
+                del item[list(column)[0]]
 
+        self._cache[identifier] = item
         return item
