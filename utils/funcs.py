@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
-import sys
 from inspect import cleandoc
-from typing import (TYPE_CHECKING, Any, Callable, Optional, Sequence, TypeVar,
-                    Union)
+from typing import TYPE_CHECKING, Optional, Sequence, TypeVar, Union
 
 import orjson
 
@@ -19,6 +16,7 @@ if TYPE_CHECKING:
     import discord
     from typing_extensions import ParamSpec
 
+    from .constants import JSON_IN
     from .websocket_types import WS_TARGET
     _P = ParamSpec("_P")
     _R = TypeVar("_R")
@@ -32,10 +30,9 @@ def construct_unslotted(cls: type[_T], *args, **kwargs) -> _T:
     # as subclassing deletes __slots__, this works perfectly, if a bit hacky
     return type(cls.__name__, (cls,), {})(*args, **kwargs) # type: ignore
 
-def data_to_ws_json(command: str, target: Union[WS_TARGET, str], **kwargs: Any) -> bytes:
+def data_to_ws_json(command: str, target: Union[WS_TARGET, str], **kwargs: JSON_IN) -> bytes:
     "Turns arguments and kwargs into usable data for the WS IPC system"
-    wsjson = {"c": command.lower(), "a": kwargs, "t": target}
-    return orjson.dumps(wsjson)
+    return orjson.dumps({"c": command.lower(), "a": kwargs, "t": target})
 
 def emoji_match_to_cleaned(match: re.Match[str]) -> str:
     is_animated, emoji_name = bool(match[1]), match.group(2)

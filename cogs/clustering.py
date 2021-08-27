@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 import traceback
 from typing import TYPE_CHECKING, Any, Coroutine, Protocol, Union
 
@@ -38,7 +39,7 @@ data_lookup: dict[str, RequestDataFunction] = {
     "has_support":  lambda b, *_: None if b.get_support_server() is None else b.cluster_id,
 }
 
-
+WHITE_CHECK_MARK = "\U00002705"
 def setup(bot: ClusteredTTSBot):
     if bot.cluster_id is None:
         return
@@ -91,7 +92,11 @@ class Clustering(utils.CommonCog, command_attrs={"hidden": True}):
         if response is None:
             return
 
-        await ctx.send(response[0]["run_code"])
+        return_value: str = response[0]["run_code"]
+        if return_value:
+            await ctx.send(return_value)
+        else:
+            await ctx.message.add_reaction(WHITE_CHECK_MARK)
 
     # IPC events that have been plugged into bot.dispatch
     @commands.Cog.listener()
@@ -109,6 +114,11 @@ class Clustering(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.Cog.listener()
     async def on_reload(self, cog: str, *_):
         self.bot.reload_extension(cog)
+
+    @commands.Cog.listener()
+    async def on_view_load(self, traceback: str, message_id: int, *_):
+        view = utils.ShowTracebackView(f"```\n{traceback}```")
+        self.bot.add_view(view, message_id=message_id)
 
     @commands.Cog.listener()
     async def on_change_log_level(self, level: str, *_):

@@ -93,9 +93,7 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
             await asyncio.wait_for(self.play(source), timeout=length+5)
         except asyncio.TimeoutError:
             self.bot.log("on_play_timeout")
-
-            error = f"`{self.guild.id}`'s vc.play didn't finish audio!"
-            self.bot.logger.error(error)
+            self.bot.logger.debug(f"`{self.guild.id}`'s vc.play didn't finish audio!")
         except Exception as exception:
             await self.bot.on_error("play_audio", exception, self)
 
@@ -108,7 +106,7 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
             audio, length = await self.get_tts(text, lang, self.max_length)
         except asyncio.TimeoutError:
             error = f"`{self.guild.id}`'s `{len(text)}` character long message was cancelled!"
-            return self.bot.logger.error(error)
+            return self.bot.logger.debug(error)
 
         if audio is None or length is None:
             return

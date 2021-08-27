@@ -80,7 +80,17 @@ class ErrorEvents(utils.CommonCog):
 
         assert message_id is not None
         if message_id != err_msg.id:
-            await err_msg.delete()
+            return await err_msg.delete()
+
+        if self.bot.websocket is not None:
+            ws_json = utils.data_to_ws_json("SEND", target="support", **{
+                "c": "load_view",
+                "a": {
+                    "traceback": traceback,
+                    "message_id": message_id
+                }
+            })
+            await self.bot.websocket.send(ws_json)
 
 
     async def on_error(self, event_method: str, error: Optional[BaseException] = None, *targs: Any, **_):

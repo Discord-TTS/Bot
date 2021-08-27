@@ -46,7 +46,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             return await ctx.reply(f"You don't need to include the `{ctx.prefix}tts` for messages to be said!")
 
         author_name = "".join(filter(str.isalnum, ctx.author.name))
-        lang = (await self.bot.userinfo.get(ctx.author.id)).get("lang", "en")
+        lang = (await self.bot.userinfo.get(ctx.author.id)).get("lang") or "en"
 
         audio, _ = await utils.TTSAudioMaker(self.bot).get_tts(
             lang=lang,
