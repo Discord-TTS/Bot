@@ -22,10 +22,10 @@ if TYPE_CHECKING:
 error_lookup = {"bool": commands.BadBoolArgument, "TextChannel": commands.ChannelNotFound}
 
 def make_fancy(
-    func: Callable[[CommonCog, TypedGuildContext, Any], Awaitable[_R]]
-) -> Callable[[CommonCog, TypedGuildContext, Optional[Union[discord.TextChannel, bool]]], Coroutine[Any, Any, Optional[_R]]]:
+    func: Callable[[CommonCog, TypedGuildContext, Any], Awaitable[Any]]
+) -> Callable[[CommonCog, TypedGuildContext, Optional[Union[discord.TextChannel, bool]]], Coroutine[Any, Any, Optional[Any]]]:
 
-    async def wrapper(self: CommonCog, ctx: TypedGuildContext, value: Optional[Union[discord.TextChannel, bool]] = None) -> Optional[_R]:
+    async def wrapper(self: CommonCog, ctx: TypedGuildContext, value: Optional[Union[discord.TextChannel, bool]] = None) -> Optional[Any]:
         type_to_convert: str = [*func.__annotations__.values()][1].split(".")[-1]
         if value is not None or ctx.interaction is not None:
             if type(value).__name__ != type_to_convert:
@@ -40,9 +40,16 @@ def make_fancy(
                 if (channel.permissions_for(ctx.guild.me).read_messages
                     and channel.permissions_for(ctx.author).read_messages)
             ), 25):
-                select_view.add_item(ChannelSelector(ctx, channels))
+                try:
+                    select_view.add_item(ChannelSelector(ctx, channels))
+                except ValueError:
+                    return await ctx.send_error(
+                        error="we cannot show a menu as this server has too many channels",
+                        fix=f"use the slash command or do `{ctx.prefix}setup #channel`"
+                    )
 
             await ctx.reply("Select a channel!", view=select_view)
+
         elif type_to_convert == "bool":
             await ctx.reply("What do you want to set this to?", view=BoolView(ctx))
         else:

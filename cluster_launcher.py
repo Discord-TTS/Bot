@@ -29,7 +29,7 @@ if TYPE_CHECKING:
                                        WSGenericJSON, WSKillJSON,
                                        WSRequestJSON, WSSendJSON)
 
-    _CLUSTER_ARG = tuple[int, int, tuple[int]]
+    _CLUSTER_ARG = tuple[int, int, list[int]]
     _WSSP = websockets.WebSocketServerProtocol
 
 
@@ -173,9 +173,9 @@ class ClusterManager:
 
         all_shards = as_chunks(range(shard_count), shards_per_cluster)
         for cluster_id, shards in enumerate(all_shards):
-            args = (cluster_id, shard_count, shards)
-
+            args: _CLUSTER_ARG = (cluster_id, shard_count, shards)
             cluster_watcher_func = partial(self.cluster_watcher, args)
+
             self.monitors[cluster_id] = asyncio.Task(asyncio.to_thread(cluster_watcher_func))
 
         async def keep_alive():

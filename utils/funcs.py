@@ -14,12 +14,10 @@ if TYPE_CHECKING:
 
     import aioredis
     import discord
-    from typing_extensions import ParamSpec
 
     from .constants import JSON_IN
     from .websocket_types import WS_TARGET
-    _P = ParamSpec("_P")
-    _R = TypeVar("_R")
+
     _T = TypeVar("_T")
 
 
