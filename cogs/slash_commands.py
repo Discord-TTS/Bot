@@ -208,12 +208,18 @@ class SlashCommands(utils.CommonCog):
         assert interaction.user is not None
         assert interaction.channel is not None
 
-        if not isinstance(interaction.channel, (
-            discord.TextChannel, discord.DMChannel,
-            discord.Thread, discord.PartialMessageable,
-        )):
+        channel = interaction.channel
+        if isinstance(channel, discord.PartialMessageable):
+            if interaction.guild is None:
+                channel = await interaction.user.create_dm()
+            else:
+                # discord.py internals already failed to find a channel with
+                # this ID, we can go straight to fetch as a last resort
+                channel = await interaction.guild.fetch_channel(channel.id)
+
+        if not isinstance(channel, (discord.TextChannel, discord.DMChannel, discord.Thread)):
             msg = "Sorry, but this channel type is unsupported for commands!"
-            log_msg = f"Slash Command invoked in unsupported channel type: {type(interaction.channel)}"
+            log_msg = f"Slash Command invoked in unsupported channel type: {type(channel)}"
 
             self.bot.logger.error(log_msg)
             return await interaction.response.send_message(msg, ephemeral=True)
@@ -225,8 +231,8 @@ class SlashCommands(utils.CommonCog):
         # I am going to hell for this
         message = cast(discord.Message, utils.construct_unslotted(
             cls=discord.PartialMessage,
-            channel=interaction.channel,
-            id=interaction.id
+            id=interaction.id,
+            channel=channel,
         ))
 
         prefix = await self.bot.command_prefix(self.bot, message)

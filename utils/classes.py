@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     import collections
 
     from main import TTSBot
-    from player import TTSVoicePlayer
+    from player import TTSVoiceClient
 
     from .websocket_types import WS_TARGET
 
@@ -240,7 +240,7 @@ class TypedMember(discord.Member):
 
 class TypedGuild(discord.Guild):
     owner_id: int
-    voice_client: Optional[TTSVoicePlayer]
+    voice_client: Optional[TTSVoiceClient]
     fetch_member: Callable[[int], Awaitable[TypedMember]]
 
 

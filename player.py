@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 _MessageQueue = tuple[str, str]
-class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
+class TTSVoiceClient(discord.VoiceClient, utils.TTSAudioMaker):
     bot: TTSBot
     guild: discord.Guild
     channel: utils.VoiceChannel
@@ -41,7 +41,7 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
         abufferlen = self.audio_buffer.qsize()
         mqueuelen = self.message_queue.qsize()
 
-        return f"<TTSVoicePlayer: {c=} {is_connected=} {is_playing=} {mqueuelen=} {abufferlen=}>"
+        return f"<TTSVoiceClient: {c=} {is_connected=} {is_playing=} {mqueuelen=} {abufferlen=}>"
 
 
     async def disconnect(self, *, force: bool = False) -> None:
@@ -100,8 +100,17 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
     @tasks.loop()
     @utils.decos.handle_errors
     async def fill_audio_buffer(self):
-        text, lang = await self.message_queue.get()
+        sleep_timeout = asyncio.sleep(30*60)
+        fetch_queue = asyncio.create_task(self.message_queue.get())
+        _, pending = await asyncio.wait((fetch_queue, sleep_timeout), return_when=asyncio.FIRST_COMPLETED)
 
+        if fetch_queue in pending:
+            fetch_queue.cancel()
+            return await self.disconnect()
+        else:
+            sleep_timeout.cancel()
+
+        text, lang = fetch_queue.result()
         try:
             audio, length = await self.get_tts(text, lang, self.max_length)
         except asyncio.TimeoutError:

@@ -13,7 +13,7 @@ import utils
 
 if TYPE_CHECKING:
     from main import TTSBot
-    from player import TTSVoicePlayer
+    from player import TTSVoiceClient
 
 
 BLANK = ("\u200B", "\u200B", True)
@@ -125,7 +125,7 @@ class ErrorEvents(utils.CommonCog):
             author_name, icon_url = guild.name, getattr(guild.icon, "url", None)
 
         elif event_method in {"play_audio", "fill_audio_buffer"}:
-            vc: TTSVoicePlayer = args[0]
+            vc: TTSVoiceClient = args[0]
 
             guild = vc.guild
             fields.append(("VC Repr", repr(vc), False))

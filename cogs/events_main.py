@@ -9,7 +9,7 @@ import discord
 from discord.ext import commands
 
 import utils
-from player import TTSVoicePlayer
+from player import TTSVoiceClient
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -22,7 +22,7 @@ async def do_autojoin(author: utils.TypedMember) -> bool:
         if not (permissions.view_channel and permissions.speak):
             return False
 
-        return bool(await voice_channel.connect(cls=TTSVoicePlayer)) # type: ignore
+        return bool(await voice_channel.connect(cls=TTSVoiceClient)) # type: ignore
     except (asyncio.TimeoutError, AttributeError):
         return False
 
@@ -91,7 +91,7 @@ class MainEvents(utils.CommonCog):
 
         # Fix linter issues
         if TYPE_CHECKING:
-            message.guild.voice_client = cast(TTSVoicePlayer, message.guild.voice_client)
+            message.guild.voice_client = cast(TTSVoiceClient, message.guild.voice_client)
 
 
         # Emoji filter

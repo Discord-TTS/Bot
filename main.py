@@ -46,7 +46,7 @@ else:
 class TTSBot(_commands.AutoShardedBot):
     if TYPE_CHECKING:
         from extensions import cache_handler, database_handler
-        from player import TTSVoicePlayer
+        from player import TTSVoiceClient
 
         cache: cache_handler.CacheHandler
         settings: database_handler.TableHandler[int]
@@ -60,11 +60,11 @@ class TTSBot(_commands.AutoShardedBot):
         blocked: bool # Handles if to be on gtts or espeak
         pool: Pool
 
-        voice_clients: list[TTSVoicePlayer]
+        voice_clients: list[TTSVoiceClient]
         user: discord.ClientUser
 
         conn: asyncpg.pool.PoolConnectionProxy[asyncpg.Record]
-        del cache_handler, database_handler, TTSVoicePlayer
+        del cache_handler, database_handler, TTSVoiceClient
 
     def __init__(self,
         config: ConfigParser,

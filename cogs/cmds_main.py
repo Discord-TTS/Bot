@@ -9,7 +9,7 @@ import discord
 from discord.ext import commands
 
 import utils
-from player import TTSVoicePlayer
+from player import TTSVoiceClient
 
 if TYPE_CHECKING:
     from main import TTSBot
@@ -62,7 +62,7 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
         join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
         try:
-            await voice_channel.connect(cls=TTSVoicePlayer) # type: ignore
+            await voice_channel.connect(cls=TTSVoiceClient) # type: ignore
         except asyncio.TimeoutError:
             return await ctx.send("Error: Timed out when trying to join your voice channel!")
 
