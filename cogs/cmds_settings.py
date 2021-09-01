@@ -85,7 +85,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
 
     @set.command()
     @commands.has_permissions(administrator=True)
-    @utils.decos.make_fancy
+    @utils.decos.bool_button
     async def xsaid(self, ctx: utils.TypedGuildContext, value: bool):
         "Makes the bot say \"<user> said\" before each message"
         await self.bot.settings.set(ctx.guild.id, {"xsaid": value})
@@ -93,7 +93,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
 
     @set.command(aliases=["auto_join"])
     @commands.has_permissions(administrator=True)
-    @utils.decos.make_fancy
+    @utils.decos.bool_button
     async def autojoin(self, ctx: utils.TypedGuildContext, value: bool):
         "If you type a message in the setup channel, the bot will join your vc"
         await self.bot.settings.set(ctx.guild.id, {"auto_join": value})
@@ -101,7 +101,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
 
     @set.command(aliases=["bot_ignore", "ignore_bots", "ignorebots"])
     @commands.has_permissions(administrator=True)
-    @utils.decos.make_fancy
+    @utils.decos.bool_button
     async def botignore(self, ctx: utils.TypedGuildContext, value: bool):
         "Messages sent by bots and webhooks are not read"
         await self.bot.settings.set(ctx.guild.id, {"bot_ignore": value})
@@ -180,14 +180,30 @@ class SettingCommands(utils.CommonCog, name="Settings"):
         await self.voice(ctx, voicecode)
 
 
-    @commands.has_permissions(administrator=True)
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
+    @commands.has_permissions(administrator=True)
     @commands.guild_only()
     @commands.command()
-    @utils.decos.make_fancy
-    async def setup(self, ctx: utils.TypedGuildContext, value: discord.TextChannel):
+    async def setup(self, ctx: utils.TypedGuildContext, channel: Optional[discord.TextChannel]):
         "Setup the bot to read messages from `<channel>`"
-        channel = value
+        if channel is None:
+            select_view = utils.CommandView[discord.TextChannel](ctx)
+            for channels in discord.utils.as_chunks((channel
+                for channel in ctx.guild.text_channels
+                if (channel.permissions_for(ctx.guild.me).read_messages
+                    and channel.permissions_for(ctx.author).read_messages)
+            ), 25):
+                try:
+                    select_view.add_item(utils.ChannelSelector(ctx, channels))
+                except ValueError:
+                    return await ctx.send_error(
+                        error="we cannot show a menu as this server has too many channels",
+                        fix=f"use the slash command or do `{ctx.prefix}setup #channel`"
+                    )
+
+            await ctx.reply("Select a channel!", view=select_view)
+            channel = await select_view.wait()
+
         embed = discord.Embed(
             title="TTS Bot has been setup!",
             description=cleandoc(f"""

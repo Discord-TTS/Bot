@@ -144,7 +144,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
         "Gets current ping to discord!"
 
         ping_before = time.perf_counter()
-        ping_message = await ctx.send("Loading!", return_msg=True)
+        ping_message = await ctx.send("Loading!", return_message=True)
         ping = (time.perf_counter() - ping_before) * 1000
         await ping_message.edit(content=f"Current Latency: `{ping:.0f}ms`")
 

@@ -171,30 +171,29 @@ class TypedContext(commands.Context):
 
 
     @overload
-    async def send(self, *args: Any, return_msg: Literal[False] = False, **kwargs: Any) -> None: ...
+    async def send(self,
+        content: Optional[str] = None,
+        return_message: Literal[False] = False,
+        **kwargs: Any
+    ) -> Optional[Union[discord.WebhookMessage, discord.Message]]: ...
     @overload
-    async def send(self, *args: Any, return_msg: Literal[True] = True, **kwargs: Any) -> discord.Message: ...
+    async def send(self,
+        content: Optional[str] = None,
+        return_message: Literal[True] = True,
+        **kwargs: Any
+    ) -> Union[discord.WebhookMessage, discord.Message]: ...
 
-    async def send(self,*args: Any, return_msg: bool = False, **kwargs: Any) -> Optional[discord.Message]:
-        view = kwargs.pop("view", None)
-        reference = kwargs.pop("reference", None)
-        return_msg = return_msg if view is None else True
+    async def send(self,
+        content: Optional[str] = None,
+        return_message: bool = False,
+        **kwargs: Any
+    ) -> Optional[Union[discord.WebhookMessage, discord.Message]]:
+        view = None
+        if "view" in kwargs:
+            view = kwargs["view"]
+            return_message = True
 
-        if self.interaction is None:
-            if isinstance(reference, discord.Message):
-                reference = reference.to_reference(fail_if_not_exists=False)
-
-            kwargs.pop("ephemeral", False)
-            send = partial(super().send, reference=reference)
-        elif not (self.interaction.response.is_done() or return_msg or "file" in kwargs):
-            send = self.interaction.response.send_message
-        else:
-            if not self.interaction.response.is_done():
-                await self.interaction.response.defer()
-
-            send = partial(self.interaction.followup.send, wait=return_msg)
-
-        msg = await send(*args, **kwargs)
+        msg = await super().send(content, return_message=return_message, **kwargs) # type: ignore
         if view is not None:
             view.message = msg
 

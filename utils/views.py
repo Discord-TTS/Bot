@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from typing import Any, Coroutine, Iterable,  cast
+from typing import Any, Coroutine, Generic, Iterable, TypeVar,  cast
 
 import discord
 
 from .classes import TypedGuildContext, TypedMessage
 
+_T = TypeVar("_T")
+class GenericView(Generic[_T], discord.ui.View):
+    ret: _T
+    async def wait(self) -> _T:
+        await super().wait()
+        return self.ret
 
-class GenericView(discord.ui.View):
     @classmethod
     def from_item(cls,
         item: type[discord.ui.Item[GenericView]],
@@ -18,7 +23,7 @@ class GenericView(discord.ui.View):
         return self
 
 
-class CommandView(GenericView):
+class CommandView(GenericView[_T]):
     message: TypedMessage
     def __init__(self, ctx: TypedGuildContext, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -120,5 +125,6 @@ class ChannelSelector(discord.ui.Select):
             self.options = [option for option in self.options if option.value != self.values[0]]
             self.view.message = await self.view.message.edit(view=self.view) # type: ignore
         else:
-            await self.view.recall_command(channel)
             await self.view.message.delete()
+            self.view.ret = channel
+            self.view.stop()

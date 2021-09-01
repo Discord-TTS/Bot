@@ -82,9 +82,14 @@ class TTSBot(_commands.AutoShardedBot):
 
         self.status_code = utils.RESTART_CLUSTER
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
-
-        kwargs["command_prefix"] = self.command_prefix
-        return super().__init__(*args, **kwargs)
+ 
+        return super().__init__(*args, **kwargs,
+            command_prefix=self.command_prefix,
+            slash_command_guild=(
+                int(self.config["Main"]["slash_command_guild"])
+                if "slash_command_guild" in self.config["Main"] else None
+            ),
+        )
 
 
     def handle_error(self, task: asyncio.Task):
@@ -261,6 +266,7 @@ async def _real_main(
         max_messages=None,
         help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
         activity=activity,
+        slash_commands=True,
         cluster_id=cluster_id,
         case_insensitive=True,
         shard_ids=shards_to_handle,

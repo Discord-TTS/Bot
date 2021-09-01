@@ -141,9 +141,10 @@ class ClusterManager:
 
             if process.exitcode in (utils.KILL_EVERYTHING, utils.DO_NOT_RESTART_CLUSTER):
                 logger.warning(f"Shutting down all clusters due to {cluster_name} return.")
-
                 process.close()
+
                 del self.processes[cluster_id]
+                self.websockets.pop(cluster_id, None)
                 return asyncio.run_coroutine_threadsafe(self.shutdown(), self.loop)
 
             elif process.exitcode == utils.RESTART_CLUSTER:
