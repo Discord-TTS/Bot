@@ -56,7 +56,7 @@ class ErrorEvents(utils.CommonCog):
                 ("Handling Shards", self.bot.shard_ids, True)
             ))
 
-        error_msg = discord.Embed(title=traceback.split("\n")[-2], colour=utils.RED)
+        error_msg = discord.Embed(title=traceback.split("\n")[-2][:256], colour=utils.RED)
         if author_name is not None:
             if icon_url is None:
                 error_msg.set_author(name=author_name)

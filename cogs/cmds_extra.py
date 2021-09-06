@@ -164,8 +164,8 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             await self.bot.channels["suggestions"].send(
                 files=files,
                 content=suggestion,
+                username=author_name + author_id,
                 avatar_url=ctx.author.display_avatar.url,
-                username=author_name[:32 - len(author_id)] + author_id,
             )
 
         await ctx.send("Suggestion noted")

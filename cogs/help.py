@@ -105,4 +105,4 @@ class FancyHelpCommand(commands.HelpCommand):
     async def send_cog_help(self, cog: commands.Cog) -> None:
         await super().send_error_message(self.command_not_found(cog.qualified_name)) # type: ignore
 
-    send_command_help = send_group_help
+    send_command_help = send_group_help # type: ignore

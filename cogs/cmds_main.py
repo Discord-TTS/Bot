@@ -108,7 +108,13 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
             return await ctx.send("**Error:** Nothing in message queue to skip!")
 
         vc.skip()
-        await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
+        if ctx.interaction is not None:
+            return
+
+        try:
+            await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
+        except discord.NotFound:
+            pass
 
     @skip.after_invoke # type: ignore (pylance not accepting subclasses)
     async def reset_cooldown(self, ctx: utils.TypedGuildContext):

@@ -71,28 +71,25 @@ class MainEvents(utils.CommonCog):
         if message_clean.startswith(prefix):
             return
 
-        bot_voice_client = message.guild.voice_client
         if message.author.bot:
-            if bot_ignore or not bot_voice_client:
+            if bot_ignore or not message.guild.voice_client:
                 return
         elif (
             not isinstance(message.author, discord.Member)
             or not message.author.voice
         ):
             return
-        elif not bot_voice_client:
+        elif not message.guild.voice_client:
             if not autojoin:
                 return
 
             if not await do_autojoin(message.author):
                 return
-        elif message.author.voice.channel != bot_voice_client.channel:
+
+            if not message.guild.voice_client:
+                return
+        elif message.author.voice.channel != message.guild.voice_client.channel:
             return
-
-        # Fix linter issues
-        if TYPE_CHECKING:
-            message.guild.voice_client = cast(TTSVoiceClient, message.guild.voice_client)
-
 
         # Emoji filter
         message_clean = utils.EMOJI_REGEX.sub(utils.emoji_match_to_cleaned, message_clean)

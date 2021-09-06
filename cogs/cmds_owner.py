@@ -19,7 +19,7 @@ def setup(bot: TTSBot):
 is_owner = commands.is_owner()
 class OwnerCommands(utils.CommonCog, command_attrs={"hidden": True}):
     "TTS Bot commands meant only for the bot owner."
-    cog_check = lambda _, ctx: is_owner.predicate(ctx)
+    cog_check = lambda self, ctx: is_owner.predicate(ctx)
 
     @commands.command(aliases=("log_level", "logger", "loglevel"))
     @commands.is_owner()
