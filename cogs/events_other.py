@@ -41,7 +41,7 @@ class OtherEvents(utils.CommonCog):
 
             cleanup = ('`', '\\`')
             clean_prefix = f"`{prefix.replace(*cleanup)}`"
-            permissions = message.channel.permissions_for(message.guild.me) # type: discord.Permissions
+            permissions = message.channel.permissions_for(message.guild.me)
             if not permissions.send_messages:
                 try:
                     name = discord.utils.escape_markdown(message.guild.name)

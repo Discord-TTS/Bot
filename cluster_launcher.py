@@ -174,10 +174,8 @@ class ClusterManager:
 
         all_shards = as_chunks(range(shard_count), shards_per_cluster)
         for cluster_id, shards in enumerate(all_shards):
-            args: _CLUSTER_ARG = (cluster_id, shard_count, shards)
-            cluster_watcher_func = partial(self.cluster_watcher, args)
-
-            self.monitors[cluster_id] = asyncio.Task(asyncio.to_thread(cluster_watcher_func))
+            cluster_watcher_func = partial(self.cluster_watcher, (cluster_id, shard_count, shards))
+            self.monitors[cluster_id] = asyncio.create_task(asyncio.to_thread(cluster_watcher_func))
 
         async def keep_alive():
             async with websockets.serve(

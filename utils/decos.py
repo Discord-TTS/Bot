@@ -34,7 +34,7 @@ def handle_errors(func: Callable[_P, Awaitable[Optional[_R]]]) -> Callable[_P, C
             return await func(*args, **kwargs)
         except Exception as error:
             self = cast(CommonCog, args[0])
-            await self.bot.on_error(func.__name__, error)
+            await self.bot.on_error(func.__name__, error, self)
 
         return None
     return wraps(func)(wrapper)

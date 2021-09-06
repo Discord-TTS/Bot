@@ -100,7 +100,7 @@ class TTSVoiceClient(discord.VoiceClient, utils.TTSAudioMaker):
     @tasks.loop()
     @utils.decos.handle_errors
     async def fill_audio_buffer(self):
-        sleep_timeout = asyncio.sleep(30*60)
+        sleep_timeout = asyncio.create_task(asyncio.sleep(30*60))
         fetch_queue = asyncio.create_task(self.message_queue.get())
         _, pending = await asyncio.wait((fetch_queue, sleep_timeout), return_when=asyncio.FIRST_COMPLETED)
 

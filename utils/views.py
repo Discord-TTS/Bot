@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Coroutine, Generic, Iterable, TypeVar,  cast
+from typing import Any, Coroutine, Generic, Iterable, TypeVar
 
 import discord
 
@@ -13,30 +13,12 @@ class GenericView(Generic[_T], discord.ui.View):
         await super().wait()
         return self.ret
 
-    @classmethod
-    def from_item(cls,
-        item: type[discord.ui.Item[GenericView]],
-        *args: Any, **kwargs: Any
-    ):
-        self = cls()
-        self.add_item(item(*args, **kwargs))
-        return self
-
 
 class CommandView(GenericView[_T]):
     message: TypedMessage
     def __init__(self, ctx: TypedGuildContext, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ctx = ctx
-
-    @classmethod
-    def from_item(cls,
-        item: type[discord.ui.Item[GenericView]],
-        ctx: TypedGuildContext, *args: Any, **kwargs: Any
-    ):
-        self = cls(ctx)
-        self.add_item(item(ctx, *args, **kwargs)) # type: ignore
-        return self
 
 
     def _clean_args(self, *args: Any):
@@ -65,6 +47,7 @@ class CommandView(GenericView[_T]):
 
 
 class BoolView(CommandView):
+    children: list[discord.ui.Button]
     @discord.ui.button(label="True", style=discord.ButtonStyle.success)
     async def yes(self, *_):
         await self.recall_command(True)
@@ -76,7 +59,6 @@ class BoolView(CommandView):
     def stop(self) -> None:
         super().stop()
         for button in self.children:
-            button = cast(discord.ui.Button, button)
             button.disabled = True
 
         self.ctx.bot.create_task(self.message.edit(view=self))

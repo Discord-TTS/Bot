@@ -22,12 +22,6 @@ if TYPE_CHECKING:
 
 
 _sep = OPTION_SEPERATORS[0]
-def construct_unslotted(cls: type[_T], *args, **kwargs) -> _T:
-    "Constructs cls without any slots, allowing attribute addition"
-    # This is subclassing cls, with the name of cls, then constructing it
-    # as subclassing deletes __slots__, this works perfectly, if a bit hacky
-    return type(cls.__name__, (cls,), {})(*args, **kwargs) # type: ignore
-
 def data_to_ws_json(command: str, target: Union[WS_TARGET, str], **kwargs: JSON_IN) -> bytes:
     "Turns arguments and kwargs into usable data for the WS IPC system"
     return orjson.dumps({"c": command.lower(), "a": kwargs, "t": target})
