@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from functools import partial
 from io import BytesIO
 from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
                     TypeVar, Union, cast, overload)
@@ -62,22 +61,17 @@ class TTSAudioMaker:
             if audio is None:
                 return None, None
 
-            try:
-                audio_file = BytesIO(audio)
-                file_length = await asyncio.to_thread(self.get_duration, audio_file, mode)
-            except mutagen.HeaderNotFoundError:
-                return None, None
-
-            if file_length > max_length:
-                return self.bot.log("on_above_max_length"), None
-
             await self.bot.cache.set((mode, text, lang), audio)
-        else:
-            audio_file = BytesIO(audio)
-            file_length = await asyncio.to_thread(self.get_duration, audio_file, mode)
 
-        audio_file.seek(0)
-        return audio_file, file_length
+        try:
+            file_length = await asyncio.to_thread(self.get_duration, audio, mode)
+        except mutagen.HeaderNotFoundError:
+            return None, None
+
+        if file_length > max_length:
+            return self.bot.log("on_above_max_length"), None
+
+        return audio, file_length
 
 
     async def get_gtts(self, text: str, lang: str) -> bytes:
@@ -96,11 +90,11 @@ class TTSAudioMaker:
         return wav
 
 
-    def get_duration(self, audio_file: BytesIO, mode: Literal["mp3", "wav"]) -> float:
+    def get_duration(self, audio: bytes, mode: Literal["mp3", "wav"]) -> float:
         if mode == "mp3":
-            return mutagen.MP3(audio_file).info.length
+            return mutagen.MP3(BytesIO(audio)).info.length
 
-        segment = AudioSegment.from_file_using_temporary_files(audio_file)
+        segment = AudioSegment.from_file_using_temporary_files(BytesIO(audio))
         return len(segment) / 1000 # type: ignore
 
 

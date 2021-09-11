@@ -1,5 +1,4 @@
 import re
-from io import BytesIO
 from typing import TYPE_CHECKING, TypedDict, Union
 
 import discord
@@ -23,7 +22,7 @@ REGEX_REPLACEMENTS = {
 }
 
 # Types
-AUDIODATA = tuple[BytesIO, Union[int, float]]
+AUDIODATA = tuple[bytes, Union[int, float]]
 if TYPE_CHECKING:
     import datetime
     import uuid

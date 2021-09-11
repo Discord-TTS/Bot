@@ -82,7 +82,7 @@ class TTSBot(_commands.AutoShardedBot):
 
         self.status_code = utils.RESTART_CLUSTER
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
- 
+
         return super().__init__(*args, **kwargs,
             command_prefix=self.command_prefix,
             slash_command_guild=(
