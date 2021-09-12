@@ -1,36 +1,31 @@
 from __future__ import annotations
 
-from typing import Any, Coroutine, Generic, Iterable, TypeVar
+from functools import partial
+from typing import Any, Generic, Iterable, Optional, TypeVar
 
 import discord
 
-from .classes import TypedGuildContext, TypedMessage
+from .classes import TypedGuildContext
 
 _T = TypeVar("_T")
-class GenericView(Generic[_T], discord.ui.View):
+class CommandView(Generic[_T], discord.ui.View):
     ret: _T
-    async def wait(self) -> _T:
-        await super().wait()
-        return self.ret
-
-
-class CommandView(GenericView[_T]):
-    message: TypedMessage
     def __init__(self, ctx: TypedGuildContext, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.message: Optional[discord.Message] = None
         self.ctx = ctx
 
 
-    def _clean_args(self, *args: Any):
-        return [arg for arg in args if arg is not None][1:]
-
-    def recall_command(self, *args: Any) -> Coroutine[Any, Any, Any]:
-        self.stop()
-        return self.ctx.command(*self._clean_args(*self.ctx.args), *args) # type: ignore
-
-
     async def on_error(self, *args: Any) -> None:
-        self.ctx.bot.dispatch("interaction_error", *args)
+        await self.ctx.bot.on_error("on_interaction", *args)
+
+    def stop(self, ret: _T) -> None:
+        self.ret = ret
+        return super().stop()
+
+    async def wait(self) -> _T:
+        await super().wait()
+        return self.ret
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         assert isinstance(interaction.user, discord.Member)
@@ -46,22 +41,26 @@ class CommandView(GenericView[_T]):
         return True
 
 
-class BoolView(CommandView):
+class BoolView(CommandView[bool]):
     children: list[discord.ui.Button]
-    @discord.ui.button(label="True", style=discord.ButtonStyle.success)
-    async def yes(self, *_):
-        await self.recall_command(True)
+    def __init__(self, ctx: TypedGuildContext, true: str = "True", false: str = "False", *args, **kwargs):
+        super().__init__(ctx, *args, **kwargs)
 
-    @discord.ui.button(label="False", style=discord.ButtonStyle.danger)
-    async def no(self, *_):
-        await self.recall_command(False)
+        async def button_click(*_, value: bool):
+            self.stop(value)
 
-    def stop(self) -> None:
-        super().stop()
-        for button in self.children:
-            button.disabled = True
+        for label, style, value in ((true, discord.ButtonStyle.success, True), (false, discord.ButtonStyle.danger, False)):
+            button = discord.ui.Button(label=label, style=style)
+            button.callback = partial(button_click, value=value)
+            self.add_item(button)
 
-        self.ctx.bot.create_task(self.message.edit(view=self))
+    def stop(self, ret: bool) -> None:
+        super().stop(ret)
+        if self.message is not None:
+            for button in self.children:
+                button.disabled = True
+
+            self.ctx.bot.create_task(self.message.edit(view=self))
 
 class ShowTracebackView(discord.ui.View):
     def __init__(self, traceback: str, *args, **kwargs):
@@ -107,6 +106,7 @@ class ChannelSelector(discord.ui.Select):
             self.options = [option for option in self.options if option.value != self.values[0]]
             self.view.message = await self.view.message.edit(view=self.view) # type: ignore
         else:
-            await self.view.message.delete()
-            self.view.ret = channel
-            self.view.stop()
+            if self.view.message is not None:
+                await self.view.message.delete()
+
+            self.view.stop(channel)

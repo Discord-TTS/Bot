@@ -116,10 +116,8 @@ class TypedContext(commands.Context):
         super().__init__(*args, **kwargs)
         self.interaction: Optional[discord.Interaction] = None
 
-    async def send_error(self, error: str,
-        fix: str = "get in contact with us via the support server for help",
-    ) -> Optional[discord.Message]:
-
+    default_fix = "get in contact with us via the support server for help"
+    async def send_error(self, error: str, fix: str = default_fix, **kwargs) -> Optional[discord.Message]:
         if self.guild:
             self = cast(TypedGuildContext, self)
             permissions = self.bot_permissions()
@@ -142,7 +140,7 @@ class TypedContext(commands.Context):
             text="Support Server: https://discord.gg/zWPWwQC"
         )
 
-        return await self.reply(embed=error_embed, ephemeral=True)
+        return await self.reply(embed=error_embed, ephemeral=True, **kwargs)
 
     # I wish this could be data: List[_T] -> ...Dict[_T, Any] but no, typing bad
     async def request_ws_data(self, *to_request: str, target: WS_TARGET = "*", args: dict[str, dict[str, Any]] = None) -> Optional[list[dict[str, Any]]]:

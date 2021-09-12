@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     from .constants import JSON_IN
     from .websocket_types import WS_TARGET
 
-    _T = TypeVar("_T")
-
 
 _sep = OPTION_SEPERATORS[0]
 def data_to_ws_json(command: str, target: Union[WS_TARGET, str], **kwargs: JSON_IN) -> bytes:

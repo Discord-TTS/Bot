@@ -247,15 +247,3 @@ class ErrorEvents(utils.CommonCog):
                     icon_url=ctx.author.display_avatar.url,
                 )
             )
-
-    @commands.Cog.listener()
-    async def on_interaction_error(self,
-        error: Exception,
-        item: discord.ui.Item[utils.GenericView],
-        interaction: discord.Interaction
-    ) -> None:
-
-        context_part = f"{interaction.user} caused an error with a {item.__class__.__name__} with the interaction: {interaction}"
-        error_traceback = "".join(format_exception(type(error), error, error.__traceback__))
-        full_error = f"{context_part}\n```{error_traceback}```"
-        await self.bot.channels["errors"].send(full_error)

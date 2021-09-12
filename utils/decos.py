@@ -19,10 +19,12 @@ def bool_button(
     func: Callable[[CommonCog, TypedGuildContext, bool], Awaitable[_R]]
 ) -> Callable[[CommonCog, TypedGuildContext, Optional[bool]], Coroutine[Any, Any, Optional[_R]]]:
     async def wrapper(self: CommonCog, ctx: TypedGuildContext, value: Optional[bool] = None) -> Optional[_R]:
-        if value is not None:
-            return await func(self, ctx, value)
+        if value is None:
+            view = BoolView(ctx)
+            await ctx.reply("What do you want to set this to?", view=view)
+            value = await view.wait()
 
-        await ctx.reply("What do you want to set this to?", view=BoolView(ctx))
+        return await func(self, ctx, value)
 
     wrapper.__name__ = func.__name__
     wrapper.__doc__ = func.__doc__

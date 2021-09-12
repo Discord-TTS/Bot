@@ -33,25 +33,36 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
     async def join(self, ctx: utils.TypedGuildContext):
         "Joins the voice channel you're in!"
         if not ctx.author.voice:
-            return await ctx.send("Error: You need to be in a voice channel to make me join your voice channel!")
+            return await ctx.send_error(
+                error="you need to be in a voice channel to make me join your voice channel",
+                fix="join a voice channel and try again"
+            )
 
         voice_client = ctx.guild.voice_client
         voice_channel = ctx.author.voice.channel
         permissions: discord.Permissions = voice_channel.permissions_for(ctx.guild.me)
 
+        missing_perms = []
         if not permissions.view_channel:
-            return await ctx.send("Error: Missing Permission to view your voice channel!")
-
+            missing_perms.append("view_channel")
         if not permissions.speak:
-            return await ctx.send("Error: I do not have permssion to speak!")
+            missing_perms.append("speak")
+
+        if missing_perms:
+            raise commands.BotMissingPermissions(missing_perms)
 
         if voice_client:
             if voice_client.channel == voice_channel:
-                vc_mention = "your voice channel"
-            else:
-                vc_mention = voice_client.channel.mention
+                return await ctx.reply("I am already in your voice channel!")
 
-            return await ctx.send(f"Error: I am already in {vc_mention}!")
+            channel_mention = voice_client.channel.mention
+            move_channel_view = utils.BoolView(ctx, "Yes", "No")
+            await ctx.reply(f"I am already in {channel_mention}! Would you like me to move to this channel?", view=move_channel_view)
+
+            if await move_channel_view.wait():
+                await voice_client.move_to(voice_channel)
+
+            return
 
         join_embed = discord.Embed(
             title="Joined your voice channel!",
@@ -61,10 +72,13 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
         join_embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
+        if ctx.interaction is not None:
+            await ctx.interaction.response.defer()
+
         try:
             await voice_channel.connect(cls=TTSVoiceClient) # type: ignore
         except asyncio.TimeoutError:
-            return await ctx.send("Error: Timed out when trying to join your voice channel!")
+            return await ctx.send_error("I took too long trying to join your voice channel", "try again later")
 
         await ctx.send(embed=join_embed)
 
