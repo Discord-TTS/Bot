@@ -1,4 +1,4 @@
-git+https://github.com/Gnome-py/enhanced-discord.py.git@cbf511879055d606d7954b966e75db523de4ed4e#egg=discord.py[voice,speed]
+git+https://github.com/idevision/enhanced-discord.py.git@be9e69304736f6a1bea8e34b5798ee593e7986f6#egg=discord.py[voice,speed]
 git+https://github.com/Gnome-py/voxpopuli.git@async-support
 git+https://github.com/Gnome-py/asyncgTTS.git
 aioredis[hiredis]>=2.0.0a1,<3.0

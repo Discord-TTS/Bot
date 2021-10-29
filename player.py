@@ -180,7 +180,7 @@ class TTSVoiceClient(discord.VoiceClient, utils.TTSAudioMaker):
     async def get_gtts(self, text: str, lang: str):
         try:
             return await super().get_gtts(text, lang)
-        except asyncgTTS.easygttsException as error:
+        except asyncgTTS.LibraryException as error:
             error_message = str(error)
             response_code = error_message[:3]
             if response_code == "503" or isinstance(error, asyncgTTS.RatelimitException):

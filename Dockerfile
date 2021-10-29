@@ -1,4 +1,4 @@
-FROM python:latest
+FROM python:3.9
 RUN pip install -U pip
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y ffmpeg espeak make gcc git

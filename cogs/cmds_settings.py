@@ -187,7 +187,7 @@ class SettingCommands(utils.CommonCog, name="Settings"):
     async def setup(self, ctx: utils.TypedGuildContext, channel: Optional[discord.TextChannel]):
         "Setup the bot to read messages from `<channel>`"
         if channel is None:
-            select_view = utils.CommandView[discord.TextChannel](ctx, timeout=None)
+            select_view = utils.CommandView[discord.TextChannel](ctx)
             for channels in discord.utils.as_chunks((channel
                 for channel in ctx.guild.text_channels
                 if (channel.permissions_for(ctx.guild.me).read_messages
