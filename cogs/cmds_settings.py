@@ -10,7 +10,6 @@ import discord
 from discord.ext import commands, menus
 
 import utils
-from utils.classes import VoiceNotFound
 
 if TYPE_CHECKING:
     from main import TTSBotPremium
@@ -75,14 +74,14 @@ class cmds_settings(utils.CommonCog, name="Settings"):
 
         try:
             voice = await self.bot.get_voice(userinfo["lang"], userinfo["variant"])
-        except VoiceNotFound:
+        except utils.VoiceNotFound:
             voice = await self.bot.get_voice("en-us", "a")
 
         try:
-            default_voice = self.bot.get_voice(guild_settings['default_lang'].split(" "))
-        except VoiceNotFound:
-            default_voice = None
-        
+            guild_voice = self.bot.get_voice(guild_settings["default_lang"].split(" "))
+        except (utils.VoiceNotFound, AttributeError):
+            guild_voice = None
+
         if nickname == ctx.author.display_name:
             nickname = "has not been set yet"
 
@@ -96,7 +95,7 @@ class cmds_settings(utils.CommonCog, name="Settings"):
         tts_settings = cleandoc(f"""
             {sep2} <User> said: message `{guild_settings['xsaid']}`
             {sep2} Ignore bot's messages: `{guild_settings['bot_ignore']}`
-            {sep2} Default Server Voice: `{default_voice}`
+            {sep2} Default Server Voice: `{guild_voice}`
 
             {sep2} Max Time to Read: `{guild_settings['msg_length']} seconds`
             {sep2} Max Repeated Characters: `{guild_settings['repeated_chars']}`

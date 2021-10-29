@@ -10,7 +10,7 @@ from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
 import discord
 from discord.ext import commands
 from pydub import AudioSegment
- 
+
 from .constants import AUDIODATA, RED
 from .funcs import data_to_ws_json
 

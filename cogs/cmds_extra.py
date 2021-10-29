@@ -47,7 +47,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
 
         author_name = "".join(filter(str.isalnum, ctx.author.name))
 
-        userinfo = await self.bot.userinfo.get(ctx.author.id) 
+        userinfo = await self.bot.userinfo.get(ctx.author.id)
         voice = await self.bot.get_voice(userinfo["lang"] or "en-us", userinfo["variant"] or "a")
 
         audio, _ = await utils.TTSAudioMaker(self.bot).get_tts(
