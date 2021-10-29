@@ -5,7 +5,6 @@ import dataclasses
 from collections import defaultdict
 from typing import (TYPE_CHECKING, Any, Generic, Iterable, Literal, Optional, Tuple,
                     TypeVar, Union, cast)
-import discord
 
 from discord.ext import tasks
 from sql_athame import sql
@@ -14,7 +13,7 @@ import utils
 
 if TYPE_CHECKING:
     from main import TTSBot
-    from sql_athame.base import Fragment, SQLFormatter
+    from sql_athame.base import SQLFormatter
 
     sql: SQLFormatter
     del SQLFormatter

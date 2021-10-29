@@ -102,7 +102,11 @@ class TTSVoiceClient(discord.VoiceClient, utils.TTSAudioMaker):
         self.fill_audio_buffer.cancel()
         self.play_audio.cancel()
 
-    def play(self, source: discord.AudioSource) -> asyncio.Future[None]:
+    async def play(self, source: discord.AudioSource) -> None:
+        if not self.is_connected():
+            self.play_audio.stop()
+            return await self.disconnect(force=True)
+
         future: asyncio.Future[None] = self.bot.loop.create_future()
         def _after_play(exception: Optional[Exception]) -> None:
             if exception is None:
@@ -111,7 +115,7 @@ class TTSVoiceClient(discord.VoiceClient, utils.TTSAudioMaker):
                 future.set_exception(exception)
 
         super().play(source, after=partial(self.bot.loop.call_soon_threadsafe, _after_play))
-        return future
+        return await future
 
 
     async def queue(self, text: str, lang: str, linked_channel: int, prefix: str, max_length: int = 30) -> None:
@@ -136,10 +140,6 @@ class TTSVoiceClient(discord.VoiceClient, utils.TTSAudioMaker):
     @utils.decos.handle_errors
     async def play_audio(self):
         audio, length = await self.audio_buffer.get()
-        if not self.is_connected():
-            self.play_audio.stop()
-            return await self.disconnect(force=True)
-
         source = FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"')
 
         try:
@@ -180,21 +180,21 @@ class TTSVoiceClient(discord.VoiceClient, utils.TTSAudioMaker):
     async def get_gtts(self, text: str, lang: str):
         try:
             return await super().get_gtts(text, lang)
-        except asyncgTTS.RatelimitException:
-            if self.bot.blocked:
-                return
-
-            self.bot.blocked = True
-            if await self.bot.check_gtts() is not True:
-                self.bot.create_task(self._handle_rl())
-            else:
-                self.bot.blocked = False
-
-            return (await self.get_tts(text, lang, self.max_length))[0]
         except asyncgTTS.easygttsException as error:
             error_message = str(error)
             response_code = error_message[:3]
-            if response_code in {"400", "500"}:
+            if response_code == "503" or isinstance(error, asyncgTTS.RatelimitException):
+                if self.bot.blocked:
+                    return
+
+                self.bot.blocked = True
+                if await self.bot.check_gtts() is not True:
+                    self.bot.create_task(self._handle_rl())
+                else:
+                    self.bot.blocked = False
+
+                return (await self.get_tts(text, lang, self.max_length))[0]
+            elif response_code in {"400", "500"}:
                 return
 
             raise

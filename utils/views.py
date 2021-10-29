@@ -11,7 +11,9 @@ _T = TypeVar("_T")
 class CommandView(Generic[_T], discord.ui.View):
     ret: _T
     def __init__(self, ctx: TypedGuildContext, *args, **kwargs):
+        kwargs.setdefault("timeout", 0)
         super().__init__(*args, **kwargs)
+
         self.message: Optional[discord.Message] = None
         self.ctx = ctx
 
@@ -24,7 +26,6 @@ class CommandView(Generic[_T], discord.ui.View):
         return super().stop()
 
     async def wait(self) -> _T:
-        await super().wait()
         return self.ret
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
