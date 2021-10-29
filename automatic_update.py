@@ -10,14 +10,11 @@ from __future__ import annotations
 
 import asyncio
 from configparser import ConfigParser
-from typing import (TYPE_CHECKING, Awaitable, Callable, Dict, List, Literal,
-                    Optional)
+from typing import TYPE_CHECKING, Awaitable, Callable, Literal, Optional
 
 import utils
 
-
 if TYPE_CHECKING:
-    from asyncpg import Record
     from main import TTSBotPremium
 
     _UF = Callable[[TTSBotPremium], Awaitable[Optional[bool]]]
@@ -27,10 +24,6 @@ def _update_config(config: ConfigParser):
     with open("config.ini", "w") as config_file:
         config.write(config_file)
 
-def _update_defaults(bot: TTSBotPremium) -> asyncio.Task[Record]:
-    return bot.loop.create_task( # type: ignore
-        bot.pool.fetchrow("SELECT * FROM guilds WHERE guild_id = 0;")
-    )
 
 def add_to_updates(type: Literal["early", "normal"]) -> Callable[[_UF], _UF]:
     def deco(func: _UF) -> _UF:
@@ -45,8 +38,8 @@ def add_to_updates(type: Literal["early", "normal"]) -> Callable[[_UF], _UF]:
     return deco
 
 
-early_updates: List[_UF] = []
-normal_updates: List[_UF] = []
+early_updates: list[_UF] = []
+normal_updates: list[_UF] = []
 
 async def do_early_updates(bot: TTSBotPremium):
     if bot.cluster_id not in {0, None}:
@@ -73,15 +66,13 @@ async def do_normal_updates(bot: TTSBotPremium):
 # All updates added from here
 @add_to_updates("normal")
 async def add_default_column(bot: TTSBotPremium) -> bool:
-    result = await bot.settings.DEFAULT_SETTINGS
-    if result is not None:
-        # Default column already created
-        return False
+    await asyncio.gather( # We have to insert these 2 first, because otherwise the foreign key with nicknames errors
+        bot.pool.execute("INSERT INTO guilds(guild_id) VALUES(0) ON CONFLICT (guild_id) DO NOTHING"),
+        bot.pool.execute("INSERT INTO userinfo(user_id) VALUES(0) ON CONFLICT (user_id) DO NOTHING")
+    )
 
-    await bot.conn.execute("INSERT INTO guilds(guild_id) VALUES(0)")
-    bot.settings.DEFAULT_SETTINGS = _update_defaults(bot)
-
-    return True
+    await bot.conn.execute("INSERT INTO nicknames(guild_id, user_id) VALUES(0, 0) ON CONFLICT (guild_id, user_id) DO NOTHING")
+    return False
 
 @add_to_updates("normal")
 async def add_analytics(bot: TTSBotPremium) -> bool:
@@ -93,7 +84,7 @@ async def add_analytics(bot: TTSBotPremium) -> bool:
 
 @add_to_updates("normal")
 async def add_translation(bot: TTSBotPremium) -> bool:
-    defaults = await bot.settings.DEFAULT_SETTINGS
+    defaults = (bot.settings.defaults or await bot.settings._fetch_defaults()).copy()
     if "to_translate" in defaults:
         return False
 
@@ -104,12 +95,29 @@ async def add_translation(bot: TTSBotPremium) -> bool:
             ADD COLUMN target_lang  varchar(5)
         """)
 
-    bot.settings.DEFAULT_SETTINGS = _update_defaults(bot)
+    bot.settings.defaults = None
+    return True
+
+@add_to_updates("normal")
+async def add_log_level(bot: TTSBotPremium) -> bool:
+    if "log_level" in bot.config["Main"]:
+        return False
+
+    bot.config["Main"]["log_level"] = "INFO"
+    _update_config(bot.config)
+    return True
+
+@add_to_updates("normal")
+async def add_errors(bot: TTSBotPremium) -> bool:
+    if await bot.conn.fetchval("SELECT to_regclass('public.errors')"):
+        return False
+
+    await bot.conn.execute(utils.ERRORS_CREATE)
     return True
 
 @add_to_updates("normal")
 async def json_to_sql(bot: TTSBotPremium) -> bool:
-    defaults = await bot.settings.DEFAULT_SETTINGS
+    defaults = (bot.settings.defaults or await bot.settings._fetch_defaults()).copy()
     if "premium_user" in defaults:
         return False
 
@@ -117,7 +125,7 @@ async def json_to_sql(bot: TTSBotPremium) -> bool:
 
     # Old patreon_users.json is "guild_id": user_id
     with open("patreon_users.json") as json_file:
-        premium_users: Dict[str, int] = orjson.loads(json_file.read())
+        premium_users: dict[str, int] = orjson.loads(json_file.read())
 
     # Insert all premium users into the userinfo table, so that we can...
     await bot.conn.executemany("""
@@ -147,7 +155,7 @@ async def json_to_sql(bot: TTSBotPremium) -> bool:
         for guild_id, user_id in premium_users.items()
     ])
 
-    bot.settings.DEFAULT_SETTINGS = _update_defaults(bot)
+    bot.settings.defaults = None
     return True
 
 @add_to_updates("early")
@@ -193,14 +201,5 @@ async def cache_to_redis(bot: TTSBotPremium) -> bool:
         return False
 
     bot.config["Redis Info"] = {"url": "redis://cache"}
-    _update_config(bot.config)
-    return True
-
-@add_to_updates("normal")
-async def add_log_level(bot: TTSBotPremium) -> bool:
-    if "log_level" in bot.config["Main"]:
-        return False
-
-    bot.config["Main"]["log_level"] = "INFO"
     _update_config(bot.config)
     return True

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from inspect import cleandoc
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import discord
 from discord.ext import commands
 
 import utils
-
 
 if TYPE_CHECKING:
     from main import TTSBotPremium
@@ -73,5 +72,8 @@ class DevCommands(utils.CommonCog, name="Development Commands"):
         prefix = await self.bot.command_prefix(self.bot, ctx.message)
         ctx.message.content = f"{prefix}{command} {args}"
 
+        interaction = ctx.interaction
         ctx = await self.bot.get_context(ctx.message)
+        ctx.interaction = interaction
+
         await ctx.command.invoke(ctx)

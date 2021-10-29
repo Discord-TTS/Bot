@@ -10,60 +10,64 @@ import time
 import uuid
 from configparser import ConfigParser
 from functools import partial
-from itertools import zip_longest
 from signal import SIGHUP, SIGINT, SIGKILL, SIGTERM
-from typing import (TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple,
-                    TypeVar, Union)
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import aiohttp
 import orjson
-import requests
+import psutil
 import websockets
+from discord.ext import tasks
+from discord.http import Route
+from discord.utils import as_chunks
+
 import utils
+
+if TYPE_CHECKING:
+    from concurrent.futures import Future
+    from utils.websocket_types import (WS_TARGET, WSClientResponseJSON,
+                                       WSGenericJSON, WSKillJSON,
+                                       WSRequestJSON, WSSendJSON)
+
+    _CLUSTER_ARG = tuple[int, int, list[int]]
+    _WSSP = websockets.WebSocketServerProtocol
+
 
 config = ConfigParser()
 config.read("config.ini")
-
-if TYPE_CHECKING:
-    from utils.websocket_types import *
-    from concurrent.futures import Future
-
-    _T = TypeVar("_T")
-    _CLUSTER_ARG = Tuple[int, int, Tuple[int]]
-    _CLUSTER_RET = Tuple[int, int, _CLUSTER_ARG]
-    _WSSP = websockets.WebSocketServerProtocol
-
-def group_by(iterable: Iterable[_T], by:int) -> Iterable[Tuple[_T]]:
-    yield from zip_longest(*[iter(iterable)]*by)
-
-
 def make_user_agent():
     first = "DiscordBot (https://github.com/Gnome-py/Discord-TTS-Bot Rolling)"
-    versions = "Python/{sysver} requests/{requestsver}".format(
+    versions = "Python/{sysver} aiohttp/{aiohttpver}".format(
         sysver=".".join(str(i) for i in sys.version_info[:3]),
-        requestsver=requests.__version__
+        aiohttpver=aiohttp.__version__
     )
 
     return f"{first} {versions}"
 
-def fetch_num_shards() -> int:
-    response = requests.get(
-        "https://discord.com/api/v7/gateway/bot",
-        headers={
-            "Authorization": "Bot " + config["Main"]["Token"],
-            "User-Agent": make_user_agent()
-        }
-    )
-    response.raise_for_status()
-    return response.json()["shards"]
 
-def run_bot(cluster_id: int, total_shard_count: int, shards: List[int]) -> _CLUSTER_RET:
+def run_bot(cluster_id: int, total_shard_count: int, shards: list[int]):
     """This function is run from the bot process"""
     import asyncio
     import sys
 
     import utils
     from main import main
+
+    class UnbufferedStdout:
+        def __init__(self, stream):
+            self.stream = stream
+        def __getattr__(self, attr):
+            return getattr(self.stream, attr)
+
+        def write(self, *args, **kwargs):
+            self.stream.write(*args, **kwargs)
+            self.stream.flush()
+
+        def writelines(self, *args, **kwargs):
+            self.stream.writelines(*args, **kwargs)
+            self.stream.flush()
+
+    sys.stdout = UnbufferedStdout(sys.stdout)
 
     try:
         return_code = asyncio.run(main(cluster_id, total_shard_count, shards))
@@ -73,7 +77,12 @@ def run_bot(cluster_id: int, total_shard_count: int, shards: List[int]) -> _CLUS
         sys.exit(return_code)
 
 class ClusterManager:
-    def __init__(self, websocket_host: str, websocket_port: int) -> None:
+    def __init__(self,
+        session: aiohttp.ClientSession,
+        websocket_host: str, websocket_port: int
+    ) -> None:
+
+        self.session = session
         self.websocket_port = websocket_port
         self.websocket_host = websocket_host
 
@@ -81,11 +90,11 @@ class ClusterManager:
         self.loop = asyncio.get_running_loop()
         self.support_cluster: Optional[int] = None
 
-        self.processes: Dict[int, Optional[int]] = {}
-        self.monitors: Dict[int, asyncio.Task[Optional[Future[None]]]] = {}
+        self.processes: dict[int, int] = {}
+        self.monitors: dict[int, asyncio.Task[Optional[Future[None]]]] = {}
 
-        self.websockets: Dict[int, websockets.WebSocketServerProtocol] = {}
-        self.pending_responses: Dict[str, asyncio.Queue[Dict[str, Any]]] = {}
+        self.websockets: dict[int, websockets.WebSocketServerProtocol] = {}
+        self.pending_responses: dict[str, asyncio.Queue[dict[str, Any]]] = {}
 
         for sig in (SIGTERM, SIGINT, SIGHUP):
             self.loop.add_signal_handler(sig, self.signal_handler, sig)
@@ -99,6 +108,16 @@ class ClusterManager:
             await self.shutdown()
 
 
+    async def fetch_num_shards(self) -> int:
+        headers = {
+            "Authorization": "Bot " + config["Main"]["Token"],
+            "User-Agent": make_user_agent()
+        }
+        async with self.session.get(f"{Route.BASE}/gateway/bot", headers=headers) as resp:
+            resp.raise_for_status()
+            return (await resp.json())["shards"]
+
+
     def signal_handler(self, signal: int):
         logger.debug(f"Signal {signal} received")
         return self.loop.create_task(self.shutdown())
@@ -110,7 +129,9 @@ class ClusterManager:
         process = multiprocessing.Process(target=run_bot, args=cluster_args)
         while not self.shutting_down:
             process.start() # start bot
+            assert process.pid is not None
             self.processes[cluster_id] = process.pid # store PID so can be killed later
+
             process.join() # wait until finished
 
             while process.exitcode is None:
@@ -120,9 +141,10 @@ class ClusterManager:
 
             if process.exitcode in (utils.KILL_EVERYTHING, utils.DO_NOT_RESTART_CLUSTER):
                 logger.warning(f"Shutting down all clusters due to {cluster_name} return.")
-
                 process.close()
+
                 del self.processes[cluster_id]
+                self.websockets.pop(cluster_id, None)
                 return asyncio.run_coroutine_threadsafe(self.shutdown(), self.loop)
 
             elif process.exitcode == utils.RESTART_CLUSTER:
@@ -143,20 +165,17 @@ class ClusterManager:
 
     async def start(self):
         shards_per_cluster = int(config["Clustering"]["shards_per_cluster"])
-        shard_count = int(config["Clustering"].get("shard_count") or fetch_num_shards())
+        shard_count = int(config["Clustering"].get("shard_count") or await self.fetch_num_shards())
 
         full_clusters, last_cluster_shards = divmod(shard_count, shards_per_cluster)
         cluster_count = full_clusters + int(bool(last_cluster_shards))
 
         logger.info(f"Launching {cluster_count} clusters to handle {shard_count} shards with {shards_per_cluster} per cluster.")
 
-        all_shards = group_by(range(shard_count), shards_per_cluster)
+        all_shards = as_chunks(range(shard_count), shards_per_cluster)
         for cluster_id, shards in enumerate(all_shards):
-            shards = [s for s in shards if s is not None]
-            args = (cluster_id, shard_count, shards)
-
-            cluster_watcher_func = partial(self.cluster_watcher, args)
-            self.monitors[cluster_id] = asyncio.Task(utils.to_thread(cluster_watcher_func))
+            cluster_watcher_func = partial(self.cluster_watcher, (cluster_id, shard_count, shards))
+            self.monitors[cluster_id] = asyncio.create_task(asyncio.to_thread(cluster_watcher_func))
 
         async def keep_alive():
             async with websockets.serve(
@@ -166,6 +185,7 @@ class ClusterManager:
             ):
                 await asyncio.gather(*self.monitors.values())
 
+        self.keep_clusters_alive.start()
         self.keep_alive = self.loop.create_task(keep_alive())
 
     async def shutdown(self, *_: Any, **__: Any):
@@ -174,37 +194,42 @@ class ClusterManager:
 
         self.shutting_down = True
         logger.warning("Shutting all clusters down")
-
-        wsrequest = {"c": "send", "a": {"c": "close", "a": {}}, "t": "*"} # type: ignore
-        await self.send_handler(None, wsrequest) # type: ignore
+        await self.send_handler(None, {"c": "send", "a": {"c": "close", "a": {}}, "t": "*"})
 
         logger.info("Kiilled all processes, and cancelling keep alive. Bye!")
         self.keep_alive.cancel()
 
         try:
-            await asyncio.wait_for(self.keep_alive, timeout=3)
+            await asyncio.wait_for(self.keep_alive, timeout=5)
         except asyncio.TimeoutError:
             logger.error("Timed out on shutdown, force killing!")
-            sys.exit()
 
 
     async def _get_from_clusters(self,
-        info: List[str],
-        nonce: Union[str, uuid.UUID],
+        info: list[str],
+        nonce: Union[str, uuid.UUID] = None,
+        args: dict[str, dict[str, Any]] = None,
         target: WS_TARGET = "*"
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
 
-        nonce = str(nonce)
-        responses: List[Dict[str, Any]] = []
+        nonce = str(nonce or uuid.uuid4())
+        responses: list[dict[str, Any]] = []
         self.pending_responses[nonce] = asyncio.Queue()
 
         request_json = {"c": "request", "a": {"info": info, "nonce": nonce}}
+        if args is not None:
+            request_json["a"]["args"] = args
+
         send_all = {"c": "send", "a": request_json, "t": target}
         await self.send_handler(None, send_all) # type: ignore
 
-        for i in self.monitors.keys():
+        for i in range(len(self.monitors) if target == "*" else 1):
             logger.debug(f"Waiting for response {i}")
-            responses.append(await self.pending_responses[nonce].get())
+            try:
+                responses.append(await self.pending_responses[nonce].get())
+            except asyncio.CancelledError:
+                del self.pending_responses[nonce]
+                raise
 
         logger.debug(f"Got {responses} from clusters")
         del self.pending_responses[nonce]
@@ -215,29 +240,71 @@ class ClusterManager:
         cluster_id = int("".join(c for c in cluster if c.isdigit()))
         logger.debug(f"New Websocket connection from cluster {cluster_id}")
 
-        tasks: List[asyncio.Task[Any]] = []
+        tasks: list[asyncio.Task[Any]] = []
         self.websockets[cluster_id] = connection
-        async for msg in connection:
-            logger.debug(f"Recieved msg from cluster {cluster_id}: {msg}")
+        try:
+            async for msg in connection:
+                logger.debug(f"Recieved msg from cluster {cluster_id}: {msg}")
 
-            json_msg: WSGenericJSON = orjson.loads(msg)
-            command = json_msg["c"]
+                json_msg: WSGenericJSON = orjson.loads(msg)
+                command = json_msg["c"]
 
-            handler = getattr(self, f"{command}_handler", None)
-            if handler is None:
-                logger.error(f"Websocket sent unknown command: {command}")
-            else:
-                handler_coro = handler(connection, request=json_msg)
-                tasks.append(self.loop.create_task(handler_coro))
+                handler = getattr(self, f"{command}_handler", None)
+                if handler is None:
+                    logger.error(f"Websocket sent unknown command: {command}")
+                else:
+                    handler_coro = handler(connection, request=json_msg)
+                    tasks.append(self.loop.create_task(handler_coro))
+        except websockets.ConnectionClosed:
+            logger.error(f"{cluster_id} closed websocket connection!")
+        finally:
+            await asyncio.gather(*tasks)
 
-        await asyncio.gather(*tasks)
+    @tasks.loop(minutes=1)
+    async def keep_clusters_alive(self):
+        await asyncio.gather(*(
+            self.check_cluster(cluster_id, pid)
+            for cluster_id, pid in self.processes.items()
+        ))
+    @keep_clusters_alive.before_loop
+    async def wait_before_start(self):
+        await asyncio.sleep(10)
+
+    async def check_cluster(self, cluster_id: int, pid: int):
+        process = psutil.Process(pid)
+        websocket = self.websockets.get(cluster_id)
+        if websocket is None:
+            logger.error(f"Cluster ID {cluster_id} doesn't have a websocket! Killing and restarting.")
+            return process.kill()
+
+        try:
+            coro = self._get_from_clusters(["ping"], target=cluster_id)
+            await asyncio.wait_for(coro, timeout=10)
+        except (asyncio.TimeoutError, websockets.WebSocketException):
+            logger.warning(f"Cluster {cluster_id} didn't respond to ping in 10 seconds, restarting safely!")
+            ws_json = utils.data_to_ws_json(command="RESTART", target=cluster_id)
+            try:
+                await websocket.send(ws_json)
+                await asyncio.sleep(15)
+            except websockets.WebSocketException:
+                pass
+
+            if not process.is_running():
+                # Cluster has been killed and hopefully restarted by watcher.
+                return
+
+            logger.warning(f"{cluster_id} wasn't restarted by websocket message, killing!")
+            return process.kill()
 
 
     async def request_handler(self, connection: _WSSP, request: WSRequestJSON):
         nonce = request["a"]["nonce"]
-        to_get = request["a"]["info"]
-        target = request.get("t", "*")
-        responses = await self._get_from_clusters(to_get, nonce, target=target)
+        responses = await self._get_from_clusters(
+            nonce=nonce,
+            info=request["a"]["info"],
+            target=request.get("t", "*"),
+            args=request["a"].get("args"),
+        )
 
         response_json = utils.data_to_ws_json(command="RESPONSE", target=nonce, responses=responses)
         await connection.send(response_json)
@@ -304,7 +371,7 @@ async def main():
 
     async with aiohttp.ClientSession() as session:
         logger = utils.setup_logging(level=config["Main"]["log_level"], session=session, prefix="`[Launcher]`: ")
-        async with ClusterManager(host, port) as manager:
+        async with ClusterManager(session, host, port) as manager:
             try:
                 await manager.keep_alive
             except asyncio.CancelledError:

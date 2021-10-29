@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta
-from typing import TYPE_CHECKING, Awaitable, Dict, List, Tuple
+import datetime
+from typing import TYPE_CHECKING
 
 import discord
-import orjson
-import websockets
 from discord.ext import tasks
 
 import utils
 from utils.websocket_types import WSGenericJSON
-
 
 if TYPE_CHECKING:
     from main import TTSBotPremium
@@ -33,16 +30,6 @@ get_commands = """
 """
 
 
-def sleep_until(time: time) -> Awaitable[None]:
-    now = datetime.utcnow()
-    date = now.date()
-    if now.time() > time:
-        date += timedelta(days=1)
-
-    then = datetime.combine(date, time)
-    return discord.utils.sleep_until(then)
-
-
 def setup(bot: TTSBotPremium):
     bot.add_cog(Loops(bot))
 
@@ -50,6 +37,7 @@ class Loops(utils.CommonCog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.run_once = False
         # This is a sin, adds all tasks to self.tasks and starts them
         attrs = (getattr(self, str_attr) for str_attr in dir(self))
         self.tasks = [attr for attr in attrs if isinstance(attr, tasks.Loop)]
@@ -60,40 +48,6 @@ class Loops(utils.CommonCog):
     def cog_unload(self):
         for task in self.tasks:
             task.cancel()
-
-
-    @tasks.loop()
-    @utils.decos.handle_errors
-    async def catch_task_errors(self):
-        "Makes sure asyncio.Task errors are handled"
-        await (await self.bot.tasks.get())
-
-    @tasks.loop()
-    @utils.decos.handle_errors
-    async def websocket_client(self):
-        if self.bot.websocket is None:
-            return self.websocket_client.stop()
-
-        try:
-            async for msg in self.bot.websocket:
-                wsjson: WSGenericJSON = orjson.loads(msg)
-                self.bot.dispatch("websocket_msg", msg)
-
-                args = [*wsjson["a"].values()]
-                if wsjson.get("t", None):
-                    args.append(wsjson["t"])
-
-                command = wsjson["c"].lower()
-                self.bot.dispatch(command, *args)
-        except websockets.ConnectionClosed as error:
-            disconnect_msg = f"Websocket disconnected with code `{error.code}: {error.reason}`"
-            try:
-                self.bot.websocket = await self.bot.create_websocket()
-            except Exception as new_error:
-                self.bot.websocket = None
-                self.bot.logger.error(f"{disconnect_msg} and failed to reconnect: {new_error}")
-            else:
-                self.bot.logger.warning(f"{disconnect_msg} and was able to reconnect!")
 
 
     @tasks.loop(seconds=60)
@@ -107,29 +61,27 @@ class Loops(utils.CommonCog):
             DO UPDATE SET count = analytics.count + EXCLUDED.count
         ;"""
 
-        rows: List[Tuple[str, bool, int]] = []
+        rows: list[tuple[str, bool, int]] = []
         for raw_event, count in self.bot.analytics_buffer.items():
-            event = utils.removeprefix(raw_event, "on_")
+            event = raw_event.removeprefix("on_")
             rows.append((event, raw_event == event, count))
 
         await self.bot.pool.executemany(query, rows)
         self.bot.analytics_buffer = utils.SafeDict()
 
-    @tasks.loop(minutes=10)
+    @tasks.loop(time=datetime.time(hour=12))
     @utils.decos.handle_errors
-    async def send_analytics_msg(self, wait: bool = True):
+    async def send_analytics_msg(self):
         if self.bot.cluster_id not in {None, 0}:
             return self.send_analytics_msg.cancel()
 
-        if wait:
-            midday = time(hour=12)
-            await sleep_until(midday)
+        if not self.run_once:
+            self.run_once = True
+            return
 
         max_len = 0
-        yesterday = datetime.today() - timedelta(days=1)
-        sections: Dict[str, List[List[str]]] = {
-            "Commands:": [], "Events:": []
-        }
+        yesterday = datetime.datetime.today() - datetime.timedelta(days=1)
+        sections: dict[str, list[list[str]]] = {"Commands:": [], "Events:": []}
 
         embed = discord.Embed(
             title="TTS Bot Premium Analytics",
@@ -161,7 +113,7 @@ class Loops(utils.CommonCog):
 
         embed.description = ""
         for section_name in lookup.values():
-            embed.description += section_name + "\n" # type: ignore
+            embed.description += section_name + "\n"
             for first, second in sections[section_name]:
                 embed.description += f"{first:<{max_len}} {second}\n"
 

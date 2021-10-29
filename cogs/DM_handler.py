@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import random
 from inspect import cleandoc
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
 import utils
-
 
 if TYPE_CHECKING:
     from main import TTSBotPremium
@@ -33,7 +32,7 @@ class DMHandler(utils.CommonCog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.is_welcomed: Dict[int, bool] = {}
+        self.is_welcomed: dict[int, bool] = {}
 
 
     def is_welcome_message(self, message: discord.Message) -> bool:
@@ -61,7 +60,7 @@ class DMHandler(utils.CommonCog):
                 self.bot.logger.info(f"{message.author} just got the 'dont ask to ask' message")
                 await message.channel.send("We cannot help you unless you ask a question, if you want the help command just do `-help`!")
 
-            elif not await self.bot.userinfo.get("blocked", message.author, default=False):
+            elif not (await self.bot.userinfo.get(message.author.id)).get("blocked", False):
                 files = [await attachment.to_file() for attachment in message.attachments]
 
                 author_name = str(message.author)
@@ -69,8 +68,9 @@ class DMHandler(utils.CommonCog):
                 await self.bot.channels["dm_logs"].send(
                     files=files,
                     content=message.content,
-                    avatar_url=message.author.avatar.url,
-                    username=author_name[:32 - len(author_id)] + author_id,
+                    username=author_name + author_id,
+                    avatar_url=message.author.display_avatar.url,
+                    allowed_mentions=discord.AllowedMentions.none(),
                 )
 
         else:
@@ -92,6 +92,8 @@ class DMHandler(utils.CommonCog):
             await dm_message.pin()
 
     @commands.Cog.listener()
-    async def on_private_channel_pins_update(self, channel: utils.TypedDMChannel, _):
+    async def on_private_channel_pins_update(self, channel: discord.DMChannel, _):
+        assert channel.recipient is not None
+
         welcomed = any(map(self.is_welcome_message, await channel.pins()))
         self.is_welcomed[channel.recipient.id] = welcomed

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
 import utils
-
 
 if TYPE_CHECKING:
     from main import TTSBotPremium
@@ -26,10 +25,10 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     async def block(self, ctx: utils.TypedContext, user: discord.User, notify: bool = False):
-        if await self.bot.userinfo.get("blocked", user, default=False):
+        if (await self.bot.userinfo.get(user.id)).get("blocked", False):
             return await ctx.send(f"{user} | {user.id} is already blocked!")
 
-        await self.bot.userinfo.block(user)
+        await self.bot.userinfo.set(user.id, {"blocked": True})
 
         await ctx.send(f"Blocked {user} | {user.id}")
         if notify:
@@ -37,10 +36,10 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
 
     @commands.command()
     async def unblock(self, ctx: utils.TypedContext, user: discord.User, notify: bool = False):
-        if not await self.bot.userinfo.get("blocked", user, default=False):
+        if not (await self.bot.userinfo.get(user.id)).get("blocked", False):
             return await ctx.send(f"{user} | {user.id} isn't blocked!")
 
-        await self.bot.userinfo.unblock(user)
+        await self.bot.userinfo.set(user.id, {"blocked": False})
 
         await ctx.send(f"Unblocked {user} | {user.id}")
         if notify:
@@ -50,14 +49,14 @@ class TrustedCommands(utils.CommonCog, command_attrs={"hidden": True}):
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     async def dm(self, ctx: utils.TypedContext, todm: discord.User, *, message: str):
         embed = discord.Embed(title="Message from the developers:", description=message)
-        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar.url)
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
 
         sent = await todm.send(embed=embed)
         await ctx.send(f"Sent message to {todm}:", embed=sent.embeds[0])
 
     @commands.command()
     async def dmhistory(self, ctx: utils.TypedContext, user: discord.User, amount: int = 10):
-        messages: List[str] = []
+        messages: list[str] = []
         async for message in user.history(limit=amount):
             if message.embeds:
                 if message.embeds[0].author:

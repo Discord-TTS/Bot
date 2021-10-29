@@ -17,7 +17,7 @@ Text to speech Discord Bot using the Google TTS API and discord.py!
 - Now the bot is running in the container, and you can use it!
 
 ### Hard (Self Host):
-- Make sure python 3.7+, git, postgresql, and ffmpeg are installed
+- Make sure python 3.9+, git, postgresql, and ffmpeg are installed
 - Run `git clone https://github.com/Gnome-py/Discord-TTS-Bot.git`
 - Rename `config-selfhost.ini` to `config.ini` and fill it out
 

@@ -9,15 +9,14 @@ from configparser import ConfigParser
 from os import listdir
 from signal import SIGHUP, SIGINT, SIGTERM
 from time import monotonic
-from typing import (Set, TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
-                    Optional, TypeVar, Union, cast)
+from typing import (TYPE_CHECKING, Any, Awaitable, Optional, TypeVar, Union,
+                    cast, overload)
 
 import aiohttp
 import aioredis
 import asyncgTTS
 import asyncpg
 import discord
-from discord.ext import commands as _commands
 import websockets
 from discord.ext import commands
 
@@ -52,7 +51,7 @@ async def premium_check(ctx: utils.TypedGuildContext):
     if ctx.bot.patreon_members is None:
         ctx.bot.patreon_members = await ctx.bot.fill_patreon_members()
 
-    premium_user: Optional[int] = (await ctx.bot.settings.get(ctx.guild, ["premium_user"]))[0]
+    premium_user: Optional[int] = ctx.bot.settings[ctx.guild.id]["premium_user"]
     if premium_user is not None and premium_user in ctx.bot.patreon_members:
         return True
 
@@ -68,7 +67,7 @@ async def premium_check(ctx: utils.TypedGuildContext):
                 description=main_msg,
             )
             embed.set_footer(text=footer_msg)
-            embed.set_thumbnail(url=ctx.bot.user.avatar.url)
+            embed.set_thumbnail(url=ctx.bot.user.display_avatar.url)
 
             await ctx.send(embed=embed)
         else:
@@ -84,29 +83,26 @@ else:
 class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
     if TYPE_CHECKING:
         from extensions import cache_handler, database_handler
-        from player import TTSVoicePlayer
+        from player import TTSVoiceClient
 
-        settings: database_handler.GeneralSettings
-        userinfo: database_handler.UserInfoHandler
-        nicknames: database_handler.NicknameHandler
         cache: cache_handler.CacheHandler
+        settings: database_handler.TableHandler[int]
+        userinfo: database_handler.TableHandler[int]
+        nicknames: database_handler.TableHandler[tuple[int, int]]
 
-        voice_clients: List[TTSVoicePlayer]
+        voice_clients: list[TTSVoiceClient]
         analytics_buffer: utils.SafeDict
-        _voice_data: List[utils.Voice]
+        _voice_data: list[utils.Voice]
         gtts: asyncgTTS.asyncgTTS
         cache_db: aioredis.Redis
         bot: TTSBotPremium
         pool: Pool
 
-        get_command: Callable[[str], Optional[_commands.Command]]
-        voice_clients: List[TTSVoicePlayer]
-        commands: Set[utils.TypedCommand]
+        voice_clients: list[TTSVoiceClient]
         user: discord.ClientUser
-        shard_ids: List[int]
 
         conn: asyncpg.pool.PoolConnectionProxy[asyncpg.Record]
-        del cache_handler, database_handler, TTSVoicePlayer
+        del cache_handler, database_handler, TTSVoiceClient
 
     def __init__(self,
         config: ConfigParser,
@@ -119,16 +115,35 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
         self.websocket = None
         self.session = session
         self.cluster_id = cluster_id
-        self.channels: Dict[str, discord.Webhook] = {}
-        self.patreon_members: Optional[List[int]] = None
-        self.tasks: asyncio.Queue[Awaitable[Any]] = asyncio.Queue()
 
         self.status_code = utils.RESTART_CLUSTER
+        self.channels: dict[str, discord.Webhook] = {}
+        self.patreon_members: Optional[list[int]] = None
+
         self.trusted = config["Main"]["trusted_ids"].strip("[]'").split(", ")
 
-        kwargs["command_prefix"] = self.command_prefix
-        super().__init__(*args, **kwargs)
+        return super().__init__(*args, **kwargs,
+            command_prefix=self.command_prefix,
+            slash_command_guild=(
+                int(self.config["Main"]["slash_command_guild"])
+                if "slash_command_guild" in self.config["Main"] else None
+            ),
+        )
 
+
+    def handle_error(self, task: asyncio.Task):
+        try:
+            exception = task.exception()
+        except (asyncio.CancelledError, RecursionError):
+            return
+
+        if exception is not None:
+            self.create_task(self.on_error("task", exception))
+
+    def create_task(self, coro: Awaitable[_T], *args: Any, **kwargs: Any) -> asyncio.Task[_T]:
+        task = self.loop.create_task(coro, *args, **kwargs)
+        task.add_done_callback(self.handle_error)
+        return task
 
     @property
     def invite_channel(self) -> Optional[discord.TextChannel]:
@@ -138,9 +153,6 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
 
     def log(self, event: str) -> None:
         self.analytics_buffer.add(event)
-
-    def create_task(self, *args: Any, **kwargs: Any) -> None:
-        self.tasks.put_nowait(self.loop.create_task(*args, **kwargs))
 
     def get_support_server(self) -> Optional[discord.Guild]:
         return self.get_guild(int(self.config["Main"]["main_server"]))
@@ -180,7 +192,7 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
         real_user_id = int(match.group(1))
         try:
             return await self.fetch_user(real_user_id)
-        except _commands.UserNotFound:
+        except commands.UserNotFound:
             return
 
     @utils.decos.require_voices
@@ -201,11 +213,11 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
             return await self.get_voice(lang, variant)
         except utils.VoiceNotFound:
             embed = discord.Embed(title=f"Cannot find voice with language `{lang}` and variant `{variant}` combo!")
-            embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar.url)
+            embed.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
             embed.set_footer(text=f"Try {ctx.prefix}voices for a full list!")
             return embed
 
-    async def fill_patreon_members(self) -> List[int]:
+    async def fill_patreon_members(self) -> list[int]:
         support_server = self.get_support_server()
         if support_server is None:
             return []
@@ -218,7 +230,7 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
         if support_members is None:
             return []
 
-        support_members = cast(List[discord.Member], support_members)
+        support_members = cast(list[discord.Member], support_members)
         self.patreon_members = [
             member.id
             for member in support_members
@@ -237,14 +249,20 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
     @staticmethod
     async def command_prefix(bot: TTSBotPremium, message: discord.Message) -> str:
         if message.guild:
-            return (await bot.settings.get(message.guild, ["prefix"]))[0]
+            return (await bot.settings.get(message.guild.id))["prefix"]
 
         return "p-"
 
-    async def get_context(self,
-        message: discord.Message
-    ) -> Union[utils.TypedContext, utils.TypedGuildContext]:
-        cls = utils.TypedGuildContext if message.guild else utils.TypedContext
+    @overload
+    async def get_context(self, message: discord.Message, cls: None = None) -> Union[utils.TypedGuildContext, utils.TypedContext]: ...
+
+    @overload
+    async def get_context(self, message: discord.Message, cls: type[_T]) -> _T: ...
+
+    async def get_context(self, message: discord.Message, cls=None):
+        if cls is None:
+            cls = utils.TypedGuildContext if message.guild else utils.TypedContext
+
         return await super().get_context(message, cls=cls)
 
     def close(self, status_code: Optional[int] = None) -> Awaitable[None]:
@@ -275,27 +293,38 @@ class TTSBotPremium(commands.AutoShardedBot, utils.CommonCog):
 
         # Fill up bot.channels, as a load of webhooks
         for channel_name, webhook_url in self.config["Webhook URLs"].items():
-            self.channels[channel_name] = discord.Webhook.from_url(
-                webhook_url, session=self.session, bot_token=self.http.token
+            webhook: discord.Webhook = discord.Webhook.from_url(
+                url=webhook_url,
+                session=self.session,
+                bot_token=self.http.token
             )
+            webhook._state = self._connection
+            self.channels[channel_name] = await webhook.fetch()
 
-        # Load all of /cogs
-        self.load_extensions("cogs")
-        self.load_extensions("extensions")
-
-        # Send starting message and actually start the bot
+        # Create websocket and other clustering specific stuff
         if self.shard_ids is not None:
             prefix = f"`[Cluster] [ID {self.cluster_id}] [Shards {len(self.shard_ids)}]`: "
             self.websocket = await self.create_websocket()
-            kwargs["reconnect"] = True
         else:
-            prefix = ""
             self.websocket = None
+            prefix = ""
 
+        # Load all of /cogs and /extensions
+        self.load_extensions("cogs")
+        self.load_extensions("extensions")
+
+        # Setup logging and more migrations
         self.logger = utils.setup_logging(config["Main"]["log_level"], prefix, self.session)
-        self.logger.info("Starting TTS Bot!")
-
         await automatic_update.do_normal_updates(self)
+
+        # Add all persistent views
+        tracebacks = await self.pool.fetch("SELECT * from errors")
+        for row in tracebacks:
+            view = utils.ShowTracebackView(f"```{row['traceback']}```")
+            self.add_view(view, message_id=row["message_id"])
+
+        # Actually start the bot
+        self.logger.info("Starting TTS Bot!")
         await super().start(token, **kwargs)
 
 
@@ -318,7 +347,7 @@ async def _real_main(
     session: aiohttp.ClientSession,
     cluster_id: Optional[int] = None,
     total_shard_count: Optional[int] = None,
-    shards_to_handle: Optional[List[int]] = None,
+    shards_to_handle: Optional[list[int]] = None,
 ) -> int:
     bot = TTSBotPremium(
         config=config,
@@ -328,6 +357,7 @@ async def _real_main(
         max_messages=None,
         help_command=None, # Replaced by FancyHelpCommand by FancyHelpCommandCog
         activity=activity,
+        slash_commands=True,
         cluster_id=cluster_id,
         case_insensitive=True,
         shard_ids=shards_to_handle,

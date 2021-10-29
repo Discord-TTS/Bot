@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Literal, Union
 
 from typing_extensions import TypedDict
 
@@ -11,15 +11,16 @@ __all__ = (
     "WSClientResponseJSON",
 )
 
-
 WS_TARGET = Union[Literal["*", "support"], int]
 class EmptyDict(TypedDict): ...
 
 
-class WSGenericJSON(TypedDict):
+class WSOptionalGenericJSON(TypedDict, total=False):
+    t: WS_TARGET
+
+class WSGenericJSON(WSOptionalGenericJSON, TypedDict):
     c: str
     a: Any
-    t: WS_TARGET
 
 class WSSendJSON(TypedDict):
     c: Literal["send"]
@@ -37,7 +38,8 @@ class WSKillJSON(TypedDict):
 
 
 class WSRequestArgs(TypedDict):
-    info: List[str]
+    info: list[str]
+    args: dict[str, dict[str, Any]] # {"run_code": {"code": "print('hello world')"}}
     nonce: str
 
 class WSRequestJSON(TypedDict):
@@ -48,5 +50,5 @@ class WSRequestJSON(TypedDict):
 
 class WSClientResponseJSON(TypedDict):
     c: Literal["response"]
-    a: Dict[str, Any]
+    a: dict[str, Any]
     t: str

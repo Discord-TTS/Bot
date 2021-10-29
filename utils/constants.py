@@ -1,28 +1,45 @@
-import re as _re
-from typing import Tuple, Union
+import re
+from typing import TYPE_CHECKING, TypedDict, Union
 
+import discord
+
+# Emums
 KILL_EVERYTHING = 0
 RESTART_CLUSTER = 1
 DO_NOT_RESTART_CLUSTER = 2
 
-NETURAL_COLOUR = 0xcaa652
-AUDIODATA = Tuple[bytes, Union[int, float]]
-TRANSLATION_URL = "https://api-free.deepl.com/v2"
-DEFAULT_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/{}.png"
-
-EMOJI_REGEX = _re.compile(r"<(a?):(.+):(\d+)>")
-ID_IN_BRACKETS_REGEX = _re.compile(r"\((\d+)\)")
-
+# Regexes
+EMOJI_REGEX = re.compile(r"<(a?):(.+):(\d+)>")
+ID_IN_BRACKETS_REGEX = re.compile(r"\((\d+)\)")
 _PRE_REGEX_REPLACEMENTS = {
     r"\|\|.*?\|\|": ". spoiler avoided.",
     r"```.*?```": ". code block.",
     r"`.*?`": ". code snippet.",
 }
 REGEX_REPLACEMENTS = {
-    _re.compile(key, _re.DOTALL): value
+    re.compile(key, re.DOTALL): value
     for key, value in _PRE_REGEX_REPLACEMENTS.items()
 }
 
+# Types
+AUDIODATA = tuple[bytes, Union[int, float]]
+if TYPE_CHECKING:
+    import datetime
+    import uuid
+
+    import numpy
+    JSON_OUT = Union[dict, list, int, float, str, bool, None]
+    JSON_IN = Union[
+        JSON_OUT, tuple, TypedDict, datetime.datetime,
+        datetime.date, datetime.time, uuid.UUID, numpy.ndarray,
+    ]
+
+
+# Everything else
+NETURAL_COLOUR = 0xcaa652
+RED = discord.Colour.from_rgb(255, 0, 0)
+TRANSLATION_URL = "https://api-free.deepl.com/v2"
+DEFAULT_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/{}.png"
 OPTION_SEPERATORS = (
     ":small_orange_diamond:",
     ":small_blue_diamond:",
@@ -130,9 +147,16 @@ ANALYTICS_CREATE = """
 
         PRIMARY KEY (event, is_command, date_collected)
     );"""
+ERRORS_CREATE = """
+    CREATE TABLE errors (
+        traceback   text    PRIMARY KEY,
+        message_id  bigint  NOT NULL,
+        occurrences int     DEFAULT 1
+    );"""
 
 DB_SETUP_QUERY = "\n".join((
     GUILDS_CREATE,
+    ERRORS_CREATE,
     USERINFO_CREATE,
     NICKNAMES_CREATE,
     ANALYTICS_CREATE

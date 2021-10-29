@@ -8,8 +8,7 @@ import discord
 from discord.ext import commands
 
 import utils
-from player import TTSVoicePlayer
-
+from player import TTSVoiceClient
 
 if TYPE_CHECKING:
     from main import TTSBotPremium
@@ -20,10 +19,11 @@ def setup(bot: TTSBotPremium):
 
 class MainCommands(utils.CommonCog, name="Main Commands"):
     "TTS Bot main commands, required for the bot to work."
-    async def cog_check(self, ctx: utils.TypedGuildContext) -> bool:
-        channel = (await self.bot.settings.get(ctx.guild, ["channel"]))[0]
-        return ctx.channel.id == channel
+    def cog_check(self, ctx: utils.TypedContext) -> bool:
+        if ctx.guild is None:
+            return False
 
+        return ctx.channel.id == self.bot.settings[ctx.guild.id]["channel"]
 
     @commands.bot_has_permissions(send_messages=True, embed_links=True)
     @commands.cooldown(1, 10, commands.BucketType.guild)
@@ -32,37 +32,52 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
     async def join(self, ctx: utils.TypedGuildContext):
         "Joins the voice channel you're in!"
         if not ctx.author.voice:
-            return await ctx.send("Error: You need to be in a voice channel to make me join your voice channel!")
+            return await ctx.send_error(
+                error="you need to be in a voice channel to make me join your voice channel",
+                fix="join a voice channel and try again"
+            )
 
         voice_client = ctx.guild.voice_client
         voice_channel = ctx.author.voice.channel
-        permissions = voice_channel.permissions_for(ctx.guild.me)
+        permissions: discord.Permissions = voice_channel.permissions_for(ctx.guild.me)
 
+        missing_perms = []
         if not permissions.view_channel:
-            return await ctx.send("Error: Missing Permission to view your voice channel!")
-
+            missing_perms.append("view_channel")
         if not permissions.speak:
-            return await ctx.send("Error: I do not have permssion to speak!")
+            missing_perms.append("speak")
+
+        if missing_perms:
+            raise commands.BotMissingPermissions(missing_perms)
 
         if voice_client:
-            if voice_client == voice_channel:
-                await ctx.send("Error: I am already in your voice channel!")
-            else:
-                await ctx.send(f"Error: I am in {voice_client.channel.mention}!")
+            if voice_client.channel == voice_channel:
+                return await ctx.reply("I am already in your voice channel!")
+
+            channel_mention = voice_client.channel.mention
+            move_channel_view = utils.BoolView(ctx, "Yes", "No")
+            await ctx.reply(f"I am already in {channel_mention}! Would you like me to move to this channel?", view=move_channel_view)
+
+            if await move_channel_view.wait():
+                await voice_client.move_to(voice_channel)
+
             return
 
         join_embed = discord.Embed(
             title="Joined your voice channel!",
             description="Just type normally and TTS Bot Premium will say your messages!"
         )
-        join_embed.set_thumbnail(url=self.bot.user.avatar.url)
-        join_embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        join_embed.set_thumbnail(url=self.bot.user.display_avatar.url)
+        join_embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         join_embed.set_footer(text=pick_random(utils.FOOTER_MSGS))
 
+        if ctx.interaction is not None:
+            await ctx.interaction.response.defer()
+
         try:
-            await voice_channel.connect(cls=TTSVoicePlayer) # type: ignore
+            await voice_channel.connect(cls=TTSVoiceClient) # type: ignore
         except asyncio.TimeoutError:
-            return await ctx.send("Error: Timed out when trying to join your voice channel!")
+            return await ctx.send_error("I took too long trying to join your voice channel", "try again later")
 
         await ctx.send(embed=join_embed)
 
@@ -96,9 +111,15 @@ class MainCommands(utils.CommonCog, name="Main Commands"):
             return await ctx.send("**Error:** Nothing in message queue to skip!")
 
         vc.skip()
-        await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
+        if ctx.interaction is not None:
+            return
 
-    @skip.after_invoke
+        try:
+            await ctx.message.add_reaction("\N{THUMBS UP SIGN}")
+        except discord.NotFound:
+            pass
+
+    @skip.after_invoke # type: ignore (pylance not accepting subclasses)
     async def reset_cooldown(self, ctx: utils.TypedGuildContext):
         if ctx.author_permissions().administrator:
             self.skip.reset_cooldown(ctx)

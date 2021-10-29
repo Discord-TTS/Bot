@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, TYPE_CHECKING, List, Mapping, Optional, Union
+from typing import Any, TYPE_CHECKING, Mapping, Optional, Union
 
 import discord
 from discord.ext import commands
+
 from utils import NETURAL_COLOUR
 
 if TYPE_CHECKING:
@@ -25,11 +26,9 @@ class FancyHelpCommandCog(commands.Cog, name="Uncategoried"):
 
         bot.help_command = help_command
         bot.help_command.cog = self
-        bot.help_command.add_check(
-            commands.bot_has_permissions(
-                send_messages=True, embed_links=True
-            ).predicate # type: ignore
-        )
+
+        check = commands.bot_has_permissions(send_messages=True, embed_links=True)
+        bot.help_command.add_check(check.predicate)
 
 
 class FancyHelpCommand(commands.HelpCommand):
@@ -56,17 +55,17 @@ class FancyHelpCommand(commands.HelpCommand):
 
         known_cogs_names = ("Main Commands", "Settings", "Extra Commands")
 
-        known_cogs = [bot.get_cog(cog) for cog in known_cogs_names]
+        known_cogs = [cog for cog_name in known_cogs_names if (cog := bot.get_cog(cog_name)) is not None]
         unknown_cogs = [cog for cog in bot.cogs.values() if cog not in known_cogs]
-        cogs: List[commands.Cog] = known_cogs + unknown_cogs # type: ignore
+        cogs: list[commands.Cog] = known_cogs + unknown_cogs
 
-        mapping: Dict[Optional[commands.Cog], List[commands.Command]]
+        mapping: dict[Optional[commands.Cog], list[commands.Command]]
 
         mapping = {cog: cog.get_commands() for cog in cogs}
         mapping[None] = [c for c in bot.all_commands.values() if c.cog is None]
         return mapping
 
-    async def send_bot_help(self, mapping: Mapping[Optional[commands.Cog], List[commands.Command]]) -> None:
+    async def send_bot_help(self, mapping: Mapping[Optional[commands.Cog], list[commands.Command]]) -> None:
         description = ""
         for cog, commands in mapping.items():
             if cog is None:
@@ -83,7 +82,7 @@ class FancyHelpCommand(commands.HelpCommand):
             colour=NETURAL_COLOUR
         )
 
-        embed.set_author(name=self.context.author.display_name, icon_url=self.context.author.avatar.url)
+        embed.set_author(name=self.context.author.display_name, icon_url=self.context.author.display_avatar.url)
         embed.set_footer(text=self.get_ending_note())
         await self.get_destination().send(embed=embed)
 
@@ -106,4 +105,4 @@ class FancyHelpCommand(commands.HelpCommand):
     async def send_cog_help(self, cog: commands.Cog) -> None:
         await super().send_error_message(self.command_not_found(cog.qualified_name)) # type: ignore
 
-    send_command_help = send_group_help
+    send_command_help = send_group_help # type: ignore

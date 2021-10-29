@@ -1,25 +1,29 @@
 from __future__ import annotations
 
 import asyncio
-import collections
-from functools import partial
-from io import BytesIO
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, List, Literal,
-                    Optional, Tuple, TypeVar, Union, overload)
 from dataclasses import dataclass
+import uuid
+from io import BytesIO
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
+                    TypeVar, Union, cast, overload, Tuple)
 
 import discord
 from discord.ext import commands
 from pydub import AudioSegment
+ 
+from .constants import AUDIODATA, RED
+from .funcs import data_to_ws_json
 
-from .funcs import to_thread
+if TYPE_CHECKING:
+    import collections
+
+    from main import TTSBotPremium
+    from player import TTSVoiceClient
+
+    from .websocket_types import WS_TARGET
+
 
 _T = TypeVar("_T")
-if TYPE_CHECKING:
-    from main import TTSBotPremium
-    from player import TTSVoicePlayer
-
-
 # Cleanup classes
 class VoiceNotFound(Exception):
     pass
@@ -28,6 +32,12 @@ class CommonCog(commands.Cog):
     def __init__(self, bot: TTSBotPremium):
         self.bot = bot
 
+class ClearableQueue(asyncio.Queue[_T]):
+    _queue: collections.deque[_T]
+
+    def clear(self):
+        self._queue.clear()
+
 class SafeDict(dict[str, int]):
     def add(self, event: str):
         if event not in self:
@@ -35,28 +45,22 @@ class SafeDict(dict[str, int]):
 
         self[event] += 1
 
-class ClearableQueue(asyncio.Queue[_T]):
-    _queue: collections.deque[_T]
-
-    def clear(self):
-        self._queue.clear()
-
 class TTSAudioMaker:
     def __init__(self, bot: TTSBotPremium):
         self.bot = bot
 
-    async def get_tts(self, text: str, voice: Tuple[str, str], max_length: float) -> Union[Tuple[bytes, float], Tuple[None, None]]:
+    async def get_tts(self, text: str, voice: tuple[str, str], max_length: float) -> Union[AUDIODATA, tuple[None, None]]:
         ogg = await self.bot.cache.get((text, *voice))
         if not ogg:
             ogg = await self.bot.gtts.get(text, voice_lang=voice)
-            file_length = await to_thread(self.get_duration, ogg)
+            file_length = await asyncio.to_thread(self.get_duration, ogg)
 
             if file_length >= max_length:
                 return (None, None)
 
             await self.bot.cache.set((text, *voice), ogg)
         else:
-            file_length = await to_thread(self.get_duration, ogg)
+            file_length = await asyncio.to_thread(self.get_duration, ogg)
 
         return ogg, file_length
 
@@ -86,6 +90,7 @@ class Voice:
     def formatted(self) -> str:
         return f"{self.lang} - {self.variant} ({self.gender})"
 
+
     def __repr__(self):
         return f"<Voice {self.lang=} {self.variant=} {self.gender=}>"
 
@@ -93,44 +98,98 @@ class Voice:
         return self.formatted
 
 # Typed Classes for silencing type errors.
-TextChannel = Union[discord.TextChannel, discord.DMChannel]
 VoiceChannel = Union[discord.VoiceChannel, discord.StageChannel]
+GuildTextChannel = Union[discord.TextChannel, discord.Thread]
+TextChannel = Union[GuildTextChannel, discord.DMChannel]
 class TypedContext(commands.Context):
     prefix: str
     cog: CommonCog
-    args: List[Any]
     bot: TTSBotPremium
     channel: TextChannel
     message: TypedMessage
+    command: commands.Command
     guild: Optional[TypedGuild]
     author: Union[discord.User, TypedMember]
-    command: Union[TypedCommand, commands.Group]
-    invoked_subcommand: Optional[commands.Command]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.interaction: Optional[discord.Interaction] = None
 
+    default_fix = "get in contact with us via the support server for help"
+    async def send_error(self, error: str, fix: str = default_fix, **kwargs) -> Optional[discord.Message]:
+        if self.guild:
+            self = cast(TypedGuildContext, self)
+            permissions = self.bot_permissions()
+
+            if not permissions.send_messages:
+                return
+
+            if not permissions.embed_links:
+                msg = "An Error Occurred! Please give me embed links permissions so I can tell you more!"
+                return await self.reply(msg, ephemeral=True)
+
+        error_embed = discord.Embed(
+            colour=RED,
+            title="An Error Occurred!",
+            description=f"Sorry but {error}, to fix this, please {fix}!"
+        ).set_author(
+            name=self.author.display_name,
+            icon_url=self.author.display_avatar.url
+        ).set_footer(
+            text="Support Server: https://discord.gg/zWPWwQC"
+        )
+
+        return await self.reply(embed=error_embed, ephemeral=True, **kwargs)
+
+    # I wish this could be data: List[_T] -> ...Dict[_T, Any] but no, typing bad
+    async def request_ws_data(self, *to_request: str, target: WS_TARGET = "*", args: dict[str, dict[str, Any]] = None) -> Optional[list[dict[str, Any]]]:
+        assert self.bot.websocket is not None
+
+        args = args or {}
+        ws_uuid = uuid.uuid4()
+        wsjson = data_to_ws_json(
+            command="REQUEST", target=target,
+            info=to_request, args=args, nonce=ws_uuid
+        )
+
+        await self.bot.websocket.send(wsjson)
+        try:
+            check = lambda _, nonce: uuid.UUID(nonce) == ws_uuid
+            return (await self.bot.wait_for(timeout=10, check=check, event="response"))[0]
+        except asyncio.TimeoutError:
+            self.bot.logger.error("Timed out requesting data from WS!")
+            await self.send_error("the bot timed out fetching this info")
+
+
     @overload
-    async def send(self, *args: Any, return_msg: Literal[False] = False, **kwargs: Any) -> None: ...
+    async def send(self,
+        content: Optional[str] = None,
+        return_message: Literal[False] = False,
+        **kwargs: Any
+    ) -> Optional[Union[discord.WebhookMessage, discord.Message]]: ...
     @overload
-    async def send(self, *args: Any, return_msg: Literal[True] = True, **kwargs: Any) -> discord.Message: ...
+    async def send(self,
+        content: Optional[str] = None,
+        return_message: Literal[True] = True,
+        **kwargs: Any
+    ) -> Union[discord.WebhookMessage, discord.Message]: ...
 
-    async def send(self,*args: Any, return_msg: bool = False, **kwargs: Any) -> Optional[discord.Message]:
-        reference = kwargs.pop("reference", None)
+    async def send(self,
+        content: Optional[str] = None,
+        return_message: bool = False,
+        **kwargs: Any
+    ) -> Optional[Union[discord.WebhookMessage, discord.Message]]:
+        view = None
+        if "view" in kwargs:
+            view = kwargs["view"]
+            return_message = True
 
-        if self.interaction is None:
-            kwargs.pop("ephemeral", False)
-            send = partial(super().send, reference=reference)
-        elif not (self.interaction.response.is_done() or return_msg or "file" in kwargs):
-            send = self.interaction.response.send_message
-        else:
-            if not self.interaction.response.is_done():
-                await self.interaction.response.defer()
+        msg = await super().send(content, return_message=return_message, **kwargs) # type: ignore
+        if view is not None:
+            view.message = msg
 
-            send = partial(self.interaction.followup.send, wait=return_msg)
+        return msg
 
-        return await send(*args, **kwargs)
 
     def reply(self, *args: Any, **kwargs: Any):
         return self.send(*args, **kwargs)
@@ -138,9 +197,12 @@ class TypedContext(commands.Context):
 class TypedGuildContext(TypedContext):
     guild: TypedGuild
     author: TypedMember
-    channel: discord.TextChannel
+    channel: GuildTextChannel
 
     def author_permissions(self) -> discord.Permissions:
+        if self.interaction is not None:
+            return self.interaction.permissions
+
         return self.channel.permissions_for(self.author)
     def bot_permissions(self) -> discord.Permissions:
         return self.channel.permissions_for(self.guild.me)
@@ -153,33 +215,27 @@ class TypedGuildContext(TypedContext):
 
 
 class TypedMessage(discord.Message):
-    content: str
     guild: Optional[TypedGuild]
     author: Union[TypedMember, discord.User]
+    reference: Optional[TypedMessageReference]
 
 class TypedGuildMessage(TypedMessage):
     guild: TypedGuild
-    author: TypedMember
-    channel: discord.TextChannel
+    channel: GuildTextChannel
 
 
 class TypedMember(discord.Member):
     guild: TypedGuild
     voice: TypedVoiceState
-    avatar: discord.Asset
 
 class TypedGuild(discord.Guild):
     owner_id: int
-    voice_client: Optional[TTSVoicePlayer]
+    voice_client: Optional[TTSVoiceClient]
     fetch_member: Callable[[int], Awaitable[TypedMember]]
+
 
 class TypedVoiceState(discord.VoiceState):
     channel: VoiceChannel
 
-class TypedDMChannel(discord.DMChannel):
-    recipient: discord.User
-
-class TypedCommand(commands.Command):
-    name: str
-    help: Optional[str]
-    qualified_name: str
+class TypedMessageReference(discord.MessageReference):
+    resolved: Optional[Union[TypedMessage, discord.DeletedReferencedMessage]]

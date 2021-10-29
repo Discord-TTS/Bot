@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from functools import partial
 from io import BytesIO
 from shlex import split
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import discord
 from discord.ext import tasks
@@ -12,11 +13,8 @@ from discord.opus import Encoder
 
 import utils
 
-
-
 if TYPE_CHECKING:
     from main import TTSBotPremium
-
 
 
 class FFmpegPCMAudio(discord.AudioSource):
@@ -69,8 +67,8 @@ class FFmpegPCMAudio(discord.AudioSource):
         self._process = None
 
 
-_MessageQueue = Tuple[str, Tuple[str, str]]
-class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
+_MessageQueue = tuple[str, tuple[str, str]]
+class TTSVoiceClient(discord.VoiceClient, utils.TTSAudioMaker):
     bot: TTSBotPremium
     guild: discord.Guild
     channel: utils.VoiceChannel
@@ -82,9 +80,6 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
         self.prefix = None
         self.linked_channel = 0
 
-        self.currently_playing = asyncio.Event()
-        self.currently_playing.set()
-
         self.audio_buffer = utils.ClearableQueue[utils.AUDIODATA](maxsize=5)
         self.message_queue = utils.ClearableQueue[_MessageQueue]()
 
@@ -92,11 +87,13 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
 
     def __repr__(self):
         c = self.channel.id
+        is_playing = self.is_playing()
+        is_connected = self.is_connected()
+
         abufferlen = self.audio_buffer.qsize()
         mqueuelen = self.message_queue.qsize()
-        playing_audio = not self.currently_playing.is_set()
 
-        return f"<TTSVoicePlayer: {c=} {playing_audio=} {mqueuelen=} {abufferlen=}>"
+        return f"<TTSVoiceClient: {c=} {is_connected=} {is_playing=} {mqueuelen=} {abufferlen=}>"
 
 
     async def disconnect(self, *, force: bool = False) -> None:
@@ -104,11 +101,27 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
         self.fill_audio_buffer.cancel()
         self.play_audio.cancel()
 
-    async def queue(self, text: str, lang: Tuple[str, str], max_length: int = 30) -> None:
+    async def play(self, source: discord.AudioSource) -> None:
+        if not self.is_connected():
+            self.play_audio.stop()
+            return await self.disconnect(force=True)
+
+        future: asyncio.Future[None] = self.bot.loop.create_future()
+        def _after_play(exception: Optional[Exception]) -> None:
+            if exception is None:
+                future.set_result(None)
+            else:
+                future.set_exception(exception)
+
+        super().play(source, after=partial(self.bot.loop.call_soon_threadsafe, _after_play))
+        return await future
+
+
+    async def queue(self, text: str, lang: tuple[str, str], max_length: int = 30) -> None:
         self.max_length = max_length
 
         await self.message_queue.put((text, lang))
-        if not self.fill_audio_buffer.is_running:
+        if not self.fill_audio_buffer.is_running():
             self.fill_audio_buffer.start()
 
     def skip(self):
@@ -123,34 +136,36 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
     @tasks.loop()
     @utils.decos.handle_errors
     async def play_audio(self):
-        self.currently_playing.clear()
-
         audio, length = await self.audio_buffer.get()
         source = FFmpegPCMAudio(audio, pipe=True, options='-loglevel "quiet"')
 
         try:
-            self.play(source, after=self.after_player)
-        except discord.ClientException:
-            self.currently_playing.set()
-
-        try:
-            await asyncio.wait_for(self.currently_playing.wait(), timeout=length+5)
+            await asyncio.wait_for(self.play(source), timeout=length+5)
         except asyncio.TimeoutError:
             self.bot.log("on_play_timeout")
-
-            error = f"`{self.guild.id}`'s vc.play didn't finish audio!"
-            self.bot.logger.error(error)
+            self.bot.logger.debug(f"`{self.guild.id}`'s vc.play didn't finish audio!")
+        except Exception as exception:
+            await self.bot.on_error("play_audio", exception, self)
 
     @tasks.loop()
     @utils.decos.handle_errors
     async def fill_audio_buffer(self):
-        text, lang = await self.message_queue.get()
+        sleep_timeout = asyncio.create_task(asyncio.sleep(30*60))
+        fetch_queue = asyncio.create_task(self.message_queue.get())
+        _, pending = await asyncio.wait((fetch_queue, sleep_timeout), return_when=asyncio.FIRST_COMPLETED)
 
+        if fetch_queue in pending:
+            fetch_queue.cancel()
+            return await self.disconnect()
+        else:
+            sleep_timeout.cancel()
+
+        text, lang = fetch_queue.result()
         try:
             audio, length = await self.get_tts(text, lang, self.max_length)
         except asyncio.TimeoutError:
             error = f"`{self.guild.id}`'s `{len(text)}` character long message was cancelled!"
-            return self.bot.logger.error(error)
+            return self.bot.logger.debug(error)
 
         if audio is None or length is None:
             return
@@ -158,28 +173,3 @@ class TTSVoicePlayer(discord.VoiceClient, utils.TTSAudioMaker):
         await self.audio_buffer.put((audio, length))
         if not self.play_audio.is_running():
             self.play_audio.start()
-
-
-    # Helper functions
-    def after_player(self, exception: Optional[Exception]) -> None:
-        # This func runs in a seperate thread, has to do awaiting, and we
-        # don't care about it's return value, so we get back to the main
-        # thread to fix race conditions and get this thread out of the way
-        return utils.to_async(
-            self._after_player_coro(exception),
-            return_result=False,
-            loop=self.bot.loop,
-        )
-
-    async def _after_player_coro(self, exception: Optional[Exception]) -> Tuple[Any]:
-        exceptions = [exception] or []
-        try:
-            self.currently_playing.set()
-        except Exception as error:
-            exceptions.append(error)
-
-        exceptions = [err for err in exceptions if err is not None]
-        return await asyncio.gather(*(
-            self.bot.on_error("play_audio", exception)
-            for exception in exceptions
-        ))

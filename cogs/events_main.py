@@ -9,8 +9,7 @@ import discord
 from discord.ext import commands
 
 import utils
-from player import TTSVoicePlayer
-
+from player import TTSVoiceClient
 
 if TYPE_CHECKING:
     from typing_extensions import TypedDict
@@ -31,7 +30,7 @@ async def do_autojoin(author: utils.TypedMember) -> bool:
         if not (permissions.view_channel and permissions.speak):
             return False
 
-        return bool(await voice_channel.connect(cls=TTSVoicePlayer)) # type: ignore
+        return bool(await voice_channel.connect(cls=TTSVoiceClient)) # type: ignore
     except (asyncio.TimeoutError, AttributeError):
         return False
 
@@ -46,7 +45,7 @@ class MainEvents(utils.CommonCog):
 
         # Premium Check
         if str(message.author.id) not in self.bot.trusted:
-            premium_user: Optional[int] = (await self.bot.settings.get(message.guild, ["premium_user"]))[0]
+            premium_user: Optional[int] = self.bot.settings[message.guild.id]["premium_user"]
             if premium_user is None:
                 return
 
@@ -57,77 +56,71 @@ class MainEvents(utils.CommonCog):
                 return
 
         # Get settings
-        repeated_limit, to_translate, target_lang, bot_ignore, max_length, autojoin, channel, is_formal, prefix, xsaid = await self.bot.settings.get(
-            message.guild,
-            settings=[
-                "repeated_chars",
-                "to_translate",
-                "target_lang",
-                "bot_ignore",
-                "msg_length",
-                "auto_join",
-                "channel",
-                "formal",
-                "prefix",
-                "xsaid",
-            ]
-        )
+        settings = await self.bot.settings.get(message.guild.id)
+        userinfo = await self.bot.userinfo.get(message.author.id)
 
-        message_clean = utils.removeprefix(
-            message.clean_content.lower(), f"{prefix}tts"
-        )
+        prefix: str = settings["prefix"]
+        channel: int = settings["channel"]
+        autojoin: bool = settings["auto_join"]
+        bot_ignore: bool = settings["bot_ignore"]
+        default_lang: str = settings["default_lang"]
+        to_translate: bool = settings["to_translate"]
+        is_formal: Optional[bool] = settings["formal"]
+        repeated_limit: int = settings["repeated_chars"]
+        target_lang: Optional[str] = settings["target_lang"]
 
         # Check if a setup channel
         if message.channel.id != channel:
             return
 
+        message_clean = message.clean_content.lower()
+        message_clean = message_clean.removeprefix(f"{prefix}tts")
+
+        if len(message_clean) >= 1500:
+            return
+
         if message_clean.startswith(prefix):
             return
 
-        bot_voice_client = message.guild.voice_client
         if message.author.bot:
-            if bot_ignore or not bot_voice_client:
+            if bot_ignore or not message.guild.voice_client:
                 return
         elif (
             not isinstance(message.author, discord.Member)
             or not message.author.voice
         ):
             return
-        elif not bot_voice_client:
+        elif not message.guild.voice_client:
             if not autojoin:
                 return
 
             if not await do_autojoin(message.author):
                 return
-        elif message.author.voice.channel != bot_voice_client.channel:
+
+            if not message.guild.voice_client:
+                return
+        elif message.author.voice.channel != message.guild.voice_client.channel:
             return
 
         # Fix linter issues
         if TYPE_CHECKING:
-            message.guild.voice_client = cast(TTSVoicePlayer, message.guild.voice_client)
+            message.guild.voice_client = cast(TTSVoiceClient, message.guild.voice_client)
 
         # Get voice and parse it into a useable format
-        user_voice = None
-        guild_voice = None
-        lang, variant = cast(List[Optional[str]], await asyncio.gather(
-            self.bot.userinfo.get("lang", message.author, default=None),
-            self.bot.userinfo.get("variant", message.author, default="")
-        ))
+        user_voice: Optional[str] = None
+        lang: Optional[str] = userinfo["lang"]
+        variant: Optional[str] = userinfo["variant"]
+        if lang is not None and variant is not None:
+            user_voice = f"{lang} {variant}"
 
-        if lang is not None:
-            user_voice = " ".join((lang, variant)) # type: ignore
-        else:
-            guild_voice = (await self.bot.settings.get(message.guild, ["default_lang"]))[0]
-
-        str_voice: str = user_voice or guild_voice or "en-us a"
-
+        str_voice: str = user_voice or default_lang or "en-us a"
         voice = await self.bot.get_voice(*str_voice.split())
 
         # Emoji filter
         message_clean = utils.EMOJI_REGEX.sub(utils.emoji_match_to_cleaned, message_clean)
 
         # Acronyms
-        if lang == "en":
+        if voice.lang.startswith("en"):
             message_clean = f" {message_clean} "
             for toreplace, replacewith in utils.ACRONYMS.items():
                 message_clean = message_clean.replace(
@@ -149,16 +142,31 @@ class MainEvents(utils.CommonCog):
 
         contained_url = message_clean != with_urls
         # Toggleable xsaid and attachment + links detection
-        if xsaid:
-            said_name = await self.bot.nicknames.get(message.guild, message.author)
+        if settings["xsaid"]:
+            nicknames = await self.bot.nicknames.get((message.guild.id, message.author.id))
+            said_name: str = nicknames.get("name") or message.author.display_name
+
             file_format = utils.exts_to_format(message.attachments)
 
             if contained_url:
-
                 if message_clean:
                     message_clean += " and sent a link."
                 else:
                     message_clean = "a link."
+
+            if message.attachments:
+                if not message_clean:
+                    message_clean = f"{said_name} sent {file_format}"
+                else:
+                    message_clean = f"{said_name} sent {file_format} and said {message_clean}"
+            else:
+                message_clean = f"{said_name} said: {message_clean}"
+
+        elif contained_url:
+            if message_clean:
+                message_clean += ". This message contained a link"
+            else:
+                message_clean = "a link."
 
         if message_clean.strip(" ?.)'!\":") == "":
             return
@@ -212,9 +220,7 @@ class MainEvents(utils.CommonCog):
                     message_clean = translation["text"]
 
         # Adds filtered message to queue
-        await message.guild.voice_client.queue(
-            message_clean, voice.tuple, max_length
-        )
+        await message.guild.voice_client.queue(message_clean, voice.tuple, settings["msg_length"])
 
 
     @commands.Cog.listener()

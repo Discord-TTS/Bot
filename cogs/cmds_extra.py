@@ -2,27 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import time
-import uuid
-from functools import partial
 from inspect import cleandoc
 from io import BytesIO
-from os import getpid
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import discord
+import utils
 from discord.ext import commands
 from psutil import Process
 
-import utils
-from utils.websocket_types import *
-
-
 if TYPE_CHECKING:
     from main import TTSBotPremium
-
-    from events_errors import ErrorEvents
-else:
-    ErrorEvents = None
 
 
 start_time = time.monotonic()
@@ -48,15 +38,17 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             not ctx.interaction
             and ctx.guild is not None
             and ctx.guild.voice_client
-            and (await self.bot.settings.get(ctx.guild, ["channel"]))[0] == ctx.channel.id
+            and isinstance(ctx.author, discord.Member)
+            and ctx.author.voice
+            and ctx.guild.voice_client.channel == ctx.author.voice.channel
+            and self.bot.settings[ctx.guild.id]["channel"] == ctx.channel.id
         ):
-            return # probably in VC, just let on_message do TTS
+            return await ctx.reply(f"You don't need to include the `{ctx.prefix}tts` for messages to be said!")
 
         author_name = "".join(filter(str.isalnum, ctx.author.name))
 
-        lang = await self.bot.userinfo.get("lang", ctx.author, "en-us")
-        variant = await self.bot.userinfo.get("variant", ctx.author, "a")
-        voice = await self.bot.get_voice(lang, variant)
+        userinfo = await self.bot.userinfo.get(ctx.author.id) 
+        voice = await self.bot.get_voice(userinfo["lang"] or "en-us", userinfo["variant"] or "a")
 
         audio, _ = await utils.TTSAudioMaker(self.bot).get_tts(
             text=message,
@@ -86,24 +78,13 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             total_voice_clients = len(self.bot.voice_clients)
             total_guild_count = len(guilds)
 
-            raw_ram_usage = Process(getpid()).memory_info().rss
+            raw_ram_usage = Process().memory_info().rss
         else:
-            ws_uuid = uuid.uuid4()
-            to_fetch = ["guild_count", "member_count", "voice_count"]
-            wsjson = utils.data_to_ws_json("REQUEST", target="*", info=to_fetch, nonce=ws_uuid)
+            responses = await ctx.request_ws_data("guild_count", "member_count", "voice_count")
+            if responses is None:
+                return
 
-            await self.bot.websocket.send(wsjson)
-            try:
-                check = lambda _, nonce: uuid.UUID(nonce) == ws_uuid
-                responses, _ = await self.bot.wait_for(timeout=10, check=check, event="response",)
-            except asyncio.TimeoutError:
-                cog = cast(ErrorEvents, self.bot.get_cog("ErrorEvents"))
-                self.bot.logger.error("Timed out fetching botstats!")
-
-                error_msg = "the bot timed out fetching this info"
-                return await cog.send_error(ctx, error_msg)
-
-            raw_ram_usage = await utils.to_thread(partial(get_ram_recursive, Process(getpid()).parent()))
+            raw_ram_usage = await asyncio.to_thread(get_ram_recursive, Process().parent())
             total_voice_clients = sum(resp["voice_count"] for resp in responses)
             total_guild_count = sum(resp["guild_count"] for resp in responses)
             total_members = sum(resp["member_count"] for resp in responses)
@@ -129,7 +110,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
                     {sep1} {raw_ram_usage / 1024 ** 2:.1f}MB of RAM
                 and can be used by {total_members:,} people!
             """)
-        ).set_footer(text=footer).set_thumbnail(url=self.bot.user.avatar.url)
+        ).set_footer(text=footer).set_thumbnail(url=self.bot.user.display_avatar.url)
 
         await ctx.send(embed=embed)
 
@@ -138,7 +119,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
     @commands.command()
     async def channel(self, ctx: utils.TypedGuildContext):
         "Shows the current setup channel!"
-        channel = (await self.bot.settings.get(ctx.guild, ["channel"]))[0]
+        channel = self.bot.settings[ctx.guild.id]["channel"]
 
         if channel == ctx.channel.id:
             await ctx.send("You are in the right channel already!")
@@ -164,7 +145,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
         "Gets current ping to discord!"
 
         ping_before = time.perf_counter()
-        ping_message = await ctx.send("Loading!", return_msg=True)
+        ping_message = await ctx.send("Loading!", return_message=True)
         ping = (time.perf_counter() - ping_before) * 1000
         await ping_message.edit(content=f"Current Latency: `{ping:.0f}ms`")
 
@@ -176,7 +157,7 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
         if suggestion.lower().replace("*", "") == "suggestion":
             return await ctx.send("Hey! You are meant to replace `*suggestion*` with your actual suggestion!")
 
-        if not await self.bot.userinfo.get("blocked", ctx.author, default=False):
+        if not (await self.bot.userinfo.get(ctx.author.id)).get("blocked", False):
             files = [await attachment.to_file() for attachment in ctx.message.attachments]
 
             author_name = str(ctx.author)
@@ -184,8 +165,8 @@ class ExtraCommands(utils.CommonCog, name="Extra Commands"):
             await self.bot.channels["suggestions"].send(
                 files=files,
                 content=suggestion,
-                avatar_url=ctx.author.avatar.url,
-                username=author_name[:32 - len(author_id)] + author_id,
+                username=author_name + author_id,
+                avatar_url=ctx.author.display_avatar.url,
             )
 
         await ctx.send("Suggestion noted")

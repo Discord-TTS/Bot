@@ -2,39 +2,27 @@
 
 from __future__ import annotations
 
-import asyncio
-import sys
 from inspect import cleandoc
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Literal, Optional,
-                    Sequence, Type, TypeVar, Union, overload)
+from typing import TYPE_CHECKING, Optional, Sequence, TypeVar, Union
 
 import orjson
 
-from utils.constants import OPTION_SEPERATORS, READABLE_TYPE
-from utils.websocket_types import WS_TARGET
+from .constants import OPTION_SEPERATORS, READABLE_TYPE
 
 if TYPE_CHECKING:
     import re
 
     import aioredis
     import discord
-    from typing_extensions import ParamSpec
 
-    _P = ParamSpec("_P")
-    _R = TypeVar("_R")
-    _T = TypeVar("_T")
+    from .constants import JSON_IN
+    from .websocket_types import WS_TARGET
 
 
 _sep = OPTION_SEPERATORS[0]
-
-def construct_unslotted(cls: Type[_T], *args, **kwargs) -> _T:
-    "Constructs cls without any slots, allowing attribute addition"
-    return type(cls.__name__, (cls,), {})(*args, **kwargs) # type: ignore
-
-def data_to_ws_json(command: str, target: Union[WS_TARGET, str], **kwargs: Any) -> bytes:
+def data_to_ws_json(command: str, target: Union[WS_TARGET, str], **kwargs: JSON_IN) -> bytes:
     "Turns arguments and kwargs into usable data for the WS IPC system"
-    wsjson = {"c": command.lower(), "a": kwargs, "t": target}
-    return orjson.dumps(wsjson)
+    return orjson.dumps({"c": command.lower(), "a": kwargs, "t": target})
 
 def emoji_match_to_cleaned(match: re.Match[str]) -> str:
     is_animated, emoji_name = bool(match[1]), match.group(2)
@@ -74,49 +62,3 @@ async def get_redis_info(cache_db: aioredis.Redis) -> str:
         {_sep} `Key Hits:      {hits}`
         {_sep} `Key Misses:    {misses}`
     """)
-
-@overload
-def to_async(
-    coro: Awaitable[_R],
-    loop: Optional[asyncio.AbstractEventLoop] = None,
-    return_result: Literal[True] = True
-) -> _R: ...
-@overload
-def to_async(
-    coro: Awaitable[Any],
-    loop: Optional[asyncio.AbstractEventLoop] = None,
-    return_result: Literal[False] = False
-) -> None: ...
-
-def to_async(
-    coro: Awaitable[Union[_R, Any]],
-    loop: Optional[asyncio.AbstractEventLoop] = None,
-    return_result: bool = True
-) -> Optional[_R]:
-    """Gets to an async env and returns the coro's result
-    Notes: Can be used for swapping threads, if loop is passed."""
-
-    if not loop:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            raise RuntimeError
-
-        result = loop.run_until_complete(coro)
-        return result if return_result else None
-
-    future = asyncio.run_coroutine_threadsafe(coro, loop)
-    return future.result() if return_result else None
-
-
-if sys.version_info >= (3, 9):
-    to_thread = asyncio.to_thread
-    removeprefix = str.removeprefix
-else:
-    # For the people running older than 3.9, these are some functions
-    # backported, may not be 100% accurate but get the job done.
-    async def to_thread(func: Callable[_P, _R]) -> _R:
-        "asyncio.to_thread but for older python versions"
-        return await asyncio.get_event_loop().run_in_executor(None, func)
-    def removeprefix(self: str, __prefix: str) -> str:
-        "str.removeprefix but for older python versions"
-        return self[len(__prefix):] if self.startswith(__prefix) else self
