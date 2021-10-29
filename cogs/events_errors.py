@@ -238,7 +238,7 @@ class ErrorEvents(utils.CommonCog):
                 fields.append(channel)
 
             await asyncio.gather(
-                ctx.send_error( error="an unknown error occured"),
+                ctx.send_error(error="an unknown error occurred"),
                 self.send_unhandled_msg(
                     event="command",
                     extra_fields=fields,

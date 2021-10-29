@@ -165,10 +165,7 @@ class TTSBot(_commands.AutoShardedBot):
 
     @staticmethod
     async def command_prefix(bot: TTSBot, message: discord.Message) -> str:
-        if message.guild:
-            return (await bot.settings.get(message.guild.id))["prefix"]
-
-        return "-"
+        return bot.settings[message.guild.id]["prefix"] if message.guild else "-"
 
     @overload
     async def get_context(self, message: discord.Message, cls: None = None) -> Union[utils.TypedGuildContext, utils.TypedContext]: ...
@@ -177,6 +174,10 @@ class TTSBot(_commands.AutoShardedBot):
     async def get_context(self, message: discord.Message, cls: type[_T]) -> _T: ...
 
     async def get_context(self, message: discord.Message, cls=None):
+        if message.guild:
+            # Fills cache for the settings
+            await self.settings.get(message.guild.id)
+
         if cls is None:
             cls = utils.TypedGuildContext if message.guild else utils.TypedContext
 
