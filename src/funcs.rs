@@ -368,9 +368,9 @@ pub fn clean_msg(
         lazy_static! {
             static ref REGEX_REPLACEMENTS: [(Regex, &'static str); 3] = {
                 [
-                    (Regex::new(r"\|\|.*?\|\|").unwrap(), ". spoiler avoided."),
-                    (Regex::new(r"```.*?```").unwrap(), ". code block."),
-                    (Regex::new(r"`.*?`").unwrap(), ". code snippet."),
+                    (Regex::new(r"\|\|(?s:.)*?\|\|").unwrap(), ". spoiler avoided."),
+                    (Regex::new(r"```(?s:.)*?```").unwrap(), ". code block."),
+                    (Regex::new(r"`(?s:.)*?`").unwrap(), ". code snippet."),
                 ]
             };
         }
@@ -381,12 +381,13 @@ pub fn clean_msg(
     }
 
     // TODO: Regex url stuff?
-    const LINK_STARTERS: [&str; 3] = ["https://", "http://", "www."];
-
     let with_urls = content.split(' ').join(" ");
     content = content
         .split(' ')
-        .filter(|w| LINK_STARTERS.iter().all(|ls| !w.starts_with(ls)))
+        .filter(|w|
+            ["https://", "http://", "www."].iter()
+            .any(|ls| w.starts_with(ls))
+        )
         .join(" ");
 
     let contained_url = content != with_urls;
