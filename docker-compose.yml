@@ -1,0 +1,21 @@
+services:
+    bot:
+        build: .
+        volumes:
+          - type: bind
+            source: ./config.toml
+            target: /config.toml
+        depends_on: [database, lavalink]
+    lavalink:
+        image: fredboat/lavalink:master
+        volumes:
+          - type: bind
+            source: ./lavalink_config.yml
+            target: /opt/Lavalink/application.yml
+        expose: [2333]
+    database:
+        image: postgres:13
+        expose: [5432]
+        environment: 
+            POSTGRES_USER: tts
+            POSTGRES_PASSWORD: tts_password

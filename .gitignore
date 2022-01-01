@@ -1,7 +1,8 @@
-*.save
-*.mp3
-*.bak
-.*
-__pycache__
-cache
+.vscode
+*.hidden
 config.ini
+config.toml
+
+# Added by cargo
+
+/target

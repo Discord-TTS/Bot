@@ -1,0 +1,28 @@
+[Lavalink]
+#host = 
+#password = 
+#port =
+#ssl = 
+
+[Main]
+log_level = 'info'
+#main_server_invite = 'https://discord.gg/example'
+#invite_channel = id here
+#main_server = id here 
+#ofs_role = 
+#token = 
+
+[PostgreSQL-Info]
+#database = 
+#password = 
+#host = 
+#user = 
+
+[Webhook-Info]
+# Each URL will look like 'https://discord.com/api/webhooks/830137192985788457/nCrFLCz-2tJRFUoBrFx1nN9cvUZdhdW0860ek0zNosf0DfCaMTbyM_oFdf9RidC_mcPp'
+#logs = 
+#errors = 
+#dm_logs = 
+#servers = 
+#analytics = 
+#suggestions = 

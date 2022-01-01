@@ -1,0 +1,56 @@
+[package]
+name = "discord_tts_bot"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+url = "2.2"
+toml = "0.5"
+rand = "0.8"
+regex = "1.5"
+strfmt = "0.1"
+dashmap = "5.0"
+tracing = "0.1"
+strsim = "0.10"
+reqwest = "0.11"
+indexmap = "1.7"
+itertools = "0.10"
+cargo-lock = "7.0"
+lazy_static = "1.4"
+async-recursion = "0.3"
+deadpool-postgres = "0.10"
+#serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = ["simdjson"] }
+
+[dependencies.tokio]
+version = "1.14"
+features = ["macros", "rt-multi-thread", "signal"]
+
+[dependencies.poise]
+git = "https://github.com/kangalioo/poise"
+features = ["collector"]
+branch = "develop"
+
+[dependencies.songbird]
+git = "https://github.com/serenity-rs/songbird"
+branch = "next"
+
+[dependencies.lavalink-rs]
+git = "https://gitlab.com/vicky5124/lavalink-rs"
+features = ["serenity", "rustls"]
+branch = "master"
+
+[dependencies.psutil]
+version = "3.2"
+features = ["process"]
+default-features = false
+
+[dependencies.parking_lot]
+version = "0.11"
+features = ["nightly"]
+
+
+# lavalink pulls serenity from crates.io. tell it to pull from github instead 
+[patch.crates-io]
+serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next" }
+songbird = { git = "https://github.com/serenity-rs/songbird", branch = "next" }

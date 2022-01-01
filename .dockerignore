@@ -1,0 +1,9 @@
+.*
+target
+
+# These files shouldn't be sent into the container as it causes a rebuild
+# on simple config changes/development 
+Dockerfile
+docker-compose.*
+config.toml
+lavalink_config.yml
