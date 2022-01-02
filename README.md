@@ -14,6 +14,8 @@ Text to speech Discord Bot using Serenity, Poise, and lavalink-rs
 - Run `git clone https://github.com/Gnome-py/Discord-TTS-Bot.git`
 - Rename `config-docker.toml` to `config.toml` and fill it out
 - Rename `docker-compose-example.yml` to `docker-compose.yml`
+- Rename `Dockerfile-prod` OR `Dockerfile-dev` to `Dockerfile`
+(prod takes longer to build, dev is less efficient to run)
 
 - Build and run the docker containers with `docker-compose up --build -d`
 - Check the terminal output with `docker-compose logs bot`

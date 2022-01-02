@@ -2,6 +2,7 @@
 *.hidden
 config.ini
 config.toml
+Dockerfile
 
 # Added by cargo
 
