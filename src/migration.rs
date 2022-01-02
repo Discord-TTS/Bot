@@ -24,16 +24,6 @@ pub async fn start_migration(config: &mut toml::Value, pool: &Arc<deadpool_postg
     let transaction = conn.transaction().await?;
 
     let main_config = config["Main"].as_table_mut().unwrap();
-    if main_config.remove("key").is_some() {
-        // Migrating from python version
-        transaction.execute("
-        ALTER TABLE userinfo (
-            CREATE COLUMN dm_welcomed bool DEFAULT false,
-            RENAME blocked TO dm_blocked
-        );
-        ", &[]).await?;
-    }
-
     if main_config.get("setup").is_none() {
         transaction.batch_execute(DB_SETUP_QUERY).await?;
 

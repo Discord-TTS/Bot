@@ -16,18 +16,16 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use async_recursion::async_recursion;
-use dashmap::DashMap;
 use strfmt::strfmt;
-
-use deadpool_postgres::{tokio_postgres, Object as Connection};
+use dashmap::DashMap;
 use tokio_postgres::Statement;
+use deadpool_postgres::{tokio_postgres, Object as Connection};
 
 use crate::constants::*;
 
 #[poise::async_trait]
 pub trait CacheKeyTrait {
-    async fn get(&self, conn: Connection, stmt: Statement) -> Result<tokio_postgres::Row, Error>;
+    async fn get(&self, conn: Connection, stmt: Statement) -> Result<Option<tokio_postgres::Row>, Error>;
     async fn set_one(&self, conn: Connection, stmt: Statement, value: &(dyn tokio_postgres::types::ToSql + Sync)) -> Result<(), Error>;
     async fn create_row(&self, conn: Connection, stmt: Statement) -> Result<(), Error>;
     async fn delete(&self, conn: Connection, stmt: Statement) -> Result<(), Error>;
@@ -35,13 +33,8 @@ pub trait CacheKeyTrait {
 
 #[poise::async_trait]
 impl CacheKeyTrait for u64 {
-    async fn get(&self, conn: Connection, stmt: Statement) -> Result<tokio_postgres::Row, Error> {
-        let row = match conn.query_opt(&stmt, &[&(self.to_owned() as i64)]).await? {
-            Some(row) => row,
-            None => 0.get(conn, stmt).await?, // ID 0 is default row
-        };
-
-        Ok(row)
+    async fn get(&self, conn: Connection, stmt: Statement) -> Result<Option<tokio_postgres::Row>, Error> {
+        Ok(conn.query_opt(&stmt, &[&(self.to_owned() as i64)]).await?)
     }
     async fn set_one(&self, conn: Connection, stmt: Statement, value: &(dyn tokio_postgres::types::ToSql + Sync)) -> Result<(), Error> {
         conn.execute(&stmt, &[&(self.to_owned() as i64), value]).await?;
@@ -59,14 +52,9 @@ impl CacheKeyTrait for u64 {
 
 #[poise::async_trait]
 impl CacheKeyTrait for [u64; 2] {
-    async fn get(&self, conn: Connection, stmt: Statement) -> Result<tokio_postgres::Row, Error> {
+    async fn get(&self, conn: Connection, stmt: Statement) -> Result<Option<tokio_postgres::Row>, Error> {
         let [guild_id, user_id] = self;
-        let row = match conn.query_opt(&stmt, &[&(guild_id.to_owned() as i64), &(user_id.to_owned() as i64)]).await? {
-            Some(row) => row,
-            None => [0, 0].get(conn, stmt).await?, // ID 0 is default row
-        };
-
-        Ok(row)
+        Ok(conn.query_opt(&stmt, &[&(guild_id.to_owned() as i64), &(user_id.to_owned() as i64)]).await?)
     }
     async fn set_one(&self, conn: Connection, stmt: Statement, value: &(dyn tokio_postgres::types::ToSql + Sync)) -> Result<(), Error> {
         let [guild_id, user_id] = self;
@@ -89,6 +77,7 @@ pub struct DatabaseHandler<T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash> {
     pool: Arc<deadpool_postgres::Pool>,
     cache: DashMap<T, Arc<tokio_postgres::Row>>,
 
+    default_row: Arc<tokio_postgres::Row>,
     single_insert: &'static str,
     create_row: &'static str,
     select: &'static str,
@@ -98,30 +87,41 @@ pub struct DatabaseHandler<T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash> {
 impl<T> DatabaseHandler<T>
 where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + std::marker::Send
 {
-    pub fn new(
+    pub async fn new(
         pool: Arc<deadpool_postgres::Pool>,
+        default_id: T,
         select: &'static str,
         delete: &'static str,
         create_row: &'static str,
         single_insert: &'static str,
     ) -> Result<Self, Error> {
-        Ok(
-            DatabaseHandler {
-                pool, select, delete, create_row, single_insert,
-                cache: DashMap::new(),
-            }
-        )
+        Ok(DatabaseHandler {
+            cache: DashMap::new(),
+            default_row: Self::_get(
+                pool.get().await?,
+                select,
+                &default_id
+            ).await?.expect("Default row not in table!"),
+
+            pool, select, delete, create_row, single_insert,
+        })
     }
 
-    #[async_recursion]
+    async fn _get(conn: Connection, select_query: &'static str, identifier: &T) -> Result<Option<Arc<tokio_postgres::Row>>, Error> {
+        let stmt = conn.prepare_cached(select_query).await?;
+        Ok(identifier.get(conn, stmt).await?.map(Arc::new))
+    }
+
     pub async fn get(&self, identifier: T) -> Result<Arc<tokio_postgres::Row>, Error> {
         if let Some(row) = self.cache.get(&identifier) {
             return Ok(row.clone());
         }
 
-        let conn = self.pool.get().await?;
-        let stmt = conn.prepare_cached(self.select).await?;
-        let row = Arc::new(identifier.get(conn, stmt).await?);
+        let row = Self::_get(
+            self.pool.get().await?,
+            self.select,
+            &identifier
+        ).await?.unwrap_or_else(|| self.default_row.clone());
 
         self.cache.insert(identifier, row.clone());
         Ok(row)

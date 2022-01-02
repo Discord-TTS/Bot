@@ -46,17 +46,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-recursion"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7d78656ba01f1b93024b7c3a0467f1608e4be67d725749fdcd7d2c7678fd7a2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -411,7 +400,6 @@ dependencies = [
 name = "discord_tts_bot"
 version = "0.1.0"
 dependencies = [
- "async-recursion",
  "cargo-lock",
  "dashmap 5.0.0",
  "deadpool-postgres",
@@ -1649,9 +1637,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.132"
+version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b9875c23cf305cd1fd7eb77234cbb705f21ea6a72c637a5c6db5fe4b8e7f008"
+checksum = "97565067517b60e2d1ea8b268e59ce036de907ac523ad83a0475da04e818989a"
 dependencies = [
  "serde_derive",
 ]
@@ -1669,9 +1657,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.132"
+version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc0db5cb2556c0e558887d9bbdcf6ac4471e83ff66cf696e5419024d1606276"
+checksum = "ed201699328568d8d08208fdd080e3ff594e6c422e438b6705905da01005d537"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1680,9 +1668,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.73"
+version = "1.0.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcbd0344bc6533bc7ec56df11d42fb70f1b912351c0825ccb7211b59d8af7cf5"
+checksum = "ee2bb9cd061c5865d345bb02ca49fcef1391741b672b54a0bf7b679badec3142"
 dependencies = [
  "itoa 1.0.1",
  "ryu",
@@ -1715,7 +1703,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.10.9"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#f0df151534a89ea6cf418a928572b33b15c7d453"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#3b05774033170967404c1c9e5edb2853bd735a41"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.16.1",
@@ -1742,7 +1730,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.0"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#f0df151534a89ea6cf418a928572b33b15c7d453"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#3b05774033170967404c1c9e5edb2853bd735a41"
 dependencies = [
  "bitflags",
  "enum_primitive",

@@ -18,7 +18,6 @@ indexmap = "1.7"
 itertools = "0.10"
 cargo-lock = "7.0"
 lazy_static = "1.4"
-async-recursion = "0.3"
 deadpool-postgres = "0.10"
 #serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = ["simdjson"] }
 

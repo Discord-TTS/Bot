@@ -151,7 +151,7 @@ async fn main() {
         tokio::spawn(async move {analytics_sender.loop_task().await});
     }
 
-    let guilds_db = DatabaseHandler::new(pool.clone(),
+    let guilds_db = DatabaseHandler::new(pool.clone(), 0,
         "SELECT * FROM guilds WHERE guild_id = $1",
         "DELETE FROM guilds WHERE guild_id = $1",
         "
@@ -162,8 +162,8 @@ async fn main() {
             INSERT INTO guilds(guild_id, {key}) VALUES ($1, $2)
             ON CONFLICT (guild_id) DO UPDATE SET {key} = $2
         "
-    ).unwrap();
-    let userinfo_db = DatabaseHandler::new(pool.clone(),
+    ).await.unwrap();
+    let userinfo_db = DatabaseHandler::new(pool.clone(), 0,
         "SELECT * FROM userinfo WHERE user_id = $1",
         "DELETE FROM userinfo WHERE user_id = $1",
         "
@@ -174,8 +174,8 @@ async fn main() {
             INSERT INTO userinfo(user_id, {key}) VALUES ($1, $2)
             ON CONFLICT (user_id) DO UPDATE SET {key} = $2
         "
-    ).unwrap();
-    let nickname_db = DatabaseHandler::new(pool.clone(),
+    ).await.unwrap();
+    let nickname_db = DatabaseHandler::new(pool.clone(), [0, 0],
         "SELECT * FROM nicknames WHERE guild_id = $1 AND user_id = $2",
         "DELETE FROM nicknames WHERE guild_id = $1 AND user_id = $2",
         "
@@ -186,7 +186,7 @@ async fn main() {
             INSERT INTO nicknames(guild_id, user_id, {key}) VALUES ($1, $2, $3)
             ON CONFLICT (guild_id, user_id) DO UPDATE SET {key} = $3
         "
-    ).unwrap();
+    ).await.unwrap();
 
     let reqwest = reqwest::Client::new();
     let framework = poise::Framework::build()
@@ -194,10 +194,10 @@ async fn main() {
         .client_settings(move |f| {
             f.intents(
                 serenity::GatewayIntents::GUILDS
-                    | serenity::GatewayIntents::GUILD_MESSAGES
-                    | serenity::GatewayIntents::DIRECT_MESSAGES
-                    | serenity::GatewayIntents::GUILD_VOICE_STATES
-                    | serenity::GatewayIntents::GUILD_MEMBERS,
+                | serenity::GatewayIntents::GUILD_MESSAGES
+                | serenity::GatewayIntents::DIRECT_MESSAGES
+                | serenity::GatewayIntents::GUILD_VOICE_STATES
+                | serenity::GatewayIntents::GUILD_MEMBERS,
             )
             .register_songbird()
         })
@@ -221,13 +221,13 @@ async fn main() {
             on_error: |error| Box::pin(on_error(error)),
             listener: |ctx, event, fw, ud| Box::pin(event_listener(ctx, event, fw, ud)),
             prefix_options: poise::PrefixFrameworkOptions {
-                prefix: Some(String::from("-")),
-                dynamic_prefix: Some(|ctx| {Box::pin(async move {
+                prefix: None,
+                dynamic_prefix: Some(|ctx| {Box::pin(async move {Some(
                     match ctx.guild_id {
-                        Some(guild_id) => Some(ctx.data.guilds_db.get(guild_id.into()).await.unwrap().get("prefix")),
-                        None => None,
+                        Some(guild_id) => ctx.data.guilds_db.get(guild_id.into()).await.unwrap().get("prefix"),
+                        None => String::from("-"),
                     }
-                })}),
+                )})}),
                 ..Default::default()
             },
             // Add all the commands, this ordering is important as it is shown on the help command
