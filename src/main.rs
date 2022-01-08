@@ -276,10 +276,10 @@ async fn main() {
             );
         }
         #[cfg(windows)] {
-            let [mut s1, mut s2] = [
+            let (mut s1, mut s2) = (
                 tokio::signal::windows::ctrl_c().unwrap(),
                 tokio::signal::windows::ctrl_break().unwrap()
-            ];
+            );
 
             tokio::select!(
                 v = s1.recv() => v.unwrap(),
