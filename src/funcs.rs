@@ -30,8 +30,8 @@ use crate::structs::{SerenityContextAdditions, Error};
 use crate::database::DatabaseHandler;
 
 pub async fn parse_voice(
-    guilds_db: &DatabaseHandler<u64>,
-    userinfo_db: &DatabaseHandler<u64>,
+    guilds_db: &DatabaseHandler<i64>,
+    userinfo_db: &DatabaseHandler<i64>,
     author_id: serenity::UserId,
     guild_id: Option<serenity::GuildId>,
 ) -> Result<String, Error> {

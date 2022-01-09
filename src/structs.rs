@@ -28,9 +28,9 @@ pub struct Config {
 
 pub struct Data {
     pub analytics: Arc<AnalyticsHandler>,
-    pub guilds_db: DatabaseHandler<u64>,
-    pub userinfo_db: DatabaseHandler<u64>,
-    pub nickname_db: DatabaseHandler<[u64; 2]>,
+    pub guilds_db: DatabaseHandler<i64>,
+    pub userinfo_db: DatabaseHandler<i64>,
+    pub nickname_db: DatabaseHandler<[i64; 2]>,
 
     pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
     pub start_time: std::time::SystemTime,
