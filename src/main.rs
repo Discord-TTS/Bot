@@ -246,7 +246,7 @@ async fn main() {
                         },
                         commands::settings::xsaid(), commands::settings::autojoin(), commands::settings::botignore(),
                         commands::settings::language(), commands::settings::server_language(), commands::settings::prefix(),
-                        commands::settings::nick(), commands::settings::repeated_characters()
+                        commands::settings::nick(), commands::settings::repeated_characters(), commands::settings::audienceignore()
                     ],
                     ..commands::settings::set()
                 },
@@ -527,12 +527,13 @@ async fn process_tts_msg(
     let autojoin = settings_row.get("auto_join");
     let bot_ignore = settings_row.get("bot_ignore");
     let repeated_limit: i16 = settings_row.get("repeated_chars");
+    let audience_ignore = settings_row.get("audience_ignore");
     
     let lang: String;
     let lavalink_client = &data.lavalink;
     let content = match run_checks(
         ctx, message, lavalink_client,
-        channel as u64, prefix, autojoin, bot_ignore
+        channel as u64, prefix, autojoin, bot_ignore, audience_ignore
     ).await? {
         Some(content) => {
             let member = guild.member(ctx, message.author.id.0).await?;
