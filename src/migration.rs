@@ -32,6 +32,13 @@ pub async fn start_migration(config: &mut toml::Value, pool: &Arc<deadpool_postg
         main_config.insert(String::from("setup"), toml::Value::Boolean(true));
     }
 
+    if cfg!(feature="premium") {
+        let default_user_row = transaction.query_one("SELECT * FROM userinfo WHERE user_id = 0", &[]).await?;
+        if default_user_row.try_get::<&str, f32>("speaking_rate").is_err() {
+            transaction.execute("ALTER TABLE userinfo ADD COLUMN speaking_rate real DEFAULT 1", &[]).await?;
+        }
+    }
+
 
     if &starting_conf != config {
         let mut config_file = std::fs::File::create("config.toml")?;

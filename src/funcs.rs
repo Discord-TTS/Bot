@@ -49,7 +49,7 @@ pub async fn parse_voice(
 }
 
 #[cfg(feature="premium")]
-pub async fn fetch_audio(data: &crate::structs::Data, content: String, lang: &str) -> Result<String, Error> {
+pub async fn fetch_audio(data: &crate::structs::Data, content: String, lang: &str, speaking_rate: f32) -> Result<String, Error> {
     let mut jwt_token = data.jwt_token.lock();
     let mut expire_time = data.jwt_expire.lock();
 
@@ -63,7 +63,7 @@ pub async fn fetch_audio(data: &crate::structs::Data, content: String, lang: &st
 
     let resp = data.reqwest.post("https://texttospeech.googleapis.com/v1/text:synthesize")
         .header("Authorization", format!("Bearer {jwt_token}"))
-        .json(&generate_google_json(&content, lang)?)
+        .json(&generate_google_json(&content, lang, speaking_rate)?)
     .send().await?;
 
     if resp.status().as_u16() == 200 {
@@ -75,7 +75,7 @@ pub async fn fetch_audio(data: &crate::structs::Data, content: String, lang: &st
 }
 
 #[cfg(feature="premium")]
-pub fn generate_google_json(content: &str, lang: &str) -> Result<serenity::json::Value, Error> {
+pub fn generate_google_json(content: &str, lang: &str, speaking_rate: f32) -> Result<serenity::json::Value, Error> {
     let (lang, variant) = lang.split_once(' ').ok_or_else(|| 
         format!("{} cannot be parsed into lang and variant", lang)
     )?;
@@ -90,7 +90,8 @@ pub fn generate_google_json(content: &str, lang: &str) -> Result<serenity::json:
                 "name": format!("{}-Standard-{}", lang, variant),
             },
             "audioConfig": {
-                "audioEncoding": "OGG_OPUS"
+                "audioEncoding": "OGG_OPUS",
+                "speakingRate": speaking_rate
             }
         })
     )

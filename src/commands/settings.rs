@@ -519,7 +519,7 @@ pub async fn prefix(
     Ok(())
 }
 
-/// Max repetion of a character (0 = off)
+/// Changes the max repetion of a character (0 = off)
 #[poise::command(
     category="Settings",
     prefix_command, slash_command,
@@ -527,17 +527,44 @@ pub async fn prefix(
     required_bot_permissions="SEND_MESSAGES",
     aliases("repeated_chars", "repeated_letters", "chars")
 )]
-pub async fn repeated_characters(ctx: Context<'_>, #[description="The max message time to read (in seconds)"] chars: u8) -> Result<(), Error> {
+pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeated characters"] chars: u8) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
 
     let to_send = {
         if chars > 100 {
-            String::from("**Error**: Cannot set the max repeated characters above 60 seconds")
-        } else if chars < 20 {
-            String::from("**Error**: Cannot set the max repeated characters below 20 seconds")
+            String::from("**Error**: Cannot set the max repeated characters above 100")
+        } else if chars < 20 && chars != 0 {
+            String::from("**Error**: Cannot set the max repeated characters below 5")
         } else {
-            ctx.data().guilds_db.set_one(guild_id, "msg_length", &(chars as i16)).await?;
+            ctx.data().guilds_db.set_one(guild_id, "repeated_chars", &(chars as i16)).await?;
             format!("Max repeated characters is now: {chars}")
+        }
+    };
+
+    ctx.say(to_send).await?;
+    Ok(())
+}
+
+/// Changes the multiplier for how fast to speak
+#[cfg(feature="premium")]
+#[poise::command(
+    category="Settings",
+    prefix_command, slash_command,
+    required_bot_permissions="SEND_MESSAGES",
+    aliases("speed", "speed_multiplier", "speaking_rate_multiplier", "speaking_speed", "tts_speed")
+)]
+pub async fn speaking_rate(
+    ctx: Context<'_>,
+    #[description="The speed to speak at (0.25-4.0)"] #[min=0.25] #[max=4.0] multiplier: f32
+) -> Result<(), Error> {
+    let to_send = {
+        if multiplier > 4.0 {
+            String::from("**Error**: Cannot set the speaking rate multiplier above 4x")
+        } else if multiplier < 0.25 {
+            String::from("**Error**: Cannot set the speaking rate multiplier below 0.25x")
+        } else {
+            ctx.data().userinfo_db.set_one(ctx.author().id.into(), "speaking_rate", &multiplier).await?;
+            format!("The speaking rate multiplier is now: {multiplier}")
         }
     };
 

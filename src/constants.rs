@@ -42,14 +42,21 @@ There are some basic rules if you want to get help though:
 ";
 
 pub fn db_setup_query() -> String {
-    format!("{}{}{}", "
-        CREATE TABLE userinfo (
-            user_id      bigint     PRIMARY KEY,
-            dm_blocked   bool       DEFAULT False,
-            dm_welcomed  bool       DEFAULT false,
-            voice        text
-        );
-        ", if cfg!(feature="premium") {"
+    format!("{}{}{}",
+        if cfg!(feature="premium") {"
+            CREATE TABLE userinfo (
+                user_id       bigint     PRIMARY KEY,
+                dm_blocked    bool       DEFAULT False,
+                dm_welcomed   bool       DEFAULT false,
+                speaking_rate real       DEFAULT 1,
+                voice         text
+            );"} else {"
+            CREATE TABLE userinfo (
+                user_id      bigint     PRIMARY KEY,
+                dm_blocked   bool       DEFAULT False,
+                dm_welcomed  bool       DEFAULT false,
+                voice        text
+            );"}, if cfg!(feature="premium") {"
             CREATE TABLE guilds (
                 guild_id       bigint     PRIMARY KEY,
                 channel        bigint     DEFAULT 0,

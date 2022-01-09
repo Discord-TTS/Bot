@@ -38,12 +38,11 @@ pub async fn tts(
     ctx: Context<'_>, 
     #[description="The text to TTS"] #[rest] message: String
 ) -> Result<(), Error> {
-    let guild = ctx.guild();
-    let author = ctx.author();
     let data = ctx.data();
-    
+    let author = ctx.author();
+
     if let poise::Context::Prefix(_) = ctx {
-        if let Some(guild) = guild.clone() {
+        if let Some(guild) = ctx.guild() {
             let author_voice_state = guild.voice_states.get(&author.id);
             let bot_voice_state = guild.voice_states.get(&ctx.discord().cache.current_user_id());
             if let (Some(bot_voice_state), Some(author_voice_state)) = (bot_voice_state, author_voice_state) {
@@ -63,13 +62,14 @@ pub async fn tts(
             &data.guilds_db,
             &data.userinfo_db,
             author.id,
-            guild.map(|g| g.id)
+            ctx.guild_id()
         ).await?;
 
         let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
         #[cfg(feature="premium")] {
+            let speaking_rate = data.userinfo_db.get(author.id.into()).await?.get("speaking_rate");
             serenity::AttachmentType::Bytes {
-                data: std::borrow::Cow::Owned(base64::decode(fetch_audio(data, message, &lang).await?)?),
+                data: std::borrow::Cow::Owned(base64::decode(fetch_audio(data, message, &lang, speaking_rate).await?)?),
                 filename: format!("{}-{}.ogg", author_name, ctx.id())
             }
         }

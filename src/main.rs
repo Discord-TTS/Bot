@@ -137,7 +137,11 @@ async fn main() {
     let listener = logging::WebhookLogRecv::new(
         rx,
         http_client,
-        String::from("[Main]"),
+        format!("[{}]",
+            if cfg!(feature="debug_assertions") {"Debug"}
+            else if cfg!(feature="premium") {"Premium"}
+            else {"Main"}
+        ),
         webhooks["logs"].clone(),
         webhooks["errors"].clone(),
     );
@@ -266,6 +270,7 @@ async fn main() {
                         commands::settings::language(), commands::settings::server_language(), commands::settings::prefix(),
                         #[cfg(feature="premium")] commands::settings::translation(),
                         #[cfg(feature="premium")] commands::settings::translation_lang(),
+                        #[cfg(feature="premium")] commands::settings::speaking_rate(),
                         commands::settings::nick(), commands::settings::repeated_characters()
                     ],
                     ..commands::settings::set()
@@ -644,14 +649,16 @@ async fn process_tts_msg(
     };
 
     #[cfg(feature="premium")] {
+        let speaking_rate: f32 = data.userinfo_db.get(message.author.id.into()).await?.get("speaking_rate");
         let target_lang: Option<String> = guild_row.get("target_lang");
+
         let query_json = funcs::generate_google_json(&
             if let Some(target_lang) = target_lang {
                 if guild_row.get("to_translate") {
                     funcs::translate(&content, &target_lang, data).await?.unwrap_or(content)
                 } else {content}
             } else {content},
-            &voice
+            &voice, speaking_rate
         )?;
 
         let mut query = url::Url::parse("tts://")?;
