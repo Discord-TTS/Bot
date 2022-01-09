@@ -16,8 +16,8 @@
 
 use poise::serenity_prelude as serenity;
 
-use crate::constants::*;
-use crate::{random_footer, PoiseContextAdditions, SerenityContextAdditions};
+use crate::structs::{Context, Error, PoiseContextAdditions, SerenityContextAdditions};
+use crate::funcs::random_footer;
 
 async fn channel_check(ctx: &Context<'_>) -> Result<bool, Error> {
     let guild_id = ctx.guild_id().unwrap();

@@ -21,7 +21,7 @@ use dashmap::DashMap;
 use tokio_postgres::Statement;
 use deadpool_postgres::{tokio_postgres, Object as Connection};
 
-use crate::constants::*;
+use crate::structs::Error;
 
 #[poise::async_trait]
 pub trait CacheKeyTrait {
@@ -131,10 +131,6 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
         &self,
         identifier: T
     ) -> Result<(), Error> {
-        if self.cache.contains_key(&identifier) {
-            return Ok(());
-        }
-
         let conn = self.pool.get().await?;
         let stmt = conn.prepare_cached(self.create_row).await?;
         identifier.create_row(conn, stmt).await?;

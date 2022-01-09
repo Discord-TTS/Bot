@@ -7,12 +7,12 @@ WORKDIR /bot
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && \
     echo "// dummy file" > src/lib.rs && \
-    cargo build && \
+    cargo build --features "premium" && \
     rm -r src
 
 # This is the actual build, copy in the rest of the sources
 COPY . .
-RUN cargo build
+RUN cargo build --features "premium"
 
 # Now make the runtime container
 FROM debian:buster-slim

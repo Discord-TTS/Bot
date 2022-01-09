@@ -16,9 +16,11 @@
 
 use indexmap::IndexMap;
 
-use crate::constants::*;
+use crate::structs::{Context, Data, Error};
+use crate::constants::NETURAL_COLOUR;
 
 type Command = poise::Command<Data, Error>;
+
 enum HelpCommandMode<'a> {
     Root,
     Group(&'a Command),

@@ -27,17 +27,9 @@ lavalink:
         playerUpdateInterval: 5 # How frequently to send player updates to clients, in seconds
         gc-warnings: true
 
-metrics:
-    prometheus:
-        enabled: false
-        endpoint: /metrics
-
-sentry:
-    dsn: ""
-    environment: ""
-    #  tags:
-    #    some_key: some_value
-    #    another_key: another_value
+    plugins:
+     - dependency: "com.dunctebot:tts-plugin:1.0.1"
+       repository: "https://jitpack.io"
 
 logging:
     file:

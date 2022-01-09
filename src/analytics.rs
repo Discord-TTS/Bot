@@ -19,7 +19,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use tracing::error;
 
-use crate::constants::*;
+use crate::structs::Error;
 
 pub struct AnalyticsHandler {
     log_buffer: DashMap<String, i32>,
