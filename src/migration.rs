@@ -36,6 +36,8 @@ pub async fn start_migration(config: &mut toml::Value, pool: &Arc<deadpool_postg
 
     }
 
+    transaction.execute("ALTER TABLE guilds ADD COLUMN IF NOT EXISTS audience_ignore bool DEFAULT True", &[]).await?;
+
     transaction.commit().await?;
     Ok(())
 }

@@ -85,15 +85,16 @@ There are some basic rules if you want to get help though:
 
 pub const DB_SETUP_QUERY: &str = "
     CREATE TABLE guilds (
-        guild_id       bigint     PRIMARY KEY,
-        channel        bigint     DEFAULT 0,
-        xsaid          bool       DEFAULT True,
-        bot_ignore     bool       DEFAULT True,
-        auto_join      bool       DEFAULT False,
-        msg_length     smallint   DEFAULT 30,
-        repeated_chars smallint   DEFAULT 0,
-        prefix         varchar(6) DEFAULT '-',
-        default_lang   varchar(5)
+        guild_id        bigint     PRIMARY KEY,
+        channel         bigint     DEFAULT 0,
+        xsaid           bool       DEFAULT True,
+        bot_ignore      bool       DEFAULT True,
+        auto_join       bool       DEFAULT False,
+        msg_length      smallint   DEFAULT 30,
+        repeated_chars  smallint   DEFAULT 0,
+        prefix          varchar(6) DEFAULT '-',
+        default_lang    varchar(5),
+        audience_ignore bool       DEFAULT True
     );
 
     CREATE TABLE userinfo (
