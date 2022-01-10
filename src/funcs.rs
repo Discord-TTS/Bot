@@ -15,6 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::fmt::Write;
+use std::collections::BTreeMap;
+
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
@@ -22,146 +24,169 @@ use rand::prelude::SliceRandom;
 use lavalink_rs::LavalinkClient;
 
 use poise::serenity_prelude as serenity;
+use serenity::json::prelude as json;
 
-use crate::constants::*;
+use crate::structs::{SerenityContextAdditions, Error};
 use crate::database::DatabaseHandler;
 
-#[serenity::async_trait]
-pub trait PoiseContextAdditions {
-    async fn send_error(&self, error: &str, fix: Option<String>) -> Result<Option<poise::ReplyHandle<'_>>, Error>;
-}
-#[serenity::async_trait]
-pub trait SerenityContextAdditions {
-    async fn user_from_dm(&self, dm_name: &str) -> Option<serenity::User>;
-    async fn join_vc(
-        &self,
-        lavalink: &LavalinkClient,
-        guild_id: &serenity::GuildId,
-        channel_id: &serenity::ChannelId,
-    ) -> Result<(), &'static str>;
-}
-
-#[serenity::async_trait]
-impl PoiseContextAdditions for Context<'_> {
-    async fn send_error(&self, error: &str, fix: Option<String>) -> Result<Option<poise::ReplyHandle<'_>>, Error> {
-        let author = self.author();
-        let fix =
-            fix.unwrap_or_else(|| String::from("get in contact with us via the support server"));
-
-        let ctx_discord = self.discord();
-        let (name, avatar_url) = match self.channel_id().to_channel(ctx_discord).await? {
-            serenity::Channel::Guild(channel) => {
-                let permissions = channel
-                    .permissions_for_user(ctx_discord, ctx_discord.cache.current_user_id())?;
-
-                if !permissions.send_messages() {
-                    return Ok(None);
-                };
-
-                if !permissions.embed_links() {
-                    self.send(|b| {
-                        b.ephemeral(true);
-                        b.content("An Error Occurred! Please give me embed links permissions so I can tell you more!")
-                    }).await?;
-                    return Ok(None);
-                };
-
-                match channel.guild_id.member(ctx_discord, author.id).await {
-                    Ok(member) => (member.display_name().into_owned(), member.face()),
-                    Err(_) => (author.name.clone(), author.face()),
-                }
-            }
-            serenity::Channel::Private(_) => (author.name.clone(), author.face()),
-            _ => unreachable!(),
-        };
-
-        Ok(
-            self.send(|b| {
-                b.ephemeral(true);
-                b.embed(|e| {
-                    e.colour(RED);
-                    e.title("An Error Occurred!");
-                    e.description(format!("Sorry but {}, to fix this, please {}!", error, fix));
-                    e.author(|a| {
-                        a.name(name);
-                        a.icon_url(avatar_url)
-                    });
-                    e.footer(|f| f.text(format!(
-                        "Support Server: {}", self.data().config.server_invite
-                    )))
-                })
-            })
-            .await?
-        )
-    }
-}
-
-#[serenity::async_trait]
-impl SerenityContextAdditions for serenity::Context {
-    async fn user_from_dm(&self, dm_name: &str) -> Option<serenity::User> {
-        lazy_static! {
-            static ref ID_IN_BRACKETS_REGEX: Regex = Regex::new(r"\((\d+)\)").unwrap();
-        }
-
-        let re_match = ID_IN_BRACKETS_REGEX.captures(dm_name)?;
-        let user_id: u64 = re_match.get(1)?.as_str().parse().ok()?;
-        self.http.get_user(user_id).await.ok()
-    }
-
-    async fn join_vc(
-        &self,
-        lavalink: &LavalinkClient,
-        guild_id: &serenity::GuildId,
-        channel_id: &serenity::ChannelId,
-    ) -> Result<(), &'static str> {
-        let manager = songbird::get(self).await.unwrap();
-        let (_, handler) = manager.join_gateway(guild_id.0, channel_id.0).await;
-
-        match handler {
-            Ok(connection_info) => {
-                match lavalink
-                    .create_session_with_songbird(&connection_info)
-                    .await
-                {
-                    Ok(_) => Ok(()),
-                    _ => Err("lavalink failed"),
-                }
-            }
-            Err(_) => Err("Error joining the channel"),
-        }
-    }
-}
-
-pub async fn parse_lang(
-    settings: &DatabaseHandler<u64>,
-    userinfo: &DatabaseHandler<u64>,
+pub async fn parse_voice(
+    guilds_db: &DatabaseHandler<i64>,
+    userinfo_db: &DatabaseHandler<i64>,
     author_id: serenity::UserId,
     guild_id: Option<serenity::GuildId>,
 ) -> Result<String, Error> {
-    let user_lang: Option<String> = userinfo.get(author_id.into()).await?.get("lang");
+    let user_voice: Option<String> = userinfo_db.get(author_id.into()).await?.get("voice");
 
-    Ok(match guild_id {
-        Some(guild_id) => {
-            let settings = settings.get(guild_id.into()).await?;
-            user_lang
-                .or_else(|| settings.get("default_lang"))
-                .unwrap_or_else(|| String::from("en"))
-        }
-        None => user_lang.unwrap_or_else(|| String::from("en")),
-    })
+    Ok(
+        match guild_id {
+            Some(guild_id) => {
+                let settings = guilds_db.get(guild_id.into()).await?;
+                user_voice.or_else(|| settings.get("default_voice"))
+            }
+            None => user_voice
+        }.unwrap_or_else(|| String::from(if cfg!(feature="premium") {"en-us a"} else {"en"}))
+    )
 }
 
-pub fn parse_url(content: &str, lang: String) -> Vec<url::Url> {
+#[cfg(feature="premium")]
+pub async fn fetch_audio(data: &crate::structs::Data, content: String, lang: &str, speaking_rate: f32) -> Result<String, Error> {
+    let mut jwt_token = data.jwt_token.lock();
+    let mut expire_time = data.jwt_expire.lock();
+
+    if let Some((new_token, new_expire)) = generate_jwt(
+        &data.service_acc,
+        &expire_time,
+    )? {
+        *expire_time = new_expire;
+        *jwt_token = new_token;
+    };
+
+    let resp = data.reqwest.post("https://texttospeech.googleapis.com/v1/text:synthesize")
+        .header("Authorization", format!("Bearer {jwt_token}"))
+        .json(&generate_google_json(&content, lang, speaking_rate)?)
+    .send().await?;
+
+    if resp.status().as_u16() == 200 {
+        let data: json::Value = resp.json().await?;
+        Ok(String::from(data["audioContent"].as_str().unwrap()))
+    } else {
+        Err(Error::Tts(resp))
+    }
+}
+
+#[cfg(feature="premium")]
+pub fn generate_google_json(content: &str, lang: &str, speaking_rate: f32) -> Result<serenity::json::Value, Error> {
+    let (lang, variant) = lang.split_once(' ').ok_or_else(|| 
+        format!("{} cannot be parsed into lang and variant", lang)
+    )?;
+
+    Ok(
+        serenity::json::prelude::json!({
+            "input": {
+                "text": content
+            },
+            "voice": {
+                "languageCode": lang,
+                "name": format!("{}-Standard-{}", lang, variant),
+            },
+            "audioConfig": {
+                "audioEncoding": "OGG_OPUS",
+                "speakingRate": speaking_rate
+            }
+        })
+    )
+}
+
+
+#[cfg(feature="premium")]
+fn generate_jwt(service_account: &crate::structs::ServiceAccount, expire_time: &std::time::SystemTime) -> Result<Option<(String, std::time::SystemTime)>, Error> {
+    let current_time = std::time::SystemTime::now();
+    if &current_time > expire_time  {
+        let private_key_raw = &service_account.private_key;
+        let private_key = jsonwebtoken::EncodingKey::from_rsa_pem(private_key_raw.as_bytes())?;
+
+        let mut headers = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
+        headers.kid = Some(private_key_raw.clone());
+
+        let new_expire_time = current_time + std::time::Duration::from_secs(3600);
+        let payload = serenity::json::prelude::json!({
+            "exp": new_expire_time.duration_since(std::time::UNIX_EPOCH)?.as_secs(),
+            "iat": current_time.duration_since(std::time::UNIX_EPOCH)?.as_secs(),
+            "aud": "https://texttospeech.googleapis.com/",
+            "iss": service_account.client_email,
+            "sub": service_account.client_email,
+        });
+
+        Ok(Some((jsonwebtoken::encode(&headers, &payload, &private_key)?, new_expire_time)))
+    } else {
+        Ok(None)
+    }
+}
+
+
+#[cfg(not(feature="premium"))]
+pub async fn fetch_audio(reqwest: &reqwest::Client, content: String, lang: &str) -> Result<Vec<u8>, Error> {
+    let mut audio_buf = Vec::new();
+    for url in parse_url(&content, lang) {
+        let resp = reqwest.get(url).send().await?;
+        let status = resp.status();
+        if status == 200 {
+            audio_buf.append(&mut resp.bytes().await?.to_vec())
+        } else {    
+            return Err(Error::Tts(resp))
+        }
+    }
+
+    Ok(audio_buf)
+}
+
+#[cfg(not(feature="premium"))]
+pub fn parse_url(content: &str, lang: &str) -> Vec<url::Url> {
     content.chars().chunks(200).into_iter().map(|c| c.collect::<String>()).map(|chunk| {
         let mut url = url::Url::parse("https://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&client=tw-ob").unwrap();
         url.query_pairs_mut()
-            .append_pair("tl", &lang)
+            .append_pair("tl", lang)
             .append_pair("q", &chunk)
             .append_pair("textlen", &chunk.len().to_string())
             .finish();
         url
     }).collect()
 }
+
+
+
+#[cfg(feature="premium")]
+pub fn get_supported_languages() -> crate::structs::VoiceData { 
+    use crate::structs::{GoogleVoice, Gender};
+
+    // {lang_accent: {variant: gender}}
+    let mut cleaned_map = BTreeMap::new();
+    let raw_map: Vec<GoogleVoice<'_>> = json::from_str(std::include_str!("data/langs-premium.json")).unwrap();    
+
+    for gvoice in raw_map {
+        let mode_variant: String = gvoice.name.split_inclusive('-').skip(2).collect();
+        let (mode, variant) = mode_variant.split_once('-').unwrap();
+
+        if mode == "Standard" {
+            let [language] = gvoice.languageCodes;
+
+            let inner_map = cleaned_map.entry(language).or_insert_with(BTreeMap::new);
+            inner_map.insert(String::from(variant), match gvoice.ssmlGender {
+                "MALE" => Gender::Male,
+                "FEMALE" => Gender::Female,
+                _ => unreachable!()
+            });
+        }
+    }
+
+    cleaned_map
+}
+
+#[cfg(not(feature="premium"))]
+pub fn get_supported_languages() -> BTreeMap<String, String> {
+    json::from_str(std::include_str!("data/langs-free.json")).unwrap()
+}
+
 
 pub fn random_footer(prefix: Option<&str>, server_invite: Option<&str>, client_id: Option<u64>) -> String {
     let mut footers = Vec::with_capacity(4);
@@ -332,8 +357,15 @@ pub async fn run_checks(
         }
     }
 
+    let mut removed_chars_content = content.clone();
+    removed_chars_content.retain(|c| !" ?.)'!\":".contains(c));
+    if removed_chars_content.is_empty() {
+        return Ok(None)
+    }
+
     Ok(Some(content))
 }
+
 pub fn clean_msg(
     content: String,
 
@@ -393,16 +425,13 @@ pub fn clean_msg(
         .split(' ')
         .filter(|w|
             ["https://", "http://", "www."].iter()
-            .any(|ls| w.starts_with(ls))
+            .all(|ls| !w.starts_with(ls))
         )
         .join(" ");
 
     let contained_url = content != with_urls;
 
     if xsaid {
-        let said_name = nickname.unwrap_or_else(|| member.nick.unwrap_or_else(|| member.user.name.clone()));
-        let file_format = attachments_to_format(attachments);
-
         if contained_url {
             write!(content, " {}",
                 if content.is_empty() {"a link."}
@@ -410,7 +439,8 @@ pub fn clean_msg(
             ).unwrap();
         }
 
-        content = match file_format {
+        let said_name = nickname.unwrap_or_else(|| member.nick.unwrap_or_else(|| member.user.name.clone()));
+        content = match attachments_to_format(attachments) {
             Some(file_format) if content.is_empty() => format!("{} sent {}", said_name, file_format),
             Some(file_format) => format!("{} sent {} and said {}", said_name, file_format, content),
             None => format!("{} said: {}", said_name, content),
@@ -422,12 +452,31 @@ pub fn clean_msg(
         ).unwrap()
     }
 
-    let mut removed_chars_content = content.clone();
-    removed_chars_content.retain(|c| !" ?.)'!\":".contains(c));
-
     if repeated_limit != 0 {
         content = remove_repeated_chars(&content, repeated_limit as usize)
     }
 
     Ok(content)
+}
+
+#[cfg(feature="premium")]
+pub async fn translate(content: &str, target_lang: &str, data: &crate::structs::Data) -> Result<Option<String>, Error> {
+    let url = format!("{}/translate", crate::constants::TRANSLATION_URL);
+    let response: crate::structs::DeeplTranslateResponse = data.reqwest.get(url)
+        .query(&serenity::json::prelude::json!({
+            "text": content,
+            "target_lang": target_lang,
+            "preserve_formatting": 1u8,
+            "auth_key": &data.config.translation_token,
+        }))
+        .send().await?.error_for_status()?
+        .json().await?;
+
+    if let Some(translation) = response.translations.first() {
+        if translation.detected_source_language != target_lang {
+            return Ok(Some(translation.text.clone()))
+        }
+    }
+
+    Ok(None)
 }

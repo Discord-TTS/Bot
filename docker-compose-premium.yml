@@ -1,0 +1,38 @@
+services:
+    bot:
+        build: .
+        volumes:
+          - type: bind
+            source: ./config.toml
+            target: /config.toml
+          - type: bind
+            source: ${GOOGLE_APPLICATION_CREDENTIALS}
+            target: /gcp.json
+
+        environment:
+            - GOOGLE_APPLICATION_CREDENTIALS=/gcp.json
+
+        depends_on: [database, lavalink]
+    lavalink:
+        image: fredboat/lavalink:dev
+        volumes:
+          - type: bind
+            source: ./lavalink_config.yml
+            target: /opt/Lavalink/application.yml
+          - type: bind
+            source: ./lavalink-plugins
+            target: /opt/Lavalink/plugins
+          - type: bind
+            source: ${GOOGLE_APPLICATION_CREDENTIALS}
+            target: /gcp.json
+
+        environment:
+            - GOOGLE_APPLICATION_CREDENTIALS=/gcp.json
+
+        expose: [2333]
+    database:
+        image: postgres:13
+        expose: [5432]
+        environment: 
+            POSTGRES_USER: tts
+            POSTGRES_PASSWORD: tts_password

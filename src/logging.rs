@@ -23,7 +23,7 @@ use itertools::Itertools;
 use parking_lot::Mutex;
 use strfmt::strfmt;
 
-use crate::constants::*;
+use crate::structs::Error;
 
 // This is split up into two structs as listener needs to be run in the background
 // and the sender needs to be given to tracing as a subscriber, so mspc is used as

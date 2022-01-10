@@ -1,8 +1,10 @@
 .vscode
 *.hidden
+Dockerfile
 config.ini
 config.toml
-Dockerfile
+docker-compose.yml
+lavalink-plugins/*
 
 # Added by cargo
 

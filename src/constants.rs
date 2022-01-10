@@ -14,64 +14,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
-
-use lavalink_rs::LavalinkClient;
-use poise::serenity_prelude as serenity;
-
-use crate::{database::DatabaseHandler, analytics::AnalyticsHandler};
-
-pub struct Config {
-    pub server_invite: String,
-    pub invite_channel: u64,
-    pub main_server: u64,
-    pub ofs_role: u64,
-}
-
-pub struct Data {
-    pub analytics: Arc<AnalyticsHandler>,
-    pub guilds_db: DatabaseHandler<u64>,
-    pub userinfo_db: DatabaseHandler<u64>,
-    pub nickname_db: DatabaseHandler<[u64; 2]>,
-
-    pub webhooks: HashMap<String, serenity::Webhook>,
-    pub start_time: std::time::SystemTime,
-    pub owner_id: serenity::UserId,
-    pub lavalink: LavalinkClient,
-    pub reqwest: reqwest::Client,
-    pub config: Config,
-}
-
-
-#[derive(Debug)]
-pub enum Error {
-    GuildOnly,
-    DebugLog(&'static str), // debug log something but ignore
-    Unexpected(Box<dyn std::error::Error + Send + Sync>),
-}
-
-impl<E> From<E> for Error
-where
-    E: Into<Box<dyn std::error::Error + Send + Sync>>,
-{
-    fn from(e: E) -> Self {
-        Self::Unexpected(e.into())
-    }
-}
-impl std::fmt::Display for Error {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
-
-pub type Context<'a> = poise::Context<'a, Data, Error>;
-pub const NETURAL_COLOUR: u32 = 0x3498db;
 pub const RED: u32 = 0xff0000;
+pub const NETURAL_COLOUR: u32 = 
+    if cfg!(feature="premium") {
+        0xcaa652
+    } else {
+        0x3498db
+    };
 
-pub const OPTION_SEPERATORS: [&str; 3] = [
+#[cfg(feature="premium")]
+pub const TRANSLATION_URL: &str = "https://api-free.deepl.com/v2";
+
+pub const OPTION_SEPERATORS: [&str; 4] = [
     ":small_orange_diamond:",
     ":small_blue_diamond:",
-    ":small_red_triangle:"
+    ":small_red_triangle:",
+    ":star:"
 ];
 
 pub const DM_WELCOME_MESSAGE: &str = "
@@ -83,58 +41,88 @@ There are some basic rules if you want to get help though:
 `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
 ";
 
-pub const DB_SETUP_QUERY: &str = "
-    CREATE TABLE guilds (
-        guild_id        bigint     PRIMARY KEY,
-        channel         bigint     DEFAULT 0,
-        xsaid           bool       DEFAULT True,
-        bot_ignore      bool       DEFAULT True,
-        auto_join       bool       DEFAULT False,
-        msg_length      smallint   DEFAULT 30,
-        repeated_chars  smallint   DEFAULT 0,
-        prefix          varchar(6) DEFAULT '-',
-        default_lang    varchar(5),
-        audience_ignore bool       DEFAULT True
-    );
+pub fn db_setup_query() -> String {
+    format!("{}{}{}",
+        if cfg!(feature="premium") {"
+            CREATE TABLE userinfo (
+                user_id       bigint     PRIMARY KEY,
+                dm_blocked    bool       DEFAULT False,
+                dm_welcomed   bool       DEFAULT false,
+                speaking_rate real       DEFAULT 1,
+                voice         text
+            );"} else {"
+            CREATE TABLE userinfo (
+                user_id      bigint     PRIMARY KEY,
+                dm_blocked   bool       DEFAULT False,
+                dm_welcomed  bool       DEFAULT false,
+                voice        text
+            );"}, if cfg!(feature="premium") {"
+            CREATE TABLE guilds (
+                guild_id        bigint     PRIMARY KEY,
+                channel         bigint     DEFAULT 0,
+                premium_user    bigint,
+                xsaid           bool       DEFAULT True,
+                bot_ignore      bool       DEFAULT True,
+                auto_join       bool       DEFAULT False,
+                to_translate    bool       DEFAULT False,
+                formal          bool,
+                msg_length      smallint   DEFAULT 30,
+                repeated_chars  smallint   DEFAULT 0,
+                prefix          varchar(6) DEFAULT 'p-',
+                target_lang     varchar(5),
+                default_voice   text,
+                audience_ignore bool       DEFAULT True,
 
-    CREATE TABLE userinfo (
-        user_id      bigint     PRIMARY KEY,
-        dm_blocked   bool       DEFAULT False,
-        dm_welcomed  bool       DEFAULT false,
-        lang         varchar(5)
-    );
+                FOREIGN KEY         (premium_user)
+                REFERENCES userinfo (user_id)
+                ON DELETE CASCADE
+            );"
+        } else {"
+            CREATE TABLE guilds (
+                guild_id        bigint     PRIMARY KEY,
+                channel         bigint     DEFAULT 0,
+                xsaid           bool       DEFAULT True,
+                bot_ignore      bool       DEFAULT True,
+                auto_join       bool       DEFAULT False,
+                msg_length      smallint   DEFAULT 30,
+                repeated_chars  smallint   DEFAULT 0,
+                prefix          varchar(6) DEFAULT '-',
+                default_voice   text,
+                audience_ignore bool       DEFAULT True
+            );
+        "}, "
+        CREATE TABLE nicknames (
+            guild_id bigint,
+            user_id  bigint,
+            name     text,
 
-    CREATE TABLE nicknames (
-        guild_id bigint,
-        user_id  bigint,
-        name     text,
+            PRIMARY KEY (guild_id, user_id),
 
-        PRIMARY KEY (guild_id, user_id),
+            FOREIGN KEY       (guild_id)
+            REFERENCES guilds (guild_id)
+            ON DELETE CASCADE,
 
-        FOREIGN KEY       (guild_id)
-        REFERENCES guilds (guild_id)
-        ON DELETE CASCADE,
+            FOREIGN KEY         (user_id)
+            REFERENCES userinfo (user_id)
+            ON DELETE CASCADE
+        );
 
-        FOREIGN KEY         (user_id)
-        REFERENCES userinfo (user_id)
-        ON DELETE CASCADE
-    );
+        CREATE TABLE analytics (
+            event          text  NOT NULL,
+            count          int   NOT NULL,
+            is_command     bool  NOT NULL,
+            date_collected date  NOT NULL DEFAULT CURRENT_DATE,
+            PRIMARY KEY (event, is_command, date_collected)
+        );
 
-    CREATE TABLE analytics (
-        event          text  NOT NULL,
-        count          int   NOT NULL,
-        is_command     bool  NOT NULL,
-        date_collected date  NOT NULL DEFAULT CURRENT_DATE,
-        PRIMARY KEY (event, is_command, date_collected)
-    );
+        CREATE TABLE errors (
+            traceback   text    PRIMARY KEY,
+            message_id  bigint  NOT NULL,
+            occurrences int     DEFAULT 1
+        );
 
-    CREATE TABLE errors (
-        traceback   text    PRIMARY KEY,
-        message_id  bigint  NOT NULL,
-        occurrences int     DEFAULT 1
-    );
-
-    INSERT INTO guilds(guild_id) VALUES(0);
-    INSERT INTO userinfo(user_id) VALUES(0);
-    INSERT INTO NICKNAMES(guild_id, user_id) VALUES (0, 0);
-";
+        INSERT INTO guilds(guild_id) VALUES(0);
+        INSERT INTO userinfo(user_id) VALUES(0);
+        INSERT INTO NICKNAMES(guild_id, user_id) VALUES (0, 0);
+    ")
+}

@@ -14,12 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use tracing::error;
-
 use poise::serenity_prelude as serenity;
 
-use crate::constants::*;
-use crate::{parse_url, parse_lang};
+use crate::structs::{Context, Error};
+use crate::funcs::{fetch_audio, parse_voice};
+use crate::constants::{OPTION_SEPERATORS, NETURAL_COLOUR};
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
@@ -39,12 +38,11 @@ pub async fn tts(
     ctx: Context<'_>, 
     #[description="The text to TTS"] #[rest] message: String
 ) -> Result<(), Error> {
-    let guild = ctx.guild();
-    let author = ctx.author();
     let data = ctx.data();
-    
+    let author = ctx.author();
+
     if let poise::Context::Prefix(_) = ctx {
-        if let Some(guild) = guild.clone() {
+        if let Some(guild) = ctx.guild() {
             let author_voice_state = guild.voice_states.get(&author.id);
             let bot_voice_state = guild.voice_states.get(&ctx.discord().cache.current_user_id());
             if let (Some(bot_voice_state), Some(author_voice_state)) = (bot_voice_state, author_voice_state) {
@@ -60,34 +58,26 @@ pub async fn tts(
     }
 
     let attachment = {
-        let lang = parse_lang(
+        let lang = parse_voice(
             &data.guilds_db,
             &data.userinfo_db,
             author.id,
-            guild.map(|g| g.id)
+            ctx.guild_id()
         ).await?;
 
-        let mut audio_buf = Vec::new();
-        for url in parse_url(&message, lang) {
-            let resp = data.reqwest.get(url).send().await?;
-            let status = resp.status();
-            if status == 200 {
-                audio_buf.append(&mut resp.bytes().await?.to_vec())
-            } else {
-                error!("gTTS Error! Status: {}", status);
-                ctx.send(|b| {
-                    b.content("Failed to generate TTS!");
-                    b.ephemeral(true)
-                }).await?;
-    
-                return Ok(())
+        let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
+        #[cfg(feature="premium")] {
+            let speaking_rate = data.userinfo_db.get(author.id.into()).await?.get("speaking_rate");
+            serenity::AttachmentType::Bytes {
+                data: std::borrow::Cow::Owned(base64::decode(fetch_audio(data, message, &lang, speaking_rate).await?)?),
+                filename: format!("{}-{}.ogg", author_name, ctx.id())
             }
         }
-
-        let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
-        serenity::AttachmentType::Bytes {
-            data: std::borrow::Cow::Owned(audio_buf),
-            filename: format!("{}-{}.mp3", author_name, ctx.id())
+        #[cfg(not(feature="premium"))] {
+            serenity::AttachmentType::Bytes {
+                data: std::borrow::Cow::Owned(fetch_audio(&data.reqwest, message, &lang).await?),
+                filename: format!("{}-{}.mp3", author_name, ctx.id())
+            }
         }
     };
 

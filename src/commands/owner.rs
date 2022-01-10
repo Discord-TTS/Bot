@@ -16,7 +16,7 @@
 
 use poise::serenity_prelude as serenity;
 
-use crate::constants::*;
+use crate::structs::{Context, Error};
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {

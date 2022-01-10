@@ -16,27 +16,35 @@
 
 use std::{sync::Arc, io::Write};
 
-use crate::constants::*;
+use crate::structs::Error;
+use crate::constants::db_setup_query;
 
 // I'll use a proper framework for this one day
 pub async fn start_migration(config: &mut toml::Value, pool: &Arc<deadpool_postgres::Pool>) -> Result<(), Error> {
+    let starting_conf = config.clone();
+
     let mut conn = pool.get().await?;
     let transaction = conn.transaction().await?;
-
     let main_config = config["Main"].as_table_mut().unwrap();
-    if main_config.get("setup").is_none() {
-        transaction.batch_execute(DB_SETUP_QUERY).await?;
 
+    if main_config.get("setup").is_none() {
+        transaction.batch_execute(&db_setup_query()).await?;
         main_config.insert(String::from("setup"), toml::Value::Boolean(true));
     }
 
-    {   
-        let mut config_file = std::fs::File::create("config.toml")?;
-        config_file.write_all(toml::to_string_pretty(config)?.as_bytes())?;
-
+    if cfg!(feature="premium") {
+        let default_user_row = transaction.query_one("SELECT * FROM userinfo WHERE user_id = 0", &[]).await?;
+        if default_user_row.try_get::<&str, f32>("speaking_rate").is_err() {
+            transaction.execute("ALTER TABLE userinfo ADD COLUMN speaking_rate real DEFAULT 1", &[]).await?;
+        }
     }
 
     transaction.execute("ALTER TABLE guilds ADD COLUMN IF NOT EXISTS audience_ignore bool DEFAULT True", &[]).await?;
+
+    if &starting_conf != config {
+        let mut config_file = std::fs::File::create("config.toml")?;
+        config_file.write_all(toml::to_string_pretty(config)?.as_bytes())?;
+    }
 
     transaction.commit().await?;
     Ok(())
