@@ -58,19 +58,20 @@ pub fn db_setup_query() -> String {
                 voice        text
             );"}, if cfg!(feature="premium") {"
             CREATE TABLE guilds (
-                guild_id       bigint     PRIMARY KEY,
-                channel        bigint     DEFAULT 0,
-                premium_user   bigint,
-                xsaid          bool       DEFAULT True,
-                bot_ignore     bool       DEFAULT True,
-                auto_join      bool       DEFAULT False,
-                to_translate   bool       DEFAULT False,
-                formal         bool,
-                msg_length     smallint   DEFAULT 30,
-                repeated_chars smallint   DEFAULT 0,
-                prefix         varchar(6) DEFAULT 'p-',
-                target_lang    varchar(5),
-                default_voice  text,
+                guild_id        bigint     PRIMARY KEY,
+                channel         bigint     DEFAULT 0,
+                premium_user    bigint,
+                xsaid           bool       DEFAULT True,
+                bot_ignore      bool       DEFAULT True,
+                auto_join       bool       DEFAULT False,
+                to_translate    bool       DEFAULT False,
+                formal          bool,
+                msg_length      smallint   DEFAULT 30,
+                repeated_chars  smallint   DEFAULT 0,
+                prefix          varchar(6) DEFAULT 'p-',
+                target_lang     varchar(5),
+                default_voice   text,
+                audience_ignore bool       DEFAULT True,
 
                 FOREIGN KEY         (premium_user)
                 REFERENCES userinfo (user_id)
@@ -78,15 +79,16 @@ pub fn db_setup_query() -> String {
             );"
         } else {"
             CREATE TABLE guilds (
-                guild_id       bigint     PRIMARY KEY,
-                channel        bigint     DEFAULT 0,
-                xsaid          bool       DEFAULT True,
-                bot_ignore     bool       DEFAULT True,
-                auto_join      bool       DEFAULT False,
-                msg_length     smallint   DEFAULT 30,
-                repeated_chars smallint   DEFAULT 0,
-                prefix         varchar(6) DEFAULT '-',
-                default_voice  text
+                guild_id        bigint     PRIMARY KEY,
+                channel         bigint     DEFAULT 0,
+                xsaid           bool       DEFAULT True,
+                bot_ignore      bool       DEFAULT True,
+                auto_join       bool       DEFAULT False,
+                msg_length      smallint   DEFAULT 30,
+                repeated_chars  smallint   DEFAULT 0,
+                prefix          varchar(6) DEFAULT '-',
+                default_voice   text,
+                audience_ignore bool       DEFAULT True
             );
         "}, "
         CREATE TABLE nicknames (

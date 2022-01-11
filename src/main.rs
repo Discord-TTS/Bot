@@ -271,7 +271,7 @@ async fn main() {
                         #[cfg(feature="premium")] commands::settings::translation(),
                         #[cfg(feature="premium")] commands::settings::translation_lang(),
                         #[cfg(feature="premium")] commands::settings::speaking_rate(),
-                        commands::settings::nick(), commands::settings::repeated_characters()
+                        commands::settings::nick(), commands::settings::repeated_characters(), commands::settings::audienceignore()
                     ],
                     ..commands::settings::set()
                 },
@@ -301,10 +301,10 @@ async fn main() {
             );
         }
         #[cfg(windows)] {
-            let [mut s1, mut s2] = [
+            let (mut s1, mut s2) = (
                 tokio::signal::windows::ctrl_c().unwrap(),
                 tokio::signal::windows::ctrl_break().unwrap()
-            ];
+            );
 
             tokio::select!(
                 v = s1.recv() => v.unwrap(),
@@ -622,12 +622,13 @@ async fn process_tts_msg(
     let autojoin = guild_row.get("auto_join");
     let bot_ignore = guild_row.get("bot_ignore");
     let repeated_limit: i16 = guild_row.get("repeated_chars");
+    let audience_ignore = guild_row.get("audience_ignore");
 
     let voice: String;
     let lavalink_client = &data.lavalink;
     let content = match run_checks(
         ctx, message, lavalink_client,
-        channel as u64, prefix, autojoin, bot_ignore
+        channel as u64, prefix, autojoin, bot_ignore, audience_ignore
     ).await? {
         None => return Ok(()),
         Some(content) => {

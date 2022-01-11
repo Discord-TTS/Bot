@@ -58,6 +58,7 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
     let msg_length: i16 = guild_row.get("msg_length");
     let bot_ignore: bool = guild_row.get("bot_ignore");
     let repeated_chars: i16 = guild_row.get("repeated_chars");
+    let audience_ignore: bool = guild_row.get("audience_ignore");
 
     let none = String::from("none");
     let nickname = nickname_row.get::<&str, Option<String>>("name").unwrap_or_else(|| none.clone());
@@ -86,6 +87,7 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
 {sep2} <User> said: message `{xsaid}`
 {sep2} Ignore bot's messages: `{bot_ignore}`
 {sep2} Default Server {voice_lang}: `{default_voice}`
+{sep2} Ignore audience' messages: `{audience_ignore}`
 
 {sep2} Max Time to Read: `{msg_length} seconds`
 {sep2} Max Repeated Characters: `{repeated_chars}`
@@ -542,6 +544,26 @@ pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeat
     };
 
     ctx.say(to_send).await?;
+    Ok(())
+}
+
+/// Makes the bot ignore messages sent by members of the audience in stage channels
+#[poise::command(
+category="Settings",
+prefix_command, slash_command,
+required_permissions="ADMINISTRATOR",
+required_bot_permissions="SEND_MESSAGES",
+aliases("audience_ignore", "ignore_audience", "ignoreaudience")
+)]
+pub async fn audienceignore(
+    ctx: Context<'_>,
+    #[description="Whether to ignore messages sent by the audience"] value: Option<bool>
+) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+
+    let value = bool_button(ctx, value).await?;
+    ctx.data().guilds_db.set_one(guild_id, "audience_ignore", &value).await?;
+    ctx.say(format!("Ignoring audience is now: {}", to_enabled(value))).await?;
     Ok(())
 }
 

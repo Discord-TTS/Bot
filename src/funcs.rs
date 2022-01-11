@@ -277,6 +277,7 @@ pub async fn run_checks(
     prefix: String,
     autojoin: bool,
     bot_ignore: bool,
+    audience_ignore: bool,
 ) -> Result<Option<String>, Error> {
     let cache = &ctx.cache;
     let guild = message
@@ -347,6 +348,12 @@ pub async fn run_checks(
 
         if bot_voice_state.channel_id != voice_state.channel_id {
             return Err(Error::DebugLog("Failed check: Wrong vc"));
+        }
+
+        if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_state.channel_id.ok_or("vc.channel_id is None")?).ok_or("channel is None")? {
+            if channel.kind == serenity::ChannelType::Stage && voice_state.suppress && audience_ignore {
+                return Err(Error::DebugLog("Failed check: Is audience"));
+            }
         }
     }
 
