@@ -142,18 +142,19 @@ pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     let manager = songbird::get(ctx.discord()).await.unwrap();
     if let Some(handler) = manager.get(guild.id) {
         if handler.lock().await.current_channel().map(|c| c.0) != author_channel_id {
-            ctx.say("Error: You need to be in the same voice channel as me to make me leave!")
-                .await?;
+            ctx.say("Error: You need to be in the same voice channel as me to make me leave!").await?;
             return Ok(());
         }
 
+        let data = ctx.data();
+
         manager.remove(guild.id).await?;
-        ctx.data().lavalink.destroy(guild.id).await?;
+        data.lavalink.destroy(guild.id).await?;
+        data.last_to_xsaid_tracker.remove(&guild.id);
 
         ctx.say("Left voice channel!").await?;
     } else {
-        ctx.say("Error: How do I leave a voice channel if I am not in one?")
-            .await?;
+        ctx.say("Error: How do I leave a voice channel if I am not in one?").await?;
     }
 
     Ok(())

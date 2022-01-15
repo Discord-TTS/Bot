@@ -383,6 +383,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -495,9 +506,9 @@ dependencies = [
 
 [[package]]
 name = "flume"
-version = "0.10.9"
+version = "0.10.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24c3fd473b3a903a62609e413ed7538f99e10b665ecb502b5e481a95283f8ab4"
+checksum = "5d04dafd11240188e146b6f6476a898004cace3be31d4ec5e08e216bf4947ac0"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -651,9 +662,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcd999463524c52659517fe2cea98493cfe485d10565e7b0fb07dbba7ad2753"
+checksum = "418d37c8b1d42553c93648be529cb70f920d3baf8ef469b74b9638df426e0b4c"
 dependencies = [
  "cfg-if 1.0.0",
  "js-sys",
@@ -1173,9 +1184,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-probe"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28988d872ab76095a6e6ac88d99b54fd267702734fd7ffe610ca27f533ddb95a"
+checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-sys"
@@ -1318,7 +1329,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#00e2ca103df2a638fd2106d25a76fba392d1f9cb"
+source = "git+https://github.com/kangalioo/poise?branch=develop#bb456c9a7b49935ecd01ba7fee9a702374c99ed7"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1333,7 +1344,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#00e2ca103df2a638fd2106d25a76fba392d1f9cb"
+source = "git+https://github.com/kangalioo/poise?branch=develop#bb456c9a7b49935ecd01ba7fee9a702374c99ed7"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1505,15 +1516,16 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.8"
+version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c4e0a76dc12a116108933f6301b95e83634e0c47b0afbed6abbaa0601e99258"
+checksum = "87f242f1488a539a79bac6dbe7c8609ae43b7914b7736210f239a37cccb32525"
 dependencies = [
  "base64 0.13.0",
  "bytes",
  "encoding_rs",
  "futures-core",
  "futures-util",
+ "h2",
  "http",
  "http-body",
  "hyper",
@@ -1758,7 +1770,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.10.9"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#81fd4cf3911fdfd59dc76ed791a6e33dac8c775b"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#8c76aeff3865285fc3ec90a7a78eac0cf463996e"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.16.1",
@@ -1785,7 +1797,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.0"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#81fd4cf3911fdfd59dc76ed791a6e33dac8c775b"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#8c76aeff3865285fc3ec90a7a78eac0cf463996e"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -1861,9 +1873,9 @@ checksum = "9def91fd1e018fe007022791f865d0ccc9b3a0d5001e01aabb8b40e46000afb5"
 
 [[package]]
 name = "smallvec"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
+checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
 name = "socket2"
@@ -1878,13 +1890,14 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.1"
-source = "git+https://github.com/serenity-rs/songbird?branch=next#28e370abf5b5dc217445d837b15561298ac5ba48"
+source = "git+https://github.com/serenity-rs/songbird?branch=next#a18bb0cc989cea5b8c46e6292efebf6751e4b005"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.14.0",
  "audiopus",
  "byteorder",
  "dashmap 4.0.2",
+ "derivative",
  "discortp",
  "flume",
  "futures",
@@ -2232,9 +2245,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d81bfa81424cc98cb034b837c985b7a290f592e5b4322f353f94a0ab0f9f594"
+checksum = "77be66445c4eeebb934a7340f227bfe7b338173d3f8c00a60a5a58005c9faecf"
 dependencies = [
  "ansi_term",
  "lazy_static",

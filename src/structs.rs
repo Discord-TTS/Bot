@@ -33,6 +33,7 @@ pub struct Data {
     pub nickname_db: DatabaseHandler<[i64; 2]>,
 
     pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
+    pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub start_time: std::time::SystemTime,
     pub owner_id: serenity::UserId,
     pub lavalink: LavalinkClient,
@@ -96,6 +97,7 @@ impl std::fmt::Display for Gender {
 #[derive(Debug)]
 pub enum Error {
     GuildOnly,
+    None(String),
     Tts(reqwest::Response),
     DebugLog(&'static str), // debug log something but ignore
     Unexpected(Box<dyn std::error::Error + Send + Sync>),
@@ -116,8 +118,13 @@ impl std::fmt::Display for Error {
 }
 
 pub type Context<'a> = poise::Context<'a, Data, Error>;
+pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, (serenity::UserId, std::time::SystemTime)>;
 #[cfg(feature="premium")]
 pub type VoiceData = std::collections::BTreeMap<String, std::collections::BTreeMap<String, crate::structs::Gender>>;
+
+pub trait OptionTryUnwrap<T> {
+    fn try_unwrap(self) -> Result<T, Error>;
+}
 
 #[serenity::async_trait]
 pub trait PoiseContextAdditions {
@@ -229,5 +236,18 @@ impl SerenityContextAdditions for serenity::Context {
 
         let (_, handler) = manager.join_gateway(guild_id.0, channel_id.0).await;
         Ok(lavalink.create_session_with_songbird(&handler?).await?)
+    }
+}
+
+impl<T> OptionTryUnwrap<T> for Option<T> {
+    #[track_caller]
+    fn try_unwrap(self) -> Result<T, Error> {
+        match self {
+            Some(v) => Ok(v),
+            None => Err(Error::None({
+                let location = std::panic::Location::caller();
+                format!("Unexpected None value on line {} in {}", location.line(), location.file())
+            }))
+        }
     }
 }

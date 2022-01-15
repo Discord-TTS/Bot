@@ -214,6 +214,7 @@ async fn main() {
                 guilds_db, userinfo_db, nickname_db, analytics, lavalink, webhooks, start_time, reqwest, config,
                 owner_id: application_info.owner.id,
 
+                last_to_xsaid_tracker: dashmap::DashMap::new(),
                 #[cfg(feature="premium")]
                 voices: crate::funcs::get_supported_languages(),
                 #[cfg(feature="premium")]
@@ -466,7 +467,6 @@ async fn premium_check(ctx: structs::Context<'_>) -> Result<bool, Error> {
             },
             Err(_) => main_msg = format!("Hey, you are not in {} so TTS Bot Premium cannot validate your membership!", data.config.server_invite)
         };
-
     }
 
     warn!(
@@ -498,6 +498,11 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
     match error {
         poise::FrameworkError::Command { error, ctx } => {
             let command = ctx.command();
+            let handle_unexpected = |error: String| {
+                error!("Error in {}: {:?}", command.qualified_name, error);
+                ("an unknown error occurred".to_owned(), None)
+            };
+
             let (error, fix) = match error {
                 Error::GuildOnly => (
                     format!("{} cannot be used in private messages", command.qualified_name),
@@ -512,10 +517,8 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
 
                     ("I failed to generate TTS".to_owned(), None)
                 }
-                Error::Unexpected(error) => {
-                    error!("Error in {}: {:?}", command.qualified_name, error);
-                    ("an unknown error occurred".to_owned(), None)
-                },
+                Error::Unexpected(error) => handle_unexpected(format!("{:?}", error)),
+                Error::None(error) => handle_unexpected(error),
                 Error::DebugLog(_) => unreachable!(),
             };
             ctx.send_error(&error, fix).await?;
@@ -643,9 +646,10 @@ async fn process_tts_msg(
             let nickname: Option<String> = nickname_row.get("name");
 
             clean_msg(
-                content, member, &message.attachments, &voice,
+                content, ctx, &guild, member, &message.attachments, &voice,
                 xsaid, repeated_limit as usize, nickname,
-            )?
+                &data.last_to_xsaid_tracker
+            ).await?
         }
     };
 

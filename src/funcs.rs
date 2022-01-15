@@ -26,7 +26,7 @@ use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::structs::{SerenityContextAdditions, Error};
+use crate::structs::{SerenityContextAdditions, Error, LastToXsaidTracker, OptionTryUnwrap};
 use crate::database::DatabaseHandler;
 
 pub async fn parse_voice(
@@ -366,16 +366,21 @@ pub async fn run_checks(
     Ok(Some(content))
 }
 
-pub fn clean_msg(
+#[allow(clippy::too_many_arguments)]
+pub async fn clean_msg(
     content: String,
 
+    ctx: &serenity::Context,
+    guild: &serenity::Guild,
     member: serenity::Member,
     attachments: &[serenity::Attachment],
 
     lang: &str,
     xsaid: bool,
     repeated_limit: usize,
-    nickname: Option<String>
+    nickname: Option<String>,
+
+    last_to_xsaid_tracker: &LastToXsaidTracker
 ) -> Result<String, Error> {
     // Regex
     lazy_static! {
@@ -431,7 +436,28 @@ pub fn clean_msg(
 
     let contained_url = content != with_urls;
 
-    if xsaid {
+    let last_to_xsaid = last_to_xsaid_tracker.get(&member.guild_id);
+
+    // If xsaid is enabled, and the author has not been announced last (in one minute if more than 2 users in vc)
+    if xsaid && match last_to_xsaid.map(|i| *i) {
+        Some((u_id, last_time)) => {
+            (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) && {
+                // If more than 2 users in vc
+                let bot_channel_id = guild.voice_states
+                    .get(&ctx.cache.current_user_id()).try_unwrap()?
+                    .channel_id.try_unwrap()?;
+
+                guild.voice_states.values().filter_map(|vs| {
+                    if Some(bot_channel_id) == vs.channel_id  {
+                        Some(dbg!(!guild.members.get(&vs.user_id)?.user.bot))
+                    } else {
+                        None
+                    }
+                }).count() > 2
+            })
+        },
+        None => true
+    } {
         if contained_url {
             write!(content, " {}",
                 if content.is_empty() {"a link."}
@@ -450,6 +476,10 @@ pub fn clean_msg(
             if content.is_empty() {"a link."}
             else {". This message contained a link"}
         ).unwrap()
+    }
+
+    if xsaid {
+        last_to_xsaid_tracker.insert(member.guild_id, (member.user.id, std::time::SystemTime::now()));
     }
 
     if repeated_limit != 0 {
