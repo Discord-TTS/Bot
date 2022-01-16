@@ -49,6 +49,23 @@ pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+#[cfg(feature="premium")]
+#[poise::command(prefix_command, owners_only, hide_in_help)]
+pub async fn add_premium(ctx: Context<'_>, guild: serenity::Guild, user: serenity::User) -> Result<(), Error> {
+    let data = ctx.data();
+    let user_id = user.id.into();
+
+    data.userinfo_db.create_row(user_id).await?;
+    data.guilds_db.set_one(guild.id.into(), "premium_user", &user_id).await?;
+
+    ctx.say(format!(
+        "Linked <@{}> ({}#{} | {}) to {}",
+        user.id, user.name, user.discriminator, user.id, guild.name
+    )).await?;
+    Ok(())
+}
+
+
 #[poise::command(prefix_command, hide_in_help)]
 pub async fn debug(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;

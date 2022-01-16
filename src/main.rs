@@ -216,6 +216,8 @@ async fn main() {
 
                 last_to_xsaid_tracker: dashmap::DashMap::new(),
                 #[cfg(feature="premium")]
+                pool,
+                #[cfg(feature="premium")]
                 voices: crate::funcs::get_supported_languages(),
                 #[cfg(feature="premium")]
                 jwt_token: parking_lot::Mutex::new(String::new()),
@@ -256,6 +258,7 @@ async fn main() {
             // Add all the commands, this ordering is important as it is shown on the help command
             commands: vec![
                 commands::main::join(), commands::main::skip(), commands::main::leave(),
+                #[cfg(feature="premium")] commands::main::activate(),
 
                 commands::other::tts(), commands::other::uptime(), commands::other::botstats(), commands::other::channel(),
                 commands::other::donate(), commands::other::ping(), commands::other::suggest(), commands::other::invite(),
@@ -280,6 +283,7 @@ async fn main() {
 
                 commands::help::help(),
                 commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
+                #[cfg(feature="premium")] commands::owner::add_premium(),
             ],..Default::default()
         })
         .build().await.unwrap();
@@ -342,7 +346,9 @@ async fn event_listener(
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user_id();
             let guild_id = new.guild_id.ok_or("no guild_id")?;
-            let bot_voice_client = songbird::get(ctx).await.unwrap().get(guild_id);
+            let songbird = songbird::get(ctx).await.unwrap();
+
+            let bot_voice_client = songbird.get(guild_id);
             if bot_voice_client.is_some()
                 && old.is_some() && new.channel_id.is_none() // user left vc
                 && !new.member // user other than bot leaving
@@ -355,7 +361,7 @@ async fn event_listener(
                     .members(&ctx.cache).await?
                     .iter().any(|m| !m.user.bot)
             {
-                songbird::get(ctx).await.unwrap().remove(guild_id).await?;
+                songbird.remove(guild_id).await?;
                 data.lavalink.destroy(guild_id).await?;
             }
         }
@@ -443,7 +449,7 @@ async fn premium_check(ctx: structs::Context<'_>) -> Result<bool, Error> {
         None => return Ok(true)
     };
 
-    if ctx.framework().options().owners.contains(&author.id) || ["donate", "add_premium"].contains(&ctx.command().name) {
+    if ctx.framework().options().owners.contains(&author.id) || ["donate", "activate", "add_premium"].contains(&ctx.command().name) {
         return Ok(true)
     };
 
@@ -552,6 +558,8 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
             let argument = || input.unwrap().replace('`', "");
             if error.is::<serenity::MemberParseError>() {
                 reason = Some(format!("I cannot find the member: `{}`", argument()))
+            } else if error.is::<serenity::GuildParseError>() {
+                reason = Some(format!("I cannot find the server: `{}`", argument()))
             } else if error.is::<serenity::GuildChannelParseError>() {
                 reason = Some(format!("I cannot find the channel: `{}`", argument()))
             } else if error.is::<std::num::ParseIntError>() {

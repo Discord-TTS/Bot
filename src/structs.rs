@@ -42,6 +42,7 @@ pub struct Data {
 
     #[cfg(feature="premium")] pub voices: VoiceData,
     #[cfg(feature="premium")] pub service_acc: ServiceAccount,
+    #[cfg(feature="premium")] pub pool: Arc<deadpool_postgres::Pool>,
     #[cfg(feature="premium")] pub jwt_token: parking_lot::Mutex<String>,
     #[cfg(feature="premium")] pub jwt_expire: parking_lot::Mutex<std::time::SystemTime>
 }

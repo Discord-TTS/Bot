@@ -268,6 +268,7 @@ fn remove_repeated_chars(content: &str, limit: usize) -> String {
     }).collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,

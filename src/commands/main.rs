@@ -201,3 +201,66 @@ pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
 
     Ok(())
 }
+
+/// Activates a server for premium!
+#[cfg(feature="premium")]
+#[poise::command(
+    category="Main Commands",
+    prefix_command, slash_command,
+    aliases("link"),
+    required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS | ADD_REACTIONS"
+)]
+pub async fn activate(ctx: Context<'_>) -> Result<(), Error> {
+    let guild = ctx.guild().ok_or(Error::GuildOnly)?;
+
+    let data = ctx.data();
+    let author = ctx.author();
+    let author_id = author.id.into();
+
+    let mut error_msg = match guild.member(ctx.discord(), author.id).await {
+        Ok(m) if !m.roles.contains(&data.config.patreon_role) => Some(
+            String::from(concat!(
+                "Hey, you do not have the Patreon Role on the Support Server! Please link your ",
+                "[patreon account to your discord account](https://support.patreon.com/hc/en-gb/articles/212052266) ",
+                "or [purchase TTS Bot Premium via Patreon](https://patreon.com/Gnome_The_Bot_Maker)!"
+            ))
+        ),
+        Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => Some(
+            format!("Hey, you are not in the [Support Server]({}) so I cannot validate your membership!", data.config.server_invite)
+        ),
+        _ => None
+    };
+
+    let linked_guilds = {
+        let db_conn = data.pool.get().await?;
+        db_conn.query(
+            "SELECT guild_id FROM guilds WHERE premium_user = $1",
+            &[&(author_id as i64)]
+        ).await?
+    };
+
+    if error_msg.is_none() && linked_guilds.len() > 2 {
+        error_msg = Some(String::from("Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier"));
+    }
+
+    if let Some(error_msg) = error_msg {
+        ctx.send(|b| b.embed(|e| {
+            e.title("TTS Bot Premium");
+            e.description(error_msg);
+            e.colour(crate::constants::NETURAL_COLOUR);
+            e.footer(|f| f.text("If this is an error, please contact Gnome!#6669."));
+            e.thumbnail(ctx.discord().cache.current_user_field(|u| u.face()))
+        })).await?;
+        return Ok(())
+    }
+
+    data.userinfo_db.create_row(author_id).await?;
+    data.guilds_db.set_one(guild.id.into(), "premium_user", &author_id).await?;
+    ctx.say("Done! This server is now premium!").await?;
+
+    tracing::info!(
+        "{}#{} | {} linked premium to {} | {}, they had {} linked servers",
+        author.name, author.discriminator, author.id, guild.name, guild.id, linked_guilds.len()
+    );
+    Ok(())
+}
