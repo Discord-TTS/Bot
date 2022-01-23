@@ -687,6 +687,9 @@ pub async fn setup(
             if text_channels.is_empty() {
                 ctx.say("**Error** This server doesn't have any text channels that we both have Read/Send Messages in!").await?;
                 return Ok(())
+            } else if text_channels.len() >= (25 * 5) {
+                ctx.say(format!("**Error** This server has too many text channels to show in a menu! Please run `{}setup #channel`", ctx.prefix())).await?;
+                return Ok(())
             };
 
             text_channels.sort_by(|f, s| Ord::cmp(&f.position, &s.position));
@@ -694,10 +697,10 @@ pub async fn setup(
             let message = ctx.send(|b| {
                 b.content("Select a channel!");
                 b.components(|c| {
-                    for chunked_channels in text_channels.chunks(25) {
+                    for (i, chunked_channels) in text_channels.chunks(25).enumerate() {
                         c.create_action_row(|r| {
                             r.create_select_menu(|s| {
-                                s.custom_id("select::channel");
+                                s.custom_id(format!("select::channels::{i}"));
                                 s.options(|os| {
                                     for channel in chunked_channels {
                                         os.create_option(|o| {
