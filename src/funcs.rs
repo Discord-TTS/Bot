@@ -50,15 +50,19 @@ pub async fn parse_voice(
 
 #[cfg(feature="premium")]
 pub async fn fetch_audio(data: &crate::structs::Data, content: String, lang: &str, speaking_rate: f32) -> Result<String, Error> {
-    let mut jwt_token = data.jwt_token.lock();
-    let mut expire_time = data.jwt_expire.lock();
+    let jwt_token = {
+        let mut jwt_token = data.jwt_token.lock();
+        let mut expire_time = data.jwt_expire.lock();
 
-    if let Some((new_token, new_expire)) = generate_jwt(
-        &data.service_acc,
-        &expire_time,
-    )? {
-        *expire_time = new_expire;
-        *jwt_token = new_token;
+        if let Some((new_token, new_expire)) = generate_jwt(
+            &data.service_acc,
+            &expire_time,
+        )? {
+            *expire_time = new_expire;
+            *jwt_token = new_token;
+        };
+
+        jwt_token.clone()
     };
 
     let resp = data.reqwest.post("https://texttospeech.googleapis.com/v1/text:synthesize")
@@ -327,6 +331,8 @@ pub async fn run_checks(
         }
     } else {
         let voice_state = voice_state.ok_or(Error::DebugLog("Failed check: user not in vc"))?;
+        let voice_channel = voice_state.channel_id.ok_or("vc.channel_id is None")?;
+
         let bot_voice_state = match bot_voice_state {
             Some(vc) => vc,
             None => {
@@ -334,16 +340,8 @@ pub async fn run_checks(
                     return Err(Error::DebugLog("Failed check: Bot not in vc"));
                 }
 
-                ctx.join_vc(
-                    lavalink,
-                    &guild.id,
-                    &voice_state.channel_id.ok_or("vc.channel_id is None")?,
-                )
-                .await?;
-                guild
-                    .voice_states
-                    .get(&bot_user_id)
-                    .ok_or("bot.vc still None")?
+                ctx.join_vc(lavalink, &guild.id, &voice_channel).await?;
+                guild.voice_states.get(&bot_user_id).ok_or("bot.vc still None")?
             }
         };
 
@@ -351,7 +349,7 @@ pub async fn run_checks(
             return Err(Error::DebugLog("Failed check: Wrong vc"));
         }
 
-        if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_state.channel_id.ok_or("vc.channel_id is None")?).ok_or("channel is None")? {
+        if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).ok_or("channel is None")? {
             if channel.kind == serenity::ChannelType::Stage && voice_state.suppress && audience_ignore {
                 return Err(Error::DebugLog("Failed check: Is audience"));
             }

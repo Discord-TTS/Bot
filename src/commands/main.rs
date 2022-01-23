@@ -216,8 +216,9 @@ pub async fn activate(ctx: Context<'_>) -> Result<(), Error> {
     let data = ctx.data();
     let author = ctx.author();
     let author_id = author.id.into();
+    let ctx_discord = ctx.discord();
 
-    let mut error_msg = match guild.member(ctx.discord(), author.id).await {
+    let mut error_msg = match guild.member(ctx_discord, author.id).await {
         Ok(m) if !m.roles.contains(&data.config.patreon_role) => Some(
             String::from(concat!(
                 "Hey, you do not have the Patreon Role on the Support Server! Please link your ",
@@ -249,7 +250,7 @@ pub async fn activate(ctx: Context<'_>) -> Result<(), Error> {
             e.description(error_msg);
             e.colour(crate::constants::NETURAL_COLOUR);
             e.footer(|f| f.text("If this is an error, please contact Gnome!#6669."));
-            e.thumbnail(ctx.discord().cache.current_user_field(|u| u.face()))
+            e.thumbnail(ctx_discord.cache.current_user_field(|u| u.face()))
         })).await?;
         return Ok(())
     }
