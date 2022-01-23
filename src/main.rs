@@ -413,7 +413,7 @@ Ask questions by either responding here or asking on the support server!",
             info!("Added OFS role to {}#{}", owner.name, owner.discriminator);
         }
         poise::Event::GuildDelete { incomplete, full } => {
-            let incomplete: &serenity::GuildUnavailable = incomplete;
+            let incomplete: &serenity::UnavailableGuild = incomplete;
             let guild: &Option<serenity::Guild> = full;
 
             data.guilds_db.delete(incomplete.id.into()).await?;
