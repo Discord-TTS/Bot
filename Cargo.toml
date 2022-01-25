@@ -19,6 +19,7 @@ indexmap = "1.7"
 itertools = "0.10"
 cargo-lock = "7.0"
 lazy_static = "1.4"
+parking_lot = "0.11"
 deadpool-postgres = "0.10"
 #serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = ["simdjson"] }
 
@@ -37,17 +38,13 @@ branch = "next"
 
 [dependencies.lavalink-rs]
 git = "https://gitlab.com/vicky5124/lavalink-rs"
+rev = "92386c47bf717d927a9b74f884e172562999c654"
 features = ["serenity", "rustls"]
-branch = "master"
 
 [dependencies.psutil]
 version = "3.2"
 features = ["process"]
 default-features = false
-
-[dependencies.parking_lot]
-version = "0.11"
-features = ["nightly"]
 
 # Premium dependencies
 [dependencies.base64]

@@ -91,18 +91,20 @@ pub async fn tts(
 }
 
 fn find_version(lockfile: &cargo_lock::Lockfile, pkg: &str) -> String {
-    let version: Option<String> = try {
+    let version: Option<String> = (|| -> Option<String> {
         let package = lockfile.packages.iter().find(|p| p.name.as_str() == pkg)?;
 
-        match &package.source {
+        let version = match &package.source {
             Some(source) => match source.git_reference()? {
                 cargo_lock::package::source::GitReference::Branch(s) => s.to_owned(),
                 cargo_lock::package::source::GitReference::Tag(s) => s.to_owned(),
                 cargo_lock::package::source::GitReference::Rev(s) => s.to_owned(),
             }
             None => package.version.to_string()
-        }
-    };
+        };
+
+        Some(version)
+    })();
 
     version.unwrap_or_else(|| String::from("Unknown!"))
 }

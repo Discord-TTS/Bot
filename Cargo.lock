@@ -74,6 +74,22 @@ dependencies = [
 
 [[package]]
 name = "async-tungstenite"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "742cc7dcb20b2f84a42f4691aa999070ec7e78f8e7e7438bf14be7017b44907e"
+dependencies = [
+ "futures-io",
+ "futures-util",
+ "log",
+ "pin-project-lite",
+ "tokio",
+ "tokio-rustls 0.22.0",
+ "tungstenite 0.15.0",
+ "webpki-roots 0.21.1",
+]
+
+[[package]]
+name = "async-tungstenite"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5682ea0913e5c20780fe5785abacb85a411e7437bf52a1bedb93ddb3972cb8dd"
@@ -897,15 +913,14 @@ dependencies = [
 
 [[package]]
 name = "lavalink-rs"
-version = "0.9.0-rc.3"
-source = "git+https://gitlab.com/vicky5124/lavalink-rs?branch=master#fbbccc3145d04afc5c0fac4df9308115a0244b1d"
+version = "0.9.0-rc.2"
+source = "git+https://gitlab.com/vicky5124/lavalink-rs?rev=92386c47bf717d927a9b74f884e172562999c654#92386c47bf717d927a9b74f884e172562999c654"
 dependencies = [
  "async-trait",
- "async-tungstenite 0.16.1",
- "dashmap 5.0.0",
+ "async-tungstenite 0.15.0",
+ "dashmap 4.0.2",
  "futures",
  "http",
- "parking_lot",
  "regex",
  "reqwest",
  "serde",
@@ -914,7 +929,7 @@ dependencies = [
  "serenity",
  "songbird",
  "tokio",
- "tokio-rustls 0.23.2",
+ "tokio-rustls 0.22.0",
  "tracing",
  "typemap_rev",
  "version_check",
@@ -928,9 +943,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.113"
+version = "0.2.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eef78b64d87775463c549fbd80e19249ef436ea3bf1de2a1eb7e717ec7fab1e9"
+checksum = "b0005d08a8f7b65fb8073cb697aa0b12b631ed251ce73d862ce50eeb52ce3b50"
 
 [[package]]
 name = "lock_api"
@@ -1329,10 +1344,9 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#16da99522bb91e0c2847456d8a4d31986bf9dee3"
+source = "git+https://github.com/kangalioo/poise?branch=develop#9ebc7b541b2deca8efde1c8bcbdf3d415d8e3a9a"
 dependencies = [
  "async-trait",
- "chrono",
  "futures-core",
  "futures-util",
  "once_cell",
@@ -1345,7 +1359,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#16da99522bb91e0c2847456d8a4d31986bf9dee3"
+source = "git+https://github.com/kangalioo/poise?branch=develop#9ebc7b541b2deca8efde1c8bcbdf3d415d8e3a9a"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1770,8 +1784,8 @@ dependencies = [
 
 [[package]]
 name = "serenity"
-version = "0.10.9"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#b9b26250cdfcba9426f9ad2fab5bf4bbcc7af47c"
+version = "0.10.10"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#ad78ab6543c8671f005246c89ce2651bf4809375"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.16.1",
@@ -1797,8 +1811,8 @@ dependencies = [
 
 [[package]]
 name = "serenity-voice-model"
-version = "0.1.0"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#b9b26250cdfcba9426f9ad2fab5bf4bbcc7af47c"
+version = "0.1.1"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#ad78ab6543c8671f005246c89ce2651bf4809375"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -1891,7 +1905,7 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.1"
-source = "git+https://github.com/serenity-rs/songbird?branch=next#a18bb0cc989cea5b8c46e6292efebf6751e4b005"
+source = "git+https://github.com/serenity-rs/songbird?branch=next#d3f0974412d217e7047c9681ba85d0217d79e741"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.14.0",
@@ -2045,9 +2059,9 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.3"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8018d24e04c95ac8790716a5987d0fec4f8b27249ffa0f7d33f1369bdfb88cbd"
+checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
 dependencies = [
  "once_cell",
 ]
@@ -2289,6 +2303,27 @@ dependencies = [
  "utf-8",
  "webpki 0.21.4",
  "webpki-roots 0.21.1",
+]
+
+[[package]]
+name = "tungstenite"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "983d40747bce878d2fb67d910dcb8bd3eca2b2358540c3cc1b98c027407a3ae3"
+dependencies = [
+ "base64 0.13.0",
+ "byteorder",
+ "bytes",
+ "http",
+ "httparse",
+ "log",
+ "rand",
+ "rustls 0.19.1",
+ "sha-1",
+ "thiserror",
+ "url",
+ "utf-8",
+ "webpki 0.21.4",
 ]
 
 [[package]]

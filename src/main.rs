@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#![feature(try_blocks)]
 #![warn(rust_2018_idioms)]
 
 use std::collections::HashMap;
