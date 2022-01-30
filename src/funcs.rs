@@ -322,8 +322,6 @@ pub async fn run_checks(
         ));
     }
 
-    let bot_user_id = cache.current_user_id();
-    let bot_voice_state = guild.voice_states.get(&bot_user_id);
     let voice_state = guild.voice_states.get(&message.author.id);
     if message.author.bot {
         if bot_ignore || voice_state.is_none() {
@@ -333,21 +331,20 @@ pub async fn run_checks(
         let voice_state = voice_state.ok_or(Error::DebugLog("Failed check: user not in vc"))?;
         let voice_channel = voice_state.channel_id.ok_or("vc.channel_id is None")?;
 
-        let bot_voice_state = match bot_voice_state {
-            Some(vc) => vc,
+        match guild.voice_states.get(&cache.current_user_id()) {
+            Some(vc) => {
+                if vc.channel_id != voice_state.channel_id {
+                    return Err(Error::DebugLog("Failed check: Wrong vc"));
+                }
+            },
             None => {
                 if !autojoin {
                     return Err(Error::DebugLog("Failed check: Bot not in vc"));
                 }
 
                 ctx.join_vc(lavalink, &guild.id, &voice_channel).await?;
-                guild.voice_states.get(&bot_user_id).ok_or("bot.vc still None")?
             }
         };
-
-        if bot_voice_state.channel_id != voice_state.channel_id {
-            return Err(Error::DebugLog("Failed check: Wrong vc"));
-        }
 
         if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).ok_or("channel is None")? {
             if channel.kind == serenity::ChannelType::Stage && voice_state.suppress && audience_ignore {

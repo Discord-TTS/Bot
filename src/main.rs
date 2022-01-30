@@ -679,14 +679,14 @@ async fn process_tts_msg(
             .finish();
 
         let tracks = lavalink_client.get_tracks(&query).await?.tracks;
-        let track = tracks.first().ok_or(format!("Couldn't fetch URL: {query}"))?;
+        let track = tracks.first().ok_or(format!("Guild: {} | Lavalink failed to get track!", guild.id))?;
 
         lavalink_client.play(guild.id, track.to_owned()).queue().await?;
     }
     #[cfg(not(feature="premium"))]{
         for url in crate::funcs::parse_url(&content, &voice) {
             let tracks = lavalink_client.get_tracks(&url).await?.tracks;
-            let track = tracks.first().ok_or(format!("Couldn't fetch URL: {url}"))?;
+            let track = tracks.first().ok_or(format!("Guild: {} | Lavalink failed to get track!", guild.id))?;
             lavalink_client.play(guild.id, track.to_owned()).queue().await?;
         }
     }
