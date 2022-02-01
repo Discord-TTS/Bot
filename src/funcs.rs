@@ -129,9 +129,9 @@ fn generate_jwt(service_account: &crate::structs::ServiceAccount, expire_time: &
 
 
 #[cfg(not(feature="premium"))]
-pub async fn fetch_audio(reqwest: &reqwest::Client, content: String, lang: &str) -> Result<Vec<u8>, Error> {
+pub async fn fetch_audio(reqwest: &reqwest::Client, proxy: &Option<String>, content: String, lang: &str) -> Result<Vec<u8>, Error> {
     let mut audio_buf = Vec::new();
-    for url in parse_url(&content, lang) {
+    for url in parse_url(proxy, &content, lang) {
         let resp = reqwest.get(url).send().await?;
         let status = resp.status();
         if status == 200 {
@@ -145,15 +145,22 @@ pub async fn fetch_audio(reqwest: &reqwest::Client, content: String, lang: &str)
 }
 
 #[cfg(not(feature="premium"))]
-pub fn parse_url(content: &str, lang: &str) -> Vec<url::Url> {
+pub fn parse_url(proxy: &Option<String>, content: &str, lang: &str) -> Vec<reqwest::Url> {
     content.chars().chunks(200).into_iter().map(|c| c.collect::<String>()).map(|chunk| {
-        let mut url = url::Url::parse("https://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&client=tw-ob").unwrap();
+        let mut url = reqwest::Url::parse("https://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&client=tw-ob").unwrap();
         url.query_pairs_mut()
             .append_pair("tl", lang)
             .append_pair("q", &chunk)
             .append_pair("textlen", &chunk.len().to_string())
             .finish();
-        url
+
+        if let Some(proxy_url) = proxy {
+            let mut temp_url = reqwest::Url::parse(proxy_url).unwrap();
+            temp_url.set_path(url.as_str());
+            temp_url
+        } else {
+            url
+        }
     }).collect()
 }
 
@@ -366,7 +373,6 @@ pub async fn run_checks(
 pub async fn clean_msg(
     content: String,
 
-    ctx: &serenity::Context,
     guild: &serenity::Guild,
     member: serenity::Member,
     attachments: &[serenity::Attachment],
@@ -439,13 +445,13 @@ pub async fn clean_msg(
         Some((u_id, last_time)) => {
             (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) && {
                 // If more than 2 users in vc
-                let bot_channel_id = guild.voice_states
-                    .get(&ctx.cache.current_user_id()).try_unwrap()?
+                let voice_channel_id = guild.voice_states
+                    .get(&member.user.id).try_unwrap()?
                     .channel_id.try_unwrap()?;
 
                 guild.voice_states.values().filter_map(|vs| {
-                    if Some(bot_channel_id) == vs.channel_id  {
-                        Some(dbg!(!guild.members.get(&vs.user_id)?.user.bot))
+                    if Some(voice_channel_id) == vs.channel_id  {
+                        Some(!guild.members.get(&vs.user_id)?.user.bot)
                     } else {
                         None
                     }

@@ -456,7 +456,6 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
- "url",
 ]
 
 [[package]]
@@ -1344,7 +1343,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#eeda0e61b5b6e027f791e0965d6dc1c3d031c3bb"
+source = "git+https://github.com/kangalioo/poise?branch=develop#a28b0193ab032aaedb6b383d1be0d717f9dcf775"
 dependencies = [
  "async-trait",
  "futures-core",
@@ -1359,7 +1358,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#eeda0e61b5b6e027f791e0965d6dc1c3d031c3bb"
+source = "git+https://github.com/kangalioo/poise?branch=develop#a28b0193ab032aaedb6b383d1be0d717f9dcf775"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1785,7 +1784,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.10.10"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#e7567464e09806aec8f6ee9317d33c808d39eea3"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#9bf5f25ab8421a0513a199930a7a624da3d3c853"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.16.1",
@@ -1812,7 +1811,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#e7567464e09806aec8f6ee9317d33c808d39eea3"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#9bf5f25ab8421a0513a199930a7a624da3d3c853"
 dependencies = [
  "bitflags",
  "enum_primitive",

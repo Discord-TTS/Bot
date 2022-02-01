@@ -75,7 +75,7 @@ pub async fn tts(
         }
         #[cfg(not(feature="premium"))] {
             serenity::AttachmentType::Bytes {
-                data: std::borrow::Cow::Owned(fetch_audio(&data.reqwest, message, &lang).await?),
+                data: std::borrow::Cow::Owned(fetch_audio(&data.reqwest, &data.config.use_proxy, message, &lang).await?),
                 filename: format!("{}-{}.mp3", author_name, ctx.id())
             }
         }

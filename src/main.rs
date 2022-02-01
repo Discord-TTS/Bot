@@ -107,6 +107,7 @@ async fn main() {
 
             server_invite: String::from(main_config["main_server_invite"].as_str().unwrap()),
 
+            use_proxy: main_config.get("proxy_url").and_then(|p| p.as_str()).map(String::from),
             invite_channel: main_config["invite_channel"].clone().as_integer().unwrap() as u64,
             main_server: main_config["main_server"].as_integer().unwrap() as u64,
             ofs_role: main_config["ofs_role"].as_integer().unwrap() as u64,
@@ -518,8 +519,6 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
                 ),
                 Error::Tts(resp) => {
                     error!("TTS Generation Error: {:?}", resp);
-                    dbg!(resp.text().await.unwrap_or_else(|_| String::from("")));
-
                     ("I failed to generate TTS".to_owned(), None)
                 }
                 Error::Unexpected(error) => handle_unexpected(format!("{:?}", error)),
@@ -653,7 +652,7 @@ async fn process_tts_msg(
             let nickname: Option<String> = nickname_row.get("name");
 
             clean_msg(
-                content, ctx, &guild, member, &message.attachments, &voice,
+                content, &guild, member, &message.attachments, &voice,
                 xsaid, repeated_limit as usize, nickname,
                 &data.last_to_xsaid_tracker
             ).await?
@@ -684,7 +683,7 @@ async fn process_tts_msg(
         lavalink_client.play(guild.id, track.to_owned()).queue().await?;
     }
     #[cfg(not(feature="premium"))]{
-        for url in crate::funcs::parse_url(&content, &voice) {
+        for url in crate::funcs::parse_url(&data.config.use_proxy, &content, &voice) {
             let tracks = lavalink_client.get_tracks(&url).await?.tracks;
             let track = tracks.first().ok_or(format!("Guild: {} | Lavalink failed to get track!", guild.id))?;
             lavalink_client.play(guild.id, track.to_owned()).queue().await?;
