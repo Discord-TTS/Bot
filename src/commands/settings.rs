@@ -63,8 +63,8 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
     let none = String::from("none");
     let nickname = nickname_row.get::<&str, Option<String>>("name").unwrap_or_else(|| none.clone());
 
-    let user_voice = userinfo_row.get::<&str, Option<String>>("voice").map(format_voice).unwrap_or_else(|| none.clone());
-    let default_voice = guild_row.get::<&str, Option<String>>("default_voice").map(format_voice).unwrap_or_else(|| none.clone());
+    let user_voice = userinfo_row.get::<&str, Option<String>>("voice").map_or_else(|| none.clone(), format_voice);
+    let default_voice = guild_row.get::<&str, Option<String>>("default_voice").map_or_else(|| none.clone(), format_voice);
 
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
     ctx.send(|b| {b.embed(|e| {
@@ -232,40 +232,39 @@ impl<'a> MenuPaginator<'a> {
 
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<bool, Error> {
     Ok(
-        match value {
-            Some(value) => value,
-            None => {
-                let message = ctx.send(|b| {
-                    b.content("What would you like to set this to?");
-                    b.components(|c| {
-                        c.create_action_row(|r| {
-                            r.create_button(|b| {
-                                b.style(serenity::ButtonStyle::Success);
-                                b.custom_id("True");
-                                b.label("True")
-                            });
-                            r.create_button(|b| {
-                                b.style(serenity::ButtonStyle::Danger);
-                                b.custom_id("False");
-                                b.label("False")
-                            })
+        if let Some(value) = value {
+            value
+        } else {
+            let message = ctx.send(|b| {
+                b.content("What would you like to set this to?");
+                b.components(|c| {
+                    c.create_action_row(|r| {
+                        r.create_button(|b| {
+                            b.style(serenity::ButtonStyle::Success);
+                            b.custom_id("True");
+                            b.label("True")
+                        });
+                        r.create_button(|b| {
+                            b.style(serenity::ButtonStyle::Danger);
+                            b.custom_id("False");
+                            b.label("False")
                         })
                     })
-                }).await?.unwrap().message().await?;
+                })
+            }).await?.unwrap().message().await?;
 
-                let ctx_discord = ctx.discord();
-                let interaction = message
-                    .await_component_interaction(&ctx_discord.shard)
-                    .author_id(ctx.author().id)
-                    .collect_limit(1)
-                    .await.unwrap();
+            let ctx_discord = ctx.discord();
+            let interaction = message
+                .await_component_interaction(&ctx_discord.shard)
+                .author_id(ctx.author().id)
+                .collect_limit(1)
+                .await.unwrap();
 
-                interaction.defer(&ctx_discord.http).await?;
-                match &*interaction.data.custom_id {
-                    "True" => true,
-                    "False" => false,
-                    _ => unreachable!()
-                }
+            interaction.defer(&ctx_discord.http).await?;
+            match &*interaction.data.custom_id {
+                "True" => true,
+                "False" => false,
+                _ => unreachable!()
             }
         }
     )
@@ -478,10 +477,10 @@ pub async fn translation_lang(
             data.guilds_db.set_one(guild_id, "target_lang", &lang).await?;
             ctx.say(format!(
                 "The target translation language is now: {lang}{}",
-                if !data.guilds_db.get(guild_id).await?.get::<&str, bool>("to_translate") {
-                    format!(". You may want to enable translation with `{}set translation on`", ctx.prefix())
-                } else {
+                if data.guilds_db.get(guild_id).await?.get::<&str, bool>("to_translate") {
                     String::new()
+                } else {
+                    format!(". You may want to enable translation with `{}set translation on`", ctx.prefix())
                 }
             )).await?;
         },
@@ -666,9 +665,10 @@ pub async fn setup(
     let author = ctx.author();
     let bot_user = cache.current_user();
 
-    let channel: u64 = match channel {
-        Some(channel) => channel.id.into(),
-        None => {
+    let channel: u64 =
+        if let Some(channel) = channel {
+            channel.id.into()
+        } else {
             let author_member = guild.member(ctx_discord, author).await?;
             let bot_member = guild.member(ctx_discord, bot_user.id).await?;
 
@@ -726,8 +726,7 @@ pub async fn setup(
 
             interaction.defer(&ctx_discord.http).await?;
             interaction.data.values[0].parse().unwrap()
-        }
-    };
+        };
 
     let data = ctx.data();
     data.guilds_db.set_one(guild.id.into(), "channel", &(channel as i64)).await?;
@@ -765,13 +764,13 @@ pub async fn language(
     ctx: Context<'_>,
     #[description="The language to read messages in"] lang: String
 ) -> Result<(), Error> {
-    let to_send = match crate::funcs::get_supported_languages().get(&lang) {
-        Some(lang_name) => {
+    let to_send =
+        if let Some(lang_name) = crate::funcs::get_supported_languages().get(&lang) {
             ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &lang).await?;
             format!("Changed your language to: {}", lang_name)
-        },
-        None => format!("Invalid language, do `{}languages`", ctx.prefix())
-    };
+        } else {
+            format!("Invalid language, do `{}languages`", ctx.prefix())
+        };
 
     ctx.say(to_send).await?;
     Ok(())
@@ -812,9 +811,10 @@ pub async fn languages(ctx: Context<'_>) -> Result<(), Error> {
         );
         e.field(
             "Current Language used",
-            current_lang.as_ref()
-                .map(|l| format!("{} | {}", &supported_langs[l], l))
-                .unwrap_or_else(|| String::from("None")),
+            current_lang.as_ref().map_or_else(
+                || String::from("None"),
+                |l| format!("{} | {}", &supported_langs[l], l)
+            ),
             false
         )
     })}).await?;

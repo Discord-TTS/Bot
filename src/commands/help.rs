@@ -36,7 +36,7 @@ fn get_command_mapping(commands: &[Command]) -> IndexMap<&str, Vec<&Command>> {
                 .entry(command.category.unwrap_or("Uncategoried"))
                 .or_insert_with(Vec::new);
 
-            commands.push(command)
+            commands.push(command);
         }
     }
 
@@ -53,7 +53,7 @@ fn format_params(command: &Command) -> String {
     }).collect()
 }
 
-fn show_group_description(group: IndexMap<&str, Vec<&Command>>) -> String {
+fn show_group_description(group: &IndexMap<&str, Vec<&Command>>) -> String {
     group.iter().map(|(category, commands)| {
         format!("**__{category}__**\n{}\n", commands.iter().map(|c| {
             let params = format_params(c);
@@ -66,7 +66,7 @@ fn show_group_description(group: IndexMap<&str, Vec<&Command>>) -> String {
     )}).collect::<String>()
 }
 
-
+#[allow(clippy::unused_async)]
 async fn help_autocomplete(ctx: Context<'_>, searching: String) -> Vec<String> {
     fn flatten_commands(commands: &[Command], searching: &str) -> Vec<String> {
         let mut result = Vec::new();
@@ -74,10 +74,10 @@ async fn help_autocomplete(ctx: Context<'_>, searching: String) -> Vec<String> {
         for command in commands {
             if command.subcommands.is_empty() {
                 if command.qualified_name.starts_with(searching) {
-                    result.push(command.qualified_name.clone())
+                    result.push(command.qualified_name.clone());
                 }
             } else {
-                result.extend(flatten_commands(&command.subcommands, searching))
+                result.extend(flatten_commands(&command.subcommands, searching));
             }
         }
 
@@ -111,24 +111,24 @@ pub async fn _help(ctx: Context<'_>, command: Option<String>) -> Result<(), Erro
             let mut subcommand_iterator = command.split(' ');
 
             let top_level_command = subcommand_iterator.next().unwrap();
-            let mut command_obj = match poise::find_command(commands, top_level_command, true) {
-                Some((command_obj, _, _)) => command_obj,
-                None => {
+            let mut command_obj =
+                if let Some((command_obj, _, _)) = poise::find_command(commands, top_level_command, true) {
+                    command_obj
+                } else {
                     ctx.say(format!("No command called {} found!", top_level_command)).await?;
                     return Ok(())
-                }
-            };
+                };
 
             remaining_args = subcommand_iterator.collect();
             if !remaining_args.is_empty() {
-                command_obj = match poise::find_command(&command_obj.subcommands, &remaining_args, true) {
-                    Some((command_obj, _, _)) => command_obj,
-                    None => {
+                command_obj =
+                    if let Some((command_obj, _, _)) = poise::find_command(&command_obj.subcommands, &remaining_args, true) {
+                        command_obj
+                    } else {
                         ctx.say(format!("The group {} does not have a subcommand called {}!", command_obj.name, remaining_args)).await?;
                         return Ok(())
                     }
-                }; 
-            }
+            };
 
             if command_obj.subcommands.is_empty() {
                 HelpCommandMode::Command(command_obj)
@@ -146,23 +146,23 @@ pub async fn _help(ctx: Context<'_>, command: Option<String>) -> Result<(), Erro
         }));
         e.description(match &mode {
             HelpCommandMode::Root => {
-                show_group_description(get_command_mapping(commands))
+                show_group_description(&get_command_mapping(commands))
             },
             HelpCommandMode::Command(command_obj) => {
                 format!("{}\n```{}{} {}```\n{}",
                 command_obj.inline_help.unwrap(), prefix, command_obj.qualified_name, format_params(command_obj),
-                    if !command_obj.parameters.is_empty() {
+                    if command_obj.parameters.is_empty() {
+                        String::new()
+                    } else {
                         format!("__**Parameter Descriptions**__\n{}",
                             command_obj.parameters.iter().map(|p| {
                                 format!("`{}`: {}\n", p.name, p.description.unwrap_or("no description"))
                             }).collect::<String>()
                         )
-                    } else {
-                        String::new()
                     }
                 )
             },
-            HelpCommandMode::Group(group) => show_group_description({
+            HelpCommandMode::Group(group) => show_group_description(&{
                 let mut map: IndexMap<&str, Vec<&Command>> = IndexMap::new();
                 map.insert(&group.qualified_name, group.subcommands.iter().collect());
                 map

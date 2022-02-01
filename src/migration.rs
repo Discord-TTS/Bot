@@ -20,7 +20,7 @@ use crate::structs::Error;
 use crate::constants::db_setup_query;
 
 // I'll use a proper framework for this one day
-pub async fn start_migration(config: &mut toml::Value, pool: &Arc<deadpool_postgres::Pool>) -> Result<(), Error> {
+pub async fn run(config: &mut toml::Value, pool: &Arc<deadpool_postgres::Pool>) -> Result<(), Error> {
     let starting_conf = config.clone();
 
     let mut conn = pool.get().await?;

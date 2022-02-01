@@ -7,7 +7,6 @@ use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 
 use crate::constants::RED;
-use crate::{database::DatabaseHandler, analytics::AnalyticsHandler};
 
 #[cfg(feature="premium")]
 #[derive(serde::Deserialize, Debug)]
@@ -28,10 +27,10 @@ pub struct Config {
 }
 
 pub struct Data {
-    pub analytics: Arc<AnalyticsHandler>,
-    pub guilds_db: DatabaseHandler<i64>,
-    pub userinfo_db: DatabaseHandler<i64>,
-    pub nickname_db: DatabaseHandler<[i64; 2]>,
+    pub analytics: Arc<crate::analytics::Handler>,
+    pub guilds_db: crate::database::Handler<i64>,
+    pub userinfo_db: crate::database::Handler<i64>,
+    pub nickname_db: crate::database::Handler<[i64; 2]>,
 
     pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
@@ -139,8 +138,8 @@ pub trait SerenityContextAdditions {
     async fn join_vc(
         &self,
         lavalink: &LavalinkClient,
-        guild_id: &serenity::GuildId,
-        channel_id: &serenity::ChannelId,
+        guild_id: serenity::GuildId,
+        channel_id: serenity::ChannelId,
     ) -> Result<(), Error>;
 }
 
@@ -231,8 +230,8 @@ impl SerenityContextAdditions for serenity::Context {
     async fn join_vc(
         &self,
         lavalink: &LavalinkClient,
-        guild_id: &serenity::GuildId,
-        channel_id: &serenity::ChannelId,
+        guild_id: serenity::GuildId,
+        channel_id: serenity::ChannelId,
     ) -> Result<(), Error> {
         let manager = songbird::get(self).await.unwrap();
 

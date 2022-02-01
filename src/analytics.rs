@@ -21,12 +21,12 @@ use tracing::error;
 
 use crate::structs::Error;
 
-pub struct AnalyticsHandler {
+pub struct Handler {
     log_buffer: DashMap<String, i32>,
     pool: Arc<deadpool_postgres::Pool>
 }
 
-impl AnalyticsHandler {
+impl Handler {
     pub fn new(pool: Arc<deadpool_postgres::Pool>) -> Self {
         Self {
             pool, 
@@ -40,7 +40,7 @@ impl AnalyticsHandler {
         loop {
             periodic.tick().await;
             if let Err(error) = self.send_info_to_db().await {
-                error!("Analytics Handler: {:?}", error)
+                error!("Analytics Handler: {:?}", error);
             }
         }
     }

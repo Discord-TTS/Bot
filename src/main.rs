@@ -15,6 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #![warn(rust_2018_idioms)]
+#![warn(clippy::pedantic)]
+
+// clippy::pedantic complains about u64 -> i64 and back when db conversion, however it is fine
+#![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless)]
+
+#![allow(clippy::unreadable_literal)]
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -39,8 +45,6 @@ mod logging;
 mod structs;
 mod funcs;
 
-use database::DatabaseHandler;
-use analytics::AnalyticsHandler;
 use constants::DM_WELCOME_MESSAGE;
 use funcs::{clean_msg, parse_voice, run_checks, random_footer};
 use structs::{Config, Data, Error, PoiseContextAdditions, SerenityContextAdditions};
@@ -65,7 +69,7 @@ async fn get_webhooks(
         let captures = WEBHOOK_URL_REGEX.captures(url.as_str()?)?;
 
         webhooks.insert(
-            name.to_owned(),
+            name.clone(),
             http.get_webhook_with_token(
                 captures.get(1)?.as_str().parse().ok()?,
                 captures.get(2)?.as_str(),
@@ -77,6 +81,7 @@ async fn get_webhooks(
 }
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() {
     let start_time = std::time::SystemTime::now();
     let mut config_toml = get_config().unwrap();
@@ -97,7 +102,7 @@ async fn main() {
         tokio_postgres::NoTls,
     ).unwrap());
 
-    migration::start_migration(&mut config_toml, &pool).await.unwrap();
+    migration::run(&mut config_toml, &pool).await.unwrap();
 
     let config = {
         let main_config = &config_toml["Main"];
@@ -107,7 +112,7 @@ async fn main() {
 
             server_invite: String::from(main_config["main_server_invite"].as_str().unwrap()),
 
-            use_proxy: main_config.get("proxy_url").and_then(|p| p.as_str()).map(String::from),
+            use_proxy: main_config.get("proxy_url").and_then(toml::Value::as_str).map(String::from),
             invite_channel: main_config["invite_channel"].clone().as_integer().unwrap() as u64,
             main_server: main_config["main_server"].as_integer().unwrap() as u64,
             ofs_role: main_config["ofs_role"].as_integer().unwrap() as u64,
@@ -154,13 +159,13 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     // CLEANUP
-    let analytics = Arc::new(AnalyticsHandler::new(pool.clone()));
+    let analytics = Arc::new(analytics::Handler::new(pool.clone()));
     {
         let analytics_sender = analytics.clone();
         tokio::spawn(async move {analytics_sender.loop_task().await});
     }
 
-    let guilds_db = DatabaseHandler::new(pool.clone(), 0,
+    let guilds_db = database::Handler::new(pool.clone(), 0,
         "SELECT * FROM guilds WHERE guild_id = $1",
         "DELETE FROM guilds WHERE guild_id = $1",
         "
@@ -172,7 +177,7 @@ async fn main() {
             ON CONFLICT (guild_id) DO UPDATE SET {key} = $2
         "
     ).await.unwrap();
-    let userinfo_db = DatabaseHandler::new(pool.clone(), 0,
+    let userinfo_db = database::Handler::new(pool.clone(), 0,
         "SELECT * FROM userinfo WHERE user_id = $1",
         "DELETE FROM userinfo WHERE user_id = $1",
         "
@@ -184,7 +189,7 @@ async fn main() {
             ON CONFLICT (user_id) DO UPDATE SET {key} = $2
         "
     ).await.unwrap();
-    let nickname_db = DatabaseHandler::new(pool.clone(), [0, 0],
+    let nickname_db = database::Handler::new(pool.clone(), [0, 0],
         "SELECT * FROM nicknames WHERE guild_id = $1 AND user_id = $2",
         "DELETE FROM nicknames WHERE guild_id = $1 AND user_id = $2",
         "
@@ -233,13 +238,13 @@ async fn main() {
                 serenity::CreateAllowedMentions::default()
                     .parse(serenity::ParseValue::Users)
                     .replied_user(true)
-                    .to_owned()
+                    .clone()
             ),
             pre_command: |ctx| Box::pin(async move {
                 ctx.data().analytics.log(match ctx {
                     poise::Context::Prefix(_) => "on_command",
                     poise::Context::Application(_) => "on_slash_command",
-                })
+                });
             }),
             #[cfg(feature="premium")]
             command_check: Some(|ctx| Box::pin(premium_check(ctx))),
@@ -253,7 +258,7 @@ async fn main() {
                         None => String::from("-"),
                     }
                 )})}),
-                ..Default::default()
+                ..poise::PrefixFrameworkOptions::default()
             },
             // Add all the commands, this ordering is important as it is shown on the help command
             commands: vec![
@@ -284,7 +289,7 @@ async fn main() {
                 commands::help::help(),
                 commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
                 #[cfg(feature="premium")] commands::owner::add_premium(),
-            ],..Default::default()
+            ],..poise::FrameworkOptions::default()
         })
         .build().await.unwrap();
 
@@ -338,9 +343,7 @@ async fn event_listener(
                 process_mention_msg(ctx, new_message, data),
             );
 
-            tts_result?;
-            support_result?;
-            mention_result?;
+            tts_result?; support_result?; mention_result?;
         }
         poise::Event::VoiceStateUpdate { old, new } => {
             // If (on leave) the bot should also leave as it is alone
@@ -353,8 +356,7 @@ async fn event_listener(
                 && old.is_some() && new.channel_id.is_none() // user left vc
                 && !new.member // user other than bot leaving
                     .as_ref()
-                    .map(|m| m.user.id == bot_id)
-                    .unwrap_or(false)
+                    .map_or(false, |m| m.user.id == bot_id)
                 && !ctx.cache // filter out bots from members
                     .guild_channel(old.as_ref().unwrap().channel_id.unwrap())
                     .ok_or("no channel")?
@@ -430,10 +432,10 @@ Ask questions by either responding here or asking on the support server!",
             }
         }
         poise::Event::Ready { data_about_bot } => {
-            info!("{} has connected!", data_about_bot.user.name)
+            info!("{} has connected!", data_about_bot.user.name);
         }
         poise::Event::Resume { event: _ } => {
-            data.analytics.log("on_resumed")
+            data.analytics.log("on_resumed");
         }
         _ => {}
     }
@@ -468,7 +470,7 @@ async fn premium_check(ctx: structs::Context<'_>) -> Result<bool, Error> {
                 if premium_member.roles.contains(&data.config.patreon_role) {
                     return Ok(true)
                 } else if premium_member.user.id == author.id {
-                    main_msg = format!("Hey, you have purchased TTS Bot Premium however have not activated it, please run the `{}activate` command!", ctx.prefix())
+                    main_msg = format!("Hey, you have purchased TTS Bot Premium however have not activated it, please run the `{}activate` command!", ctx.prefix());
                 }
             },
             Err(_) => main_msg = format!("Hey, you are not in {} so TTS Bot Premium cannot validate your membership!", data.config.server_invite)
@@ -489,7 +491,7 @@ async fn premium_check(ctx: structs::Context<'_>) -> Result<bool, Error> {
                     e.description(main_msg);
                     e.colour(constants::NETURAL_COLOUR);
                     e.footer(|f| f.text(footer_msg));
-                    e.thumbnail(ctx_discord.cache.current_user_field(|u| u.face()))
+                    e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
                 })
             } else {
                 b.content(format!("{}\n{}", main_msg, footer_msg))
@@ -531,7 +533,7 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
             if let Error::DebugLog(msg) = error {
                 debug!(msg);
             } else {
-                error!("Error in event handler: `{}`: `{:?}`", event.name(), error)
+                error!("Error in event handler: `{}`: `{:?}`", event.name(), error);
             }
         },
         poise::FrameworkError::MissingBotPermissions{missing_permissions, ctx} => {
@@ -555,15 +557,15 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
 
             let argument = || input.unwrap().replace('`', "");
             if error.is::<serenity::MemberParseError>() {
-                reason = Some(format!("I cannot find the member: `{}`", argument()))
+                reason = Some(format!("I cannot find the member: `{}`", argument()));
             } else if error.is::<serenity::GuildParseError>() {
-                reason = Some(format!("I cannot find the server: `{}`", argument()))
+                reason = Some(format!("I cannot find the server: `{}`", argument()));
             } else if error.is::<serenity::GuildChannelParseError>() {
-                reason = Some(format!("I cannot find the channel: `{}`", argument()))
+                reason = Some(format!("I cannot find the channel: `{}`", argument()));
             } else if error.is::<std::num::ParseIntError>() {
-                reason = Some(format!("I cannot convert `{}` to a number", argument()))
+                reason = Some(format!("I cannot convert `{}` to a number", argument()));
             } else if error.is::<std::str::ParseBoolError>() {
-                reason = Some(format!("I cannot convert `{}` to True/False", argument()))
+                reason = Some(format!("I cannot convert `{}` to True/False", argument()));
             }
 
             ctx.send_error(
@@ -594,21 +596,22 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
             } 
         },
 
-        poise::FrameworkError::NotAnOwner{ctx: _} => {},
+        poise::FrameworkError::Setup { error } => panic!("{:#?}", error),
         poise::FrameworkError::CommandCheckFailed { error, ctx } => {
             if let Some(error) = error {
                 error!("Premium Check Error: {:?}", error);
                 ctx.send_error("an unknown error occurred during the premium check", None).await?;
             }
         },
-        poise::FrameworkError::Setup { error } => panic!("{:#?}", error),
-        poise::FrameworkError::CommandStructureMismatch { description: _, ctx: _ } => {},   
+
+        poise::FrameworkError::CommandStructureMismatch { description: _, ctx: _ } |
+        poise::FrameworkError::NotAnOwner{ctx: _}=> {},
     }
 
     Ok(())
 }
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
-    _on_error(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err))
+    _on_error(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
 }
 
 async fn process_tts_msg(
@@ -652,10 +655,10 @@ async fn process_tts_msg(
             let nickname: Option<String> = nickname_row.get("name");
 
             clean_msg(
-                content, &guild, member, &message.attachments, &voice,
+                &content, &guild, member, &message.attachments, &voice,
                 xsaid, repeated_limit as usize, nickname,
                 &data.last_to_xsaid_tracker
-            ).await?
+            )?
         }
     };
 
@@ -672,7 +675,7 @@ async fn process_tts_msg(
             &voice, speaking_rate
         )?;
 
-        let mut query = url::Url::parse("tts://")?;
+        let mut query = reqwest::Url::parse("tts://")?;
         query.query_pairs_mut()
             .append_pair("config", &query_json.to_string())
             .finish();
@@ -680,13 +683,13 @@ async fn process_tts_msg(
         let tracks = lavalink_client.get_tracks(&query).await?.tracks;
         let track = tracks.first().ok_or(format!("Guild: {} | Lavalink failed to get track!", guild.id))?;
 
-        lavalink_client.play(guild.id, track.to_owned()).queue().await?;
+        lavalink_client.play(guild.id, track.clone()).queue().await?;
     }
     #[cfg(not(feature="premium"))]{
         for url in crate::funcs::parse_url(&data.config.use_proxy, &content, &voice) {
             let tracks = lavalink_client.get_tracks(&url).await?.tracks;
             let track = tracks.first().ok_or(format!("Guild: {} | Lavalink failed to get track!", guild.id))?;
-            lavalink_client.play(guild.id, track.to_owned()).queue().await?;
+            lavalink_client.play(guild.id, track.clone()).queue().await?;
         }
     }
 
@@ -822,7 +825,7 @@ async fn process_support_dm(
 
                 data.userinfo_db.set_one(message.author.id.into(), "dm_welcomed", &true).await?;
                 if channel.pins(&ctx.http).await?.len() < 50 {
-                    welcome_msg.pin(ctx).await?
+                    welcome_msg.pin(ctx).await?;
                 }
 
                 info!("{}#{} just got the 'Welcome to support DMs' message", message.author.name, message.author.discriminator);                

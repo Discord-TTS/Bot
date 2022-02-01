@@ -27,11 +27,10 @@ use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
 use crate::structs::{SerenityContextAdditions, Error, LastToXsaidTracker, OptionTryUnwrap};
-use crate::database::DatabaseHandler;
 
 pub async fn parse_voice(
-    guilds_db: &DatabaseHandler<i64>,
-    userinfo_db: &DatabaseHandler<i64>,
+    guilds_db: &crate::database::Handler<i64>,
+    userinfo_db: &crate::database::Handler<i64>,
     author_id: serenity::UserId,
     guild_id: Option<serenity::GuildId>,
 ) -> Result<String, Error> {
@@ -135,7 +134,7 @@ pub async fn fetch_audio(reqwest: &reqwest::Client, proxy: &Option<String>, cont
         let resp = reqwest.get(url).send().await?;
         let status = resp.status();
         if status == 200 {
-            audio_buf.append(&mut resp.bytes().await?.to_vec())
+            audio_buf.append(&mut resp.bytes().await?.to_vec());
         } else {    
             return Err(Error::Tts(resp))
         }
@@ -146,7 +145,7 @@ pub async fn fetch_audio(reqwest: &reqwest::Client, proxy: &Option<String>, cont
 
 #[cfg(not(feature="premium"))]
 pub fn parse_url(proxy: &Option<String>, content: &str, lang: &str) -> Vec<reqwest::Url> {
-    content.chars().chunks(200).into_iter().map(|c| c.collect::<String>()).map(|chunk| {
+    content.chars().chunks(200).into_iter().map(std::iter::Iterator::collect::<String>).map(|chunk| {
         let mut url = reqwest::Url::parse("https://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&client=tw-ob").unwrap();
         url.query_pairs_mut()
             .append_pair("tl", lang)
@@ -205,13 +204,13 @@ pub fn random_footer(prefix: Option<&str>, server_invite: Option<&str>, client_i
         footers.extend([
             format!("If you want to support the development and hosting of TTS Bot, check out {}donate!", prefix),
             format!("There are loads of customizable settings, check out {}settings help", prefix),
-        ])
+        ]);
     }
     if let Some(server_invite) = server_invite {
-        footers.push(format!("If you find a bug or want to ask a question, join the support server: {}", server_invite))
+        footers.push(format!("If you find a bug or want to ask a question, join the support server: {}", server_invite));
     }
     if let Some(client_id) = client_id {
-        footers.push(format!("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{}", client_id))
+        footers.push(format!("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{}", client_id));
     }
 
     footers.choose(&mut rand::thread_rng()).unwrap().clone()
@@ -299,9 +298,9 @@ pub async fn run_checks(
     if channel as u64 != message.channel_id.0 {
         if message.author.bot {
             return Ok(None)
-        } else {
-            return Err(Error::DebugLog("Failed check: Wrong channel"))
         }
+
+        return Err(Error::DebugLog("Failed check: Wrong channel"))
     }
 
     let mut content = serenity::content_safe(cache, &message.content,
@@ -338,19 +337,16 @@ pub async fn run_checks(
         let voice_state = voice_state.ok_or(Error::DebugLog("Failed check: user not in vc"))?;
         let voice_channel = voice_state.channel_id.ok_or("vc.channel_id is None")?;
 
-        match guild.voice_states.get(&cache.current_user_id()) {
-            Some(vc) => {
-                if vc.channel_id != voice_state.channel_id {
-                    return Err(Error::DebugLog("Failed check: Wrong vc"));
-                }
-            },
-            None => {
-                if !autojoin {
-                    return Err(Error::DebugLog("Failed check: Bot not in vc"));
-                }
-
-                ctx.join_vc(lavalink, &guild.id, &voice_channel).await?;
+        if let Some(vc) = guild.voice_states.get(&cache.current_user_id()) {
+            if vc.channel_id != voice_state.channel_id {
+                return Err(Error::DebugLog("Failed check: Wrong vc"));
             }
+        } else {
+            if !autojoin {
+                return Err(Error::DebugLog("Failed check: Bot not in vc"));
+            }
+
+            ctx.join_vc(lavalink, guild.id, voice_channel).await?;
         };
 
         if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).ok_or("channel is None")? {
@@ -370,8 +366,8 @@ pub async fn run_checks(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn clean_msg(
-    content: String,
+pub fn clean_msg(
+    content: &str,
 
     guild: &serenity::Guild,
     member: serenity::Member,
@@ -389,7 +385,7 @@ pub async fn clean_msg(
         static ref EMOJI_REGEX: Regex = Regex::new(r"<(a?):(.+):\d+>").unwrap();
     }
     let mut content = EMOJI_REGEX
-        .replace_all(&content, |re_match: &Captures<'_>| {
+        .replace_all(content, |re_match: &Captures<'_>| {
             let is_animated = re_match.get(1).unwrap().as_str();
             let emoji_name = re_match.get(2).unwrap().as_str();
 
@@ -404,13 +400,12 @@ pub async fn clean_msg(
         .into_owned();
 
     if content == "?" {
-        content = String::from("what")
+        content = String::from("what");
     } else {
         if lang == "en" {
-            content = parse_acronyms(&content)
+            content = parse_acronyms(&content);
         }
 
-        // Speeeeeeeeeeeeeeeeeeeeeed
         lazy_static! {
             static ref REGEX_REPLACEMENTS: [(Regex, &'static str); 3] = {
                 [
@@ -477,7 +472,7 @@ pub async fn clean_msg(
         write!(content, "{}",
             if content.is_empty() {"a link."}
             else {". This message contained a link"}
-        ).unwrap()
+        ).unwrap();
     }
 
     if xsaid {
@@ -485,7 +480,7 @@ pub async fn clean_msg(
     }
 
     if repeated_limit != 0 {
-        content = remove_repeated_chars(&content, repeated_limit as usize)
+        content = remove_repeated_chars(&content, repeated_limit as usize);
     }
 
     Ok(content)

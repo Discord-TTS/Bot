@@ -96,9 +96,9 @@ fn find_version(lockfile: &cargo_lock::Lockfile, pkg: &str) -> String {
 
         let version = match &package.source {
             Some(source) => match source.git_reference()? {
-                cargo_lock::package::source::GitReference::Branch(s) => s.to_owned(),
-                cargo_lock::package::source::GitReference::Tag(s) => s.to_owned(),
-                cargo_lock::package::source::GitReference::Rev(s) => s.to_owned(),
+                cargo_lock::package::source::GitReference::Branch(s) |
+                cargo_lock::package::source::GitReference::Tag(s) |
+                cargo_lock::package::source::GitReference::Rev(s) => s.clone(),
             }
             None => package.version.to_string()
         };
@@ -144,7 +144,7 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
 
     ctx.send(|b| {b.embed(|e| {
         e.title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())));
-        e.thumbnail(ctx_discord.cache.current_user_field(|f| f.face()));
+        e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face));
         e.url(&ctx.data().config.server_invite);
         e.colour(NETURAL_COLOUR);
         e.footer(|f| {

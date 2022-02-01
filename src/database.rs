@@ -59,7 +59,7 @@ impl CacheKeyTrait for [i64; 2] {
     }
 }
 
-pub struct DatabaseHandler<T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash> {
+pub struct Handler<T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash> {
     pool: Arc<deadpool_postgres::Pool>,
     cache: DashMap<T, Arc<tokio_postgres::Row>>,
 
@@ -70,7 +70,7 @@ pub struct DatabaseHandler<T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash> {
     delete: &'static str,
 }
 
-impl<T> DatabaseHandler<T>
+impl<T> Handler<T>
 where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + std::marker::Send + Copy
 {
     pub async fn new(
@@ -81,7 +81,7 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
         create_row: &'static str,
         single_insert: &'static str,
     ) -> Result<Self, Error> {
-        Ok(DatabaseHandler {
+        Ok(Handler {
             cache: DashMap::new(),
             default_row: Self::_get(
                 pool.get().await?,

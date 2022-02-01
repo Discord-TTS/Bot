@@ -49,13 +49,10 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
 
     let author = ctx.author();
 
-    let channel_id = match guild
-        .voice_states
-        .get(&author.id)
-        .and_then(|vc| vc.channel_id)
-    {
-        Some(channel) => channel,
-        None => {
+    let channel_id = {
+        if let Some(channel) = guild.voice_states.get(&author.id).and_then(|vc| vc.channel_id) {
+            channel
+        } else {
             ctx.send_error(
                 "you need to be in a voice channel to make me join your voice channel",
                 Some(String::from("join a voice channel and try again")),
@@ -98,14 +95,14 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
     };
     {
         let _typing = ctx.defer_or_broadcast().await?;
-        ctx_discord.join_vc(&ctx.data().lavalink, &guild.id, &channel_id).await?;
+        ctx_discord.join_vc(&ctx.data().lavalink, guild.id, channel_id).await?;
     }
 
     ctx.send(|m| {
         m.embed(|e| {
             e.title("Joined your voice channel!");
             e.description("Just type normally and TTS Bot will say your messages!");
-            e.thumbnail(ctx_discord.cache.current_user_field(|u| u.face()));
+            e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face));
             e.author(|a| {
                 a.name(member.nick.unwrap_or_else(|| author.name.clone()));
                 a.icon_url(author.face())
@@ -176,15 +173,12 @@ pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     {
         let nodes = lavalink.nodes().await;
         let node = nodes.get_mut(&guild.id.into());
-        if node.as_ref()
-            .map(|node| node.queue.is_empty())
-            .unwrap_or(true)
-        {
+        if node.as_ref().map_or(true, |node| node.queue.is_empty()) {
             ctx.say("**Error:** Nothing in message queue to skip!").await?;
             return Ok(());
-        } else {
-            node.unwrap().queue.clear();
         }
+
+        node.unwrap().queue.clear();
     }
 
     lavalink.skip(guild.id).await;
@@ -250,7 +244,7 @@ pub async fn activate(ctx: Context<'_>) -> Result<(), Error> {
             e.description(error_msg);
             e.colour(crate::constants::NETURAL_COLOUR);
             e.footer(|f| f.text("If this is an error, please contact Gnome!#6669."));
-            e.thumbnail(ctx_discord.cache.current_user_field(|u| u.face()))
+            e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
         })).await?;
         return Ok(())
     }

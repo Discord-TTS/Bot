@@ -84,7 +84,7 @@ impl WebhookLogRecv {
         loop {
             periodic.tick().await;
             if let Err(error) = self.send_buffer().await {
-                eprintln!("Logging Error: {:?}", error)
+                eprintln!("Logging Error: {:?}", error);
             }
         }
     }
@@ -102,7 +102,7 @@ impl WebhookLogRecv {
             };
         }
 
-        for (severity, messages) in message_buf.clone().iter() {
+        for (severity, messages) in &message_buf.clone() {
             let severity_name = severity.as_str();
             let username = format!("TTS-Webhook [{}]", severity_name);
 
@@ -131,7 +131,7 @@ impl WebhookLogRecv {
 
             let message_chunked: Vec<String> = full_message.as_str()
                 .chars().chunks(2000).into_iter()
-                .map(|c| c.collect())
+                .map(std::iter::Iterator::collect)
                 .collect();
 
             let webhook = if tracing::Level::ERROR >= *severity {
@@ -167,7 +167,7 @@ impl<'a> tracing::field::Visit for StringVisitor<'a> {
     }
 
     fn record_str(&mut self, _field: &tracing::field::Field, value: &str) {
-        self.string.push_str(value)
+        self.string.push_str(value);
     }
 }
 
@@ -205,7 +205,7 @@ impl tracing::Subscriber for WebhookLogSend {
                 }
             }
             None => {
-                eprintln!("{} log during shutdown: {}", event.metadata().level(), message)
+                eprintln!("{} log during shutdown: {}", event.metadata().level(), message);
             }
         }
     }
