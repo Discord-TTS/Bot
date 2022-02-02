@@ -603,7 +603,7 @@ pub async fn speaking_rate(
 pub async fn nick(
     ctx: Context<'_>,
     #[description="The user to set the nick for, defaults to you"] user: Option<serenity::User>,
-    #[description="The nickname to set"] #[rest] nickname: String
+    #[description="The nickname to set, leave blank to reset"] #[rest] nickname: Option<String>
 ) -> Result<(), Error> {
     let ctx_discord = ctx.discord();
     let guild = ctx.guild().ok_or(Error::GuildOnly)?;
@@ -615,18 +615,26 @@ pub async fn nick(
         ctx.say("**Error**: You need admin to set other people's nicknames!").await?;
         return Ok(())
     }
-    
-    let to_send = if nickname.contains('<') && nickname.contains('>') {
-        String::from("**Error**: You can't have mentions/emotes in your nickname!")
-    } else {
-        let data = ctx.data();
-        let (r1, r2) = tokio::join!(
-            data.guilds_db.create_row(guild.id.into()),
-            data.userinfo_db.create_row(user.id.into())
-        ); r1?; r2?;
 
-        data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nickname).await?;
-        format!("Changed {}'s nickname to {}", user.name, nickname)
+    let data = ctx.data();
+
+    let to_send = match nickname {
+        Some(ref nick) => {
+            if nick.contains('<') && nick.contains('>') {
+                String::from("**Error**: You can't have mentions/emotes in your nickname!")
+            } else {
+                let (r1, r2) = tokio::join!(
+                    data.guilds_db.create_row(guild.id.into()),
+                    data.userinfo_db.create_row(user.id.into())
+                ); r1?; r2?;
+                data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nickname).await?;
+                format!("Changed {}'s nickname to {}", user.name, nick)
+            }
+        },
+        None => {
+            data.nickname_db.delete([guild.id.into(), user.id.into()]).await?;
+            format!("Reset {}'s nickname", user.name)
+        }
     };
 
     ctx.say(to_send).await?;
