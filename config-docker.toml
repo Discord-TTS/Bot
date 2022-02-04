@@ -6,6 +6,7 @@ ssl = false
 
 [Main]
 log_level = 'info'
+tts_service = 'https://gtts-service:20310'
 #main_server_invite = 'https://discord.gg/example'
 #invite_channel = id here
 #main_server = id here 

@@ -128,9 +128,9 @@ fn generate_jwt(service_account: &crate::structs::ServiceAccount, expire_time: &
 
 
 #[cfg(not(feature="premium"))]
-pub async fn fetch_audio(reqwest: &reqwest::Client, proxy: &Option<String>, content: String, lang: &str) -> Result<Vec<u8>, Error> {
+pub async fn fetch_audio(reqwest: &reqwest::Client, tts_service: &reqwest::Url, content: String, lang: &str) -> Result<Vec<u8>, Error> {
     let mut audio_buf = Vec::new();
-    for url in parse_url(proxy, &content, lang) {
+    for url in fetch_url(tts_service, &content, lang) {
         let resp = reqwest.get(url).send().await?;
         let status = resp.status();
         if status == 200 {
@@ -144,22 +144,15 @@ pub async fn fetch_audio(reqwest: &reqwest::Client, proxy: &Option<String>, cont
 }
 
 #[cfg(not(feature="premium"))]
-pub fn parse_url(proxy: &Option<String>, content: &str, lang: &str) -> Vec<reqwest::Url> {
+pub fn fetch_url(tts_service: &reqwest::Url, content: &str, lang: &str) -> Vec<reqwest::Url> {
     content.chars().chunks(200).into_iter().map(std::iter::Iterator::collect::<String>).map(|chunk| {
-        let mut url = reqwest::Url::parse("https://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&client=tw-ob").unwrap();
+        let mut url = tts_service.clone();
+        url.set_path("tts");
         url.query_pairs_mut()
-            .append_pair("tl", lang)
-            .append_pair("q", &chunk)
-            .append_pair("textlen", &chunk.len().to_string())
+            .append_pair("text", &chunk)
+            .append_pair("lang", lang)
             .finish();
-
-        if let Some(proxy_url) = proxy {
-            let mut temp_url = reqwest::Url::parse(proxy_url).unwrap();
-            temp_url.set_path(url.as_str());
-            temp_url
-        } else {
-            url
-        }
+        url
     }).collect()
 }
 

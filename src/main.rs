@@ -110,9 +110,8 @@ async fn main() {
             #[cfg(feature="premium")] patreon_role: serenity::RoleId(main_config["patreon_role"].as_integer().unwrap() as u64),
             #[cfg(feature="premium")] translation_token: String::from(main_config["translation_token"].as_str().unwrap()),
 
+            #[cfg(not(feature="premium"))] tts_service: reqwest::Url::parse(main_config["tts_service"].as_str().unwrap()).unwrap(),
             server_invite: String::from(main_config["main_server_invite"].as_str().unwrap()),
-
-            use_proxy: main_config.get("proxy_url").and_then(toml::Value::as_str).map(String::from),
             invite_channel: main_config["invite_channel"].clone().as_integer().unwrap() as u64,
             main_server: main_config["main_server"].as_integer().unwrap() as u64,
             ofs_role: main_config["ofs_role"].as_integer().unwrap() as u64,
@@ -432,7 +431,7 @@ Ask questions by either responding here or asking on the support server!",
             }
         }
         poise::Event::Ready { data_about_bot } => {
-            info!("{} has connected!", data_about_bot.user.name);
+            info!("{} has connected in {} seconds!", data_about_bot.user.name, data.start_time.elapsed()?.as_secs());
         }
         poise::Event::Resume { event: _ } => {
             data.analytics.log("on_resumed");
@@ -686,7 +685,7 @@ async fn process_tts_msg(
         lavalink_client.play(guild.id, track.clone()).queue().await?;
     }
     #[cfg(not(feature="premium"))]{
-        for url in crate::funcs::parse_url(&data.config.use_proxy, &content, &voice) {
+        for url in crate::funcs::fetch_url(&data.config.tts_service, &content, &voice) {
             let tracks = lavalink_client.get_tracks(&url).await?.tracks;
             let track = tracks.first().ok_or(format!("Guild: {} | Lavalink failed to get track!", guild.id))?;
             lavalink_client.play(guild.id, track.clone()).queue().await?;

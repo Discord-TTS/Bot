@@ -6,6 +6,7 @@
 
 [Main]
 log_level = 'info'
+#tts_service = url to instance of https://github.com/GnomedDev/gtts-service
 #main_server_invite = 'https://discord.gg/example'
 #invite_channel = id here
 #main_server = id here 

@@ -19,7 +19,7 @@ pub struct Config {
     #[cfg(feature="premium")] pub patreon_role: serenity::RoleId,
     #[cfg(feature="premium")] pub translation_token: String,
 
-    pub use_proxy: Option<String>, // URL to prefix to each request, used on main with https://github.com/aleclol/6p
+    #[cfg(not(feature="premium"))] pub tts_service: reqwest::Url,
     pub server_invite: String,
     pub invite_channel: u64,
     pub main_server: u64,
