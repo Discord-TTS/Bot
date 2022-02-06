@@ -770,7 +770,7 @@ Just do `{}join` and start talking!
 )]
 pub async fn language(
     ctx: Context<'_>,
-    #[description="The language to read messages in, leave blank reset"] lang: Option<String>
+    #[description="The language to read messages in, leave blank to reset"] lang: Option<String>
 ) -> Result<(), Error> {
     let to_send = match lang {
         Some(lang) => {
