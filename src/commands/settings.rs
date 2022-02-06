@@ -873,19 +873,28 @@ async fn get_voice<'a>(
 )]
 pub async fn voice(
     ctx: Context<'_>,
-    #[description="The language to read messages in"] mut language: String,
+    #[description="The language to read messages in, leave blank to reset"] language: Option<String>,
     #[description="The variant of this language to use"] mut variant: Option<String>
 ) -> Result<(), Error> {
-    variant = variant.map(|s| s.to_uppercase());
-    if let Some((lang, accent)) = language.split_once('-') {
-        language = format!("{}-{}", lang, accent.to_uppercase());
-    }
-
     let data = ctx.data();
-    if let Some((variant, gender)) = get_voice(&ctx, &data.voices, &language, variant.as_ref()).await? {
-        data.userinfo_db.set_one(ctx.author().id.into(), "voice", &format!("{} {}", language, variant)).await?;
-        ctx.say(format!("Changed your voice to: {language} - {variant} ({gender})")).await?;
-    };
+    match language {
+        Some(mut language) => {
+            variant = variant.map(|s| s.to_uppercase());
+            if let Some((lang, accent)) = language.split_once('-') {
+                language = format!("{}-{}", lang, accent.to_uppercase());
+            }
+
+            if let Some((variant, gender)) = get_voice(&ctx, &data.voices, &language, variant.as_ref()).await? {
+            data.userinfo_db.set_one(ctx.author().id.into(), "voice", &format!("{} {}", language, variant)).await?;
+            ctx.say(format!("Changed your voice to: {language} - {variant} ({gender})")).await?;
+            };
+        },
+
+        None => {
+            data.userinfo_db.set_one(ctx.author().id.into(), "voice", &Option::<String>::None).await?;
+            ctx.say("Reset your voice").await?;
+        }
+    }
 
     Ok(())
 }
