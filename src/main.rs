@@ -679,20 +679,28 @@ async fn process_tts_msg(
             .append_pair("config", &query_json.to_string())
             .finish();
 
-        let tracks = lavalink_client.get_tracks(&query).await?.tracks;
-        let track = tracks.first().ok_or(format!("Guild: {} | Lavalink failed to get track!", guild.id))?;
-
-        lavalink_client.play(guild.id, track.clone()).queue().await?;
+        for _ in 0..5 {
+            let tracks = lavalink_client.get_tracks(&query).await?.tracks;
+            if let Some(track) = tracks.first() {
+                lavalink_client.play(guild.id, track.clone()).queue().await?;
+                return Ok(())
+            }
+        }
     }
     #[cfg(not(feature="premium"))]{
         for url in crate::funcs::fetch_url(&data.config.tts_service, &content, &voice) {
-            let tracks = lavalink_client.get_tracks(&url).await?.tracks;
-            let track = tracks.first().ok_or(format!("Guild: {} | Lavalink failed to get track!", guild.id))?;
-            lavalink_client.play(guild.id, track.clone()).queue().await?;
-        }
+            for _ in 0..5 {
+                let tracks = lavalink_client.get_tracks(&url).await?.tracks;
+                if let Some(track) = tracks.first() {
+                    lavalink_client.play(guild.id, track.clone()).queue().await?;
+                    return Ok(())
+                }
+            }
+           
+        } 
     }
 
-    Ok(())
+    return Err(Error::from(format!("Guild: {} | Lavalink failed to get track!", guild.id)))
 }
 
 async fn process_mention_msg(

@@ -88,8 +88,7 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
                 return Ok(());
             };
 
-            ctx.say(format!("I am already in <#{}>!", bot_channel_id))
-                .await?;
+            ctx.say(format!("I am already in <#{}>!", bot_channel_id)).await?;
             return Ok(());
         }
     };
