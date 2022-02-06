@@ -770,16 +770,22 @@ Just do `{}join` and start talking!
 )]
 pub async fn language(
     ctx: Context<'_>,
-    #[description="The language to read messages in"] lang: String
+    #[description="The language to read messages in, leave blank reset"] lang: Option<String>
 ) -> Result<(), Error> {
-    let to_send =
-        if let Some(lang_name) = crate::funcs::get_supported_languages().get(&lang) {
-            ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &lang).await?;
-            format!("Changed your language to: {}", lang_name)
-        } else {
-            format!("Invalid language, do `{}languages`", ctx.prefix())
-        };
-
+    let to_send = match lang {
+        Some(lang) => {
+            if let Some(lang_name) = crate::funcs::get_supported_languages().get(&lang) {
+                ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &lang).await?;
+                format!("Changed your language to: {}", lang_name)
+            } else {
+                format!("Invalid language, do `{}languages`", ctx.prefix())
+            }
+        },
+        None => {
+            ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &Option::<String>::None).await?;
+            String::from("Reset your language")
+        }
+    };
     ctx.say(to_send).await?;
     Ok(())
 }
