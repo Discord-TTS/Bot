@@ -603,7 +603,7 @@ pub async fn speaking_rate(
 pub async fn nick(
     ctx: Context<'_>,
     #[description="The user to set the nick for, defaults to you"] user: Option<serenity::User>,
-    #[description="The nickname to set"] #[rest] nickname: String
+    #[description="The nickname to set, leave blank to reset"] #[rest] nickname: Option<String>
 ) -> Result<(), Error> {
     let ctx_discord = ctx.discord();
     let guild = ctx.guild().ok_or(Error::GuildOnly)?;
@@ -615,19 +615,26 @@ pub async fn nick(
         ctx.say("**Error**: You need admin to set other people's nicknames!").await?;
         return Ok(())
     }
-    
-    let to_send = if nickname.contains('<') && nickname.contains('>') {
-        String::from("**Error**: You can't have mentions/emotes in your nickname!")
-    } else {
-        let data = ctx.data();
-        let (r1, r2) = tokio::join!(
-            data.guilds_db.create_row(guild.id.into()),
-            data.userinfo_db.create_row(user.id.into())
-        ); r1?; r2?;
 
-        data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nickname).await?;
-        format!("Changed {}'s nickname to {}", user.name, nickname)
-    };
+    let data = ctx.data();
+
+    let to_send =
+        if let Some(nick) = nickname {
+            if nick.contains('<') && nick.contains('>') {
+                String::from("**Error**: You can't have mentions/emotes in your nickname!")
+            } else {
+                let (r1, r2) = tokio::join!(
+                    data.guilds_db.create_row(guild.id.into()),
+                    data.userinfo_db.create_row(user.id.into())
+                ); r1?; r2?;
+
+                data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nick).await?;
+                format!("Changed {}'s nickname to {}", user.name, nick)
+            }
+        } else {
+            data.nickname_db.delete([guild.id.into(), user.id.into()]).await?;
+            format!("Reset {}'s nickname", user.name)
+        };
 
     ctx.say(to_send).await?;
     Ok(())
@@ -762,14 +769,19 @@ Just do `{}join` and start talking!
 )]
 pub async fn language(
     ctx: Context<'_>,
-    #[description="The language to read messages in"] lang: String
+    #[description="The language to read messages in, leave blank to reset"] lang: Option<String>
 ) -> Result<(), Error> {
     let to_send =
-        if let Some(lang_name) = crate::funcs::get_supported_languages().get(&lang) {
-            ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &lang).await?;
-            format!("Changed your language to: {}", lang_name)
+        if let Some(lang) = lang {
+            if let Some(lang_name) = crate::funcs::get_supported_languages().get(&lang) {
+                ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &lang).await?;
+                format!("Changed your language to: {}", lang_name)
+            } else {
+                format!("Invalid language, do `{}languages`", ctx.prefix())
+            }
         } else {
-            format!("Invalid language, do `{}languages`", ctx.prefix())
+            ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &Option::<String>::None).await?;
+            String::from("Reset your language")
         };
 
     ctx.say(to_send).await?;
@@ -859,20 +871,29 @@ async fn get_voice<'a>(
 )]
 pub async fn voice(
     ctx: Context<'_>,
-    #[description="The language to read messages in"] mut language: String,
+    #[description="The language to read messages in, leave blank to reset"] language: Option<String>,
     #[description="The variant of this language to use"] mut variant: Option<String>
 ) -> Result<(), Error> {
-    variant = variant.map(|s| s.to_uppercase());
-    if let Some((lang, accent)) = language.split_once('-') {
-        language = format!("{}-{}", lang, accent.to_uppercase());
-    }
-
     let data = ctx.data();
-    if let Some((variant, gender)) = get_voice(&ctx, &data.voices, &language, variant.as_ref()).await? {
-        data.userinfo_db.set_one(ctx.author().id.into(), "voice", &format!("{} {}", language, variant)).await?;
-        ctx.say(format!("Changed your voice to: {language} - {variant} ({gender})")).await?;
-    };
+    let to_send =
+        if let Some(mut language) = language {
+            variant = variant.map(|s| s.to_uppercase());
+            if let Some((lang, accent)) = language.split_once('-') {
+                language = format!("{}-{}", lang, accent.to_uppercase());
+            }
 
+            if let Some((variant, gender)) = get_voice(&ctx, &data.voices, &language, variant.as_ref()).await? {
+                data.userinfo_db.set_one(ctx.author().id.into(), "voice", &format!("{} {}", language, variant)).await?;
+                format!("Changed your voice to: {language} - {variant} ({gender})")
+            } else {
+                return Ok(())
+            }
+        } else {
+            data.userinfo_db.set_one(ctx.author().id.into(), "voice", &Option::<String>::None).await?;
+            String::from("Reset your voice")
+        };
+
+    ctx.say(to_send).await?;
     Ok(())
 }
 
