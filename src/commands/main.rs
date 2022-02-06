@@ -234,7 +234,7 @@ pub async fn activate(ctx: Context<'_>) -> Result<(), Error> {
         ).await?
     };
 
-    if error_msg.is_none() && linked_guilds.len() > 2 {
+    if error_msg.is_none() && linked_guilds.len() >= 2 {
         error_msg = Some(String::from("Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier"));
     }
 

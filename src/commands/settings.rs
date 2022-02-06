@@ -534,7 +534,7 @@ pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeat
     let to_send = {
         if chars > 100 {
             String::from("**Error**: Cannot set the max repeated characters above 100")
-        } else if chars < 20 && chars != 0 {
+        } else if chars < 5 && chars != 0 {
             String::from("**Error**: Cannot set the max repeated characters below 5")
         } else {
             ctx.data().guilds_db.set_one(guild_id, "repeated_chars", &(chars as i16)).await?;

@@ -13,7 +13,7 @@ rand = "0.8"
 regex = "1.5"
 serde = "1.0"
 strfmt = "0.1"
-dashmap = "5.0"
+dashmap = "4"
 tracing = "0.1"
 strsim = "0.10"
 reqwest = "0.11"
@@ -21,13 +21,13 @@ indexmap = "1.7"
 itertools = "0.10"
 cargo-lock = "7.0"
 lazy_static = "1.4"
-parking_lot = "0.11"
+parking_lot = "0.12"
 deadpool-postgres = "0.10"
 #serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = ["simdjson"] }
 
 [dependencies.tokio]
-version = "1.14"
-features = ["macros", "rt-multi-thread", "signal"]
+version = "1.16"
+features = ["macros", "rt-multi-thread", "signal", "parking_lot"]
 
 [dependencies.poise]
 git = "https://github.com/kangalioo/poise"
@@ -40,7 +40,6 @@ branch = "next"
 
 [dependencies.lavalink-rs]
 git = "https://gitlab.com/vicky5124/lavalink-rs"
-rev = "92386c47bf717d927a9b74f884e172562999c654"
 features = ["serenity", "rustls"]
 
 [dependencies.psutil]

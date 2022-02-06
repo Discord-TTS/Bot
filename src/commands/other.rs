@@ -91,7 +91,7 @@ pub async fn tts(
 }
 
 fn find_version(lockfile: &cargo_lock::Lockfile, pkg: &str) -> String {
-    let version: Option<String> = (|| -> Option<String> {
+    let version = (|| -> Option<String> {
         let package = lockfile.packages.iter().find(|p| p.name.as_str() == pkg)?;
 
         let version = match &package.source {
@@ -131,16 +131,13 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     let shard_count = ctx_discord.cache.shard_count();
     let ram_usage = raw_ram_usage / 1024_u64.pow(2);
 
-    let serenity_ver: String;
-    let poise_ver: String;
-    {
+    let [serenity_ver, poise_ver] = {
         let lockfile = cargo_lock::Lockfile::load("Cargo.lock").unwrap();
-        serenity_ver = find_version(&lockfile, "serenity");
-        poise_ver = find_version(&lockfile, "poise");
-    }
+        [find_version(&lockfile, "serenity"), find_version(&lockfile, "poise")]
+    };
 
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
-    let (sep1, sep2) = (OPTION_SEPERATORS[0], OPTION_SEPERATORS[1]);
+    let [sep1, sep2] = [OPTION_SEPERATORS[0], OPTION_SEPERATORS[1]];
 
     ctx.send(|b| {b.embed(|e| {
         e.title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())));
