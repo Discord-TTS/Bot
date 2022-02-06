@@ -875,25 +875,25 @@ pub async fn voice(
     #[description="The variant of this language to use"] mut variant: Option<String>
 ) -> Result<(), Error> {
     let data = ctx.data();
-    match language {
-        Some(mut language) => {
+    let to_send =
+        if let Some(mut language) = language {
             variant = variant.map(|s| s.to_uppercase());
             if let Some((lang, accent)) = language.split_once('-') {
                 language = format!("{}-{}", lang, accent.to_uppercase());
             }
 
             if let Some((variant, gender)) = get_voice(&ctx, &data.voices, &language, variant.as_ref()).await? {
-            data.userinfo_db.set_one(ctx.author().id.into(), "voice", &format!("{} {}", language, variant)).await?;
-            ctx.say(format!("Changed your voice to: {language} - {variant} ({gender})")).await?;
-            };
-        },
-
-        None => {
+                data.userinfo_db.set_one(ctx.author().id.into(), "voice", &format!("{} {}", language, variant)).await?;
+                format!("Changed your voice to: {language} - {variant} ({gender})")
+            } else {
+                return Ok(())
+            }
+        } else {
             data.userinfo_db.set_one(ctx.author().id.into(), "voice", &Option::<String>::None).await?;
-            ctx.say("Reset your voice").await?;
-        }
-    }
+            String::from("Reset your voice")
+        };
 
+    ctx.say(to_send).await?;
     Ok(())
 }
 
