@@ -618,8 +618,8 @@ pub async fn nick(
 
     let data = ctx.data();
 
-    let to_send = match nickname {
-        Some(ref nick) => {
+    let to_send =
+        if let Some(nick) = nickname {
             if nick.contains('<') && nick.contains('>') {
                 String::from("**Error**: You can't have mentions/emotes in your nickname!")
             } else {
@@ -627,15 +627,14 @@ pub async fn nick(
                     data.guilds_db.create_row(guild.id.into()),
                     data.userinfo_db.create_row(user.id.into())
                 ); r1?; r2?;
-                data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nickname).await?;
+
+                data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nick).await?;
                 format!("Changed {}'s nickname to {}", user.name, nick)
             }
-        },
-        None => {
+        } else {
             data.nickname_db.delete([guild.id.into(), user.id.into()]).await?;
             format!("Reset {}'s nickname", user.name)
-        }
-    };
+        };
 
     ctx.say(to_send).await?;
     Ok(())
@@ -772,20 +771,19 @@ pub async fn language(
     ctx: Context<'_>,
     #[description="The language to read messages in, leave blank to reset"] lang: Option<String>
 ) -> Result<(), Error> {
-    let to_send = match lang {
-        Some(lang) => {
+    let to_send =
+        if let Some(lang) = lang {
             if let Some(lang_name) = crate::funcs::get_supported_languages().get(&lang) {
                 ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &lang).await?;
                 format!("Changed your language to: {}", lang_name)
             } else {
                 format!("Invalid language, do `{}languages`", ctx.prefix())
             }
-        },
-        None => {
+        } else {
             ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &Option::<String>::None).await?;
             String::from("Reset your language")
-        }
-    };
+        };
+
     ctx.say(to_send).await?;
     Ok(())
 }
