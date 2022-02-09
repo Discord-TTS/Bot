@@ -9,7 +9,6 @@ lto = "thin"
 
 [dependencies]
 regex = "1"
-serde = "1"
 rand = "0.8"
 toml = "0.5"
 dashmap = "5"
@@ -52,6 +51,10 @@ default-features = false
 version = "0.13"
 optional = true
 
+[dependencies.serde]
+version = "1"
+optional = true
+
 [dependencies.jsonwebtoken]
 version = "7"
 optional = true
@@ -63,4 +66,4 @@ serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next" }
 songbird = { git = "https://github.com/serenity-rs/songbird", branch = "next" }
 
 [features]
-premium = ["base64", "jsonwebtoken"]
+premium = ["base64", "serde", "jsonwebtoken"]

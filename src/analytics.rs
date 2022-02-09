@@ -22,7 +22,7 @@ use tracing::error;
 use crate::structs::Error;
 
 pub struct Handler {
-    log_buffer: DashMap<&'static str, i32>,
+    log_buffer: DashMap<String, u32>,
     pool: Arc<deadpool_postgres::Pool>
 }
 
@@ -60,7 +60,7 @@ impl Handler {
         ;").await?;
 
         for (raw_event, count) in log_buffer {
-            let event = raw_event.strip_prefix("on_").unwrap_or(raw_event);
+            let event = raw_event.strip_prefix("on_").unwrap_or(&raw_event);
             transaction.execute(&query, &[&event, &(raw_event == event), &count]).await?;
         }
 
@@ -68,8 +68,9 @@ impl Handler {
         Ok(())
     }
 
-    pub fn log(&self, event: &'static str) {
-        let count = *self.log_buffer.entry(event).or_insert(0);
-        self.log_buffer.insert(event, count + 1);
+    pub fn log(&self, event: String) -> u32 {
+        let count = (*self.log_buffer.entry(event.clone()).or_insert(0)) + 1;
+        self.log_buffer.insert(event, count);
+        count
     }
 }

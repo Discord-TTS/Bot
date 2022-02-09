@@ -33,7 +33,7 @@ pub async fn uptime(ctx: Context<'_>,) -> Result<(), Error> {
 }
 
 /// Generates TTS and sends it in the current text channel!
-#[poise::command(category="Extra Commands", prefix_command, slash_command, track_edits, required_bot_permissions="SEND_MESSAGES | ATTACH_FILES")]
+#[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | ATTACH_FILES")]
 pub async fn tts(
     ctx: Context<'_>, 
     #[description="The text to TTS"] #[rest] message: String

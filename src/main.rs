@@ -240,10 +240,13 @@ async fn main() {
                     .clone()
             ),
             pre_command: |ctx| Box::pin(async move {
-                ctx.data().analytics.log(match ctx {
+                let analytics_handler: &analytics::Handler = &ctx.data().analytics;
+
+                analytics_handler.log(ctx.command().qualified_name.clone());
+                analytics_handler.log(String::from(match ctx {
                     poise::Context::Prefix(_) => "on_command",
                     poise::Context::Application(_) => "on_slash_command",
-                });
+                }));
             }),
             #[cfg(feature="premium")]
             command_check: Some(|ctx| Box::pin(premium_check(ctx))),
@@ -434,7 +437,7 @@ Ask questions by either responding here or asking on the support server!",
             info!("{} has connected in {} seconds!", data_about_bot.user.name, data.start_time.elapsed()?.as_secs());
         }
         poise::Event::Resume { event: _ } => {
-            data.analytics.log("on_resumed");
+            data.analytics.log(String::from("on_resumed"));
         }
         _ => {}
     }
@@ -661,6 +664,7 @@ async fn process_tts_msg(
         }
     };
 
+    let tts_err = || format!("Guild: {} | Lavalink failed to get track!", guild.id);
     #[cfg(feature="premium")] {
         let speaking_rate: f32 = data.userinfo_db.get(message.author.id.into()).await?.get("speaking_rate");
         let target_lang: Option<String> = guild_row.get("target_lang");
@@ -679,28 +683,33 @@ async fn process_tts_msg(
             .append_pair("config", &query_json.to_string())
             .finish();
 
-        for _ in 0..5 {
-            let tracks = lavalink_client.get_tracks(&query).await?.tracks;
-            if let Some(track) = tracks.first() {
-                lavalink_client.play(guild.id, track.clone()).queue().await?;
-                return Ok(())
-            }
-        }
+        let tracks = lavalink_client.get_tracks(&query).await?.tracks;
+        let track = tracks.first().ok_or(tts_err)?;
+
+        lavalink_client.play(guild.id, track.clone()).queue().await?;
     }
-    #[cfg(not(feature="premium"))]{
-        for url in crate::funcs::fetch_url(&data.config.tts_service, &content, &voice) {
+    #[cfg(not(feature="premium"))] {
+        // Try to fetch audio 5 times, give up and log on failed chunk
+        'url_fetch: for url in crate::funcs::fetch_url(&data.config.tts_service, &content, &voice) {
             for _ in 0..5 {
                 let tracks = lavalink_client.get_tracks(&url).await?.tracks;
                 if let Some(track) = tracks.first() {
                     lavalink_client.play(guild.id, track.clone()).queue().await?;
-                    return Ok(())
+                    continue 'url_fetch
                 }
-            }
-           
-        } 
+            };
+
+            data.analytics.log(String::from("on_tts_failure"));
+            return Err(Error::from(tts_err()))
+        }
     }
 
-    return Err(Error::from(format!("Guild: {} | Lavalink failed to get track!", guild.id)))
+    // "Mode" changing planned (gtts, espeak, premium)
+    data.analytics.log(format!("on_{}_tts",
+        if cfg!(feature="premium") {"premium"}
+        else {"gtts"}
+    ));
+    Ok(())
 }
 
 async fn process_mention_msg(
@@ -787,7 +796,7 @@ async fn process_support_dm(
                 return Ok(());
             }
 
-            data.analytics.log("on_dm");
+            data.analytics.log(String::from("on_dm"));
 
             let userinfo = data.userinfo_db.get(message.author.id.into()).await?;
             if userinfo.get("dm_welcomed") {
