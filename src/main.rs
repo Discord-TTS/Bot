@@ -684,7 +684,7 @@ async fn process_tts_msg(
             .finish();
 
         let tracks = lavalink_client.get_tracks(&query).await?.tracks;
-        let track = tracks.first().ok_or(tts_err)?;
+        let track = tracks.first().ok_or_else(tts_err)?;
 
         lavalink_client.play(guild.id, track.clone()).queue().await?;
     }
