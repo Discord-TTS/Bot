@@ -56,7 +56,7 @@ version = "1"
 optional = true
 
 [dependencies.jsonwebtoken]
-version = "7"
+version = "8"
 optional = true
 
 
