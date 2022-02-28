@@ -145,7 +145,7 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
             f.text(format!("
 Time to fetch: {time_to_fetch:.2}ms
 Support Server: https://discord.gg/zWPWwQC
-Repository: https://github.com/Gnome-py/Discord-TTS-Bot
+Repository: https://github.com/GnomedDev/Discord-TTS-Bot
             ", ))
         });
         e.description(format!("
