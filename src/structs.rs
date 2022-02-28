@@ -6,23 +6,15 @@ use lazy_static::lazy_static;
 use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 
-use crate::constants::RED;
-
-#[cfg(feature="premium")]
-#[derive(serde::Deserialize, Debug)]
-pub struct ServiceAccount {
-    pub private_key: String,
-    pub client_email: String,
-}
+use crate::{constants::RED, commands::settings::{TTSModeChoice, TTSModeServerChoice}};
 
 pub struct Config {
-    #[cfg(feature="premium")] pub patreon_role: serenity::RoleId,
-    #[cfg(feature="premium")] pub translation_token: String,
-
-    #[cfg(not(feature="premium"))] pub tts_service: reqwest::Url,
+    pub translation_token: Option<String>,
+    pub patreon_role: serenity::RoleId,
+    pub main_server: serenity::GuildId,
+    pub tts_service: reqwest::Url,
     pub server_invite: String,
     pub invite_channel: u64,
-    pub main_server: u64,
     pub ofs_role: u64,
 }
 
@@ -31,44 +23,85 @@ pub struct Data {
     pub guilds_db: crate::database::Handler<i64>,
     pub userinfo_db: crate::database::Handler<i64>,
     pub nickname_db: crate::database::Handler<[i64; 2]>,
+    pub user_voice_db: crate::database::Handler<(i64, TTSMode)>,
+    pub guild_voice_db: crate::database::Handler<(i64, TTSMode)>,
 
     pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
+    pub premium_users: Vec<serenity::UserId>,
     pub start_time: std::time::SystemTime,
-    pub owner_id: serenity::UserId,
+    pub premium_avatar_url: String,
     pub lavalink: LavalinkClient,
     pub reqwest: reqwest::Client,
     pub config: Config,
 
-    #[cfg(feature="premium")] pub voices: VoiceData,
-    #[cfg(feature="premium")] pub service_acc: ServiceAccount,
-    #[cfg(feature="premium")] pub pool: Arc<deadpool_postgres::Pool>,
-    #[cfg(feature="premium")] pub jwt_token: parking_lot::Mutex<String>,
-    #[cfg(feature="premium")] pub jwt_expire: parking_lot::Mutex<std::time::SystemTime>
+    pub premium_voices: PremiumVoices,
+    pub pool: Arc<deadpool_postgres::Pool>,
 }
 
 
-#[cfg(feature="premium")]
+#[derive(
+    postgres_types::ToSql, postgres_types::FromSql,
+    Debug, Hash, PartialEq, Eq, Copy, Clone
+)]
+#[postgres(name="ttsmode")]
+pub enum TTSMode {
+    #[postgres(name="gtts")] Gtts,
+    #[postgres(name="espeak")] Espeak,
+    #[postgres(name="premium")] Premium
+}
+
+impl Default for TTSMode {
+    fn default() -> Self {
+        Self::Gtts
+    }
+}
+
+impl std::fmt::Display for TTSMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Gtts => "gTTS",
+            Self::Espeak => "eSpeak",
+            Self::Premium => "Premium"
+        })
+    }
+}
+
+impl From<TTSModeServerChoice> for TTSMode {
+    fn from(mode: TTSModeServerChoice) -> Self {
+        match mode {
+            TTSModeServerChoice::Gtts => TTSMode::Gtts,
+            TTSModeServerChoice::Espeak => TTSMode::Espeak,
+            TTSModeServerChoice::Premium => TTSMode::Premium
+        }
+    }
+}
+
+impl From<TTSModeChoice> for TTSMode {
+    fn from(mode: TTSModeChoice) -> Self {
+        match mode {
+            TTSModeChoice::Espeak => TTSMode::Espeak,
+            TTSModeChoice::Premium => TTSMode::Premium
+        }
+    }
+}
+
 #[derive(serde::Deserialize, Debug)]
 pub struct DeeplTranslateResponse {
     pub translations: Vec<DeeplTranslation>
 }
 
-#[cfg(feature="premium")]
 #[derive(serde::Deserialize, Debug)]
 pub struct DeeplTranslation {
     pub text: String,
     pub detected_source_language: String
 }
 
-#[cfg(feature="premium")]
 #[derive(serde::Deserialize, Debug)]
 pub struct DeeplVoice {
     pub language: String,
-    pub name: String
 }
 
-#[cfg(feature="premium")]
 #[allow(non_snake_case)]
 #[derive(serde::Deserialize, Debug)]
 pub struct GoogleVoice<'a> {
@@ -77,14 +110,12 @@ pub struct GoogleVoice<'a> {
     pub languageCodes: [String; 1],
 }
 
-#[cfg(feature="premium")]
 #[derive(serde::Serialize, Debug)]
 pub enum Gender {
     Male,
     Female
 }
 
-#[cfg(feature="premium")]
 impl std::fmt::Display for Gender {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
@@ -99,7 +130,6 @@ impl std::fmt::Display for Gender {
 pub enum Error {
     GuildOnly,
     None(String),
-    Tts(reqwest::Response),
     DebugLog(&'static str), // debug log something but ignore
     Unexpected(Box<dyn std::error::Error + Send + Sync>),
 }
@@ -119,9 +149,8 @@ impl std::fmt::Display for Error {
 }
 
 pub type Context<'a> = poise::Context<'a, Data, Error>;
+pub type PremiumVoices = std::collections::BTreeMap<String, std::collections::BTreeMap<String, Gender>>;
 pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, (serenity::UserId, std::time::SystemTime)>;
-#[cfg(feature="premium")]
-pub type VoiceData = std::collections::BTreeMap<String, std::collections::BTreeMap<String, crate::structs::Gender>>;
 
 pub trait OptionTryUnwrap<T> {
     fn try_unwrap(self) -> Result<T, Error>;

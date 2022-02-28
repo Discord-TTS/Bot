@@ -14,63 +14,74 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::borrow::Cow;
+
+use itertools::Itertools;
+
 use poise::serenity_prelude as serenity;
 
-use crate::constants::{NETURAL_COLOUR, OPTION_SEPERATORS};
-use crate::structs::{Context, Error};
-use crate::random_footer;
+use crate::funcs::{get_gtts_voices, get_espeak_voices, netural_colour, parse_user_or_guild};
+use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
+use crate::structs::{Context, Error, TTSMode, Data};
+use crate::{random_footer, database};
+
 
 /// Displays the current settings!
 #[poise::command(category="Settings", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
 pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
-    let author_id = ctx.author().id.into();
+    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+    let author_id = ctx.author().id;
 
     let data = ctx.data();
     let ctx_discord = ctx.discord();
 
-    let guild_row = data.guilds_db.get(guild_id).await?;
-    let userinfo_row = data.userinfo_db.get(author_id).await?;
-    let nickname_row = data.nickname_db.get([guild_id, author_id]).await?;
+    let guild_row = data.guilds_db.get(guild_id.into()).await?;
+    let userinfo_row = data.userinfo_db.get(author_id.into()).await?;
+    let nickname_row = data.nickname_db.get([guild_id.into(), author_id.into()]).await?;
 
     let channel_name = guild_row.get::<&str, Option<i64>>("channel")
-        .and_then(|c| 
-            ctx_discord.cache.guild_channel_field(c as u64, |c| c.name.clone())
-        )
-        .unwrap_or_else(|| String::from("has not been set up yet"));
-
-    #[cfg(feature="premium")] let voice_lang = "Voice";
-    #[cfg(not(feature="premium"))] let voice_lang = "Language";
-
-    let format_voice = |voice: String| {
-        #[cfg(feature="premium")] {
-            let (lang, variant) = voice.split_once(' ').unwrap();
-            let gender = &ctx.data().voices[lang][variant];
-            format!("{lang} - {variant} ({gender})")
-        } #[cfg(not(feature="premium"))] {
-            voice
-        }
-    };
+        .and_then(|c| ctx_discord.cache.guild_channel_field(c as u64, |c| c.name.clone()).map(Cow::Owned))
+        .unwrap_or(Cow::Borrowed("has not been set up yet"));
 
     let xsaid: bool = guild_row.get("xsaid");
     let prefix: String = guild_row.get("prefix");
     let autojoin: bool = guild_row.get("auto_join");
     let msg_length: i16 = guild_row.get("msg_length");
     let bot_ignore: bool = guild_row.get("bot_ignore");
+    let to_translate: bool = guild_row.get("to_translate");
     let repeated_chars: i16 = guild_row.get("repeated_chars");
     let audience_ignore: bool = guild_row.get("audience_ignore");
 
+    let guild_mode: TTSMode = guild_row.get("voice_mode");
+    let user_mode: Option<TTSMode> = userinfo_row.get("voice_mode");
+
+    let format_voice = |voice: String, mode: TTSMode| {
+        if mode == TTSMode::Premium {
+            let (lang, variant) = voice.split_once(' ').unwrap();
+            let gender = &data.premium_voices[lang][variant];
+            format!("{lang} - {variant} ({gender})")
+        } else {
+            voice
+        }
+    };
+
     let none = String::from("none");
-    let nickname = nickname_row.get::<&str, Option<String>>("name").unwrap_or_else(|| none.clone());
 
-    let user_voice = userinfo_row.get::<&str, Option<String>>("voice").map_or_else(|| none.clone(), format_voice);
-    let default_voice = guild_row.get::<&str, Option<String>>("default_voice").map_or_else(|| none.clone(), format_voice);
+    let default_voice = format_voice(data.guild_voice_db.get((guild_id.into(), guild_mode)).await?.get("voice"), guild_mode);
+    let user_voice = match user_mode {
+        Some(mode) => format_voice(data.user_voice_db.get((author_id.into(), mode)).await?.get("voice"), mode),
+        None => none.clone()
+    };
 
+    let target_lang = guild_row.get::<_, Option<String>>("target_lang").unwrap_or_else(|| none.clone());
+    let nickname = nickname_row.get::<_, Option<String>>("name").unwrap_or_else(|| none.clone());
+
+    let netural_colour = netural_colour(crate::premium_check(data, Some(guild_id)).await?.is_none());
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
     ctx.send(|b| {b.embed(|e| {
         e.title("Current Settings");
         e.url(&data.config.server_invite);
-        e.colour(NETURAL_COLOUR);
+        e.colour(netural_colour);
         e.footer(|f| {
             f.text(format!(concat!(
                 "Change these settings with {prefix}set property value!\n",
@@ -84,33 +95,31 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
 {sep1} Auto Join: `{autojoin}`
         "), false);
         e.field("**TTS Settings**", format!("
-{sep2} <User> said: message `{xsaid}`
+{sep2} <User> said: message: `{xsaid}`
 {sep2} Ignore bot's messages: `{bot_ignore}`
-{sep2} Default Server {voice_lang}: `{default_voice}`
-{sep2} Ignore audience' messages: `{audience_ignore}`
+{sep2} Ignore audience messages: `{audience_ignore}`
+
+**{sep2} Default Server Voice Mode: `{guild_mode}`**
+**{sep2} Default Server Voice: `{default_voice}`**
 
 {sep2} Max Time to Read: `{msg_length} seconds`
 {sep2} Max Repeated Characters: `{repeated_chars}`
         "), false);
-        if cfg!(feature="premium") {
-            let to_translate: bool = guild_row.get("to_translate");
-            let target_lang = guild_row.get::<&str, Option<String>>("target_lang").unwrap_or(none);
-            e.field("**Translation Settings**", format!("
+        e.field("**Translation Settings (Premium Only)**", format!("
 {sep4} Translation: `{to_translate}`
 {sep4} Translation Language: `{target_lang}`
-            "), false);
-        }
+        "), false);
         e.field("**User Specific**", format!("
-{sep3} {voice_lang}: `{user_voice}`
+{sep3} Voice: `{user_voice}`
+{sep3} Voice Mode: `{}`
 {sep3} Nickname: `{nickname}`
-        "), false)
+        ", user_mode.map_or(none, |v| format!("{:#}", v))), false)
     })}).await?;
 
     Ok(())
 }
 
 
-#[cfg(feature="premium")]
 struct MenuPaginator<'a> {
     index: usize,
     ctx: Context<'a>,
@@ -118,7 +127,6 @@ struct MenuPaginator<'a> {
     current_lang: String,
 }
 
-#[cfg(feature="premium")]
 impl<'a> MenuPaginator<'a> {
     pub fn new(ctx: Context<'a>, pages: Vec<String>, current_lang: String) -> Self {
         Self {
@@ -269,8 +277,112 @@ async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<bool, Erro
         }
     )
 }
+#[allow(clippy::too_many_arguments)]
+async fn change_mode<T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy>(
+    ctx: &Context<'_>,
+    general_db: &database::Handler<T>,
+    guild_id: serenity::GuildId,
+    key: T, mode: Option<TTSMode>,
+    target: &str
+) -> Result<Option<Cow<'static, str>>, Error> {
+    let data = ctx.data();
+    if mode == Some(TTSMode::Premium) && crate::premium_check(data, Some(guild_id)).await?.is_some() {
+        ctx.send(|b| b.embed(|e| {
+            e.title("TTS Bot Premium");
+            e.colour(PREMIUM_NEUTRAL_COLOUR);
+            e.thumbnail(data.premium_avatar_url.clone());
+            e.url("https://www.patreon.com/Gnome_the_Bot_Maker");
+            e.footer(|f| f.text("If this is an error, please contact Gnome!#6669."));
+            e.description(format!("
+                The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `{prefix}premium` command!
+                If this server has purchased premium, please run the `{prefix}activate` command to link yourself to this server!
+            ", prefix=ctx.prefix()))
+        })).await?;
+        Ok(None)
+    } else {
+        general_db.set_one(key, "voice_mode", &mode).await?;
+        Ok(Some(match mode {
+            Some(mode) => Cow::Owned(format!("Changed {target} TTS Mode to: {}", mode)),
+            None => Cow::Borrowed("Reset {target} mode")
+        }))
+    }
+}
 
-fn to_enabled(value: bool) -> &'static str {
+#[allow(clippy::too_many_arguments)]
+async fn change_voice<T>(
+    ctx: &Context<'_>,
+    general_db: &database::Handler<T>,
+    voice_db: &database::Handler<(T, TTSMode)>,
+    author_id: serenity::UserId, guild_id: serenity::GuildId,
+    key: T, voice: Option<String>,
+    target: &str,
+) -> Result<String, Error>
+    where T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
+    (T, TTSMode): database::CacheKeyTrait
+{
+    let (_, mode) = parse_user_or_guild(ctx.data(), author_id, Some(guild_id)).await?;
+    Ok(if let Some(voice) = voice {
+        if check_valid_voice(ctx.data(), voice.clone(), mode).await? {
+            general_db.set_one(key, "voice_mode", &mode).await?;
+            voice_db.set_one((key, mode), "voice", &voice).await?;
+            format!("Changed {target} voice to: {voice}")
+        } else {
+            format!("Invalid voice, do `{}voices`", ctx.prefix())
+        }
+    } else {
+        voice_db.delete((key, mode)).await?;
+        format!("Reset {target} voice")
+    })
+}
+
+async fn check_valid_voice(data: &Data, voice: String, mode: TTSMode) -> Result<bool, Error> {
+    Ok(match mode {
+        TTSMode::Gtts => get_gtts_voices().contains_key(&voice),
+        TTSMode::Espeak => get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?.contains(&voice),
+        TTSMode::Premium => {
+            let mut voice = voice.split_whitespace();
+            let language = match voice.next() {
+                Some(i) => i,
+                None => return Ok(false)
+            };
+
+            data.premium_voices.contains_key(language)
+        }
+    })
+}
+
+async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Result<Vec<String>, Error> {
+    Ok(
+        reqwest
+            .get(format!("{}/languages", crate::constants::TRANSLATION_URL))
+            .query(&serenity::json::prelude::json!({
+                "type": "target",
+                "auth_key": token
+            }))
+            .send().await?
+            .error_for_status()?
+            .json::<Vec<crate::structs::DeeplVoice>>().await?
+            .iter().map(|v| v.language.to_lowercase()).collect()
+    )
+}
+
+#[derive(poise::ChoiceParameter)]
+pub enum TTSModeServerChoice {
+    // Name to show in slash command invoke           Aliases for prefix
+    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       Gtts,
+    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     Espeak,
+    #[name="Premium TTS (changable)"]                 #[name="premium"]    Premium
+}
+
+#[derive(poise::ChoiceParameter)]
+pub enum TTSModeChoice {
+    // Name to show in slash command invoke           Aliases for prefix
+    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     Espeak,
+    #[name="Premium TTS (changable)"]                 #[name="premium"]    Premium
+}
+
+
+const fn to_enabled(value: bool) -> &'static str {
     if value {
         "Enabled"
     } else {
@@ -362,10 +474,63 @@ pub async fn botignore(
 
     Ok(())
 }
-/// Whether to use deepL translate to translate all TTS messages to the same language 
-#[cfg(feature="premium")]
+
+/// Changes the default mode for TTS that messages are read in
 #[poise::command(
     category="Settings",
+    prefix_command, slash_command,
+    required_permissions="ADMINISTRATOR",
+    required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
+    aliases("server_voice_mode", "server_tts_mode", "server_ttsmode")
+)]
+pub async fn server_mode(
+    ctx: Context<'_>,
+    #[description="The TTS Mode to change to"] mode: TTSModeServerChoice
+) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+
+    let data = ctx.data();
+    let to_send = change_mode(
+        &ctx, &data.guilds_db,
+        guild_id, guild_id.into(),
+        Some(TTSMode::from(mode)), "the server"
+    ).await?;
+
+    if let Some(to_send) = to_send {
+        ctx.say(to_send).await?;
+    };
+    Ok(())
+}
+
+/// Changes the default language messages are read in
+#[poise::command(
+    category="Settings",
+    prefix_command, slash_command,
+    required_permissions="ADMINISTRATOR",
+    required_bot_permissions="SEND_MESSAGES",
+    aliases("defaultlang", "default_lang", "defaultlang", "slang", "serverlanguage")
+)]
+pub async fn server_voice(
+    ctx: Context<'_>,
+    #[description="The default voice to read messages in"] voice: String
+) -> Result<(), Error> {
+    let data = ctx.data();
+    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+
+    let to_send = change_voice(
+        &ctx, &data.guilds_db, &data.guild_voice_db,
+        ctx.author().id, guild_id, guild_id.into(), Some(voice),
+        "the server"
+    ).await?;
+
+    ctx.say(to_send).await?;
+    Ok(())
+}
+
+/// Whether to use DeepL translate to translate all TTS messages to the same language 
+#[poise::command(
+    category="Settings",
+    check="crate::premium_command_check",
     prefix_command, slash_command,
     required_permissions="ADMINISTRATOR",
     required_bot_permissions="SEND_MESSAGES",
@@ -381,82 +546,10 @@ pub async fn translation(ctx: Context<'_>, #[description="Whether to translate a
     Ok(())
 }
 
-/// Changes the default language messages are read in
-#[cfg(not(feature="premium"))]
-#[poise::command(
-    category="Settings",
-    prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
-    required_bot_permissions="SEND_MESSAGES",
-    aliases("defaultlang", "default_lang", "defaultlang", "slang", "serverlanguage")
-)]
-pub async fn server_language(
-    ctx: Context<'_>,
-    #[description="The default languages to read messages in"] language: String
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
-
-    let to_send = if crate::funcs::get_supported_languages().contains_key(&language) {
-        ctx.data().guilds_db.set_one(guild_id, "default_voice", &language).await?;
-        format!("Default language for this server is now: {}", language)
-    } else {
-        format!("**Error**: Invalid language, do `{}voices`", ctx.prefix())
-    };
-
-    ctx.say(to_send).await?;
-    Ok(())
-}
-
-/// Changes the default language messages are read in
-#[cfg(feature="premium")]
-#[poise::command(
-    category="Settings",
-    prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
-    required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
-    aliases("server_language", "defaultlang", "default_lang", "defaultlang", "slang", "serverlanguage")
-)]
-pub async fn server_voice(
-    ctx: Context<'_>,
-    #[description="The default language to read messages in"] mut language: String,
-    #[description="The default variant of this language to use"] mut variant: Option<String>
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
-
-    variant = variant.map(|s| s.to_uppercase());
-    if let Some((lang, accent)) = language.split_once('-') {
-        language = format!("{}-{}", lang, accent.to_uppercase());
-    }
-
-    let data = ctx.data();
-    if let Some((variant, gender)) = get_voice(&ctx, &data.voices, &language, variant.as_ref()).await? {
-        ctx.data().guilds_db.set_one(guild_id, "default_voice", &format!("{} {}", language, variant)).await?;
-        ctx.say(format!("Changed the server default voice to: {language} - {variant} ({gender})")).await?;
-    }
-
-    Ok(())
-}
-
-#[cfg(feature="premium")]
-async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Result<Vec<String>, Error> {
-    Ok(
-        reqwest
-            .get(format!("{}/languages", crate::constants::TRANSLATION_URL))
-            .query(&serenity::json::prelude::json!({
-                "type": "target",
-                "auth_key": token
-            }))
-            .send().await?
-            .error_for_status()?
-            .json::<Vec<crate::structs::DeeplVoice>>().await?
-            .iter().map(|v| v.language.to_lowercase()).collect()
-    )
-}
-
 /// Changes the target language for translation
-#[cfg(feature="premium")]
 #[poise::command(
     category="Settings",
+    check="crate::premium_command_check",
     prefix_command, slash_command,
     required_permissions="ADMINISTRATOR",
     required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
@@ -466,12 +559,15 @@ pub async fn translation_lang(
     ctx: Context<'_>,
     #[description="The language to translate all TTS messages to"] lang: Option<String>
 ) -> Result<(), Error> {
-    use itertools::Itertools;
 
     let data = ctx.data();
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
 
-    let translation_langs = get_translation_langs(&data.reqwest, &data.config.translation_token).await?;
+    let translation_langs = get_translation_langs(
+        &data.reqwest,
+        data.config.translation_token.as_ref().expect("Tried to do translation without token set in config!")
+    ).await?;
+
     match lang {
         Some(lang) if translation_langs.contains(&lang) => {
             data.guilds_db.set_one(guild_id, "target_lang", &lang).await?;
@@ -548,11 +644,11 @@ pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeat
 
 /// Makes the bot ignore messages sent by members of the audience in stage channels
 #[poise::command(
-category="Settings",
-prefix_command, slash_command,
-required_permissions="ADMINISTRATOR",
-required_bot_permissions="SEND_MESSAGES",
-aliases("audience_ignore", "ignore_audience", "ignoreaudience")
+    category="Settings",
+    prefix_command, slash_command,
+    required_permissions="ADMINISTRATOR",
+    required_bot_permissions="SEND_MESSAGES",
+    aliases("audience_ignore", "ignore_audience", "ignoreaudience")
 )]
 pub async fn audienceignore(
     ctx: Context<'_>,
@@ -567,9 +663,9 @@ pub async fn audienceignore(
 }
 
 /// Changes the multiplier for how fast to speak
-#[cfg(feature="premium")]
 #[poise::command(
     category="Settings",
+    check="crate::premium_command_check",
     prefix_command, slash_command,
     required_bot_permissions="SEND_MESSAGES",
     aliases("speed", "speed_multiplier", "speaking_rate_multiplier", "speaking_speed", "tts_speed")
@@ -759,57 +855,88 @@ Just do `{}join` and start talking!
     Ok(())
 }
 
-/// Changes the language your messages are read in, full list in `-voices`
-#[cfg(not(feature="premium"))]
+/// Changes the default mode for TTS that messages are read in
 #[poise::command(
     category="Settings",
-    aliases("lang", "voice"),
+    prefix_command, slash_command,
+    required_permissions="ADMINISTRATOR",
+    required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
+    aliases("voice_mode", "server_mode", "server_tts_mode", "server_ttsmode")
+)]
+pub async fn mode(
+    ctx: Context<'_>,
+    #[description="The TTS Mode to change to"] mode: TTSModeChoice
+) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+
+    let data = ctx.data();
+    let to_send = change_mode(
+        &ctx, &data.userinfo_db,
+        guild_id, ctx.author().id.into(),
+        Some(TTSMode::from(mode)), "your"
+    ).await?;
+
+    if let Some(to_send) = to_send {
+        ctx.say(to_send).await?;
+    };
+    Ok(())
+}
+
+/// Changes the voice your messages are read in, full list in `-voices`
+#[poise::command(
+    category="Settings",
+    aliases("language", "voice"),
     prefix_command, slash_command,
     required_bot_permissions="SEND_MESSAGES",
 )]
-pub async fn language(
+pub async fn voice(
     ctx: Context<'_>,
-    #[description="The language to read messages in, leave blank to reset"] lang: Option<String>
+    #[description="The voice to read messages in, leave blank to reset"] voice: Option<String>
 ) -> Result<(), Error> {
-    let to_send =
-        if let Some(lang) = lang {
-            if let Some(lang_name) = crate::funcs::get_supported_languages().get(&lang) {
-                ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &lang).await?;
-                format!("Changed your language to: {}", lang_name)
-            } else {
-                format!("Invalid language, do `{}languages`", ctx.prefix())
-            }
-        } else {
-            ctx.data().userinfo_db.set_one(ctx.author().id.into(), "voice", &Option::<String>::None).await?;
-            String::from("Reset your language")
-        };
+    let data = ctx.data();
+    let author_id = ctx.author().id;
+    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+
+    let to_send = change_voice(
+        &ctx, &data.userinfo_db, &data.user_voice_db,
+        author_id, guild_id, author_id.into(), voice,
+        "your"
+    ).await?;
 
     ctx.say(to_send).await?;
     Ok(())
 }
 
-/// Lists all the language codes that TTS bot accepts
-#[cfg(not(feature="premium"))]
+/// Lists all the voices that TTS bot accepts for the current mode
 #[poise::command(
     category="Settings",
-    aliases("langs", "voices"),
+    aliases("langs", "languages"),
     prefix_command, slash_command,
     required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
 )]
-pub async fn languages(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn voices(ctx: Context<'_>) -> Result<(), Error> {
     let author = ctx.author();
+    let data = ctx.data();
 
-    let supported_langs = crate::funcs::get_supported_languages();
-    let current_lang: Option<String> = ctx.data().userinfo_db.get(author.id.into()).await?.get("voice");
+    let (_, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
+    let voices: String = {
+        let mut supported_langs = match mode {
+            TTSMode::Gtts => crate::funcs::get_gtts_voices().into_iter().map(|(k, _)| k).collect(),
+            TTSMode::Espeak => crate::funcs::get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?,
+            TTSMode::Premium => return list_premium_voices(ctx).await
+        };
 
-    let langs_string = supported_langs.keys().map(|l| format!("`{l}`, ")).collect::<String>();
+        supported_langs.sort_unstable();
+        supported_langs.into_iter().map(|l| format!("`{l}`, ")).collect()
+    };
 
     let cache = &ctx.discord().cache;
+    let current_lang: Option<String> = data.user_voice_db.get((author.id.into(), mode)).await?.get("voice");
     ctx.send(|b| {b.embed(|e| {
-        e.title(format!("{} Languages", cache.current_user_field(|u| u.name.clone())));
+        e.title(format!("{} Voices | Mode: `{}`", cache.current_user_field(|u| u.name.clone()), mode));
         e.footer(|f| f.text(random_footer(
             Some(&String::from(ctx.prefix())),
-            Some(&ctx.data().config.server_invite),
+            Some(&data.config.server_invite),
             Some(cache.current_user_id().0)
         )));
         e.author(|a| {
@@ -817,16 +944,13 @@ pub async fn languages(ctx: Context<'_>) -> Result<(), Error> {
             a.icon_url(author.face())
         });
         e.field(
-            "Currently Supported Languages", 
-            langs_string.strip_suffix(", ").unwrap_or(&langs_string),
+            "Currently supported voices",
+            voices.strip_suffix(", ").unwrap_or(&voices),
             true
         );
         e.field(
-            "Current Language used",
-            current_lang.as_ref().map_or_else(
-                || String::from("None"),
-                |l| format!("{} | {}", &supported_langs[l], l)
-            ),
+            "Current voice used",
+            current_lang.as_ref().map_or("None", std::ops::Deref::deref),
             false
         )
     })}).await?;
@@ -835,78 +959,7 @@ pub async fn languages(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 
-#[cfg(feature="premium")]
-async fn get_voice<'a>(
-    ctx: &'a Context<'a>,
-    voices: &'a crate::structs::VoiceData,
-    language: &'a str, variant: Option<&'a String>
-) -> Result<Option<(&'a String, &'a crate::structs::Gender)>, Error> {
-    let voice = voices.get(language).and_then(|variants| match variant {
-        Some(variant) => variants.get(variant).map(|g| (variant, g)),
-        None => variants.iter().next()
-    });
-
-    if voice.is_none() {
-        let author = ctx.author();
-        let none = String::from("None");
-        ctx.send(|b| {b.embed(|e| {
-            e.title(format!("Cannot find voice `{language} - {}`", variant.unwrap_or(&none)));
-            e.footer(|f| f.text(format!("Try {}voices for a full list!", ctx.prefix())));
-            e.author(|a| {
-                a.name(format!("{}#{}", author.name, author.discriminator));
-                a.icon_url(author.face())
-            })
-        })}).await?;
-    }
-    Ok(voice)
-}
-
-/// Changes the voice your messages are read in, full list in `p-voices`
-#[cfg(feature="premium")]
-#[poise::command(
-    category="Settings",
-    aliases("lang", "languages"),
-    prefix_command, slash_command,
-    required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
-)]
-pub async fn voice(
-    ctx: Context<'_>,
-    #[description="The language to read messages in, leave blank to reset"] language: Option<String>,
-    #[description="The variant of this language to use"] mut variant: Option<String>
-) -> Result<(), Error> {
-    let data = ctx.data();
-    let to_send =
-        if let Some(mut language) = language {
-            variant = variant.map(|s| s.to_uppercase());
-            if let Some((lang, accent)) = language.split_once('-') {
-                language = format!("{}-{}", lang, accent.to_uppercase());
-            }
-
-            if let Some((variant, gender)) = get_voice(&ctx, &data.voices, &language, variant.as_ref()).await? {
-                data.userinfo_db.set_one(ctx.author().id.into(), "voice", &format!("{} {}", language, variant)).await?;
-                format!("Changed your voice to: {language} - {variant} ({gender})")
-            } else {
-                return Ok(())
-            }
-        } else {
-            data.userinfo_db.set_one(ctx.author().id.into(), "voice", &Option::<String>::None).await?;
-            String::from("Reset your voice")
-        };
-
-    ctx.say(to_send).await?;
-    Ok(())
-}
-
-/// Lists all the voices that TTS Bot Premium accepts
-#[cfg(feature="premium")]
-#[poise::command(
-    category="Settings",
-    aliases("langs", "languages"),
-    prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
-    required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
-)]
-pub async fn voices(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn list_premium_voices(ctx: Context<'_>) -> Result<(), Error> {
     let http = &ctx.discord().http; 
     if let poise::Context::Application(ctx) = ctx {
         if let poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) = ctx.interaction {
@@ -914,27 +967,22 @@ pub async fn voices(ctx: Context<'_>) -> Result<(), Error> {
                 b.kind(serenity::InteractionResponseType::ChannelMessageWithSource);
                 b.interaction_response_data(|b| b.content("Loading!"))
             }).await?;
-            
+
             interaction.delete_original_interaction_response(http).await?;
         }
     }
 
     let data = ctx.data();
-    let pages: Vec<String> = data.voices.iter().map(|(language, variants)| {
+    let pages: Vec<String> = data.premium_voices.iter().map(|(language, variants)| {
         variants.iter().map(|(variant, gender)| {
-            format!("{} - {variant} ({gender})\n", language)
+            format!("{language} - {variant} ({gender})\n")
         }).collect()
     }).collect();
 
-    let lang_variant = crate::funcs::parse_voice(&data.guilds_db, &data.userinfo_db, ctx.author().id, ctx.guild_id()).await?;
+    let (lang_variant, _) = parse_user_or_guild(data, ctx.author().id, ctx.guild_id()).await?;
     let (lang, variant) = lang_variant.split_once(' ').unwrap();
 
     let variant = String::from(variant);
-    let (variant, gender) = get_voice(&ctx, &data.voices, lang, Some(&variant)).await?.unwrap();
-    MenuPaginator::new(ctx, pages, format!("{} {variant} ({gender})", lang)).start().await
+    let gender = &data.premium_voices[lang][&variant];
+    MenuPaginator::new(ctx, pages, format!("{lang} {variant} ({gender})")).start().await
 }
-
-
-#[cfg(feature="premium")] pub use server_voice as server_language;
-#[cfg(feature="premium")] pub use voices as languages;
-#[cfg(feature="premium")] pub use voice as language;

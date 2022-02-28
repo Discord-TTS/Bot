@@ -22,7 +22,7 @@ use tracing::error;
 use crate::structs::Error;
 
 pub struct Handler {
-    log_buffer: DashMap<String, u32>,
+    log_buffer: DashMap<String, i32>,
     pool: Arc<deadpool_postgres::Pool>
 }
 
@@ -68,7 +68,7 @@ impl Handler {
         Ok(())
     }
 
-    pub fn log(&self, event: String) -> u32 {
+    pub fn log(&self, event: String) -> i32 {
         let count = (*self.log_buffer.entry(event.clone()).or_insert(0)) + 1;
         self.log_buffer.insert(event, count);
         count

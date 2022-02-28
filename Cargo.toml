@@ -8,6 +8,7 @@ edition = "2021"
 lto = "thin"
 
 [dependencies]
+serde = "1"
 regex = "1"
 rand = "0.8"
 toml = "0.5"
@@ -23,6 +24,10 @@ itertools = "0.10"
 parking_lot = "0.12"
 deadpool-postgres = "0.10"
 #serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = ["simdjson"] }
+
+[dependencies.postgres-types]
+version = "0.2"
+features = ["derive"]
 
 [dependencies.tokio]
 version = "1"
@@ -46,24 +51,8 @@ version = "3"
 features = ["process"]
 default-features = false
 
-# Premium dependencies
-[dependencies.base64]
-version = "0.13"
-optional = true
-
-[dependencies.serde]
-version = "1"
-optional = true
-
-[dependencies.jsonwebtoken]
-version = "8"
-optional = true
-
 
 # lavalink pulls serenity from crates.io. tell it to pull from github instead 
 [patch.crates-io]
 serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next" }
 songbird = { git = "https://github.com/serenity-rs/songbird", branch = "next" }
-
-[features]
-premium = ["base64", "serde", "jsonwebtoken"]

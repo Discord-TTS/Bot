@@ -17,7 +17,7 @@
 use indexmap::IndexMap;
 
 use crate::structs::{Context, Data, Error};
-use crate::constants::NETURAL_COLOUR;
+use crate::funcs::netural_colour;
 
 type Command = poise::Command<Data, Error>;
 
@@ -139,6 +139,7 @@ pub async fn _help(ctx: Context<'_>, command: Option<String>) -> Result<(), Erro
     };
 
     let prefix = ctx.prefix();
+    let netural_colour = netural_colour(crate::premium_check(ctx.data(), ctx.guild_id()).await?.is_none());
     ctx.send(|b| {b.embed(|e| {
         e.title(format!("{} Help!", match &mode {
             HelpCommandMode::Root => ctx.discord().cache.current_user_field(|u| u.name.clone()),
@@ -169,7 +170,7 @@ pub async fn _help(ctx: Context<'_>, command: Option<String>) -> Result<(), Erro
             }),
         });
 
-        e.colour(NETURAL_COLOUR);
+        e.colour(netural_colour);
         e.author(|a| {
             a.name(ctx.author().name.clone());
             a.icon_url(ctx.author().face())

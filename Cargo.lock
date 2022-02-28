@@ -405,17 +405,16 @@ dependencies = [
 name = "discord_tts_bot"
 version = "0.1.0"
 dependencies = [
- "base64",
  "cargo-lock",
  "dashmap 5.1.0",
  "deadpool-postgres",
  "indexmap",
  "itertools",
- "jsonwebtoken",
  "lavalink-rs",
  "lazy_static",
  "parking_lot 0.12.0",
  "poise",
+ "postgres-types",
  "psutil",
  "rand",
  "regex",
@@ -862,20 +861,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonwebtoken"
-version = "8.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "012bb02250fdd38faa5feee63235f7a459974440b9b57593822414c31f92839e"
-dependencies = [
- "base64",
- "pem",
- "ring",
- "serde",
- "serde_json",
- "simple_asn1",
-]
-
-[[package]]
 name = "lavalink-rs"
 version = "0.9.0-rc.3"
 source = "git+https://gitlab.com/vicky5124/lavalink-rs#2487c2953c7af2fb3515f4cf6b3a593147c14728"
@@ -1097,17 +1082,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-bigint"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
-dependencies = [
- "autocfg",
- "num-integer",
- "num-traits 0.2.14",
-]
-
-[[package]]
 name = "num-integer"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1142,15 +1116,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19e64526ebdee182341572e50e9ad03965aa510cd94427a4549448f285e957a1"
 dependencies = [
  "hermit-abi",
- "libc",
-]
-
-[[package]]
-name = "num_threads"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97ba99ba6393e2c3734791401b66902d981cb03bf190af674ca69949b6d5fb15"
-dependencies = [
  "libc",
 ]
 
@@ -1257,15 +1222,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pem"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9a3b09a20e374558580a4914d3b7d89bd61b954a5a5e1dcbea98753addb1947"
-dependencies = [
- "base64",
-]
-
-[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1357,7 +1313,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#0aadeea7972b0482368a53181a73781156e3ae38"
+source = "git+https://github.com/kangalioo/poise?branch=develop#8e7dd533b3896eef95aaafeb7eac5c0c4b21a71e"
 dependencies = [
  "async-trait",
  "futures-core",
@@ -1372,7 +1328,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#0aadeea7972b0482368a53181a73781156e3ae38"
+source = "git+https://github.com/kangalioo/poise?branch=develop#8e7dd533b3896eef95aaafeb7eac5c0c4b21a71e"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1389,6 +1345,17 @@ dependencies = [
  "cpufeatures",
  "opaque-debug",
  "universal-hash",
+]
+
+[[package]]
+name = "postgres-derive"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a269d4442ff2c409dd0b854e9d4aa37fcd28237090e64bda7284b6e4731fb409"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1417,6 +1384,7 @@ checksum = "04619f94ba0cc80999f4fc7073607cb825bc739a883cb6d20900fc5e009d6b0d"
 dependencies = [
  "bytes",
  "fallible-iterator",
+ "postgres-derive",
  "postgres-protocol",
 ]
 
@@ -1447,15 +1415,6 @@ dependencies = [
  "nix",
  "once_cell",
  "thiserror",
-]
-
-[[package]]
-name = "quickcheck"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "588f6378e4dd99458b60ec275b4477add41ce4fa9f64dcba6f15adccb19b50d6"
-dependencies = [
- "rand",
 ]
 
 [[package]]
@@ -1807,7 +1766,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.10.10"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#13e57c8bae08ba1579f5904bb5973a391afb1710"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#0391d7c868fb8d4a7cdc341b292d9e45a3fc743e"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.16.1",
@@ -1835,7 +1794,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#13e57c8bae08ba1579f5904bb5973a391afb1710"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#0391d7c868fb8d4a7cdc341b292d9e45a3fc743e"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -1884,18 +1843,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "simple_asn1"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a762b1c38b9b990c694b9c2f8abe3372ce6a9ceaae6bca39cfc46e054f45745"
-dependencies = [
- "num-bigint",
- "num-traits 0.2.14",
- "thiserror",
- "time",
 ]
 
 [[package]]
@@ -1976,9 +1923,9 @@ dependencies = [
 
 [[package]]
 name = "spin_sleep"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a98101bdc3833e192713c2af0b0dd2614f50d1cf1f7a97c5221b7aac052acc7"
+checksum = "e7273f3e2cded885af169b41b2099b7dc096414215b5a540ae071fddf44f386a"
 dependencies = [
  "once_cell",
  "winapi",
@@ -2089,25 +2036,6 @@ checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
 dependencies = [
  "once_cell",
 ]
-
-[[package]]
-name = "time"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "004cbc98f30fa233c61a38bc77e96a9106e65c88f2d3bef182ae952027e5753d"
-dependencies = [
- "itoa",
- "libc",
- "num_threads",
- "quickcheck",
- "time-macros",
-]
-
-[[package]]
-name = "time-macros"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25eb0ca3468fc0acc11828786797f6ef9aa1555e4a211a60d64cc8e4d1be47d6"
 
 [[package]]
 name = "tinyvec"

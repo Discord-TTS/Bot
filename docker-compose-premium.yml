@@ -5,13 +5,6 @@ services:
           - type: bind
             source: ./config.toml
             target: /config.toml
-          - type: bind
-            source: ${GOOGLE_APPLICATION_CREDENTIALS}
-            target: /gcp.json
-
-        environment:
-            - GOOGLE_APPLICATION_CREDENTIALS=/gcp.json
-
         depends_on: [database, lavalink]
     lavalink:
         image: fredboat/lavalink:dev
@@ -19,15 +12,6 @@ services:
           - type: bind
             source: ./lavalink_config.yml
             target: /opt/Lavalink/application.yml
-          - type: bind
-            source: ./lavalink-plugins
-            target: /opt/Lavalink/plugins
-          - type: bind
-            source: ${GOOGLE_APPLICATION_CREDENTIALS}
-            target: /gcp.json
-
-        environment:
-            - GOOGLE_APPLICATION_CREDENTIALS=/gcp.json
 
         expose: [2333]
     database:
@@ -36,3 +20,19 @@ services:
         environment: 
             POSTGRES_USER: tts
             POSTGRES_PASSWORD: tts_password
+    tts-service:
+        build:
+          context: git://github.com/GnomedDev/tts-service.git
+          args:
+              MODES: "espeak,gtts,premium"
+        volumes:
+          - type: bind
+            source: ${GOOGLE_APPLICATION_CREDENTIALS}
+            target: /gcp.json
+        environment:
+          -  IPV6_BLOCK
+          -  LOG_LEVEL=INFO
+          -  BIND_ADDR=0.0.0.0:20310
+          -  GOOGLE_APPLICATION_CREDENTIALS=/gcp.json
+        network_mode: "host"
+        expose: [20310]

@@ -16,9 +16,9 @@
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Error};
-use crate::funcs::{fetch_audio, parse_voice};
-use crate::constants::{OPTION_SEPERATORS, NETURAL_COLOUR};
+use crate::structs::{Context, Error, TTSMode};
+use crate::constants::{OPTION_SEPERATORS};
+use crate::funcs::{fetch_audio, netural_colour, parse_user_or_guild};
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
@@ -58,26 +58,21 @@ pub async fn tts(
     }
 
     let attachment = {
-        let lang = parse_voice(
-            &data.guilds_db,
-            &data.userinfo_db,
-            author.id,
-            ctx.guild_id()
-        ).await?;
+        let (voice, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
 
         let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
-        #[cfg(feature="premium")] {
-            let speaking_rate = data.userinfo_db.get(author.id.into()).await?.get("speaking_rate");
-            serenity::AttachmentType::Bytes {
-                data: std::borrow::Cow::Owned(base64::decode(fetch_audio(data, message, &lang, speaking_rate).await?)?),
-                filename: format!("{}-{}.ogg", author_name, ctx.id())
-            }
-        }
-        #[cfg(not(feature="premium"))] {
-            serenity::AttachmentType::Bytes {
-                data: std::borrow::Cow::Owned(fetch_audio(&data.reqwest, &data.config.tts_service, message, &lang).await?),
-                filename: format!("{}-{}.mp3", author_name, ctx.id())
-            }
+        let speaking_rate = data.userinfo_db.get(author.id.into()).await?.get("speaking_rate");
+
+        serenity::AttachmentType::Bytes {
+            data: std::borrow::Cow::Owned(fetch_audio(
+                &data.reqwest, &data.config.tts_service,
+                message, &voice, &mode.to_string(), speaking_rate
+            ).await?),
+            filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
+                TTSMode::Gtts => "mp3",
+                TTSMode::Espeak => "wav",
+                TTSMode::Premium => "ogg"
+            })
         }
     };
 
@@ -137,13 +132,15 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     };
 
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
-    let [sep1, sep2] = [OPTION_SEPERATORS[0], OPTION_SEPERATORS[1]];
+
+    let [sep1, sep2, ..] = OPTION_SEPERATORS;
+    let netural_colour = netural_colour(crate::premium_check(ctx.data(), ctx.guild_id()).await?.is_none());
 
     ctx.send(|b| {b.embed(|e| {
         e.title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())));
         e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face));
         e.url(&ctx.data().config.server_invite);
-        e.colour(NETURAL_COLOUR);
+        e.colour(netural_colour);
         e.footer(|f| {
             f.text(format!("
 Time to fetch: {time_to_fetch:.2}ms
@@ -203,10 +200,10 @@ pub async fn ping(ctx: Context<'_>,) -> Result<(), Error> {
     let content = format!("Current Latency: {}ms", ping_before.elapsed()?.as_millis());
 
     match ping_msg {
-        poise::ReplyHandle::Prefix(mut msg) => {
+        poise::ReplyHandle::Known(mut msg) => {
             msg.edit(ctx.discord(), |b| b.content(content)).await?;
         },
-        poise::ReplyHandle::Application { http, interaction } => {
+        poise::ReplyHandle::Unknown { http, interaction } => {
             interaction.edit_original_interaction_response(http, |b| {b.content(content)}).await?;  
         },
     }
@@ -245,7 +242,7 @@ pub async fn invite(ctx: Context<'_>,) -> Result<(), Error> {
     let config = &ctx.data().config;
     let invite_channel = config.invite_channel;
 
-    if ctx.guild_id() == Some(serenity::GuildId(config.main_server)) {
+    if ctx.guild_id() == Some(config.main_server) {
         ctx.say(format!("Check out <#{}> to invite <@{}>!", invite_channel, bot_user_id)).await?;
         return Ok(())
     }

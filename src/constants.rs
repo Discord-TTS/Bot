@@ -15,16 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub const RED: u32 = 0xff0000;
-pub const NETURAL_COLOUR: u32 = 
-    if cfg!(feature="premium") {
-        0xcaa652
-    } else {
-        0x3498db
-    };
+pub const FREE_NEUTRAL_COLOUR: u32 = 0x3498db;
+pub const PREMIUM_NEUTRAL_COLOUR: u32 = 0xcaa652;
 
-#[cfg(feature="premium")]
 pub const TRANSLATION_URL: &str = "https://api-free.deepl.com/v2";
-
 pub const OPTION_SEPERATORS: [&str; 4] = [
     ":small_orange_diamond:",
     ":small_blue_diamond:",
@@ -41,88 +35,100 @@ There are some basic rules if you want to get help though:
 `3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
 ";
 
-pub fn db_setup_query() -> String {
-    format!("{}{}{}",
-        if cfg!(feature="premium") {"
-            CREATE TABLE userinfo (
-                user_id       bigint     PRIMARY KEY,
-                dm_blocked    bool       DEFAULT False,
-                dm_welcomed   bool       DEFAULT false,
-                speaking_rate real       DEFAULT 1,
-                voice         text
-            );"} else {"
-            CREATE TABLE userinfo (
-                user_id      bigint     PRIMARY KEY,
-                dm_blocked   bool       DEFAULT False,
-                dm_welcomed  bool       DEFAULT false,
-                voice        text
-            );"}, if cfg!(feature="premium") {"
-            CREATE TABLE guilds (
-                guild_id        bigint     PRIMARY KEY,
-                channel         bigint     DEFAULT 0,
-                premium_user    bigint,
-                xsaid           bool       DEFAULT True,
-                bot_ignore      bool       DEFAULT True,
-                auto_join       bool       DEFAULT False,
-                to_translate    bool       DEFAULT False,
-                formal          bool,
-                msg_length      smallint   DEFAULT 30,
-                repeated_chars  smallint   DEFAULT 0,
-                prefix          varchar(6) DEFAULT 'p-',
-                target_lang     varchar(5),
-                default_voice   text,
-                audience_ignore bool       DEFAULT True,
+pub const DB_SETUP_QUERY: &str = "
+    CREATE type TTSMode AS ENUM {
+        'gtts',
+        'espeak',
+        'premium'
+    }
 
-                FOREIGN KEY         (premium_user)
-                REFERENCES userinfo (user_id)
-                ON DELETE CASCADE
-            );"
-        } else {"
-            CREATE TABLE guilds (
-                guild_id        bigint     PRIMARY KEY,
-                channel         bigint     DEFAULT 0,
-                xsaid           bool       DEFAULT True,
-                bot_ignore      bool       DEFAULT True,
-                auto_join       bool       DEFAULT False,
-                msg_length      smallint   DEFAULT 30,
-                repeated_chars  smallint   DEFAULT 0,
-                prefix          varchar(6) DEFAULT '-',
-                default_voice   text,
-                audience_ignore bool       DEFAULT True
-            );
-        "}, "
-        CREATE TABLE nicknames (
-            guild_id bigint,
-            user_id  bigint,
-            name     text,
+    CREATE TABLE userinfo (
+        user_id       bigint     PRIMARY KEY,
+        dm_blocked    bool       DEFAULT False,
+        dm_welcomed   bool       DEFAULT false,
+        speaking_rate real       DEFAULT 1,
+        voice_mode    TTSMode
+    );
 
-            PRIMARY KEY (guild_id, user_id),
+    CREATE TABLE guilds (
+        guild_id        bigint      PRIMARY KEY,
+        channel         bigint      DEFAULT 0,
+        premium_user    bigint,
+        xsaid           bool        DEFAULT True,
+        bot_ignore      bool        DEFAULT True,
+        auto_join       bool        DEFAULT False,
+        to_translate    bool        DEFAULT False,
+        msg_length      smallint    DEFAULT 30,
+        repeated_chars  smallint    DEFAULT 0,
+        prefix          varchar(6)  DEFAULT 'p-',
+        target_lang     varchar(5),
+        audience_ignore bool        DEFAULT True,
+        voice_mode      TTSMode     DEFAULT 'gtts',
 
-            FOREIGN KEY       (guild_id)
-            REFERENCES guilds (guild_id)
-            ON DELETE CASCADE,
+        FOREIGN KEY         (premium_user)
+        REFERENCES userinfo (user_id)
+        ON DELETE CASCADE
+    );
 
-            FOREIGN KEY         (user_id)
-            REFERENCES userinfo (user_id)
-            ON DELETE CASCADE
-        );
+    CREATE TABLE guild_voice (
+        guild_id      bigint,
+        mode          TTSMode,
+        voice         text     NOT NULL,
 
-        CREATE TABLE analytics (
-            event          text  NOT NULL,
-            count          int   NOT NULL,
-            is_command     bool  NOT NULL,
-            date_collected date  NOT NULL DEFAULT CURRENT_DATE,
-            PRIMARY KEY (event, is_command, date_collected)
-        );
+        PRIMARY KEY (guild_id, mode),
 
-        CREATE TABLE errors (
-            traceback   text    PRIMARY KEY,
-            message_id  bigint  NOT NULL,
-            occurrences int     DEFAULT 1
-        );
+        FOREIGN KEY       (guild_id)
+        REFERENCES guilds (guild_id)
+        ON DELETE CASCADE
+    );
 
-        INSERT INTO guilds(guild_id) VALUES(0);
-        INSERT INTO userinfo(user_id) VALUES(0);
-        INSERT INTO NICKNAMES(guild_id, user_id) VALUES (0, 0);
-    ")
-}
+    CREATE TABLE user_voice (
+        user_id       bigint,
+        mode          TTSMode,
+        voice         text     NOT NULL,
+
+        PRIMARY KEY (user_id, mode),
+
+        FOREIGN KEY         (user_id)
+        REFERENCES userinfo (user_id)
+        ON DELETE CASCADE
+    );
+
+    CREATE TABLE nicknames (
+        guild_id bigint,
+        user_id  bigint,
+        name     text,
+
+        PRIMARY KEY (guild_id, user_id),
+
+        FOREIGN KEY       (guild_id)
+        REFERENCES guilds (guild_id)
+        ON DELETE CASCADE,
+
+        FOREIGN KEY         (user_id)
+        REFERENCES userinfo (user_id)
+        ON DELETE CASCADE
+    );
+
+    CREATE TABLE analytics (
+        event          text  NOT NULL,
+        count          int   NOT NULL,
+        is_command     bool  NOT NULL,
+        date_collected date  NOT NULL DEFAULT CURRENT_DATE,
+        PRIMARY KEY (event, is_command, date_collected)
+    );
+
+    CREATE TABLE errors (
+        traceback   text    PRIMARY KEY,
+        message_id  bigint  NOT NULL,
+        occurrences int     DEFAULT 1
+    );
+
+    INSERT INTO guilds(guild_id) VALUES(0);
+    INSERT INTO userinfo(user_id) VALUES(0);
+    INSERT INTO user_voice(user_id) VALUES(0);
+    INSERT INTO nicknames(guild_id, user_id) VALUES (0, 0);
+
+    INSERT INTO user_voice(user_id, mode) VALUES(0, 'gtts');
+    INSERT INTO guild_voice(guild_id, mode, voice) VALUES(0, 'gtts', 'en');
+";

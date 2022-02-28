@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::borrow::Cow;
 use std::fmt::Write;
 use std::collections::BTreeMap;
 
@@ -26,142 +27,94 @@ use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::structs::{SerenityContextAdditions, Error, LastToXsaidTracker, OptionTryUnwrap};
+use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, OptionTryUnwrap, TTSMode, PremiumVoices, Gender, GoogleVoice};
+use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 
-pub async fn parse_voice(
-    guilds_db: &crate::database::Handler<i64>,
-    userinfo_db: &crate::database::Handler<i64>,
+pub async fn parse_user_or_guild(
+    data: &Data,
     author_id: serenity::UserId,
     guild_id: Option<serenity::GuildId>,
-) -> Result<String, Error> {
-    let user_voice: Option<String> = userinfo_db.get(author_id.into()).await?.get("voice");
-
-    Ok(
-        match guild_id {
-            Some(guild_id) => {
-                let settings = guilds_db.get(guild_id.into()).await?;
-                user_voice.or_else(|| settings.get("default_voice"))
-            }
-            None => user_voice
-        }.unwrap_or_else(|| String::from(if cfg!(feature="premium") {"en-us a"} else {"en"}))
-    )
-}
-
-#[cfg(feature="premium")]
-pub async fn fetch_audio(data: &crate::structs::Data, content: String, lang: &str, speaking_rate: f32) -> Result<String, Error> {
-    let jwt_token = {
-        let mut jwt_token = data.jwt_token.lock();
-        let mut expire_time = data.jwt_expire.lock();
-
-        if let Some((new_token, new_expire)) = generate_jwt(
-            &data.service_acc,
-            &expire_time,
-        )? {
-            *expire_time = new_expire;
-            *jwt_token = new_token;
+) -> Result<(Cow<'static, str>, TTSMode), Error> {
+    let user_row = data.userinfo_db.get(author_id.into()).await?;
+    let mode =
+        if let Some(mode) = user_row.get("voice_mode") {
+            mode
+        } else if let Some(guild_id) = guild_id {
+            let settings = data.guilds_db.get(guild_id.into()).await?;
+            settings.get("voice_mode")
+        } else {
+            TTSMode::Gtts
         };
 
-        jwt_token.clone()
-    };
-
-    let resp = data.reqwest.post("https://texttospeech.googleapis.com/v1/text:synthesize")
-        .header("Authorization", format!("Bearer {jwt_token}"))
-        .json(&generate_google_json(&content, lang, speaking_rate)?)
-    .send().await?;
-
-    if resp.status().as_u16() == 200 {
-        let data: json::Value = resp.json().await?;
-        Ok(String::from(data["audioContent"].as_str().unwrap()))
-    } else {
-        Err(Error::Tts(resp))
-    }
-}
-
-#[cfg(feature="premium")]
-pub fn generate_google_json(content: &str, lang: &str, speaking_rate: f32) -> Result<serenity::json::Value, Error> {
-    let (lang, variant) = lang.split_once(' ').ok_or_else(|| 
-        format!("{} cannot be parsed into lang and variant", lang)
-    )?;
-
-    Ok(
-        serenity::json::prelude::json!({
-            "input": {
-                "text": content
-            },
-            "voice": {
-                "languageCode": lang,
-                "name": format!("{}-Standard-{}", lang, variant),
-            },
-            "audioConfig": {
-                "audioEncoding": "OGG_OPUS",
-                "speakingRate": speaking_rate
+    let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
+    let voice =
+        // Get user voice for user mode
+        if user_voice_row.get::<_, i64>("user_id") == 0 {
+            None
+        } else if let Some(guild_id) = guild_id {
+            // Get default server voice for user mode
+            let guild_voice_row = data.guild_voice_db.get((guild_id.into(), mode)).await?;
+            if guild_voice_row.get::<_, i64>("guild_id") == 0 {
+                None
+            } else {
+                Some(Cow::Owned(guild_voice_row.get("voice")))
             }
-        })
-    )
+        } else {
+            Some(Cow::Owned(user_voice_row.get("voice")))
+        }.unwrap_or(Cow::Borrowed(match mode {
+            TTSMode::Gtts => "en",
+            TTSMode::Espeak => "en1",
+            TTSMode::Premium => "en-US A",
+        }));
+
+    Ok((voice, mode))
 }
 
 
-#[cfg(feature="premium")]
-fn generate_jwt(service_account: &crate::structs::ServiceAccount, expire_time: &std::time::SystemTime) -> Result<Option<(String, std::time::SystemTime)>, Error> {
-    let current_time = std::time::SystemTime::now();
-    if &current_time > expire_time  {
-        let private_key_raw = &service_account.private_key;
-        let private_key = jsonwebtoken::EncodingKey::from_rsa_pem(private_key_raw.as_bytes())?;
+pub async fn fetch_audio(
+    reqwest: &reqwest::Client,
+    tts_service: &reqwest::Url,
+    content: String,
+    lang: &str,
+    mode: &str,
+    speaking_rate: f32
+) -> Result<Vec<u8>, Error> {
+    assert!(
+        !((speaking_rate - 1.0).abs() > f32::EPSILON && mode != "premium"),
+        "speaking_rate was set without premium mode"
+    );
 
-        let mut headers = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
-        headers.kid = Some(private_key_raw.clone());
-
-        let new_expire_time = current_time + std::time::Duration::from_secs(3600);
-        let payload = serenity::json::prelude::json!({
-            "exp": new_expire_time.duration_since(std::time::UNIX_EPOCH)?.as_secs(),
-            "iat": current_time.duration_since(std::time::UNIX_EPOCH)?.as_secs(),
-            "aud": "https://texttospeech.googleapis.com/",
-            "iss": service_account.client_email,
-            "sub": service_account.client_email,
-        });
-
-        Ok(Some((jsonwebtoken::encode(&headers, &payload, &private_key)?, new_expire_time)))
-    } else {
-        Ok(None)
+    let mut data = Vec::new();
+    for url in fetch_url(tts_service, content, lang, mode, speaking_rate) {
+        data.push(reqwest.get(url).send().await?.error_for_status()?.bytes().await?);
     }
+    Ok(data.into_iter().flatten().collect())
 }
 
-
-#[cfg(not(feature="premium"))]
-pub async fn fetch_audio(reqwest: &reqwest::Client, tts_service: &reqwest::Url, content: String, lang: &str) -> Result<Vec<u8>, Error> {
-    let mut audio_buf = Vec::new();
-    for url in fetch_url(tts_service, &content, lang) {
-        let resp = reqwest.get(url).send().await?;
-        let status = resp.status();
-        if status == 200 {
-            audio_buf.append(&mut resp.bytes().await?.to_vec());
-        } else {    
-            return Err(Error::Tts(resp))
-        }
-    }
-
-    Ok(audio_buf)
-}
-
-#[cfg(not(feature="premium"))]
-pub fn fetch_url(tts_service: &reqwest::Url, content: &str, lang: &str) -> Vec<reqwest::Url> {
-    content.chars().chunks(200).into_iter().map(std::iter::Iterator::collect::<String>).map(|chunk| {
+pub fn fetch_url(tts_service: &reqwest::Url, content: String, lang: &str, mode: &str, speaking_rate: f32) -> Vec<reqwest::Url> {
+    let fetch_url = |chunk: String| {
         let mut url = tts_service.clone();
         url.set_path("tts");
         url.query_pairs_mut()
             .append_pair("text", &chunk)
             .append_pair("lang", lang)
+            .append_pair("mode", mode)
+            .append_pair("speaking_rate", &speaking_rate.to_string())
             .finish();
         url
-    }).collect()
+    };
+
+    if mode == "gTTS" {
+        content.chars().chunks(200).into_iter().map(std::iter::Iterator::collect::<String>).map(|chunk| {
+            fetch_url(chunk)
+        }).collect()
+    } else{
+        vec![fetch_url(content)]
+    }
 }
 
 
-
-#[cfg(feature="premium")]
-pub fn get_supported_languages() -> crate::structs::VoiceData { 
-    use crate::structs::{GoogleVoice, Gender};
-
+pub fn get_premium_voices() -> PremiumVoices {
     // {lang_accent: {variant: gender}}
     let mut cleaned_map = BTreeMap::new();
     let raw_map: Vec<GoogleVoice<'_>> = json::from_str(std::include_str!("data/langs-premium.json")).unwrap();    
@@ -185,11 +138,31 @@ pub fn get_supported_languages() -> crate::structs::VoiceData {
     cleaned_map
 }
 
-#[cfg(not(feature="premium"))]
-pub fn get_supported_languages() -> BTreeMap<String, String> {
+pub async fn get_espeak_voices(reqwest: &reqwest::Client, mut tts_service: reqwest::Url) -> Result<Vec<String>, Error> {
+    tts_service.set_path("voices");
+    tts_service.query_pairs_mut()
+        .append_pair("mode", "eSpeak")
+        .finish();
+
+    Ok(
+        reqwest.get(tts_service)
+            .send().await?
+            .error_for_status()?
+            .json().await?
+        )
+}
+
+pub fn get_gtts_voices() -> BTreeMap<String, String> {
     json::from_str(std::include_str!("data/langs-free.json")).unwrap()
 }
 
+pub const fn netural_colour(premium: bool) -> u32{
+    if premium {
+        PREMIUM_NEUTRAL_COLOUR
+    } else {
+        FREE_NEUTRAL_COLOUR
+    }
+}
 
 pub fn random_footer(prefix: Option<&str>, server_invite: Option<&str>, client_id: Option<u64>) -> String {
     let mut footers = Vec::with_capacity(4);
@@ -479,7 +452,7 @@ pub fn clean_msg(
     Ok(content)
 }
 
-#[cfg(feature="premium")]
+
 pub async fn translate(content: &str, target_lang: &str, data: &crate::structs::Data) -> Result<Option<String>, Error> {
     let url = format!("{}/translate", crate::constants::TRANSLATION_URL);
     let response: crate::structs::DeeplTranslateResponse = data.reqwest.get(url)
@@ -487,14 +460,14 @@ pub async fn translate(content: &str, target_lang: &str, data: &crate::structs::
             "text": content,
             "target_lang": target_lang,
             "preserve_formatting": 1u8,
-            "auth_key": &data.config.translation_token,
+            "auth_key": &data.config.translation_token.as_ref().expect("Tried to do translation without token set in config!")
         }))
         .send().await?.error_for_status()?
         .json().await?;
 
-    if let Some(translation) = response.translations.first() {
+    if let Some(translation) = response.translations.into_iter().next() {
         if translation.detected_source_language != target_lang {
-            return Ok(Some(translation.text.clone()))
+            return Ok(Some(translation.text))
         }
     }
 

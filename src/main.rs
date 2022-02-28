@@ -19,10 +19,9 @@
 
 // clippy::pedantic complains about u64 -> i64 and back when db conversion, however it is fine
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless)]
-
 #![allow(clippy::unreadable_literal)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, borrow::Cow};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -46,8 +45,8 @@ mod structs;
 mod funcs;
 
 use constants::DM_WELCOME_MESSAGE;
-use funcs::{clean_msg, parse_voice, run_checks, random_footer};
-use structs::{Config, Data, Error, PoiseContextAdditions, SerenityContextAdditions};
+use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices};
+use structs::{TTSMode, Config, Data, Error, PoiseContextAdditions, SerenityContextAdditions};
 
 
 struct LavalinkHandler;
@@ -91,11 +90,8 @@ async fn main() {
     let mut db_config = deadpool_postgres::Config::new();
     db_config.user = Some(String::from(db_config_toml["user"].as_str().ok_or("").unwrap()));
     db_config.host = Some(String::from(db_config_toml["host"].as_str().ok_or("").unwrap()));
+    db_config.dbname = Some(String::from(db_config_toml["database"].as_str().ok_or("").unwrap()));
     db_config.password = Some(String::from(db_config_toml["password"].as_str().ok_or("").unwrap()));
-    db_config.dbname = Some(format!(
-        "{}{}", db_config_toml["database"].as_str().ok_or("").unwrap(),
-        if cfg!(feature="premium") {"_premium"} else {""}
-    ));
 
     let pool = Arc::new(db_config.create_pool(
         Some(deadpool_postgres::Runtime::Tokio1),
@@ -107,17 +103,16 @@ async fn main() {
     let config = {
         let main_config = &config_toml["Main"];
         Config {
-            #[cfg(feature="premium")] patreon_role: serenity::RoleId(main_config["patreon_role"].as_integer().unwrap() as u64),
-            #[cfg(feature="premium")] translation_token: String::from(main_config["translation_token"].as_str().unwrap()),
-
-            #[cfg(not(feature="premium"))] tts_service: reqwest::Url::parse(main_config["tts_service"].as_str().unwrap()).unwrap(),
+            translation_token: main_config.get("translation_token").map(|v| v.as_str().unwrap()).map(String::from),
+            tts_service: reqwest::Url::parse(main_config["tts_service"].as_str().unwrap()).unwrap(),
+            patreon_role: serenity::RoleId(main_config["patreon_role"].as_integer().unwrap() as u64),
             server_invite: String::from(main_config["main_server_invite"].as_str().unwrap()),
+
+            main_server: serenity::GuildId(main_config["main_server"].as_integer().unwrap() as u64),
             invite_channel: main_config["invite_channel"].clone().as_integer().unwrap() as u64,
-            main_server: main_config["main_server"].as_integer().unwrap() as u64,
             ofs_role: main_config["ofs_role"].as_integer().unwrap() as u64,
         }
     };
-
 
     let token = config_toml["Main"]["token"].as_str().unwrap();
     let http_client = serenity::http::Http::new_with_token(token);
@@ -142,8 +137,7 @@ async fn main() {
         rx,
         http_client,
         format!("[{}]",
-            if cfg!(feature="debug_assertions") {"Debug"}
-            else if cfg!(feature="premium") {"Premium"}
+            if cfg!(debug_assertions) {"Debug"}
             else {"Main"}
         ),
         webhooks["logs"].clone(),
@@ -200,6 +194,30 @@ async fn main() {
             ON CONFLICT (guild_id, user_id) DO UPDATE SET {key} = $3
         "
     ).await.unwrap();
+    let user_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::Gtts),
+        "SELECT * FROM user_voice WHERE user_id = $1 AND mode = $2",
+        "DELETE FROM user_voice WHERE user_id = $1 AND mode = $2",
+        "
+            INSERT INTO user_voice(user_id, mode) VALUES ($1, $2)
+            ON CONFLICT (user_id, mode) DO NOTHING
+        ",
+        "
+            INSERT INTO user_voice(user_id, mode, {key}) VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, mode) DO UPDATE SET {key} = $3
+        "
+    ).await.unwrap();
+    let guild_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::Gtts),
+        "SELECT * FROM guild_voice WHERE guild_id = $1 AND mode = $2",
+        "DELETE FROM guild_voice WHERE guild_id = $1 AND mode = $2",
+        "
+            INSERT INTO guild_voice(guild_id, mode) VALUES ($1, $2)
+            ON CONFLICT (guild_id, mode) DO NOTHING
+        ",
+        "
+            INSERT INTO guild_voice(guild_id, mode, {key}) VALUES ($1, $2, $3)
+            ON CONFLICT (guild_id, mode) DO UPDATE SET {key} = $3
+        "
+    ).await.unwrap();
 
     let reqwest = reqwest::Client::new();
     let framework = poise::Framework::build()
@@ -210,27 +228,21 @@ async fn main() {
                 | serenity::GatewayIntents::GUILD_MESSAGES
                 | serenity::GatewayIntents::DIRECT_MESSAGES
                 | serenity::GatewayIntents::GUILD_VOICE_STATES
-                | serenity::GatewayIntents::GUILD_MEMBERS,
+                | serenity::GatewayIntents::GUILD_MEMBERS
+                | serenity::GatewayIntents::MESSAGE_CONTENT,
             )
             .register_songbird()
         })
-        .user_data_setup(move |_ctx, _ready, _framework| {Box::pin(async move {Ok(Data {
-                guilds_db, userinfo_db, nickname_db, analytics, lavalink, webhooks, start_time, reqwest, config,
-                owner_id: application_info.owner.id,
+        .user_data_setup(move |ctx, _ready, _framework| {Box::pin(async move {Ok(Data {
+            premium_voices: get_premium_voices(),
+            last_to_xsaid_tracker: dashmap::DashMap::new(),
+            premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
+            premium_users: config.main_server.members(&ctx.http, None, None).await?.into_iter()
+                .filter_map(|m| if m.roles.contains(&config.patreon_role) {Some(m.user.id)} else {None})
+                .collect(),
 
-                last_to_xsaid_tracker: dashmap::DashMap::new(),
-                #[cfg(feature="premium")]
-                pool,
-                #[cfg(feature="premium")]
-                voices: crate::funcs::get_supported_languages(),
-                #[cfg(feature="premium")]
-                jwt_token: parking_lot::Mutex::new(String::new()),
-                #[cfg(feature="premium")]
-                jwt_expire: parking_lot::Mutex::new(std::time::SystemTime::now()),
-                #[cfg(feature="premium")]
-                service_acc: serenity::json::prelude::from_str(
-                    &std::fs::read_to_string(std::env::var("GOOGLE_APPLICATION_CREDENTIALS").unwrap()).unwrap()
-                ).unwrap()
+            guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
+            analytics, lavalink, webhooks, start_time, reqwest, config, pool,
         })})})
         .options(poise::FrameworkOptions {
             allowed_mentions: Some(
@@ -248,8 +260,6 @@ async fn main() {
                     poise::Context::Application(_) => "on_slash_command",
                 }));
             }),
-            #[cfg(feature="premium")]
-            command_check: Some(|ctx| Box::pin(premium_check(ctx))),
             on_error: |error| Box::pin(on_error(error)),
             listener: |ctx, event, fw, ud| Box::pin(event_listener(ctx, event, fw, ud)),
             prefix_options: poise::PrefixFrameworkOptions {
@@ -264,8 +274,7 @@ async fn main() {
             },
             // Add all the commands, this ordering is important as it is shown on the help command
             commands: vec![
-                commands::main::join(), commands::main::skip(), commands::main::leave(),
-                #[cfg(feature="premium")] commands::main::activate(),
+                commands::main::join(), commands::main::skip(), commands::main::leave(), commands::main::premium_activate(),
 
                 commands::other::tts(), commands::other::uptime(), commands::other::botstats(), commands::other::channel(),
                 commands::other::donate(), commands::other::ping(), commands::other::suggest(), commands::other::invite(),
@@ -278,19 +287,18 @@ async fn main() {
                             ..commands::settings::setup()
                         },
                         commands::settings::xsaid(), commands::settings::autojoin(), commands::settings::botignore(),
-                        commands::settings::language(), commands::settings::server_language(), commands::settings::prefix(),
-                        #[cfg(feature="premium")] commands::settings::translation(),
-                        #[cfg(feature="premium")] commands::settings::translation_lang(),
-                        #[cfg(feature="premium")] commands::settings::speaking_rate(),
+                        commands::settings::voice(), commands::settings::server_voice(), commands::settings::mode(),
+                        commands::settings::server_mode(), commands::settings::prefix(),
+                        commands::settings::translation(), commands::settings::translation_lang(), commands::settings::speaking_rate(),
                         commands::settings::nick(), commands::settings::repeated_characters(), commands::settings::audienceignore()
                     ],
                     ..commands::settings::set()
                 },
-                commands::settings::setup(), commands::settings::languages(),
+                commands::settings::setup(), commands::settings::voices(),
 
                 commands::help::help(),
                 commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
-                #[cfg(feature="premium")] commands::owner::add_premium(),
+                commands::owner::add_premium(),
             ],..poise::FrameworkOptions::default()
         })
         .build().await.unwrap();
@@ -404,7 +412,7 @@ Ask questions by either responding here or asking on the support server!",
             }
 
             match ctx.http.add_member_role(
-                data.config.main_server,
+                data.config.main_server.into(),
                 owner.id.0,
                 data.config.ofs_role,
                 None
@@ -445,58 +453,79 @@ Ask questions by either responding here or asking on the support server!",
     Ok(())
 }
 
-#[cfg(feature="premium")]
-async fn premium_check(ctx: structs::Context<'_>) -> Result<bool, Error> {
-    let author = ctx.author();
-    let guild = match ctx.guild() {
-        Some(guild) => guild,
-        None => return Ok(true)
+enum FailurePoint {
+    PatreonRole(serenity::UserId),
+    PremiumUser,
+    Guild,
+}
+
+async fn premium_check(data: &Data, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>, Error> {
+    let guild = match guild_id {
+        Some(guild) => guild.0 as i64,
+        None => return Ok(Some(FailurePoint::Guild))
     };
 
-    if ctx.framework().options().owners.contains(&author.id) || ["donate", "activate", "add_premium"].contains(&ctx.command().name) {
-        return Ok(true)
-    };
+    let premium_user_id = data
+        .guilds_db.get(guild).await?
+        .get::<&str, Option<i64>>("premium_user")
+        .map(|u| serenity::UserId(u as u64));
 
-    let data = ctx.data();
-    let premium_user: Option<i64> = data 
-        .guilds_db.get(guild.id.into()).await?
-        .get("premium_user");
+    premium_user_id.map_or(
+        Ok(Some(FailurePoint::PremiumUser)),
+        |premium_user_id|
+            if data.premium_users.contains(&premium_user_id) {
+                Ok(None)
+            } else {
+                Ok(Some(FailurePoint::PatreonRole(premium_user_id)))
+            }
+    )
+}
 
-    let mut main_msg = format!("Hey, this server isn't premium, please purchase TTS Bot Premium via Patreon! (`{}donate`)", ctx.prefix());
-    let footer_msg = "If this is an error, please contact Gnome!#6669.";
-
+async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, Error> {
     let ctx_discord = ctx.discord();
-    if let Some(premium_user_id) = premium_user {
-        match guild.member(ctx_discord, premium_user_id as u64).await {
-            Ok(premium_member) => {
-                if premium_member.roles.contains(&data.config.patreon_role) {
-                    return Ok(true)
-                } else if premium_member.user.id == author.id {
-                    main_msg = format!("Hey, you have purchased TTS Bot Premium however have not activated it, please run the `{}activate` command!", ctx.prefix());
-                }
-            },
-            Err(_) => main_msg = format!("Hey, you are not in {} so TTS Bot Premium cannot validate your membership!", data.config.server_invite)
-        };
-    }
+    let guild = ctx.guild();
+    let data = ctx.data();
 
+    let main_msg =
+        match premium_check(data, guild.as_ref().map(|g| g.id)).await? {
+            None => return Ok(true),
+            Some(FailurePoint::Guild) => Cow::Borrowed("Hey, this is a premium command so it must be run in a server!"),
+            Some(FailurePoint::PremiumUser) => {Cow::Owned(
+                format!("Hey, this server isn't premium, please purchase TTS Bot Premium via Patreon! (`{}donate`)", ctx.prefix())
+            )}
+            Some(FailurePoint::PatreonRole(premium_user_id)) => {
+                let premium_user = premium_user_id.to_user(ctx_discord).await?;
+                Cow::Owned(format!(concat!(
+                    "Hey, this server has a premium user setup, however they are not longer a patreon!",
+                    "Please ask {}#{} to renew their membership."
+                ),premium_user.name, premium_user.discriminator))
+            }
+        };
+
+    let author = ctx.author();
     warn!(
-        "{}#{} | {} failed premium check in {} | {}",
-        author.name, author.discriminator, author.id, guild.name, guild.id
+        "{}#{} | {} failed the premium check in {}",
+        author.name, author.discriminator, author.id,
+        match guild {
+            Some(guild) => Cow::Owned(format!("{} | {}", guild.name, guild.id)),
+            None => Cow::Borrowed("DMs")
+        }
     );
 
     let permissions = ctx.author_permissions().await?;
     if permissions.send_messages() {
         ctx.send(|b| {
+            const FOOTER_MSG: &str = "If this is an error, please contact Gnome!#6669.";
             if permissions.embed_links() {
                 b.embed(|e| {
-                    e.title("TTS Bot Premium");
+                    e.title("TTS Bot Premium - Premium Only Command!");
                     e.description(main_msg);
-                    e.colour(constants::NETURAL_COLOUR);
-                    e.footer(|f| f.text(footer_msg));
-                    e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
+                    e.colour(constants::PREMIUM_NEUTRAL_COLOUR);
+                    e.thumbnail(data.premium_avatar_url.clone());
+                    e.footer(|f| f.text(FOOTER_MSG))
                 })
             } else {
-                b.content(format!("{}\n{}", main_msg, footer_msg))
+                b.content(format!("{}\n{}", main_msg, FOOTER_MSG))
             }
         }).await?;
     }
@@ -521,10 +550,6 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
                         ctx.discord().cache.current_user_field(|b| b.name.clone())
                     )),
                 ),
-                Error::Tts(resp) => {
-                    error!("TTS Generation Error: {:?}", resp);
-                    ("I failed to generate TTS".to_owned(), None)
-                }
                 Error::Unexpected(error) => handle_unexpected(format!("{:?}", error)),
                 Error::None(error) => handle_unexpected(error),
                 Error::DebugLog(_) => unreachable!(),
@@ -572,7 +597,7 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
 
             ctx.send_error(
                 &reason.unwrap_or_else(|| String::from("you typed the command wrong")),
-                Some(fix.unwrap_or_else(|| format!("check out {}help {}", ctx.prefix(), ctx.command().name)))
+                Some(fix.unwrap_or_else(|| format!("check out `{}help {}`", ctx.prefix(), ctx.command().qualified_name)))
             ).await?;
         },
         poise::FrameworkError::CooldownHit { remaining_cooldown, ctx } => {
@@ -582,7 +607,7 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
             ).await?;
 
             if let poise::Context::Prefix(ctx) = ctx {
-                if let Some(poise::ReplyHandle::Prefix(error_message)) = cooldown_response {
+                if let Some(poise::ReplyHandle::Known(error_message)) = cooldown_response {
                     tokio::time::sleep(remaining_cooldown).await;
     
                     let ctx_discord = ctx.discord;
@@ -638,20 +663,21 @@ async fn process_tts_msg(
     let repeated_limit: i16 = guild_row.get("repeated_chars");
     let audience_ignore = guild_row.get("audience_ignore");
 
-    let voice: String;
+    let mode;
+    let voice;
+
     let lavalink_client = &data.lavalink;
-    let content = match run_checks(
+    let mut content = match run_checks(
         ctx, message, lavalink_client,
         channel as u64, prefix, autojoin, bot_ignore, audience_ignore
     ).await? {
         None => return Ok(()),
         Some(content) => {
             let member = guild.member(ctx, message.author.id.0).await?;
-            voice = parse_voice(
-                guilds_db, &data.userinfo_db,
-                message.author.id,
-                Some(guild.id),
-            ).await?;
+            let voice_mode = parse_user_or_guild(data, message.author.id, Some(guild.id)).await?;
+
+            voice = voice_mode.0;
+            mode = voice_mode.1;
 
             let nickname_row = nicknames.get([guild.id.into(), message.author.id.into()]).await?;
             let nickname: Option<String> = nickname_row.get("name");
@@ -664,51 +690,28 @@ async fn process_tts_msg(
         }
     };
 
+    let speaking_rate: f32 = data.userinfo_db.get(message.author.id.into()).await?.get("speaking_rate");
+    if let Some(target_lang) = guild_row.get("target_lang") {
+        if guild_row.get("to_translate") && premium_check(data, Some(guild.id)).await?.is_none() {
+            content = funcs::translate(&content, target_lang, data).await?.unwrap_or(content);
+        };
+    }
+
     let tts_err = || format!("Guild: {} | Lavalink failed to get track!", guild.id);
-    #[cfg(feature="premium")] {
-        let speaking_rate: f32 = data.userinfo_db.get(message.author.id.into()).await?.get("speaking_rate");
-        let target_lang: Option<String> = guild_row.get("target_lang");
+    for url in funcs::fetch_url(
+        &data.config.tts_service,
+        content,
+        &voice,
+        &mode.to_string(),
+        speaking_rate
+    ) {
+        let tracks = lavalink_client.get_tracks(&url).await?.tracks;
+        let track = tracks.into_iter().next().ok_or_else(tts_err)?;
 
-        let query_json = funcs::generate_google_json(&
-            if let Some(target_lang) = target_lang {
-                if guild_row.get("to_translate") {
-                    funcs::translate(&content, &target_lang, data).await?.unwrap_or(content)
-                } else {content}
-            } else {content},
-            &voice, speaking_rate
-        )?;
-
-        let mut query = reqwest::Url::parse("tts://")?;
-        query.query_pairs_mut()
-            .append_pair("config", &query_json.to_string())
-            .finish();
-
-        let tracks = lavalink_client.get_tracks(&query).await?.tracks;
-        let track = tracks.first().ok_or_else(tts_err)?;
-
-        lavalink_client.play(guild.id, track.clone()).queue().await?;
-    }
-    #[cfg(not(feature="premium"))] {
-        // Try to fetch audio 5 times, give up and log on failed chunk
-        'url_fetch: for url in crate::funcs::fetch_url(&data.config.tts_service, &content, &voice) {
-            for _ in 0..5 {
-                let tracks = lavalink_client.get_tracks(&url).await?.tracks;
-                if let Some(track) = tracks.first() {
-                    lavalink_client.play(guild.id, track.clone()).queue().await?;
-                    continue 'url_fetch
-                }
-            };
-
-            data.analytics.log(String::from("on_tts_failure"));
-            return Err(Error::from(tts_err()))
-        }
+        lavalink_client.play(guild.id, track).queue().await?;
     }
 
-    // "Mode" changing planned (gtts, espeak, premium)
-    data.analytics.log(format!("on_{}_tts",
-        if cfg!(feature="premium") {"premium"}
-        else {"gtts"}
-    ));
+    data.analytics.log(format!("on_{}_tts", mode));
     Ok(())
 }
 

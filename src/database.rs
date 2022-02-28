@@ -21,7 +21,7 @@ use dashmap::DashMap;
 use tokio_postgres::{Statement, Error as SqlError};
 use deadpool_postgres::{tokio_postgres, Object as Connection};
 
-use crate::structs::Error;
+use crate::structs::{Error, TTSMode};
 
 #[poise::async_trait]
 pub trait CacheKeyTrait {
@@ -59,6 +59,23 @@ impl CacheKeyTrait for [i64; 2] {
     }
 }
 
+#[poise::async_trait]
+impl CacheKeyTrait for (i64, TTSMode) {
+    async fn get(&self, conn: Connection, stmt: Statement) -> Result<Option<tokio_postgres::Row>, SqlError> {
+        let (id, mode) = self;
+        conn.query_opt(&stmt, &[id, mode]).await
+    }
+    async fn set_one(&self, conn: Connection, stmt: Statement, value: &(impl tokio_postgres::types::ToSql + Sync)) -> Result<u64, SqlError> {
+        let (id, mode) = self;
+        conn.execute(&stmt, &[id, mode, value]).await
+    }
+    async fn execute(&self, conn: Connection, stmt: Statement) -> Result<u64, SqlError> {
+        let (id, mode) = self;
+        conn.execute(&stmt, &[id, mode]).await
+    }
+}
+
+
 pub struct Handler<T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash> {
     pool: Arc<deadpool_postgres::Pool>,
     cache: DashMap<T, Arc<tokio_postgres::Row>>,
@@ -81,7 +98,7 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
         create_row: &'static str,
         single_insert: &'static str,
     ) -> Result<Self, Error> {
-        Ok(Handler {
+        Ok(Self {
             cache: DashMap::new(),
             default_row: Self::_get(
                 pool.get().await?,

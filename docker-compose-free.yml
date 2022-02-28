@@ -12,9 +12,7 @@ services:
           - type: bind
             source: ./lavalink_config.yml
             target: /opt/Lavalink/application.yml
-          - type: bind
-            source: ./lavalink-plugins
-            target: /opt/Lavalink/plugins
+
         expose: [2333]
     database:
         image: postgres:13
@@ -22,12 +20,15 @@ services:
         environment: 
             POSTGRES_USER: tts
             POSTGRES_PASSWORD: tts_password
-    gtts-service:
-        build: git://github.com/GnomedDev/gtts-service.git
-        network_mode: "host"
-        expose: [20310]
+    tts-service:
+        build:
+          context: git://github.com/GnomedDev/tts-service.git
+          args:
+              MODES: "espeak,gtts"
 
         environment:
+          -  IPV6_BLOCK
           -  LOG_LEVEL=INFO
           -  BIND_ADDR=0.0.0.0:20310
-          -  IPV6_BLOCK=$(IPV6_BLOCK)
+        network_mode: "host"
+        expose: [20310]

@@ -27,10 +27,6 @@ lavalink:
         playerUpdateInterval: 5 # How frequently to send player updates to clients, in seconds
         gc-warnings: true
 
-    plugins:
-     - dependency: "com.dunctebot:tts-plugin:1.0.1"
-       repository: "https://jitpack.io"
-
 logging:
     file:
         max-history: 30

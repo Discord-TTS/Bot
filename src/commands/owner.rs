@@ -49,7 +49,6 @@ pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[cfg(feature="premium")]
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn add_premium(ctx: Context<'_>, guild: serenity::Guild, user: serenity::User) -> Result<(), Error> {
     let data = ctx.data();

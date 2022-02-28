@@ -13,10 +13,11 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Error, PoiseContextAdditions, SerenityContextAdditions};
+use crate::structs::{Context, Error, PoiseContextAdditions, SerenityContextAdditions, TTSMode};
 use crate::funcs::random_footer;
 
 async fn channel_check(ctx: &Context<'_>) -> Result<bool, Error> {
@@ -195,66 +196,75 @@ pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-/// Activates a server for premium!
-#[cfg(feature="premium")]
+/// Activates a server for TTS Bot Premium!
 #[poise::command(
     category="Main Commands",
     prefix_command, slash_command,
-    aliases("link"),
+    aliases("activate"),
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS | ADD_REACTIONS"
 )]
-pub async fn activate(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn premium_activate(ctx: Context<'_>) -> Result<(), Error> {
+    let data = ctx.data();
     let guild = ctx.guild().ok_or(Error::GuildOnly)?;
 
-    let data = ctx.data();
+    if crate::premium_check(data, Some(guild.id)).await?.is_none() {
+        ctx.say("Hey, this server is already premium!").await?;
+        return Ok(())
+    }
+
     let author = ctx.author();
     let author_id = author.id.into();
     let ctx_discord = ctx.discord();
 
-    let mut error_msg = match guild.member(ctx_discord, author.id).await {
+    let mut error_msg: Option<Cow<'_, str>> = match guild.member(ctx_discord, author.id).await {
         Ok(m) if !m.roles.contains(&data.config.patreon_role) => Some(
-            String::from(concat!(
+            Cow::Borrowed(concat!(
                 "Hey, you do not have the Patreon Role on the Support Server! Please link your ",
                 "[patreon account to your discord account](https://support.patreon.com/hc/en-gb/articles/212052266) ",
                 "or [purchase TTS Bot Premium via Patreon](https://patreon.com/Gnome_The_Bot_Maker)!"
             ))
         ),
         Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => Some(
-            format!("Hey, you are not in the [Support Server]({}) so I cannot validate your membership!", data.config.server_invite)
+            Cow::Owned(format!(
+                "Hey, you are not in the [Support Server]({}) so I cannot validate your membership!",
+                data.config.server_invite
+            ))
         ),
         _ => None
     };
 
-    let linked_guilds = {
+    let linked_guilds: i64 = {
         let db_conn = data.pool.get().await?;
-        db_conn.query(
-            "SELECT guild_id FROM guilds WHERE premium_user = $1",
+        db_conn.query_one(
+            "SELECT count(*) FROM guilds WHERE premium_user = $1",
             &[&(author_id as i64)]
-        ).await?
+        ).await?.get("count")
     };
 
-    if error_msg.is_none() && linked_guilds.len() >= 2 {
-        error_msg = Some(String::from("Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier"));
+    if error_msg.is_none() && linked_guilds >= 2 {
+        error_msg = Some(Cow::Borrowed("Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier"));
     }
 
     if let Some(error_msg) = error_msg {
         ctx.send(|b| b.embed(|e| {
             e.title("TTS Bot Premium");
             e.description(error_msg);
-            e.colour(crate::constants::NETURAL_COLOUR);
-            e.footer(|f| f.text("If this is an error, please contact Gnome!#6669."));
-            e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
+            e.thumbnail(data.premium_avatar_url.clone());
+            e.colour(crate::constants::PREMIUM_NEUTRAL_COLOUR);
+            e.footer(|f| f.text("If this is an error, please contact Gnome!#6669."))
         })).await?;
         return Ok(())
     }
 
     data.userinfo_db.create_row(author_id).await?;
     data.guilds_db.set_one(guild.id.into(), "premium_user", &author_id).await?;
+    data.guilds_db.set_one(guild.id.into(), "voice_mode", &TTSMode::Premium).await?;
+
     ctx.say("Done! This server is now premium!").await?;
 
     tracing::info!(
         "{}#{} | {} linked premium to {} | {}, they had {} linked servers",
-        author.name, author.discriminator, author.id, guild.name, guild.id, linked_guilds.len()
+        author.name, author.discriminator, author.id, guild.name, guild.id, linked_guilds
     );
     Ok(())
 }
