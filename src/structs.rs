@@ -80,8 +80,8 @@ impl From<TTSModeServerChoice> for TTSMode {
 impl From<TTSModeChoice> for TTSMode {
     fn from(mode: TTSModeChoice) -> Self {
         match mode {
+            TTSModeChoice::Gtts => TTSMode::Gtts,
             TTSModeChoice::Espeak => TTSMode::Espeak,
-            TTSModeChoice::Premium => TTSMode::Premium
         }
     }
 }

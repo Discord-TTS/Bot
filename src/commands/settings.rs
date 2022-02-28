@@ -377,8 +377,8 @@ pub enum TTSModeServerChoice {
 #[derive(poise::ChoiceParameter)]
 pub enum TTSModeChoice {
     // Name to show in slash command invoke           Aliases for prefix
+    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       Gtts,
     #[name="eSpeak TTS (male)"]                       #[name="espeak"]     Espeak,
-    #[name="Premium TTS (changable)"]                 #[name="premium"]    Premium
 }
 
 
