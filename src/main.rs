@@ -299,6 +299,13 @@ async fn main() {
                 commands::help::help(),
                 commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
                 commands::owner::add_premium(),
+
+                poise::Command {
+                    subcommands: vec![
+                        commands::owner::guild(), commands::owner::user(),
+                        commands::owner::guild_voice(), commands::owner::user_voice(),
+                    ], ..commands::owner::remove_cache()
+                }
             ],..poise::FrameworkOptions::default()
         })
         .build().await.unwrap();

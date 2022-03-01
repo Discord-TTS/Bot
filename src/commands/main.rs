@@ -216,7 +216,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> Result<(), Error> {
     let author_id = author.id.into();
     let ctx_discord = ctx.discord();
 
-    let mut error_msg: Option<Cow<'_, str>> = match guild.member(ctx_discord, author.id).await {
+    let mut error_msg: Option<Cow<'_, str>> = match data.config.main_server.member(ctx_discord, author.id).await {
         Ok(m) if !m.roles.contains(&data.config.patreon_role) => Some(
             Cow::Borrowed(concat!(
                 "Hey, you do not have the Patreon Role on the Support Server! Please link your ",

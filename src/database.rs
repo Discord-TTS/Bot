@@ -170,4 +170,8 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
 
         Ok(())
     }
+
+    pub fn invalidate_cache(&self, identifier: &T) {
+        self.cache.remove(identifier);
+    }
 }

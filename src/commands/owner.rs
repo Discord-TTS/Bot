@@ -13,10 +13,11 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#![allow(clippy::unused_async)]
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Error};
+use crate::structs::{Context, Error, TTSModeServerChoice};
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {
@@ -61,6 +62,40 @@ pub async fn add_premium(ctx: Context<'_>, guild: serenity::Guild, user: serenit
         "Linked <@{}> ({}#{} | {}) to {}",
         user.id, user.name, user.discriminator, user.id, guild.name
     )).await?;
+    Ok(())
+}
+
+#[poise::command(prefix_command, owners_only, hide_in_help)]
+pub async fn remove_cache(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.say("Please run a subcommand!").await?;
+    Ok(())
+}
+
+#[poise::command(prefix_command, owners_only, hide_in_help)]
+pub async fn guild(ctx: Context<'_>, guild: i64) -> Result<(), Error> {
+    ctx.data().guilds_db.invalidate_cache(&guild);
+    ctx.say("Done!").await?;
+    Ok(())
+}
+
+#[poise::command(prefix_command, owners_only, hide_in_help)]
+pub async fn user(ctx: Context<'_>, user: i64) -> Result<(), Error> {
+    ctx.data().userinfo_db.invalidate_cache(&user);
+    ctx.say("Done!").await?;
+    Ok(())
+}
+
+#[poise::command(prefix_command, owners_only, hide_in_help)]
+pub async fn guild_voice(ctx: Context<'_>, guild: i64, mode: TTSModeServerChoice) -> Result<(), Error> {
+    ctx.data().guild_voice_db.invalidate_cache(&(guild, mode.into()));
+    ctx.say("Done!").await?;
+    Ok(())
+}
+
+#[poise::command(prefix_command, owners_only, hide_in_help)]
+pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeServerChoice) -> Result<(), Error> {
+    ctx.data().user_voice_db.invalidate_cache(&(user, mode.into()));
+    ctx.say("Done!").await?;
     Ok(())
 }
 

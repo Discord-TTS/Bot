@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 
-use crate::{constants::RED, commands::settings::{TTSModeChoice, TTSModeServerChoice}};
+use crate::constants::RED;
 
 pub struct Config {
     pub translation_token: Option<String>,
@@ -65,6 +65,21 @@ impl std::fmt::Display for TTSMode {
             Self::Premium => "Premium"
         })
     }
+}
+
+#[derive(poise::ChoiceParameter)]
+pub enum TTSModeServerChoice {
+    // Name to show in slash command invoke           Aliases for prefix
+    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       Gtts,
+    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     Espeak,
+    #[name="Premium TTS (changable)"]                 #[name="premium"]    Premium
+}
+
+#[derive(poise::ChoiceParameter)]
+pub enum TTSModeChoice {
+    // Name to show in slash command invoke           Aliases for prefix
+    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       Gtts,
+    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     Espeak,
 }
 
 impl From<TTSModeServerChoice> for TTSMode {

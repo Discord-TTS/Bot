@@ -85,7 +85,7 @@ pub const DB_SETUP_QUERY: &str = "
     CREATE TABLE user_voice (
         user_id       bigint,
         mode          TTSMode,
-        voice         text     NOT NULL,
+        voice         text,
 
         PRIMARY KEY (user_id, mode),
 

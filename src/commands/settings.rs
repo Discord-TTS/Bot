@@ -67,11 +67,25 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
 
     let none = String::from("none");
 
-    let default_voice = format_voice(data.guild_voice_db.get((guild_id.into(), guild_mode)).await?.get("voice"), guild_mode);
-    let user_voice = match user_mode {
-        Some(mode) => format_voice(data.user_voice_db.get((author_id.into(), mode)).await?.get("voice"), mode),
-        None => none.clone()
+    let default_voice = {
+        let guild_voice_row = data.guild_voice_db.get((guild_id.into(), guild_mode)).await?;
+        if guild_voice_row.get::<_, i64>("guild_id") == 0 {
+            Cow::Borrowed(crate::funcs::default_voice(guild_mode))
+        } else {
+            Cow::Owned(format_voice(guild_voice_row.get("voice"), guild_mode))
+        }
     };
+
+    let user_voice =
+        if let Some(mode) =  user_mode {
+            if let Some(user_voice) = data.user_voice_db.get((author_id.into(), mode)).await?.get("voice") {
+                format_voice(user_voice, mode)
+            } else {
+                none.clone()
+            }
+        } else {
+            none.clone()
+        };
 
     let target_lang = guild_row.get::<_, Option<String>>("target_lang").unwrap_or_else(|| none.clone());
     let nickname = nickname_row.get::<_, Option<String>>("name").unwrap_or_else(|| none.clone());
@@ -366,20 +380,6 @@ async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Result
     )
 }
 
-#[derive(poise::ChoiceParameter)]
-pub enum TTSModeServerChoice {
-    // Name to show in slash command invoke           Aliases for prefix
-    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       Gtts,
-    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     Espeak,
-    #[name="Premium TTS (changable)"]                 #[name="premium"]    Premium
-}
-
-#[derive(poise::ChoiceParameter)]
-pub enum TTSModeChoice {
-    // Name to show in slash command invoke           Aliases for prefix
-    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       Gtts,
-    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     Espeak,
-}
 
 
 const fn to_enabled(value: bool) -> &'static str {
@@ -485,7 +485,7 @@ pub async fn botignore(
 )]
 pub async fn server_mode(
     ctx: Context<'_>,
-    #[description="The TTS Mode to change to"] mode: TTSModeServerChoice
+    #[description="The TTS Mode to change to"] mode: crate::structs::TTSModeServerChoice
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
 
@@ -865,7 +865,7 @@ Just do `{}join` and start talking!
 )]
 pub async fn mode(
     ctx: Context<'_>,
-    #[description="The TTS Mode to change to"] mode: TTSModeChoice
+    #[description="The TTS Mode to change to"] mode: crate::structs::TTSModeChoice
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
 

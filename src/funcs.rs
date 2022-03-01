@@ -30,6 +30,14 @@ use serenity::json::prelude as json;
 use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, OptionTryUnwrap, TTSMode, PremiumVoices, Gender, GoogleVoice};
 use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 
+pub const fn default_voice(mode: TTSMode) -> &'static str {
+    match mode {
+        TTSMode::Gtts => "en",
+        TTSMode::Espeak => "en1",
+        TTSMode::Premium => "en-US A",
+    }
+}
+
 pub async fn parse_user_or_guild(
     data: &Data,
     author_id: serenity::UserId,
@@ -61,11 +69,7 @@ pub async fn parse_user_or_guild(
             }
         } else {
             Some(Cow::Owned(user_voice_row.get("voice")))
-        }.unwrap_or(Cow::Borrowed(match mode {
-            TTSMode::Gtts => "en",
-            TTSMode::Espeak => "en1",
-            TTSMode::Premium => "en-US A",
-        }));
+        }.unwrap_or_else(|| Cow::Borrowed(default_voice(mode)));
 
     Ok((voice, mode))
 }
