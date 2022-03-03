@@ -94,7 +94,7 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
     ctx.send(|b| {b.embed(|e| {
         e.title("Current Settings");
-        e.url(&data.config.server_invite);
+        e.url(&data.config.main_server_invite);
         e.colour(netural_colour);
         e.footer(|f| {
             f.text(format!(concat!(
@@ -167,7 +167,7 @@ impl<'a> MenuPaginator<'a> {
         });
         embed.footer(|f| {f.text(random_footer(
             Some(self.ctx.prefix()),
-            Some(&self.ctx.data().config.server_invite),
+            Some(&self.ctx.data().config.main_server_invite),
             Some(bot_id.into())
         ))})
     }
@@ -843,7 +843,7 @@ Just do `{}join` and start talking!
 
         e.footer(|f| {f.text(random_footer(
             Some(&String::from(ctx.prefix())),
-            Some(&data.config.server_invite),
+            Some(&data.config.main_server_invite),
             Some(cache.current_user_id().0)
         ))});
         e.author(|a| {
@@ -936,7 +936,7 @@ pub async fn voices(ctx: Context<'_>) -> Result<(), Error> {
         e.title(format!("{} Voices | Mode: `{}`", cache.current_user_field(|u| u.name.clone()), mode));
         e.footer(|f| f.text(random_footer(
             Some(&String::from(ctx.prefix())),
-            Some(&data.config.server_invite),
+            Some(&data.config.main_server_invite),
             Some(cache.current_user_id().0)
         )));
         e.author(|a| {

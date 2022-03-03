@@ -46,15 +46,11 @@ mod funcs;
 
 use constants::DM_WELCOME_MESSAGE;
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices};
-use structs::{TTSMode, Config, Data, Error, PoiseContextAdditions, SerenityContextAdditions};
-
+use structs::{TTSMode, Config, Data, Error, PoiseContextAdditions, SerenityContextAdditions, PostgresConfig};
 
 struct LavalinkHandler;
 impl LavalinkEventHandler for LavalinkHandler {}
 
-fn get_config() -> Result<toml::Value, Error> {
-    Ok(std::fs::read_to_string("config.toml")?.parse()?)
-}
 async fn get_webhooks(
     http: &serenity::Http,
     webhooks_raw: &toml::value::Table,
@@ -83,73 +79,28 @@ async fn get_webhooks(
 #[allow(clippy::too_many_lines)]
 async fn main() {
     let start_time = std::time::SystemTime::now();
-    let mut config_toml = get_config().unwrap();
 
-    // Setup database pool
-    let db_config_toml = &config_toml["PostgreSQL-Info"];
-    let mut db_config = deadpool_postgres::Config::new();
-    db_config.user = Some(String::from(db_config_toml["user"].as_str().ok_or("").unwrap()));
-    db_config.host = Some(String::from(db_config_toml["host"].as_str().ok_or("").unwrap()));
-    db_config.dbname = Some(String::from(db_config_toml["database"].as_str().ok_or("").unwrap()));
-    db_config.password = Some(String::from(db_config_toml["password"].as_str().ok_or("").unwrap()));
+    let (pool, mut main, lavalink, webhooks) = {
+        let mut config_toml: toml::Value = std::fs::read_to_string("config.toml").unwrap().parse().unwrap();
+        let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone()).unwrap();
 
-    let pool = Arc::new(db_config.create_pool(
-        Some(deadpool_postgres::Runtime::Tokio1),
-        tokio_postgres::NoTls,
-    ).unwrap());
+        // Setup database pool
+        let mut db_config = deadpool_postgres::Config::new();
+        db_config.user = Some(postgres.user);
+        db_config.host = Some(postgres.host);
+        db_config.dbname = Some(postgres.database);
+        db_config.password = Some(postgres.password);
 
-    migration::run(&mut config_toml, &pool).await.unwrap();
+        let pool = Arc::new(db_config.create_pool(
+            Some(deadpool_postgres::Runtime::Tokio1),
+            tokio_postgres::NoTls,
+        ).unwrap());
 
-    let config = {
-        let main_config = &config_toml["Main"];
-        Config {
-            translation_token: main_config.get("translation_token").map(|v| v.as_str().unwrap()).map(String::from),
-            tts_service: reqwest::Url::parse(main_config["tts_service"].as_str().unwrap()).unwrap(),
-            patreon_role: serenity::RoleId(main_config["patreon_role"].as_integer().unwrap() as u64),
-            server_invite: String::from(main_config["main_server_invite"].as_str().unwrap()),
+        migration::run(&mut config_toml, &pool).await.unwrap();
 
-            main_server: serenity::GuildId(main_config["main_server"].as_integer().unwrap() as u64),
-            invite_channel: main_config["invite_channel"].clone().as_integer().unwrap() as u64,
-            ofs_role: main_config["ofs_role"].as_integer().unwrap() as u64,
-        }
+        let Config{main, lavalink, webhooks} = config_toml.try_into().unwrap();
+        (pool, main, lavalink, webhooks)
     };
-
-    let token = config_toml["Main"]["token"].as_str().unwrap();
-    let http_client = serenity::http::Http::new_with_token(token);
-    let application_info = http_client.get_current_application_info().await.unwrap();
-
-    let lavalink_config = &config_toml["Lavalink"];
-    let lavalink = LavalinkClient::builder(application_info.id.0)
-        .set_host(&lavalink_config["host"].as_str().unwrap())
-        .set_password(&lavalink_config["password"].as_str().unwrap())
-        .set_port(u16::try_from(lavalink_config["port"].as_integer().unwrap()).unwrap())
-        .set_is_ssl(lavalink_config["ssl"].as_bool().unwrap())
-        .build(LavalinkHandler)
-        .await.unwrap();
-
-    let webhooks = get_webhooks(
-        &http_client,
-        config_toml["Webhook-Info"].as_table().unwrap()
-    ).await.unwrap();
-
-    let (send, rx) = std::sync::mpsc::channel();
-    let listener = logging::WebhookLogRecv::new(
-        rx,
-        http_client,
-        format!("[{}]",
-            if cfg!(debug_assertions) {"Debug"}
-            else {"Main"}
-        ),
-        webhooks["logs"].clone(),
-        webhooks["errors"].clone(),
-    );
-    let subscriber = logging::WebhookLogSend::new(
-        send,
-        tracing::Level::from_str(config_toml["Main"]["log_level"].as_str().unwrap()).unwrap()
-    );
-
-    tokio::spawn(async move {listener.listener().await;});
-    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     // CLEANUP
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));
@@ -219,9 +170,8 @@ async fn main() {
         "
     ).await.unwrap();
 
-    let reqwest = reqwest::Client::new();
     let framework = poise::Framework::build()
-        .token(token)
+        .token(main.token.take().unwrap())
         .client_settings(move |f| {
             f.intents(
                 serenity::GatewayIntents::GUILDS
@@ -233,17 +183,45 @@ async fn main() {
             )
             .register_songbird()
         })
-        .user_data_setup(move |ctx, _ready, _framework| {Box::pin(async move {Ok(Data {
-            premium_voices: get_premium_voices(),
-            last_to_xsaid_tracker: dashmap::DashMap::new(),
-            premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
-            premium_users: config.main_server.members(&ctx.http, None, None).await?.into_iter()
-                .filter_map(|m| if m.roles.contains(&config.patreon_role) {Some(m.user.id)} else {None})
-                .collect(),
+        .user_data_setup(move |ctx, ready, _framework| {Box::pin(async move {
+            let webhooks = get_webhooks(&ctx.http, &webhooks).await.unwrap();
 
-            guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
-            analytics, lavalink, webhooks, start_time, reqwest, config, pool,
-        })})})
+            let (send, rx) = std::sync::mpsc::channel();
+            let subscriber = logging::WebhookLogSend::new(send, tracing::Level::from_str(&main.log_level)?);
+            let listener = logging::WebhookLogRecv::new(
+                rx,
+                ctx.http.clone(),
+                format!("[{}]",
+                    if cfg!(debug_assertions) {"Debug"}
+                    else {"Main"}
+                ),
+                webhooks["logs"].clone(),
+                webhooks["errors"].clone(),
+            );
+
+            tokio::spawn(async move {listener.listener().await;});
+            tracing::subscriber::set_global_default(subscriber).unwrap();
+
+            Ok(Data {
+                reqwest: reqwest::Client::new(),
+                premium_voices: get_premium_voices(),
+                last_to_xsaid_tracker: dashmap::DashMap::new(),
+                premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
+                premium_users: main.main_server.members(&ctx.http, None, None).await?.into_iter()
+                    .filter_map(|m| if m.roles.contains(&main.patreon_role) {Some(m.user.id)} else {None})
+                    .collect(),
+                lavalink: LavalinkClient::builder(ready.application.id.0)
+                    .set_password(&lavalink.password)
+                    .set_host(&lavalink.host)
+                    .set_port(lavalink.port)
+                    .set_is_ssl(lavalink.ssl)
+                    .build(LavalinkHandler).await?,
+                config: main,
+
+                guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
+                analytics, webhooks, start_time, pool,
+            })
+        })})
         .options(poise::FrameworkOptions {
             allowed_mentions: Some(
                 serenity::CreateAllowedMentions::default()
@@ -261,7 +239,7 @@ async fn main() {
                 }));
             }),
             on_error: |error| Box::pin(on_error(error)),
-            listener: |ctx, event, fw, ud| Box::pin(event_listener(ctx, event, fw, ud)),
+            listener: |ctx, event, _, ud| Box::pin(event_listener(ctx, event, ud)),
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: None,
                 dynamic_prefix: Some(|ctx| {Box::pin(async move {Some(
@@ -346,12 +324,7 @@ async fn main() {
     framework.start_autosharded().await.unwrap();
 }
 
-async fn event_listener(
-    ctx: &serenity::Context,
-    event: &poise::Event<'_>,
-    _framework: &poise::Framework<Data, Error>,
-    data: &Data,
-) -> Result<(), Error> {
+async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, data: &Data) -> Result<(), Error> {
     match event {
         poise::Event::Message { new_message } => {
             let (tts_result, support_result, mention_result) = tokio::join!(
@@ -410,7 +383,7 @@ Then, you can just type normal messages and I will say them, like magic!
 You can view all the commands with `-help`
 Ask questions by either responding here or asking on the support server!",
                 guild.name));
-                e.footer(|f| {f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.server_invite))});
+                e.footer(|f| {f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite))});
                 e.author(|a| {a.name(format!("{}#{}", &owner.name, &owner.id)); a.icon_url(owner.face())})
             })}).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
@@ -816,7 +789,7 @@ async fn process_support_dm(
                 if content.contains("discord.gg") {
                     channel.say(&ctx.http, format!(
                         "Join {} and look in <#{}> to invite {}!",
-                        data.config.server_invite, data.config.invite_channel, ctx.cache.current_user_id()
+                        data.config.main_server_invite, data.config.invite_channel, ctx.cache.current_user_id()
                     )).await?;
                 } else if content.as_str() == "help" {
                     channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
@@ -844,7 +817,7 @@ async fn process_support_dm(
                     e.description(DM_WELCOME_MESSAGE);
                     e.footer(|f| {f.text(random_footer(
                         Some(&String::from("-")),
-                        Some(&data.config.server_invite),
+                        Some(&data.config.main_server_invite),
                         Some(ctx.cache.current_user_id().0)
                     ))}
                 )})}).await?;

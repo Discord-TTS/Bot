@@ -1313,7 +1313,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#8e7dd533b3896eef95aaafeb7eac5c0c4b21a71e"
+source = "git+https://github.com/kangalioo/poise?branch=develop#27e0aae619fd3a79180d0a988214b100d067bcf6"
 dependencies = [
  "async-trait",
  "futures-core",
@@ -1328,7 +1328,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#8e7dd533b3896eef95aaafeb7eac5c0c4b21a71e"
+source = "git+https://github.com/kangalioo/poise?branch=develop#27e0aae619fd3a79180d0a988214b100d067bcf6"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1458,9 +1458,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8383f39639269cde97d255a32bdb68c047337295414940c68bdd30c2e13203ff"
+checksum = "8380fe0152551244f0747b1bf41737e0f8a74f97a14ccefd1148187271634f3c"
 dependencies = [
  "bitflags",
 ]
@@ -1766,7 +1766,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.10.10"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#0391d7c868fb8d4a7cdc341b292d9e45a3fc743e"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#2d465efe1bcc9b974af509b1623acc49f721d267"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.16.1",
@@ -1794,7 +1794,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#0391d7c868fb8d4a7cdc341b292d9e45a3fc743e"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#2d465efe1bcc9b974af509b1623acc49f721d267"
 dependencies = [
  "bitflags",
  "enum_primitive",

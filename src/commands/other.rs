@@ -139,7 +139,7 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     ctx.send(|b| {b.embed(|e| {
         e.title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())));
         e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face));
-        e.url(&ctx.data().config.server_invite);
+        e.url(&ctx.data().config.main_server_invite);
         e.colour(netural_colour);
         e.footer(|f| {
             f.text(format!("
@@ -248,7 +248,7 @@ pub async fn invite(ctx: Context<'_>,) -> Result<(), Error> {
     }
 
     let invite_channel = ctx_discord.cache.guild_channel(invite_channel).ok_or("channel is None")?;
-    ctx.say(format!("Join {} and look in #{} to invite <@{}>", config.server_invite, invite_channel.name, bot_user_id)).await?;
+    ctx.say(format!("Join {} and look in #{} to invite <@{}>", config.main_server_invite, invite_channel.name, bot_user_id)).await?;
 
     Ok(())
 }

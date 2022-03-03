@@ -109,7 +109,7 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
             });
             e.footer(|f| f.text(random_footer(
                 Some(ctx.prefix()),
-                Some(&ctx.data().config.server_invite),
+                Some(&ctx.data().config.main_server_invite),
                 Some(ctx_discord.cache.current_user_id().0)
             )))
         })
@@ -227,7 +227,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> Result<(), Error> {
         Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => Some(
             Cow::Owned(format!(
                 "Hey, you are not in the [Support Server]({}) so I cannot validate your membership!",
-                data.config.server_invite
+                data.config.main_server_invite
             ))
         ),
         _ => None

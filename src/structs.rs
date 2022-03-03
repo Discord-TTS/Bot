@@ -8,15 +8,42 @@ use poise::serenity_prelude as serenity;
 
 use crate::constants::RED;
 
+#[derive(serde::Deserialize)]
 pub struct Config {
+    #[serde(rename="Main")] pub main: MainConfig,
+    #[serde(rename="Lavalink")] pub lavalink: LavalinkConfig,
+    #[serde(rename="Webhook-Info")] pub webhooks: toml::value::Table,
+}
+
+#[derive(serde::Deserialize)]
+pub struct MainConfig {
     pub translation_token: Option<String>,
     pub patreon_role: serenity::RoleId,
     pub main_server: serenity::GuildId,
+    pub main_server_invite: String,
     pub tts_service: reqwest::Url,
-    pub server_invite: String,
+    pub token: Option<String>,
     pub invite_channel: u64,
+    pub log_level: String,
     pub ofs_role: u64,
 }
+
+#[derive(serde::Deserialize)]
+pub struct PostgresConfig {
+    pub host: String,
+    pub user: String,
+    pub database: String,
+    pub password: String,
+}
+
+#[derive(serde::Deserialize)]
+pub struct LavalinkConfig {
+    pub password: String,
+    pub host: String,
+    pub port: u16,
+    pub ssl: bool
+}
+
 
 pub struct Data {
     pub analytics: Arc<crate::analytics::Handler>,
@@ -33,7 +60,7 @@ pub struct Data {
     pub premium_avatar_url: String,
     pub lavalink: LavalinkClient,
     pub reqwest: reqwest::Client,
-    pub config: Config,
+    pub config: MainConfig,
 
     pub premium_voices: PremiumVoices,
     pub pool: Arc<deadpool_postgres::Pool>,
@@ -250,7 +277,7 @@ impl PoiseContextAdditions for Context<'_> {
                         a.icon_url(avatar_url)
                     });
                     e.footer(|f| f.text(format!(
-                        "Support Server: {}", self.data().config.server_invite
+                        "Support Server: {}", self.data().config.main_server_invite
                     )))
                 })
             })

@@ -46,7 +46,7 @@ pub struct WebhookLogRecv {
 impl WebhookLogRecv {
     pub fn new(
         rx: Receiver<(tracing::Level, LogMessage)>,
-        http: serenity::Http,
+        http: Arc<serenity::Http>,
         prefix: String,
         normal_logs: serenity::Webhook,
         error_logs: serenity::Webhook,
@@ -68,13 +68,13 @@ impl WebhookLogRecv {
         }
 
         Self {
+            http,
             prefix,
             level_lookup,
             error_logs,
             normal_logs,
 
             rx: Mutex::new(rx),
-            http: Arc::new(http),
         }
     }
 
