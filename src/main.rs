@@ -223,17 +223,17 @@ async fn main() {
             })
         })})
         .options(poise::FrameworkOptions {
-            allowed_mentions: Some(
-                serenity::CreateAllowedMentions::default()
-                    .parse(serenity::ParseValue::Users)
-                    .replied_user(true)
-                    .clone()
-            ),
+            allowed_mentions: Some({
+                let mut allowed_mentions = serenity::CreateAllowedMentions::default();
+                allowed_mentions.parse(serenity::ParseValue::Users);
+                allowed_mentions.replied_user(true);
+                allowed_mentions
+            }),
             pre_command: |ctx| Box::pin(async move {
                 let analytics_handler: &analytics::Handler = &ctx.data().analytics;
 
-                analytics_handler.log(ctx.command().qualified_name.clone());
-                analytics_handler.log(String::from(match ctx {
+                analytics_handler.log(Cow::Owned(ctx.command().qualified_name.clone()));
+                analytics_handler.log(Cow::Borrowed(match ctx {
                     poise::Context::Prefix(_) => "on_command",
                     poise::Context::Application(_) => "on_slash_command",
                 }));
@@ -425,7 +425,7 @@ Ask questions by either responding here or asking on the support server!",
             info!("{} has connected in {} seconds!", data_about_bot.user.name, data.start_time.elapsed()?.as_secs());
         }
         poise::Event::Resume { event: _ } => {
-            data.analytics.log(String::from("on_resumed"));
+            data.analytics.log(Cow::Borrowed("on_resumed"));
         }
         _ => {}
     }
@@ -519,12 +519,12 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
             let command = ctx.command();
             let handle_unexpected = |error: String| {
                 error!("Error in {}: {:?}", command.qualified_name, error);
-                ("an unknown error occurred".to_owned(), None)
+                (Cow::Borrowed("an unknown error occurred"), None)
             };
 
             let (error, fix) = match error {
                 Error::GuildOnly => (
-                    format!("{} cannot be used in private messages", command.qualified_name),
+                    Cow::Owned(format!("{} cannot be used in private messages", command.qualified_name)),
                     Some(format!(
                         "try running it on a server with {} in",
                         ctx.discord().cache.current_user_field(|b| b.name.clone())
@@ -534,7 +534,7 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
                 Error::None(error) => handle_unexpected(error),
                 Error::DebugLog(_) => unreachable!(),
             };
-            ctx.send_error(&error, fix).await?;
+            ctx.send_error(&error, fix.as_deref()).await?;
         }
         poise::FrameworkError::Listener{error, event} => {
             if let Error::DebugLog(msg) = error {
@@ -546,13 +546,13 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
         poise::FrameworkError::MissingBotPermissions{missing_permissions, ctx} => {
             ctx.send_error(
                 &format!("I cannot run `{}` as I am missing permissions", ctx.command().name),
-                Some(format!("give me: {}", missing_permissions.get_permission_names().join(", ")))
+                Some(&format!("give me: {}", missing_permissions.get_permission_names().join(", ")))
             ).await?;
         },
         poise::FrameworkError::MissingUserPermissions{missing_permissions, ctx} => {
             ctx.send_error(
                 "you cannot run this command",
-                Some(format!(
+                Some(&format!(
                     "ask an administator for the following permissions: {}",
                     missing_permissions.ok_or("failed to fetch perms")?.get_permission_names().join(", ")
                 ))
@@ -576,14 +576,14 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
             }
 
             ctx.send_error(
-                &reason.unwrap_or_else(|| String::from("you typed the command wrong")),
-                Some(fix.unwrap_or_else(|| format!("check out `{}help {}`", ctx.prefix(), ctx.command().qualified_name)))
+                &reason.map_or_else(|| Cow::Borrowed("you typed the command wrong"), Cow::Owned),
+                Some(&fix.unwrap_or_else(|| format!("check out `{}help {}`", ctx.prefix(), ctx.command().qualified_name)))
             ).await?;
         },
         poise::FrameworkError::CooldownHit { remaining_cooldown, ctx } => {
             let cooldown_response = ctx.send_error(
                 &format!("{} is on cooldown", ctx.command().name),
-                Some(format!("try again in {:.1} seconds", remaining_cooldown.as_secs_f32()))
+                Some(&format!("try again in {:.1} seconds", remaining_cooldown.as_secs_f32()))
             ).await?;
 
             if let poise::Context::Prefix(ctx) = ctx {
@@ -691,7 +691,7 @@ async fn process_tts_msg(
         lavalink_client.play(guild.id, track).queue().await?;
     }
 
-    data.analytics.log(format!("on_{}_tts", mode));
+    data.analytics.log(Cow::Owned(format!("on_{}_tts", mode)));
     Ok(())
 }
 
@@ -779,7 +779,7 @@ async fn process_support_dm(
                 return Ok(());
             }
 
-            data.analytics.log(String::from("on_dm"));
+            data.analytics.log(Cow::Borrowed("on_dm"));
 
             let userinfo = data.userinfo_db.get(message.author.id.into()).await?;
             if userinfo.get("dm_welcomed") {
@@ -816,9 +816,7 @@ async fn process_support_dm(
                     ));
                     e.description(DM_WELCOME_MESSAGE);
                     e.footer(|f| {f.text(random_footer(
-                        Some(&String::from("-")),
-                        Some(&data.config.main_server_invite),
-                        Some(ctx.cache.current_user_id().0)
+                        "-", &data.config.main_server_invite, ctx.cache.current_user_id().0
                     ))}
                 )})}).await?;
 

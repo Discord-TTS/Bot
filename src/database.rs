@@ -150,9 +150,7 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
         let conn = self.pool.get().await?;
 
         let stmt = conn.prepare_cached(&strfmt(self.single_insert, &{
-            let mut kwargs: HashMap<String, String> = HashMap::new();
-            kwargs.insert("key".to_string(), key.to_string());
-            kwargs
+            HashMap::from_iter([(String::from("key"), String::from(key))])
         })?).await?;
 
         identifier.set_one(conn, stmt, value).await?;

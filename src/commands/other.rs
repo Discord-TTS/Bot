@@ -85,40 +85,21 @@ pub async fn tts(
     Ok(())
 }
 
-fn find_version(lockfile: &cargo_lock::Lockfile, pkg: &str) -> String {
-    let version = (|| -> Option<String> {
-        let package = lockfile.packages.iter().find(|p| p.name.as_str() == pkg)?;
-
-        let version = match &package.source {
-            Some(source) => match source.git_reference()? {
-                cargo_lock::package::source::GitReference::Branch(s) |
-                cargo_lock::package::source::GitReference::Tag(s) |
-                cargo_lock::package::source::GitReference::Rev(s) => s.clone(),
-            }
-            None => package.version.to_string()
-        };
-
-        Some(version)
-    })();
-
-    version.unwrap_or_else(|| String::from("Unknown!"))
-}
-
 /// Shows various different stats
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
 pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     ctx.defer_or_broadcast().await?;
-    
+
     let ctx_discord = ctx.discord();
     let bot_user_id = ctx_discord.cache.current_user_id();
-    
+
     let start_time = std::time::SystemTime::now();
     let raw_ram_usage = psutil::process::Process::current()?.memory_info()?.rss();
-    
+
     let guilds: Vec<serenity::Guild> = ctx_discord.cache.guilds().iter()
         .filter_map(|g| g.to_guild_cached(ctx_discord))
         .collect();
-    
+
     let total_voice_clients = guilds.iter().filter_map(|g| g.voice_states.get(&bot_user_id)).count();
     let total_members: u64 = guilds.iter().map(|g| g.member_count).sum();
     let total_guild_count = guilds.len();
@@ -126,16 +107,10 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     let shard_count = ctx_discord.cache.shard_count();
     let ram_usage = raw_ram_usage / 1024_u64.pow(2);
 
-    let [serenity_ver, poise_ver] = {
-        let lockfile = cargo_lock::Lockfile::load("Cargo.lock").unwrap();
-        [find_version(&lockfile, "serenity"), find_version(&lockfile, "poise")]
-    };
-
-    let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
-
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
     let netural_colour = netural_colour(crate::premium_check(ctx.data(), ctx.guild_id()).await?.is_none());
 
+    let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
     ctx.send(|b| {b.embed(|e| {
         e.title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())));
         e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face));
@@ -155,9 +130,6 @@ Currently in:
 Currently using:
     {sep1} {shard_count} shards
     {sep1} {ram_usage:.1}MB of RAM
-
-    {sep1} Poise Branch: `{poise_ver}` 
-    {sep1} Serenity Branch: `{serenity_ver}`
 and can be used by {total_members} people!"))
     })}).await?;
 

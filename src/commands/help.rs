@@ -98,16 +98,16 @@ pub async fn help(
     ctx: Context<'_>,
     #[rest] #[description="The command to get help with"] #[autocomplete="help_autocomplete"] command: Option<String>
 ) -> Result<(), Error> {
-    _help(ctx, command).await
+    _help(ctx, command.as_deref()).await
 }
 
-pub async fn _help(ctx: Context<'_>, command: Option<String>) -> Result<(), Error> {
+pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> Result<(), Error> {
     let commands = &ctx.framework().options().commands;
     
     let remaining_args: String;
     let mode = match command {
         None => HelpCommandMode::Root,
-        Some(ref command) => {
+        Some(command) => {
             let mut subcommand_iterator = command.split(' ');
 
             let top_level_command = subcommand_iterator.next().unwrap();

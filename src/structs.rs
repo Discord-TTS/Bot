@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, borrow::Cow};
 
 use regex::Regex;
 use lazy_static::lazy_static;
@@ -201,7 +201,7 @@ pub trait OptionTryUnwrap<T> {
 #[serenity::async_trait]
 pub trait PoiseContextAdditions {
     async fn author_permissions(&self) -> Result<serenity::Permissions, Error>;
-    async fn send_error(&self, error: &str, fix: Option<String>) -> Result<Option<poise::ReplyHandle<'_>>, Error>;
+    async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>, Error>;
 }
 #[serenity::async_trait]
 pub trait SerenityContextAdditions {
@@ -234,12 +234,10 @@ impl PoiseContextAdditions for Context<'_> {
             }
         }
     }
-    async fn send_error(&self, error: &str, fix: Option<String>) -> Result<Option<poise::ReplyHandle<'_>>, Error> {
+    async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>, Error> {
         let author = self.author();
-        let fix =
-            fix.unwrap_or_else(|| String::from("get in contact with us via the support server"));
-
         let ctx_discord = self.discord();
+
         let (name, avatar_url) = match self.channel_id().to_channel(ctx_discord).await? {
             serenity::Channel::Guild(channel) => {
                 let permissions = channel.permissions_for_user(ctx_discord, ctx_discord.cache.current_user_id())?;
@@ -257,11 +255,11 @@ impl PoiseContextAdditions for Context<'_> {
                 };
 
                 match channel.guild_id.member(ctx_discord, author.id).await {
-                    Ok(member) => (member.display_name().into_owned(), member.face()),
-                    Err(_) => (author.name.clone(), author.face()),
+                    Ok(member) => (Cow::Owned(member.display_name().into_owned()), member.face()),
+                    Err(_) => (Cow::Borrowed(&author.name), author.face()),
                 }
             }
-            serenity::Channel::Private(_) => (author.name.clone(), author.face()),
+            serenity::Channel::Private(_) => (Cow::Borrowed(&author.name), author.face()),
             _ => unreachable!(),
         };
 
@@ -271,7 +269,10 @@ impl PoiseContextAdditions for Context<'_> {
                 b.embed(|e| {
                     e.colour(RED);
                     e.title("An Error Occurred!");
-                    e.description(format!("Sorry but {}, to fix this, please {}!", error, fix));
+                    e.description(format!(
+                        "Sorry but {}, to fix this, please {}!", error,
+                        fix.unwrap_or("get in contact with us via the support server"),
+                    ));
                     e.author(|a| {
                         a.name(name);
                         a.icon_url(avatar_url)

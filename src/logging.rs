@@ -102,7 +102,7 @@ impl WebhookLogRecv {
             };
         }
 
-        for (severity, messages) in &message_buf.clone() {
+        for (severity, messages) in &message_buf {
             let severity_name = severity.as_str();
             let username = format!("TTS-Webhook [{}]", severity_name);
 
@@ -115,21 +115,19 @@ impl WebhookLogRecv {
                 }
             );
 
-            let mut full_message = String::new();
-            for [target, log_message] in messages {
-                for line in log_message.trim().split('\n') {
-                    let line = strfmt(
-                        &format_string,
-                        &HashMap::from_iter([
-                            (String::from("line"), line),
-                            (String::from("target"), target)
-                        ]),
-                    )?;
-                    full_message.push_str(&line);
-                }
-            }
-
-            let message_chunked: Vec<String> = full_message.as_str()
+            let message_chunked: Vec<String> =
+                messages.iter().flat_map(|[target, log_message]| {
+                    log_message.trim().split('\n').map(|line| {
+                        strfmt(
+                            &format_string,
+                            &HashMap::from_iter([
+                                (String::from("line"), line),
+                                (String::from("target"), target)
+                            ]),
+                        ).unwrap()
+                    })
+                })
+                .collect::<String>()
                 .chars().chunks(2000).into_iter()
                 .map(std::iter::Iterator::collect)
                 .collect();

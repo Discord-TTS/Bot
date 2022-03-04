@@ -168,22 +168,13 @@ pub const fn netural_colour(premium: bool) -> u32{
     }
 }
 
-pub fn random_footer(prefix: Option<&str>, server_invite: Option<&str>, client_id: Option<u64>) -> String {
-    let mut footers = Vec::with_capacity(4);
-    if let Some(prefix) = prefix {
-        footers.extend([
-            format!("If you want to support the development and hosting of TTS Bot, check out {}donate!", prefix),
-            format!("There are loads of customizable settings, check out {}settings help", prefix),
-        ]);
-    }
-    if let Some(server_invite) = server_invite {
-        footers.push(format!("If you find a bug or want to ask a question, join the support server: {}", server_invite));
-    }
-    if let Some(client_id) = client_id {
-        footers.push(format!("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{}", client_id));
-    }
-
-    footers.choose(&mut rand::thread_rng()).unwrap().clone()
+pub fn random_footer(prefix: &str, server_invite: &str, client_id: u64) -> String {
+    [
+        format!("If you want to support the development and hosting of TTS Bot, check out {}donate!", prefix),
+        format!("There are loads of customizable settings, check out {}settings help", prefix),
+        format!("If you find a bug or want to ask a question, join the support server: {}", server_invite),
+        format!("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{}", client_id)
+    ].choose(&mut rand::thread_rng()).unwrap().clone()
 }
 
 fn parse_acronyms(original: &str) -> String {

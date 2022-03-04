@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{sync::Arc, borrow::Cow};
 
 use dashmap::DashMap;
 use tracing::error;
@@ -22,7 +22,7 @@ use tracing::error;
 use crate::structs::Error;
 
 pub struct Handler {
-    log_buffer: DashMap<String, i32>,
+    log_buffer: DashMap<Cow<'static, str>, i32>,
     pool: Arc<deadpool_postgres::Pool>
 }
 
@@ -68,7 +68,7 @@ impl Handler {
         Ok(())
     }
 
-    pub fn log(&self, event: String) -> i32 {
+    pub fn log(&self, event: Cow<'static, str>) -> i32 {
         let count = (*self.log_buffer.entry(event.clone()).or_insert(0)) + 1;
         self.log_buffer.insert(event, count);
         count

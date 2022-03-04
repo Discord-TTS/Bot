@@ -143,5 +143,5 @@ pub async fn dm_generic(
         })
     }).await?;
 
-    Ok((format!("Sent message to {}#{}:", todm.name, todm.discriminator), sent.embeds[0].clone()))
+    Ok((format!("Sent message to {}#{}:", todm.name, todm.discriminator), sent.embeds.into_iter().next().unwrap()))
 }

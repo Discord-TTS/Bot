@@ -65,8 +65,6 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
         }
     };
 
-    let none = String::from("none");
-
     let default_voice = {
         let guild_voice_row = data.guild_voice_db.get((guild_id.into(), guild_mode)).await?;
         if guild_voice_row.get::<_, i64>("guild_id") == 0 {
@@ -76,19 +74,15 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
         }
     };
 
-    let user_voice =
+    let user_voice: Cow<'static, str> =
         if let Some(mode) =  user_mode {
             if let Some(user_voice) = data.user_voice_db.get((author_id.into(), mode)).await?.get("voice") {
-                format_voice(user_voice, mode)
-            } else {
-                none.clone()
-            }
-        } else {
-            none.clone()
-        };
+                Cow::Owned(format_voice(user_voice, mode))
+            } else {Cow::Borrowed("none")}
+        } else {Cow::Borrowed("none")};
 
-    let target_lang = guild_row.get::<_, Option<String>>("target_lang").unwrap_or_else(|| none.clone());
-    let nickname = nickname_row.get::<_, Option<String>>("name").unwrap_or_else(|| none.clone());
+    let target_lang: Cow<'static, str> = guild_row.get::<_, Option<String>>("target_lang").map_or_else(|| Cow::Borrowed("none"), Cow::Owned);
+    let nickname: Cow<'static, str> = nickname_row.get::<_, Option<String>>("name").map_or_else(|| Cow::Borrowed("none"), Cow::Owned);
 
     let netural_colour = netural_colour(crate::premium_check(data, Some(guild_id)).await?.is_none());
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
@@ -127,7 +121,10 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
 {sep3} Voice: `{user_voice}`
 {sep3} Voice Mode: `{}`
 {sep3} Nickname: `{nickname}`
-        ", user_mode.map_or(none, |v| format!("{:#}", v))), false)
+        ", user_mode.map_or_else(
+            || Cow::Borrowed("none"),
+            |v| Cow::Owned(format!("{:#}", v))
+        )), false)
     })}).await?;
 
     Ok(())
@@ -160,15 +157,13 @@ impl<'a> MenuPaginator<'a> {
 
         embed.title(format!("{bot_name} Languages"));
         embed.description(format!("**Currently Supported Languages**\n{page}"));
-        embed.field("Current Language used", self.current_lang.clone(), false);
+        embed.field("Current Language used", &self.current_lang, false);
         embed.author(|a| {
             a.name(author.name.clone());
             a.icon_url(author.face())
         });
         embed.footer(|f| {f.text(random_footer(
-            Some(self.ctx.prefix()),
-            Some(&self.ctx.data().config.main_server_invite),
-            Some(bot_id.into())
+            self.ctx.prefix(), &self.ctx.data().config.main_server_invite, bot_id.into()
         ))})
     }
 
@@ -393,7 +388,7 @@ const fn to_enabled(value: bool) -> &'static str {
 /// Changes a setting!
 #[poise::command(category="Settings", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
 pub async fn set(ctx: Context<'_>, ) -> Result<(), Error> {
-    crate::commands::help::_help(ctx, Some(String::from("set"))).await
+    crate::commands::help::_help(ctx, Some("set")).await
 }
 
 /// Owner only: used to block a user from dms
@@ -607,9 +602,9 @@ pub async fn prefix(
 
     let to_send = if prefix.len() <= 5 && prefix.matches(' ').count() <= 1 {
         ctx.data().guilds_db.set_one(guild_id, "prefix", &prefix).await?;
-        format!("Command prefix for this server is now: {}", prefix)
+        Cow::Owned(format!("Command prefix for this server is now: {}", prefix))
     } else {
-        String::from("**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space")
+        Cow::Borrowed("**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space")
     };
 
     ctx.say(to_send).await?;
@@ -629,12 +624,12 @@ pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeat
 
     let to_send = {
         if chars > 100 {
-            String::from("**Error**: Cannot set the max repeated characters above 100")
+            Cow::Borrowed("**Error**: Cannot set the max repeated characters above 100")
         } else if chars < 5 && chars != 0 {
-            String::from("**Error**: Cannot set the max repeated characters below 5")
+            Cow::Borrowed("**Error**: Cannot set the max repeated characters below 5")
         } else {
             ctx.data().guilds_db.set_one(guild_id, "repeated_chars", &(chars as i16)).await?;
-            format!("Max repeated characters is now: {chars}")
+            Cow::Owned(format!("Max repeated characters is now: {chars}"))
         }
     };
 
@@ -676,12 +671,12 @@ pub async fn speaking_rate(
 ) -> Result<(), Error> {
     let to_send = {
         if multiplier > 4.0 {
-            String::from("**Error**: Cannot set the speaking rate multiplier above 4x")
+            Cow::Borrowed("**Error**: Cannot set the speaking rate multiplier above 4x")
         } else if multiplier < 0.25 {
-            String::from("**Error**: Cannot set the speaking rate multiplier below 0.25x")
+            Cow::Borrowed("**Error**: Cannot set the speaking rate multiplier below 0.25x")
         } else {
             ctx.data().userinfo_db.set_one(ctx.author().id.into(), "speaking_rate", &multiplier).await?;
-            format!("The speaking rate multiplier is now: {multiplier}")
+            Cow::Owned(format!("The speaking rate multiplier is now: {multiplier}"))
         }
     };
 
@@ -705,7 +700,7 @@ pub async fn nick(
     let guild = ctx.guild().ok_or(Error::GuildOnly)?;
 
     let author = ctx.author();
-    let user = user.unwrap_or_else(|| author.clone());
+    let user = user.map_or_else(|| Cow::Borrowed(author), Cow::Owned);
 
     if author.id != user.id && !guild.member(ctx_discord, author).await?.permissions(ctx_discord)?.administrator() {
         ctx.say("**Error**: You need admin to set other people's nicknames!").await?;
@@ -717,7 +712,7 @@ pub async fn nick(
     let to_send =
         if let Some(nick) = nickname {
             if nick.contains('<') && nick.contains('>') {
-                String::from("**Error**: You can't have mentions/emotes in your nickname!")
+                Cow::Borrowed("**Error**: You can't have mentions/emotes in your nickname!")
             } else {
                 let (r1, r2) = tokio::join!(
                     data.guilds_db.create_row(guild.id.into()),
@@ -725,11 +720,11 @@ pub async fn nick(
                 ); r1?; r2?;
 
                 data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nick).await?;
-                format!("Changed {}'s nickname to {}", user.name, nick)
+                Cow::Owned(format!("Changed {}'s nickname to {}", user.name, nick))
             }
         } else {
             data.nickname_db.delete([guild.id.into(), user.id.into()]).await?;
-            format!("Reset {}'s nickname", user.name)
+            Cow::Owned(format!("Reset {}'s nickname", user.name))
         };
 
     ctx.say(to_send).await?;
@@ -842,9 +837,7 @@ Just do `{}join` and start talking!
         ", ctx.prefix()));
 
         e.footer(|f| {f.text(random_footer(
-            Some(&String::from(ctx.prefix())),
-            Some(&data.config.main_server_invite),
-            Some(cache.current_user_id().0)
+            ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0
         ))});
         e.author(|a| {
             a.name(&author.name);
@@ -935,9 +928,7 @@ pub async fn voices(ctx: Context<'_>) -> Result<(), Error> {
     ctx.send(|b| {b.embed(|e| {
         e.title(format!("{} Voices | Mode: `{}`", cache.current_user_field(|u| u.name.clone()), mode));
         e.footer(|f| f.text(random_footer(
-            Some(&String::from(ctx.prefix())),
-            Some(&data.config.main_server_invite),
-            Some(cache.current_user_id().0)
+            ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0
         )));
         e.author(|a| {
             a.name(author.name.clone());

@@ -29,7 +29,7 @@ async fn channel_check(ctx: &Context<'_>) -> Result<bool, Error> {
     } else {
         ctx.send_error(
             "you ran this command in the wrong channel",
-            Some(format!("do {}channel get the channel that has been setup", ctx.prefix()))
+            Some(&format!("do {}channel get the channel that has been setup", ctx.prefix()))
         ).await?;
         Ok(false)
     }
@@ -56,7 +56,7 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
         } else {
             ctx.send_error(
                 "you need to be in a voice channel to make me join your voice channel",
-                Some(String::from("join a voice channel and try again")),
+                Some("join a voice channel and try again"),
             ).await?;
             return Ok(())
         }
@@ -73,7 +73,7 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
     if !missing_permissions.is_empty() {
         ctx.send_error(
             "I do not have permissions to TTS in your voice channel!",
-            Some(format!(
+            Some(&format!(
                 "please ask an administrator to give me: {}",
                 missing_permissions.get_permission_names().join(", ")
             ))
@@ -108,9 +108,7 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
                 a.icon_url(author.face())
             });
             e.footer(|f| f.text(random_footer(
-                Some(ctx.prefix()),
-                Some(&ctx.data().config.main_server_invite),
-                Some(ctx_discord.cache.current_user_id().0)
+                ctx.prefix(), &ctx.data().config.main_server_invite, ctx_discord.cache.current_user_id().0
             )))
         })
     })
