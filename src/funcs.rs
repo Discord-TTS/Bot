@@ -382,21 +382,18 @@ pub fn clean_msg(
         }
     }
 
-    // TODO: Regex url stuff?
-    let with_urls = content.split(' ').join(" ");
-    content = content
-        .split(' ')
-        .filter(|w|
-            ["https://", "http://", "www."].iter()
-            .all(|ls| !w.starts_with(ls))
-        )
-        .join(" ");
+    // Filter URLs out of the message content
+    let filtered_content = linkify::LinkFinder::new()
+        .spans(&content)
+        .filter(|span| span.kind().is_none())
+        .map(|span| span.as_str())
+        .collect();
 
-    let contained_url = content != with_urls;
-
-    let last_to_xsaid = last_to_xsaid_tracker.get(&member.guild_id);
+    let contained_url = content != filtered_content;
+    content = filtered_content;
 
     // If xsaid is enabled, and the author has not been announced last (in one minute if more than 2 users in vc)
+    let last_to_xsaid = last_to_xsaid_tracker.get(&member.guild_id);
     if xsaid && match last_to_xsaid.map(|i| *i) {
         Some((u_id, last_time)) => {
             (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) && {

@@ -399,6 +399,7 @@ dependencies = [
  "itertools",
  "lavalink-rs",
  "lazy_static",
+ "linkify",
  "parking_lot 0.12.0",
  "poise",
  "postgres-types",
@@ -883,6 +884,15 @@ name = "libc"
 version = "0.2.119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bf2e165bb3457c8e098ea76f3e3bc9db55f87aa90d52d0e6be741470916aaa4"
+
+[[package]]
+name = "linkify"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccbcd666d915aa3ae3c3774999a9e20b2776a018309b8159d07df062b91f45e8"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "lock_api"
