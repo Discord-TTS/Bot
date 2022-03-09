@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#![feature(let_chains)]
+
 #![warn(rust_2018_idioms)]
 #![warn(clippy::pedantic)]
 
@@ -640,6 +642,7 @@ async fn process_tts_msg(
     let channel: i64 = guild_row.get("channel");
     let autojoin = guild_row.get("auto_join");
     let bot_ignore = guild_row.get("bot_ignore");
+    let require_voice = guild_row.get("require_voice");
     let repeated_limit: i16 = guild_row.get("repeated_chars");
     let audience_ignore = guild_row.get("audience_ignore");
 
@@ -649,7 +652,7 @@ async fn process_tts_msg(
     let lavalink_client = &data.lavalink;
     let mut content = match run_checks(
         ctx, message, lavalink_client,
-        channel as u64, prefix, autojoin, bot_ignore, audience_ignore
+        channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
     ).await? {
         None => return Ok(()),
         Some(content) => {
@@ -663,10 +666,10 @@ async fn process_tts_msg(
             let nickname: Option<String> = nickname_row.get("name");
 
             clean_msg(
-                &content, &guild, member, &message.attachments, &voice,
-                xsaid, repeated_limit as usize, nickname,
+                &content, &guild, &member, &message.attachments, &voice,
+                xsaid, repeated_limit as usize, nickname.as_deref(),
                 &data.last_to_xsaid_tracker
-            )?
+            )
         }
     };
 

@@ -58,6 +58,7 @@ pub const DB_SETUP_QUERY: &str = "
         bot_ignore      bool        DEFAULT True,
         auto_join       bool        DEFAULT False,
         to_translate    bool        DEFAULT False,
+        require_voice   bool        DEFAULT True,
         msg_length      smallint    DEFAULT 30,
         repeated_chars  smallint    DEFAULT 0,
         prefix          varchar(6)  DEFAULT 'p-',

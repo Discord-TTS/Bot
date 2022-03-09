@@ -105,7 +105,8 @@ pub async fn run(config: &mut toml::Value, pool: &Arc<deadpool_postgres::Pool>) 
             ADD COLUMN IF NOT EXISTS voice_mode       TTSMode    DEFAULT 'gtts',
             ADD COLUMN IF NOT EXISTS to_translate     bool       DEFAULT False,
             ADD COLUMN IF NOT EXISTS target_lang      varchar(5),
-            ADD COLUMN IF NOT EXISTS premium_user     bigint;
+            ADD COLUMN IF NOT EXISTS premium_user     bigint,
+            ADD COLUMN IF NOT EXISTS require_voice    bool       DEFAULT True;
 
         INSERT INTO user_voice  (user_id, mode)         VALUES(0, 'gtts')       ON CONFLICT (user_id, mode)  DO NOTHING;
         INSERT INTO guild_voice (guild_id, mode, voice) VALUES(0, 'gtts', 'en') ON CONFLICT (guild_id, mode) DO NOTHING;

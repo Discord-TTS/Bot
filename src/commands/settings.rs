@@ -470,6 +470,27 @@ pub async fn botignore(
     Ok(())
 }
 
+/// Makes the bot require people to be in the voice channel to TTS
+#[poise::command(
+    category="Settings",
+    prefix_command, slash_command,
+    required_permissions="ADMINISTRATOR",
+    required_bot_permissions="SEND_MESSAGES",
+    aliases("bot_ignore", "ignore_bots", "ignorebots")
+)]
+pub async fn require_voice(
+    ctx: Context<'_>,
+    #[description="Whether to require people to be in the voice channel to TTS"] value: Option<bool>
+) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+
+    let value = bool_button(ctx, value).await?;
+    ctx.data().guilds_db.set_one(guild_id, "require_voice", &value).await?;
+    ctx.say(format!("Requiring users to be in voice channel for TTS is now: {}", to_enabled(value))).await?;
+
+    Ok(())
+}
+
 /// Changes the default mode for TTS that messages are read in
 #[poise::command(
     category="Settings",
@@ -848,11 +869,10 @@ Just do `{}join` and start talking!
     Ok(())
 }
 
-/// Changes the default mode for TTS that messages are read in
+/// Changes the voice mode that messages are read in for you
 #[poise::command(
     category="Settings",
     prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
     required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
     aliases("voice_mode", "server_mode", "server_tts_mode", "server_ttsmode")
 )]

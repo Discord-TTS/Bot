@@ -27,7 +27,7 @@ use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, OptionTryUnwrap, TTSMode, PremiumVoices, Gender, GoogleVoice};
+use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice};
 use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 
 pub const fn default_voice(mode: TTSMode) -> &'static str {
@@ -239,7 +239,7 @@ fn remove_repeated_chars(content: &str, limit: usize) -> String {
     }).collect()
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 pub async fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
@@ -249,6 +249,7 @@ pub async fn run_checks(
     prefix: String,
     autojoin: bool,
     bot_ignore: bool,
+    require_voice: bool,
     audience_ignore: bool,
 ) -> Result<Option<String>, Error> {
     let cache = &ctx.cache;
@@ -295,24 +296,26 @@ pub async fn run_checks(
             return Ok(None); // Err(Error::DebugLog("Failed check: Is bot"))
         }
     } else {
-        let voice_state = voice_state.ok_or(Error::DebugLog("Failed check: user not in vc"))?;
-        let voice_channel = voice_state.channel_id.ok_or("vc.channel_id is None")?;
-
+        // If the bot is in vc
         if let Some(vc) = guild.voice_states.get(&cache.current_user_id()) {
-            if vc.channel_id != voice_state.channel_id {
+            // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
+            if require_voice && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
                 return Err(Error::DebugLog("Failed check: Wrong vc"));
             }
-        } else {
-            if !autojoin {
-                return Err(Error::DebugLog("Failed check: Bot not in vc"));
-            }
-
+        // Else if the user is in the vc and autojoin is on
+        } else if let Some(voice_state) = voice_state && autojoin {
+            let voice_channel = voice_state.channel_id.ok_or("vc.channel_id is None")?;
             ctx.join_vc(lavalink, guild.id, voice_channel).await?;
+        } else {
+            return Err(Error::DebugLog("Failed check: Bot not in vc"));
         };
 
-        if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).ok_or("channel is None")? {
-            if channel.kind == serenity::ChannelType::Stage && voice_state.suppress && audience_ignore {
-                return Err(Error::DebugLog("Failed check: Is audience"));
+        if require_voice {
+            let voice_channel = voice_state.unwrap().channel_id.ok_or("vc.channel_id is None")?;
+            if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).ok_or("channel is None")? {
+                if channel.kind == serenity::ChannelType::Stage && voice_state.map_or(false, |vs| vs.suppress) && audience_ignore {
+                    return Err(Error::DebugLog("Failed check: Is audience"));
+                }
             }
         }
     }
@@ -331,16 +334,16 @@ pub fn clean_msg(
     content: &str,
 
     guild: &serenity::Guild,
-    member: serenity::Member,
+    member: &serenity::Member,
     attachments: &[serenity::Attachment],
 
     lang: &str,
     xsaid: bool,
     repeated_limit: usize,
-    nickname: Option<String>,
+    nickname: Option<&str>,
 
     last_to_xsaid_tracker: &LastToXsaidTracker
-) -> Result<String, Error> {
+) -> String {
     // Regex
     lazy_static! {
         static ref EMOJI_REGEX: Regex = Regex::new(r"<(a?):(.+):\d+>").unwrap();
@@ -393,25 +396,22 @@ pub fn clean_msg(
     content = filtered_content;
 
     // If xsaid is enabled, and the author has not been announced last (in one minute if more than 2 users in vc)
-    let last_to_xsaid = last_to_xsaid_tracker.get(&member.guild_id);
+    let last_to_xsaid = last_to_xsaid_tracker.get(&guild.id);
+    let voice_channel_id = guild.voice_states.get(&member.user.id).and_then(|vs| vs.channel_id);
+
     if xsaid && match last_to_xsaid.map(|i| *i) {
         Some((u_id, last_time)) => {
-            (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) && {
-                // If more than 2 users in vc
-                let voice_channel_id = guild.voice_states
-                    .get(&member.user.id).try_unwrap()?
-                    .channel_id.try_unwrap()?;
-
-                guild.voice_states.values().filter_map(|vs| {
-                    if Some(voice_channel_id) == vs.channel_id  {
-                        Some(!guild.members.get(&vs.user_id)?.user.bot)
-                    } else {
-                        None
-                    }
-                }).count() > 2
-            })
-        },
-        None => true
+            if let Some(voice_channel_id) = voice_channel_id {
+                (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) && {
+                    // If more than 2 users in vc
+                    guild.voice_states.values()
+                        .filter(|vs| vs.channel_id.map_or(false, |vc| vc == voice_channel_id))
+                        .filter_map(|vs| guild.members.get(&vs.user_id))
+                        .filter(|member| !member.user.bot)
+                        .count() > 2
+                })
+            } else {true}
+        }, None => true
     } {
         if contained_url {
             write!(content, " {}",
@@ -420,7 +420,7 @@ pub fn clean_msg(
             ).unwrap();
         }
 
-        let said_name = nickname.unwrap_or_else(|| member.nick.unwrap_or_else(|| member.user.name.clone()));
+        let said_name = nickname.unwrap_or_else(|| member.nick.as_ref().unwrap_or(&member.user.name));
         content = match attachments_to_format(attachments) {
             Some(file_format) if content.is_empty() => format!("{} sent {}", said_name, file_format),
             Some(file_format) => format!("{} sent {} and said {}", said_name, file_format, content),
@@ -441,7 +441,7 @@ pub fn clean_msg(
         content = remove_repeated_chars(&content, repeated_limit as usize);
     }
 
-    Ok(content)
+    content
 }
 
 
