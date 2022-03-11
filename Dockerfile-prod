@@ -1,4 +1,4 @@
-FROM rust as builder
+FROM rustlang/rust:nightly as builder
 ENV RUSTFLAGS="-C target-cpu=native"
 
 WORKDIR /bot
