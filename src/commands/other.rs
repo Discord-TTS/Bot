@@ -77,9 +77,9 @@ pub async fn tts(
     };
 
     ctx.defer().await?;
-    ctx.send(|b| {
-        b.content("Generated some TTS!");
-        b.attachment(attachment)
+    ctx.send(|b| {b
+        .content("Generated some TTS!")
+        .attachment(attachment)
     }).await?;
 
     Ok(())
@@ -111,19 +111,19 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     let netural_colour = netural_colour(crate::premium_check(ctx.data(), ctx.guild_id()).await?.is_none());
 
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
-    ctx.send(|b| {b.embed(|e| {
-        e.title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())));
-        e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face));
-        e.url(&ctx.data().config.main_server_invite);
-        e.colour(netural_colour);
-        e.footer(|f| {
-            f.text(format!("
+    ctx.send(|b| {b.embed(|e| { e
+        .title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())))
+        .thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
+        .url(&ctx.data().config.main_server_invite)
+        .colour(netural_colour)
+        .footer(|f| {f
+            .text(format!("
 Time to fetch: {time_to_fetch:.2}ms
 Support Server: https://discord.gg/zWPWwQC
 Repository: https://github.com/GnomedDev/Discord-TTS-Bot
             ", ))
-        });
-        e.description(format!("
+        })
+        .description(format!("
 Currently in:
     {sep2} {total_voice_clients} voice channels
     {sep2} {total_guild_count} servers
@@ -193,11 +193,11 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
 
     let data = ctx.data();
     let author = ctx.author();
-    if !data.userinfo_db.get(author.id.into()).await?.get::<&str, bool>("dm_blocked") {
-        data.webhooks["suggestions"].execute(&ctx.discord().http, false, |b| {
-            b.content(suggestion);
-            b.avatar_url(author.face());
-            b.username(format!("{}#{} ({})", author.name, author.discriminator, author.id))
+    if !data.userinfo_db.get(author.id.into()).await?.get::<_, bool>("dm_blocked") {
+        data.webhooks["suggestions"].execute(&ctx.discord().http, false, |b| {b
+            .content(suggestion)
+            .avatar_url(author.face())
+            .username(format!("{}#{} ({})", author.name, author.discriminator, author.id))
         }).await?;
     }
 

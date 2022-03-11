@@ -33,9 +33,9 @@ pub async fn dm(ctx: Context<'_>, todm: serenity::User, #[rest] message: String)
     
     let http = &ctx_discord.http;
     if let poise::Context::Prefix(ctx) = ctx {
-        ctx.msg.channel_id.send_message(http, |b| {
-            b.content(content);
-            b.set_embed(serenity::CreateEmbed::from(embed))
+        ctx.msg.channel_id.send_message(http, |b| {b
+            .content(content)
+            .set_embed(serenity::CreateEmbed::from(embed))
         }).await?;
     }
 
@@ -112,9 +112,9 @@ pub async fn debug(ctx: Context<'_>) -> Result<(), Error> {
     let user_data = data.userinfo_db.get(ctx.author().id.into()).await?;
     let voice_client = songbird::get(ctx_discord).await.unwrap().get(guild_id);
 
-    ctx.send(|b| {b.embed(|e| {
-        e.title("TTS Bot Debug Info");
-        e.description(format!("
+    ctx.send(|b| {b.embed(|e| {e
+        .title("TTS Bot Debug Info")
+        .description(format!("
 Shard ID: `{shard_id}`
 Voice Client: `{voice_client:?}`
 Server Data: `{guild_data:?}`
@@ -132,16 +132,14 @@ pub async fn dm_generic(
     todm: &serenity::User,
     message: &str,
 ) -> Result<(String, serenity::Embed), Error> {
-    let sent = todm.direct_message(ctx, |b| {
-        b.embed(|e| {
-            e.title("Message from the developers:");
-            e.description(message);
-            e.author(|a| {
-                a.name(format!("{}#{}", author.name, author.discriminator));
-                a.icon_url(author.face())
-            })
+    let sent = todm.direct_message(ctx, |b| {b.embed(|e| {e
+        .title("Message from the developers:")
+        .description(message)
+        .author(|a| {a
+            .name(format!("{}#{}", author.name, author.discriminator))
+            .icon_url(author.face())
         })
-    }).await?;
+    })}).await?;
 
     Ok((format!("Sent message to {}#{}:", todm.name, todm.discriminator), sent.embeds.into_iter().next().unwrap()))
 }

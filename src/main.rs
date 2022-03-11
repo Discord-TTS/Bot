@@ -373,9 +373,9 @@ async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, data:
             );
 
             let owner = owner?;
-            match owner.direct_message(ctx, |b| {b.embed(|e| {
-                e.title(format!("Welcome to {}!", ctx.cache.current_user_field(|b| b.name.clone())));
-                e.description(format!("
+            match owner.direct_message(ctx, |b| {b.embed(|e| {e
+                .title(format!("Welcome to {}!", ctx.cache.current_user_field(|b| b.name.clone())))
+                .description(format!("
 Hello! Someone invited me to your server `{}`!
 TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
 **Most commands need to be done on your server, such as `-setup` and `-join`**
@@ -384,9 +384,9 @@ You can then do `-join` in that channel and I will join your voice channel!
 Then, you can just type normal messages and I will say them, like magic!
 You can view all the commands with `-help`
 Ask questions by either responding here or asking on the support server!",
-                guild.name));
-                e.footer(|f| {f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite))});
-                e.author(|a| {a.name(format!("{}#{}", &owner.name, &owner.id)); a.icon_url(owner.face())})
+                guild.name))
+                .footer(|f| {f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite))})
+                .author(|a| {a.name(format!("{}#{}", &owner.name, &owner.id)); a.icon_url(owner.face())})
             })}).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
                 Err(error) => return Err(Error::Unexpected(Box::from(error))),
@@ -499,12 +499,12 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, Error>
         ctx.send(|b| {
             const FOOTER_MSG: &str = "If this is an error, please contact Gnome!#6669.";
             if permissions.embed_links() {
-                b.embed(|e| {
-                    e.title("TTS Bot Premium - Premium Only Command!");
-                    e.description(main_msg);
-                    e.colour(constants::PREMIUM_NEUTRAL_COLOUR);
-                    e.thumbnail(data.premium_avatar_url.clone());
-                    e.footer(|f| f.text(FOOTER_MSG))
+                b.embed(|e| {e
+                    .title("TTS Bot Premium - Premium Only Command!")
+                    .description(main_msg)
+                    .colour(constants::PREMIUM_NEUTRAL_COLOUR)
+                    .thumbnail(data.premium_avatar_url.clone())
+                    .footer(|f| f.text(FOOTER_MSG))
                 })
             } else {
                 b.content(format!("{}\n{}", main_msg, FOOTER_MSG))
@@ -578,7 +578,7 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
             }
 
             ctx.send_error(
-                &reason.map_or_else(|| Cow::Borrowed("you typed the command wrong"), Cow::Owned),
+                reason.as_deref().unwrap_or("you typed the command wrong"),
                 Some(&fix.unwrap_or_else(|| format!("check out `{}help {}`", ctx.prefix(), ctx.command().qualified_name)))
             ).await?;
         },
@@ -663,11 +663,11 @@ async fn process_tts_msg(
             mode = voice_mode.1;
 
             let nickname_row = nicknames.get([guild.id.into(), message.author.id.into()]).await?;
-            let nickname: Option<String> = nickname_row.get("name");
+            let nickname: Option<_> = nickname_row.get("name");
 
             clean_msg(
                 &content, &guild, &member, &message.attachments, &voice,
-                xsaid, repeated_limit as usize, nickname.as_deref(),
+                xsaid, repeated_limit as usize, nickname,
                 &data.last_to_xsaid_tracker
             )
         }
@@ -770,9 +770,9 @@ async fn process_support_dm(
                         &message.content
                     ).await?;
 
-                    channel.send_message(ctx, |b| {
-                        b.content(content);
-                        b.set_embed(serenity::CreateEmbed::from(embed))
+                    channel.send_message(ctx, |b| {b
+                        .content(content)
+                        .set_embed(serenity::CreateEmbed::from(embed))
                     }).await?;
                 }
             }
@@ -803,22 +803,22 @@ async fn process_support_dm(
                         .map(|a| serenity::AttachmentType::Path(Path::new(&a.url)))
                         .collect();
 
-                    data.webhooks["dm_logs"].execute(&ctx.http, false, |b| {
-                        b.files(paths);
-                        b.content(&message.content);
-                        b.username(webhook_username);
-                        b.avatar_url(message.author.face());
-                        b.embeds(message.embeds.iter().map(|e| serenity::json::prelude::to_value(e).unwrap()).collect(),)
+                    data.webhooks["dm_logs"].execute(&ctx.http, false, |b| {b
+                        .files(paths)
+                        .content(&message.content)
+                        .username(webhook_username)
+                        .avatar_url(message.author.face())
+                        .embeds(message.embeds.iter().map(|e| serenity::json::prelude::to_value(e).unwrap()).collect())
                     }).await?;
                 }
             } else {
-                let welcome_msg = channel.send_message(&ctx.http, |b| {b.embed(|e| {
-                    e.title(format!(
+                let welcome_msg = channel.send_message(&ctx.http, |b| {b.embed(|e| {e
+                    .title(format!(
                         "Welcome to {} Support DMs!",
                         ctx.cache.current_user_field(|b| b.name.clone())
-                    ));
-                    e.description(DM_WELCOME_MESSAGE);
-                    e.footer(|f| {f.text(random_footer(
+                    ))
+                    .description(DM_WELCOME_MESSAGE)
+                    .footer(|f| {f.text(random_footer(
                         "-", &data.config.main_server_invite, ctx.cache.current_user_id().0
                     ))}
                 )})}).await?;

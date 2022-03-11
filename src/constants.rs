@@ -36,11 +36,11 @@ There are some basic rules if you want to get help though:
 ";
 
 pub const DB_SETUP_QUERY: &str = "
-    CREATE type TTSMode AS ENUM {
+    CREATE type TTSMode AS ENUM (
         'gtts',
         'espeak',
         'premium'
-    }
+    );
 
     CREATE TABLE userinfo (
         user_id       bigint     PRIMARY KEY,
@@ -61,7 +61,7 @@ pub const DB_SETUP_QUERY: &str = "
         require_voice   bool        DEFAULT True,
         msg_length      smallint    DEFAULT 30,
         repeated_chars  smallint    DEFAULT 0,
-        prefix          varchar(6)  DEFAULT 'p-',
+        prefix          varchar(6)  DEFAULT '-',
         target_lang     varchar(5),
         audience_ignore bool        DEFAULT True,
         voice_mode      TTSMode     DEFAULT 'gtts',
@@ -127,7 +127,6 @@ pub const DB_SETUP_QUERY: &str = "
 
     INSERT INTO guilds(guild_id) VALUES(0);
     INSERT INTO userinfo(user_id) VALUES(0);
-    INSERT INTO user_voice(user_id) VALUES(0);
     INSERT INTO nicknames(guild_id, user_id) VALUES (0, 0);
 
     INSERT INTO user_voice(user_id, mode) VALUES(0, 'gtts');

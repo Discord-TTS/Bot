@@ -39,7 +39,7 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
     let userinfo_row = data.userinfo_db.get(author_id.into()).await?;
     let nickname_row = data.nickname_db.get([guild_id.into(), author_id.into()]).await?;
 
-    let channel_name = guild_row.get::<&str, Option<i64>>("channel")
+    let channel_name = guild_row.get::<_, Option<i64>>("channel")
         .and_then(|c| ctx_discord.cache.guild_channel_field(c as u64, |c| c.name.clone()).map(Cow::Owned))
         .unwrap_or(Cow::Borrowed("has not been set up yet"));
 
@@ -81,28 +81,28 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
             } else {Cow::Borrowed("none")}
         } else {Cow::Borrowed("none")};
 
-    let target_lang: Cow<'static, str> = guild_row.get::<_, Option<String>>("target_lang").map_or_else(|| Cow::Borrowed("none"), Cow::Owned);
-    let nickname: Cow<'static, str> = nickname_row.get::<_, Option<String>>("name").map_or_else(|| Cow::Borrowed("none"), Cow::Owned);
+    let target_lang = guild_row.get::<_, Option<_>>("target_lang").unwrap_or("none");
+    let nickname = nickname_row.get::<_, Option<_>>("name").unwrap_or("none");
 
     let netural_colour = netural_colour(crate::premium_check(data, Some(guild_id)).await?.is_none());
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
-    ctx.send(|b| {b.embed(|e| {
-        e.title("Current Settings");
-        e.url(&data.config.main_server_invite);
-        e.colour(netural_colour);
-        e.footer(|f| {
+    ctx.send(|b| {b.embed(|e| {e
+        .title("Current Settings")
+        .url(&data.config.main_server_invite)
+        .colour(netural_colour)
+        .footer(|f| {
             f.text(format!(concat!(
                 "Change these settings with {prefix}set property value!\n",
                 "None = setting has not been set yet!"
             ), prefix=prefix))
-        });
+        })
 
-        e.field("**General Server Settings**", format!("
+        .field("**General Server Settings**", format!("
 {sep1} Setup Channel: `#{channel_name}`
 {sep1} Command Prefix: `{prefix}`
 {sep1} Auto Join: `{autojoin}`
-        "), false);
-        e.field("**TTS Settings**", format!("
+        "), false)
+        .field("**TTS Settings**", format!("
 {sep2} <User> said: message: `{xsaid}`
 {sep2} Ignore bot's messages: `{bot_ignore}`
 {sep2} Ignore audience messages: `{audience_ignore}`
@@ -112,12 +112,12 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
 
 {sep2} Max Time to Read: `{msg_length} seconds`
 {sep2} Max Repeated Characters: `{repeated_chars}`
-        "), false);
-        e.field("**Translation Settings (Premium Only)**", format!("
+        "), false)
+        .field("**Translation Settings (Premium Only)**", format!("
 {sep4} Translation: `{to_translate}`
 {sep4} Translation Language: `{target_lang}`
-        "), false);
-        e.field("**User Specific**", format!("
+        "), false)
+        .field("**User Specific**", format!("
 {sep3} Voice: `{user_voice}`
 {sep3} Voice Mode: `{}`
 {sep3} Nickname: `{nickname}`
@@ -155,25 +155,26 @@ impl<'a> MenuPaginator<'a> {
         let cache = &ctx_discord.cache;
         let (bot_id, bot_name) = cache.current_user_field(|u| (u.id, u.name.clone()));
 
-        embed.title(format!("{bot_name} Languages"));
-        embed.description(format!("**Currently Supported Languages**\n{page}"));
-        embed.field("Current Language used", &self.current_lang, false);
-        embed.author(|a| {
-            a.name(author.name.clone());
-            a.icon_url(author.face())
-        });
-        embed.footer(|f| {f.text(random_footer(
-            self.ctx.prefix(), &self.ctx.data().config.main_server_invite, bot_id.into()
-        ))})
+        embed
+            .title(format!("{bot_name} Languages"))
+            .description(format!("**Currently Supported Languages**\n{page}"))
+            .field("Current Language used", &self.current_lang, false)
+            .author(|a| {a
+                .name(author.name.clone())
+                .icon_url(author.face())
+            })
+            .footer(|f| {f.text(random_footer(
+                self.ctx.prefix(), &self.ctx.data().config.main_server_invite, bot_id.into()
+            ))})
     }
 
     fn create_action_row<'b>(&self, builder: &'b mut serenity::CreateActionRow, disabled: bool) -> &'b mut serenity::CreateActionRow {
         for emoji in ["⏮️", "◀", "⏹️", "▶️", "⏭️"] {
-            builder.create_button(|b| {
-                b.custom_id(emoji);
-                b.style(serenity::ButtonStyle::Primary);
-                b.emoji(serenity::ReactionType::Unicode(String::from(emoji)));
-                b.disabled(
+            builder.create_button(|b| {b
+                .custom_id(emoji)
+                .style(serenity::ButtonStyle::Primary)
+                .emoji(serenity::ReactionType::Unicode(String::from(emoji)))
+                .disabled(
                     disabled ||
                     (["⏮️", "◀"].contains(&emoji) && self.index == 0) ||
                     (["▶️", "⏭️"].contains(&emoji) && self.index == (self.pages.len() - 1))
@@ -193,9 +194,9 @@ impl<'a> MenuPaginator<'a> {
     }
 
     async fn edit_message(&self, message: &mut serenity::Message, disable: bool) -> Result<(), Error> {
-        message.edit(self.ctx.discord(), |b| {
-            b.embed(|e| self.create_page(e, &self.pages[self.index]));
-            b.components(|c| c.create_action_row(|r| self.create_action_row(r, disable)))
+        message.edit(self.ctx.discord(), |b| {b
+            .embed(|e| self.create_page(e, &self.pages[self.index]))
+            .components(|c| c.create_action_row(|r| self.create_action_row(r, disable)))
         }).await?;
 
         Ok(())
@@ -248,44 +249,43 @@ impl<'a> MenuPaginator<'a> {
 }
 
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<bool, Error> {
-    Ok(
-        if let Some(value) = value {
-            value
-        } else {
-            let message = ctx.send(|b| {
-                b.content("What would you like to set this to?");
-                b.components(|c| {
-                    c.create_action_row(|r| {
-                        r.create_button(|b| {
-                            b.style(serenity::ButtonStyle::Success);
-                            b.custom_id("True");
-                            b.label("True")
-                        });
-                        r.create_button(|b| {
-                            b.style(serenity::ButtonStyle::Danger);
-                            b.custom_id("False");
-                            b.label("False")
-                        })
+    if let Some(value) = value {
+        Ok(value)
+    } else {
+        let message = ctx.send(|b| {b
+            .content("What would you like to set this to?")
+            .components(|c| {c
+                .create_action_row(|r| {r
+                    .create_button(|b| {b
+                        .style(serenity::ButtonStyle::Success)
+                        .custom_id("True")
+                        .label("True")
+                    })
+                    .create_button(|b| {b
+                        .style(serenity::ButtonStyle::Danger)
+                        .custom_id("False")
+                        .label("False")
                     })
                 })
-            }).await?.unwrap().message().await?;
+            })
+        }).await?.unwrap().message().await?;
 
-            let ctx_discord = ctx.discord();
-            let interaction = message
-                .await_component_interaction(&ctx_discord.shard)
-                .author_id(ctx.author().id)
-                .collect_limit(1)
-                .await.unwrap();
+        let ctx_discord = ctx.discord();
+        let interaction = message
+            .await_component_interaction(&ctx_discord.shard)
+            .author_id(ctx.author().id)
+            .collect_limit(1)
+            .await.unwrap();
 
-            interaction.defer(&ctx_discord.http).await?;
-            match &*interaction.data.custom_id {
-                "True" => true,
-                "False" => false,
-                _ => unreachable!()
-            }
-        }
-    )
+        interaction.defer(&ctx_discord.http).await?;
+        Ok(match &*interaction.data.custom_id {
+            "True" => true,
+            "False" => false,
+            _ => unreachable!()
+        })
+    }
 }
+
 #[allow(clippy::too_many_arguments)]
 async fn change_mode<T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy>(
     ctx: &Context<'_>,
@@ -293,16 +293,16 @@ async fn change_mode<T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq
     guild_id: serenity::GuildId,
     key: T, mode: Option<TTSMode>,
     target: &str
-) -> Result<Option<Cow<'static, str>>, Error> {
+) -> Result<Option<String>, Error> {
     let data = ctx.data();
     if mode == Some(TTSMode::Premium) && crate::premium_check(data, Some(guild_id)).await?.is_some() {
-        ctx.send(|b| b.embed(|e| {
-            e.title("TTS Bot Premium");
-            e.colour(PREMIUM_NEUTRAL_COLOUR);
-            e.thumbnail(data.premium_avatar_url.clone());
-            e.url("https://www.patreon.com/Gnome_the_Bot_Maker");
-            e.footer(|f| f.text("If this is an error, please contact Gnome!#6669."));
-            e.description(format!("
+        ctx.send(|b| b.embed(|e| {e
+            .title("TTS Bot Premium")
+            .colour(PREMIUM_NEUTRAL_COLOUR)
+            .thumbnail(data.premium_avatar_url.clone())
+            .url("https://www.patreon.com/Gnome_the_Bot_Maker")
+            .footer(|f| f.text("If this is an error, please contact Gnome!#6669."))
+            .description(format!("
                 The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `{prefix}premium` command!
                 If this server has purchased premium, please run the `{prefix}activate` command to link yourself to this server!
             ", prefix=ctx.prefix()))
@@ -311,8 +311,8 @@ async fn change_mode<T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq
     } else {
         general_db.set_one(key, "voice_mode", &mode).await?;
         Ok(Some(match mode {
-            Some(mode) => Cow::Owned(format!("Changed {target} TTS Mode to: {}", mode)),
-            None => Cow::Borrowed("Reset {target} mode")
+            Some(mode) => format!("Changed {target} TTS Mode to: {mode}"),
+            None => format!("Reset {target} mode")
         }))
     }
 }
@@ -589,7 +589,7 @@ pub async fn translation_lang(
             data.guilds_db.set_one(guild_id, "target_lang", &lang).await?;
             ctx.say(format!(
                 "The target translation language is now: {lang}{}",
-                if data.guilds_db.get(guild_id).await?.get::<&str, bool>("to_translate") {
+                if data.guilds_db.get(guild_id).await?.get::<_, bool>("to_translate") {
                     String::new()
                 } else {
                     format!(". You may want to enable translation with `{}set translation on`", ctx.prefix())
@@ -597,9 +597,9 @@ pub async fn translation_lang(
             )).await?;
         },
         _ => {
-            ctx.send(|b| b.embed(|e| {
-                e.title("DeepL Translation - Supported languages");
-                e.description(format!("```{}```", translation_langs.iter().join(", ")))
+            ctx.send(|b| b.embed(|e| {e
+                .title("DeepL Translation - Supported languages")
+                .description(format!("```{}```", translation_langs.iter().join(", ")))
             })).await?;
         }
     }
@@ -813,25 +813,23 @@ pub async fn setup(
 
             text_channels.sort_by(|f, s| Ord::cmp(&f.position, &s.position));
 
-            let message = ctx.send(|b| {
-                b.content("Select a channel!");
-                b.components(|c| {
+            let message = ctx.send(|b| {b
+                .content("Select a channel!")
+                .components(|c| {
                     for (i, chunked_channels) in text_channels.chunks(25).enumerate() {
                         c.create_action_row(|r| {
-                            r.create_select_menu(|s| {
-                                s.custom_id(format!("select::channels::{i}"));
-                                s.options(|os| {
+                            r.create_select_menu(|s| {s
+                                .custom_id(format!("select::channels::{i}"))
+                                .options(|os| {
                                     for channel in chunked_channels {
-                                        os.create_option(|o| {
-                                            o.label(&channel.name);
-                                            o.value(channel.id)
+                                        os.create_option(|o| {o
+                                            .label(&channel.name)
+                                            .value(channel.id)
                                         });
                                     };
                                     os
-                                });
-                                s
-                            });
-                            r
+                                })
+                            })
                         });
                     };
                     c
@@ -849,18 +847,18 @@ pub async fn setup(
 
     let data = ctx.data();
     data.guilds_db.set_one(guild.id.into(), "channel", &(channel as i64)).await?;
-    ctx.send(|b| b.embed(|e| {
-        e.title(format!("{} has been setup!", bot_user.name));
-        e.thumbnail(bot_user.face());
-        e.description(format!("
+    ctx.send(|b| b.embed(|e| {e
+        .title(format!("{} has been setup!", bot_user.name))
+        .thumbnail(bot_user.face())
+        .description(format!("
 TTS Bot will now accept commands and read from <#{channel}>.
 Just do `{}join` and start talking!
-        ", ctx.prefix()));
+        ", ctx.prefix()))
 
-        e.footer(|f| {f.text(random_footer(
+        .footer(|f| {f.text(random_footer(
             ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0
-        ))});
-        e.author(|a| {
+        ))})
+        .author(|a| {
             a.name(&author.name);
             a.icon_url(author.face())
         })
@@ -945,21 +943,21 @@ pub async fn voices(ctx: Context<'_>) -> Result<(), Error> {
 
     let cache = &ctx.discord().cache;
     let current_lang: Option<String> = data.user_voice_db.get((author.id.into(), mode)).await?.get("voice");
-    ctx.send(|b| {b.embed(|e| {
-        e.title(format!("{} Voices | Mode: `{}`", cache.current_user_field(|u| u.name.clone()), mode));
-        e.footer(|f| f.text(random_footer(
+    ctx.send(|b| {b.embed(|e| {e
+        .title(format!("{} Voices | Mode: `{}`", cache.current_user_field(|u| u.name.clone()), mode))
+        .footer(|f| f.text(random_footer(
             ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0
-        )));
-        e.author(|a| {
-            a.name(author.name.clone());
-            a.icon_url(author.face())
-        });
-        e.field(
+        )))
+        .author(|a| {a
+            .name(author.name.clone())
+            .icon_url(author.face())
+        })
+        .field(
             "Currently supported voices",
             voices.strip_suffix(", ").unwrap_or(&voices),
             true
-        );
-        e.field(
+        )
+        .field(
             "Current voice used",
             current_lang.as_ref().map_or("None", std::ops::Deref::deref),
             false
@@ -974,9 +972,9 @@ pub async fn list_premium_voices(ctx: Context<'_>) -> Result<(), Error> {
     let http = &ctx.discord().http; 
     if let poise::Context::Application(ctx) = ctx {
         if let poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) = ctx.interaction {
-            interaction.create_interaction_response(http, |b| {
-                b.kind(serenity::InteractionResponseType::ChannelMessageWithSource);
-                b.interaction_response_data(|b| b.content("Loading!"))
+            interaction.create_interaction_response(http, |b| {b
+                .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
+                .interaction_response_data(|b| b.content("Loading!"))
             }).await?;
 
             interaction.delete_original_interaction_response(http).await?;
@@ -984,7 +982,7 @@ pub async fn list_premium_voices(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     let data = ctx.data();
-    let pages: Vec<String> = data.premium_voices.iter().map(|(language, variants)| {
+    let pages = data.premium_voices.iter().map(|(language, variants)| {
         variants.iter().map(|(variant, gender)| {
             format!("{language} - {variant} ({gender})\n")
         }).collect()

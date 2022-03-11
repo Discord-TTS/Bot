@@ -99,15 +99,15 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Joined your voice channel!");
-            e.description("Just type normally and TTS Bot will say your messages!");
-            e.thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face));
-            e.author(|a| {
-                a.name(member.nick.unwrap_or_else(|| author.name.clone()));
-                a.icon_url(author.face())
-            });
-            e.footer(|f| f.text(random_footer(
+        m.embed(|e| {e
+            .title("Joined your voice channel!")
+            .description("Just type normally and TTS Bot will say your messages!")
+            .thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
+            .author(|a| {a
+                .name(member.nick.unwrap_or_else(|| author.name.clone()))
+                .icon_url(author.face())
+            })
+            .footer(|f| f.text(random_footer(
                 ctx.prefix(), &ctx.data().config.main_server_invite, ctx_discord.cache.current_user_id().0
             )))
         })
@@ -244,12 +244,12 @@ pub async fn premium_activate(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     if let Some(error_msg) = error_msg {
-        ctx.send(|b| b.embed(|e| {
-            e.title("TTS Bot Premium");
-            e.description(error_msg);
-            e.thumbnail(data.premium_avatar_url.clone());
-            e.colour(crate::constants::PREMIUM_NEUTRAL_COLOUR);
-            e.footer(|f| f.text("If this is an error, please contact Gnome!#6669."))
+        ctx.send(|b| b.embed(|e| {e
+            .title("TTS Bot Premium")
+            .description(error_msg)
+            .thumbnail(data.premium_avatar_url.clone())
+            .colour(crate::constants::PREMIUM_NEUTRAL_COLOUR)
+            .footer(|f| f.text("If this is an error, please contact Gnome!#6669."))
         })).await?;
         return Ok(())
     }

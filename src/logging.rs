@@ -139,10 +139,10 @@ impl WebhookLogRecv {
             };
 
             for chunk in message_chunked {
-                webhook.execute(&self.http, false, |b| {
-                    b.content(&chunk);
-                    b.username(&username);
-                    b.avatar_url(&self.level_lookup.get(severity).unwrap_or(&String::from(
+                webhook.execute(&self.http, false, |b| {b
+                    .content(&chunk)
+                    .username(&username)
+                    .avatar_url(&self.level_lookup.get(severity).unwrap_or(&String::from(
                         "https://cdn.discordapp.com/embed/avatars/5.png",
                     )))
                 }).await?;

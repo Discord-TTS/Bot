@@ -140,12 +140,12 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> Result<(), Error>
 
     let prefix = ctx.prefix();
     let netural_colour = netural_colour(crate::premium_check(ctx.data(), ctx.guild_id()).await?.is_none());
-    ctx.send(|b| {b.embed(|e| {
-        e.title(format!("{} Help!", match &mode {
+    ctx.send(|b| {b.embed(|e| {e
+        .title(format!("{} Help!", match &mode {
             HelpCommandMode::Root => ctx.discord().cache.current_user_field(|u| u.name.clone()),
             HelpCommandMode::Group(c) | HelpCommandMode::Command(c) => format!("`{}`", c.qualified_name) 
-        }));
-        e.description(match &mode {
+        }))
+        .description(match &mode {
             HelpCommandMode::Root => {
                 show_group_description(&get_command_mapping(commands))
             },
@@ -168,14 +168,13 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> Result<(), Error>
                 map.insert(&group.qualified_name, group.subcommands.iter().collect());
                 map
             }),
-        });
-
-        e.colour(netural_colour);
-        e.author(|a| {
+        })
+        .colour(netural_colour)
+        .author(|a| {
             a.name(ctx.author().name.clone());
             a.icon_url(ctx.author().face())
-        });
-        e.footer(|f| f.text(match mode {
+        })
+        .footer(|f| f.text(match mode {
             HelpCommandMode::Group(c) => format!("Use {prefix}help {} [command] for more info on a command", c.qualified_name),
             HelpCommandMode::Command(_) |HelpCommandMode::Root => format!("Use {prefix}help [command] for more info on a command"),
         }))

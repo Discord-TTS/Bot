@@ -247,11 +247,10 @@ impl PoiseContextAdditions for Context<'_> {
                 };
 
                 if !permissions.embed_links() {
-                    self.send(|b| {
-                        b.ephemeral(true);
-                        b.content("An Error Occurred! Please give me embed links permissions so I can tell you more!")
-                    }).await?;
-                    return Ok(None);
+                    return self.send(|b| {b
+                        .ephemeral(true)
+                        .content("An Error Occurred! Please give me embed links permissions so I can tell you more!")
+                    }).await.map_err(Into::into)
                 };
 
                 match channel.guild_id.member(ctx_discord, author.id).await {
@@ -263,27 +262,25 @@ impl PoiseContextAdditions for Context<'_> {
             _ => unreachable!(),
         };
 
-        Ok(
-            self.send(|b| {
-                b.ephemeral(true);
-                b.embed(|e| {
-                    e.colour(RED);
-                    e.title("An Error Occurred!");
-                    e.description(format!(
-                        "Sorry but {}, to fix this, please {}!", error,
-                        fix.unwrap_or("get in contact with us via the support server"),
-                    ));
-                    e.author(|a| {
-                        a.name(name);
-                        a.icon_url(avatar_url)
-                    });
-                    e.footer(|f| f.text(format!(
-                        "Support Server: {}", self.data().config.main_server_invite
-                    )))
+
+        self.send(|b| {b
+            .ephemeral(true)
+            .embed(|e| {e
+                .colour(RED)
+                .title("An Error Occurred!")
+                .description(format!(
+                    "Sorry but {}, to fix this, please {}!", error,
+                    fix.unwrap_or("get in contact with us via the support server"),
+                ))
+                .author(|a| {a
+                    .name(name)
+                    .icon_url(avatar_url)
                 })
+                .footer(|f| f.text(format!(
+                    "Support Server: {}", self.data().config.main_server_invite
+                )))
             })
-            .await?
-        )
+        }).await.map_err(Into::into)
     }
 }
 
