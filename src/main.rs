@@ -244,12 +244,12 @@ async fn main() {
             listener: |ctx, event, _, ud| Box::pin(event_listener(ctx, event, ud)),
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: None,
-                dynamic_prefix: Some(|ctx| {Box::pin(async move {Some(
-                    match ctx.guild_id {
-                        Some(guild_id) => ctx.data.guilds_db.get(guild_id.into()).await.unwrap().get("prefix"),
+                dynamic_prefix: Some(|ctx| {Box::pin(async move {Ok(Some(
+                    match ctx.guild_id.map(Into::into) {
+                        Some(guild_id) => ctx.data.guilds_db.get(guild_id).await?.get("prefix"),
                         None => String::from("-"),
                     }
-                )})}),
+                ))})}),
                 ..poise::PrefixFrameworkOptions::default()
             },
             // Add all the commands, this ordering is important as it is shown on the help command
@@ -517,6 +517,7 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, Error>
 
 async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), Error> {
     match error {
+        poise::FrameworkError::DynamicPrefix { error } => error!("Error in dynamic_prefix: {:?}", error),
         poise::FrameworkError::Command { error, ctx } => {
             let command = ctx.command();
             let handle_unexpected = |error: String| {
