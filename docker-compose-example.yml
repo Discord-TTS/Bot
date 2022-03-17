@@ -5,7 +5,9 @@ services:
           - type: bind
             source: ./config.toml
             target: /config.toml
-        depends_on: [database, lavalink]
+
+        depends_on: [database, lavalink, tts-service]
+        network_mode: "host"
     lavalink:
         image: fredboat/lavalink:dev
         volumes:
@@ -13,18 +15,16 @@ services:
             source: ./lavalink_config.yml
             target: /opt/Lavalink/application.yml
 
+        network_mode: "host"
         expose: [2333]
     database:
         image: postgres:13
-        expose: [5432]
+        ports: [5432:5432]
         environment: 
             POSTGRES_USER: tts
             POSTGRES_PASSWORD: tts_password
     tts-service:
-        build:
-          context: git://github.com/GnomedDev/tts-service.git
-          args:
-              MODES: "espeak,gtts,premium"
+        build: gnomeddev/tts-service
         volumes:
           - type: bind
             source: ${GOOGLE_APPLICATION_CREDENTIALS}

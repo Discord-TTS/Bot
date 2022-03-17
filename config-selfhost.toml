@@ -6,11 +6,13 @@
 
 [Main]
 log_level = 'info'
-#tts_service = url to instance of https://github.com/GnomedDev/gtts-service
+#tts_service = instance of https://github.com/GnomedDev/tts-service
+#translation_token = token from https://deepl.com/
 #main_server_invite = 'https://discord.gg/example'
 #invite_channel = id here
+#patreon_role = id here
 #main_server = id here 
-#ofs_role = 
+#ofs_role = = id here
 #token = 
 
 [PostgreSQL-Info]

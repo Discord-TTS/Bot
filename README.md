@@ -11,9 +11,9 @@ Text to speech Discord Bot using Serenity, Poise, and lavalink-rs
 
 ### Normal (Docker):
 - Make sure docker, docker-compose, and git are installed
-- Run `git clone https://github.com/Gnome-py/Discord-TTS-Bot.git`
+- Run `git clone https://github.com/GnomedDev/Discord-TTS-Bot.git`
 - Rename `config-docker.toml` to `config.toml` and fill it out
-- Rename `docker-compose-example.yml` to `docker-compose.yml`
+- Rename `docker-compose-example.yml` to `docker-compose.yml` and fill it out
 - Rename `Dockerfile-prod` OR `Dockerfile-dev` to `Dockerfile`
 (prod takes longer to build, dev is less efficient to run)
 
@@ -23,7 +23,7 @@ Text to speech Discord Bot using Serenity, Poise, and lavalink-rs
 
 ### Hard (Self Host):
 - Make sure rust nightly, cargo, git, postgresql, and ffmpeg are installed
-- Run `git clone https://github.com/Gnome-py/Discord-TTS-Bot.git`
+- Run `git clone https://github.com/GnomedDev/Discord-TTS-Bot.git`
 - Rename `config-selfhost.toml` to `config.toml` and fill it out
 
 - Run `cargo build --release`
