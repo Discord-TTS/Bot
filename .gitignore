@@ -2,6 +2,7 @@
 *.hidden
 Dockerfile
 config.ini
+keydb.conf
 config.toml
 docker-compose.yml
 lavalink-plugins/*
