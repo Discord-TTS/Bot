@@ -268,7 +268,7 @@ async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<bool, Erro
                     })
                 })
             })
-        }).await?.unwrap().message().await?;
+        }).await?.message().await?;
 
         let ctx_discord = ctx.discord();
         let interaction = message
@@ -834,7 +834,7 @@ pub async fn setup(
                     };
                     c
                 })
-            }).await?.unwrap().message().await?;
+            }).await?.message().await?;
 
             let interaction = message.await_component_interaction(&ctx_discord.shard)
                 .author_id(ctx.author().id)

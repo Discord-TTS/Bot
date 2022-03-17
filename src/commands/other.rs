@@ -168,7 +168,7 @@ with more and better voices you can donate via Patreon!\nhttps://www.patreon.com
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES", aliases("lag"))]
 pub async fn ping(ctx: Context<'_>,) -> Result<(), Error> {
     let ping_before = std::time::SystemTime::now();
-    let ping_msg = ctx.say("Loading!").await?.unwrap();
+    let ping_msg = ctx.say("Loading!").await?;
     let content = format!("Current Latency: {}ms", ping_before.elapsed()?.as_millis());
 
     match ping_msg {

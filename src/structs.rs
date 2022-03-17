@@ -250,7 +250,7 @@ impl PoiseContextAdditions for Context<'_> {
                     return self.send(|b| {b
                         .ephemeral(true)
                         .content("An Error Occurred! Please give me embed links permissions so I can tell you more!")
-                    }).await.map_err(Into::into)
+                    }).await.map(Some).map_err(Into::into)
                 };
 
                 match channel.guild_id.member(ctx_discord, author.id).await {
@@ -280,7 +280,7 @@ impl PoiseContextAdditions for Context<'_> {
                     "Support Server: {}", self.data().config.main_server_invite
                 )))
             })
-        }).await.map_err(Into::into)
+        }).await.map(Some).map_err(Into::into)
     }
 }
 
