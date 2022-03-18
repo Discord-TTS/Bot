@@ -208,10 +208,12 @@ impl<'a> MenuPaginator<'a> {
         let mut message = self.create_message().await?;
 
         loop {
-            let collector = message.await_component_interaction(&ctx_discord.shard)
+            let collector = message
+                .await_component_interaction(&ctx_discord.shard)
+                .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(self.ctx.author().id)
-                .collect_limit(1)
-                ;
+                .collect_limit(1);
+
             let interaction = match collector.await {
                 Some(interaction) => interaction,
                 None => break
@@ -248,9 +250,9 @@ impl<'a> MenuPaginator<'a> {
     }
 }
 
-async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<bool, Error> {
+async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
     if let Some(value) = value {
-        Ok(value)
+        Ok(Some(value))
     } else {
         let message = ctx.send(|b| {b
             .content("What would you like to set this to?")
@@ -273,16 +275,21 @@ async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<bool, Erro
         let ctx_discord = ctx.discord();
         let interaction = message
             .await_component_interaction(&ctx_discord.shard)
+            .timeout(std::time::Duration::from_secs(60 * 5))
             .author_id(ctx.author().id)
             .collect_limit(1)
-            .await.unwrap();
+            .await;
 
-        interaction.defer(&ctx_discord.http).await?;
-        Ok(match &*interaction.data.custom_id {
-            "True" => true,
-            "False" => false,
-            _ => unreachable!()
-        })
+        if let Some(interaction) = interaction {
+            interaction.defer(&ctx_discord.http).await?;
+            match &*interaction.data.custom_id {
+                "True" => Ok(Some(true)),
+                "False" => Ok(Some(false)),
+                _ => unreachable!()
+            }
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -421,7 +428,7 @@ pub async fn xsaid(
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
 
-    let value = bool_button(ctx, value).await?;
+    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "xsaid", &value).await?;
     ctx.say(format!("xsaid is now: {}", to_enabled(value))).await?;
 
@@ -442,7 +449,7 @@ pub async fn autojoin(
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
 
-    let value = bool_button(ctx, value).await?;
+    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "auto_join", &value).await?;
     ctx.say(format!("Auto Join is now: {}", to_enabled(value))).await?;
 
@@ -463,7 +470,7 @@ pub async fn botignore(
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
 
-    let value = bool_button(ctx, value).await?;
+    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "bot_ignore", &value).await?;
     ctx.say(format!("Ignoring bots is now: {}", to_enabled(value))).await?;
 
@@ -484,7 +491,7 @@ pub async fn require_voice(
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
 
-    let value = bool_button(ctx, value).await?;
+    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "require_voice", &value).await?;
     ctx.say(format!("Requiring users to be in voice channel for TTS is now: {}", to_enabled(value))).await?;
 
@@ -555,7 +562,7 @@ pub async fn server_voice(
 pub async fn translation(ctx: Context<'_>, #[description="Whether to translate all messages to the same language"] value: Option<bool>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
 
-    let value = bool_button(ctx, value).await?;
+    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "to_translate", &value).await?;
     ctx.say(format!("Translation is now: {}", to_enabled(value))).await?;
 
@@ -672,7 +679,7 @@ pub async fn audienceignore(
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
 
-    let value = bool_button(ctx, value).await?;
+    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "audience_ignore", &value).await?;
     ctx.say(format!("Ignoring audience is now: {}", to_enabled(value))).await?;
     Ok(())
@@ -836,13 +843,20 @@ pub async fn setup(
                 })
             }).await?.message().await?;
 
-            let interaction = message.await_component_interaction(&ctx_discord.shard)
+            let interaction = message
+                .await_component_interaction(&ctx_discord.shard)
+                .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(ctx.author().id)
                 .collect_limit(1)
-                .await.unwrap();
+                .await;
 
-            interaction.defer(&ctx_discord.http).await?;
-            interaction.data.values[0].parse().unwrap()
+            if let Some(interaction) = interaction {
+                interaction.defer(&ctx_discord.http).await?;
+                interaction.data.values[0].parse().unwrap()
+            } else {
+                // The timeout was hit
+                return Ok(())
+            }
         };
 
     let data = ctx.data();
