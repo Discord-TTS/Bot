@@ -338,12 +338,24 @@ pub fn clean_msg(
 
     last_to_xsaid_tracker: &LastToXsaidTracker
 ) -> String {
-    // Regex
-    lazy_static! {
-        static ref EMOJI_REGEX: Regex = Regex::new(r"<(a?):(.+):\d+>").unwrap();
-    }
-    let mut content = EMOJI_REGEX
-        .replace_all(content, |re_match: &Captures<'_>| {
+    let contained_url;
+    let mut content = if content == "?" {
+        contained_url = false;
+        String::from("what")
+    } else {
+        // Regex
+        lazy_static! {
+            static ref EMOJI_REGEX: Regex = Regex::new(r"<(a?):(.+):\d+>").unwrap();
+            static ref REGEX_REPLACEMENTS: [(Regex, &'static str); 3] = {
+                [
+                    (Regex::new(r"\|\|(?s:.)*?\|\|").unwrap(), ". spoiler avoided."),
+                    (Regex::new(r"```(?s:.)*?```").unwrap(), ". code block."),
+                    (Regex::new(r"`(?s:.)*?`").unwrap(), ". code snippet."),
+                ]
+            };
+        }
+
+        let mut content: String = EMOJI_REGEX.replace_all(content, |re_match: &Captures<'_>| {
             let is_animated = re_match.get(1).unwrap().as_str();
             let emoji_name = re_match.get(2).unwrap().as_str();
 
@@ -354,40 +366,26 @@ pub fn clean_msg(
             };
 
             format!("{} {}", emoji_prefix, emoji_name)
-        })
-        .into_owned();
+        }).into_owned();
 
-    if content == "?" {
-        content = String::from("what");
-    } else {
+        for (regex, replacement) in REGEX_REPLACEMENTS.iter() {
+            content = regex.replace_all(&content, *replacement).into_owned();
+        };
+
+
         if lang == "en" {
             content = parse_acronyms(&content);
         }
 
-        lazy_static! {
-            static ref REGEX_REPLACEMENTS: [(Regex, &'static str); 3] = {
-                [
-                    (Regex::new(r"\|\|(?s:.)*?\|\|").unwrap(), ". spoiler avoided."),
-                    (Regex::new(r"```(?s:.)*?```").unwrap(), ". code block."),
-                    (Regex::new(r"`(?s:.)*?`").unwrap(), ". code snippet."),
-                ]
-            };
-        }
+        let filtered_content: String = linkify::LinkFinder::new()
+            .spans(&content)
+            .filter(|span| span.kind().is_none())
+            .map(|span| span.as_str())
+            .collect();
 
-        for (regex, replacement) in REGEX_REPLACEMENTS.iter() {
-            content = regex.replace_all(&content, *replacement).into_owned();
-        }
-    }
-
-    // Filter URLs out of the message content
-    let filtered_content = linkify::LinkFinder::new()
-        .spans(&content)
-        .filter(|span| span.kind().is_none())
-        .map(|span| span.as_str())
-        .collect();
-
-    let contained_url = content != filtered_content;
-    content = filtered_content;
+        contained_url = content != filtered_content;
+        filtered_content
+    };
 
     // If xsaid is enabled, and the author has not been announced last (in one minute if more than 2 users in vc)
     let last_to_xsaid = last_to_xsaid_tracker.get(&guild.id);
