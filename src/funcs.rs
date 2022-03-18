@@ -178,35 +178,29 @@ pub fn random_footer(prefix: &str, server_invite: &str, client_id: u64) -> Strin
 }
 
 fn parse_acronyms(original: &str) -> String {
-    let mut new_string = String::new();
-    for word in original.split(' ') {
-        write!(new_string, "{} ",
-            match word {
-                "iirc" => "if I recall correctly",
-                "afaik" => "as far as I know",
-                "wdym" => "what do you mean",
-                "imo" => "in my opinion",
-                "brb" => "be right back",
-                "irl" => "in real life",
-                "jk" => "just kidding",
-                "btw" => "by the way",
-                ":)" => "smiley face",
-                "gtg" => "got to go",
-                "rn" => "right now",
-                ":(" => "sad face",
-                "ig" => "i guess",
-                "rly" => "really",
-                "cya" => "see ya",
-                "ik" => "i know",
-                "@" => "at",
-                "™️" => "tm",
-                _ => word,
-            }
-        )
-        .unwrap();
-    }
-
-    String::from(new_string.strip_prefix(' ').unwrap_or(&new_string))
+    original.split(' ').map(|word|
+        match word {
+            "iirc" => "if I recall correctly",
+            "afaik" => "as far as I know",
+            "wdym" => "what do you mean",
+            "imo" => "in my opinion",
+            "brb" => "be right back",
+            "irl" => "in real life",
+            "jk" => "just kidding",
+            "btw" => "by the way",
+            ":)" => "smiley face",
+            "gtg" => "got to go",
+            "rn" => "right now",
+            ":(" => "sad face",
+            "ig" => "i guess",
+            "rly" => "really",
+            "cya" => "see ya",
+            "ik" => "i know",
+            "@" => "at",
+            "™️" => "tm",
+            _ => word,
+        }
+    ).join(" ")
 }
 
 fn attachments_to_format(attachments: &[serenity::Attachment]) -> Option<&'static str> {
