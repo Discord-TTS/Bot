@@ -57,8 +57,8 @@ pub async fn parse_user_or_guild(
     let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
     let voice =
         // Get user voice for user mode
-        if user_voice_row.get::<_, i64>("user_id") == 0 {
-            None
+        if user_voice_row.get::<_, i64>("user_id") != 0 {
+            Some(Cow::Owned(user_voice_row.get("voice")))
         } else if let Some(guild_id) = guild_id {
             // Get default server voice for user mode
             let guild_voice_row = data.guild_voice_db.get((guild_id.into(), mode)).await?;
@@ -68,7 +68,7 @@ pub async fn parse_user_or_guild(
                 Some(Cow::Owned(guild_voice_row.get("voice")))
             }
         } else {
-            Some(Cow::Owned(user_voice_row.get("voice")))
+            None
         }.unwrap_or_else(|| Cow::Borrowed(default_voice(mode)));
 
     Ok((voice, mode))
