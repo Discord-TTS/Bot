@@ -152,7 +152,7 @@ pub struct GoogleVoice<'a> {
     pub languageCodes: [String; 1],
 }
 
-#[derive(serde::Serialize, Debug)]
+#[derive(serde::Serialize, Debug, Copy, Clone)]
 pub enum Gender {
     Male,
     Female

@@ -22,7 +22,7 @@ use poise::serenity_prelude as serenity;
 
 use crate::funcs::{get_gtts_voices, get_espeak_voices, netural_colour, parse_user_or_guild};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
-use crate::structs::{Context, Error, TTSMode, Data};
+use crate::structs::{Context, Error, TTSMode, Data, TTSModeServerChoice};
 use crate::{random_footer, database};
 
 
@@ -508,7 +508,7 @@ pub async fn require_voice(
 )]
 pub async fn server_mode(
     ctx: Context<'_>,
-    #[description="The TTS Mode to change to"] mode: crate::structs::TTSModeServerChoice
+    #[description="The TTS Mode to change to"] mode: TTSModeServerChoice
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
 
@@ -939,11 +939,18 @@ pub async fn voice(
     prefix_command, slash_command,
     required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
 )]
-pub async fn voices(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn voices(
+    ctx: Context<'_>,
+    #[description="The mode to see the voices for, leave blank for current"] mode: Option<TTSModeServerChoice>
+) -> Result<(), Error> {
     let author = ctx.author();
     let data = ctx.data();
 
-    let (_, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
+    let mode = match mode {
+        Some(mode) => TTSMode::from(mode),
+        None => parse_user_or_guild(data, author.id, ctx.guild_id()).await?.1
+    };
+
     let voices: String = {
         let mut supported_langs = match mode {
             TTSMode::Gtts => crate::funcs::get_gtts_voices().into_iter().map(|(k, _)| k).collect(),
@@ -1002,10 +1009,13 @@ pub async fn list_premium_voices(ctx: Context<'_>) -> Result<(), Error> {
         }).collect()
     }).collect();
 
-    let (lang_variant, _) = parse_user_or_guild(data, ctx.author().id, ctx.guild_id()).await?;
-    let (lang, variant) = lang_variant.split_once(' ').unwrap();
+    let (lang_variant, mode) = parse_user_or_guild(data, ctx.author().id, ctx.guild_id()).await?;
+    let (lang, variant) = match mode {
+        TTSMode::Premium => lang_variant.split_once(' ').unwrap(),
+        _ => ("en-US", "a")
+    };
 
     let variant = String::from(variant);
-    let gender = &data.premium_voices[lang][&variant];
+    let gender = data.premium_voices[lang][&variant];
     MenuPaginator::new(ctx, pages, format!("{lang} {variant} ({gender})")).start().await
 }
