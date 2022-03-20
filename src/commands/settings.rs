@@ -890,7 +890,7 @@ Just do `{}join` and start talking!
 )]
 pub async fn mode(
     ctx: Context<'_>,
-    #[description="The TTS Mode to change to"] mode: crate::structs::TTSModeChoice
+    #[description="The TTS Mode to change to, leave blank for server default"] mode: Option<crate::structs::TTSModeChoice>
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
 
@@ -898,7 +898,7 @@ pub async fn mode(
     let to_send = change_mode(
         &ctx, &data.userinfo_db,
         guild_id, ctx.author().id.into(),
-        Some(TTSMode::from(mode)), "your"
+        mode.map(TTSMode::from), "your"
     ).await?;
 
     if let Some(to_send) = to_send {
