@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::borrow::Cow;
 use std::fmt::Write;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{collections::HashMap, sync::Arc};
@@ -21,7 +22,6 @@ use std::{collections::HashMap, sync::Arc};
 use poise::serenity_prelude as serenity;
 use itertools::Itertools;
 use parking_lot::Mutex;
-use strfmt::strfmt;
 
 use crate::structs::Error;
 
@@ -106,25 +106,17 @@ impl WebhookLogRecv {
             let severity_name = severity.as_str();
             let username = format!("TTS-Webhook [{}]", severity_name);
 
-            let format_string = format!("`{} [{{target}}]`: {}\n",
-                self.prefix,
-                if severity <= &tracing::Level::WARN {
-                    "**{line}**"
-                } else {
-                    "{line}"
-                }
-            );
-
             let message_chunked: Vec<String> =
                 messages.iter().flat_map(|[target, log_message]| {
                     log_message.trim().split('\n').map(|line| {
-                        strfmt(
-                            &format_string,
-                            &HashMap::from_iter([
-                                (String::from("line"), line),
-                                (String::from("target"), target)
-                            ]),
-                        ).unwrap()
+                        format!("`{} [{}]`: {}\n",
+                            self.prefix, target.clone(),
+                            if severity <= &tracing::Level::WARN {
+                                Cow::Owned(format!("**{line}**"))
+                            } else {
+                                Cow::Borrowed(line)
+                            }
+                        )
                     })
                 })
                 .collect::<String>()
