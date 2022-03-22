@@ -1012,7 +1012,7 @@ pub async fn list_premium_voices(ctx: Context<'_>) -> Result<(), Error> {
     let (lang_variant, mode) = parse_user_or_guild(data, ctx.author().id, ctx.guild_id()).await?;
     let (lang, variant) = match mode {
         TTSMode::Premium => lang_variant.split_once(' ').unwrap(),
-        _ => ("en-US", "a")
+        _ => ("en-US", "A")
     };
 
     let variant = String::from(variant);
