@@ -13,6 +13,7 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use num_format::{Locale, ToFormattedString};
 
 use poise::serenity_prelude as serenity;
 
@@ -100,12 +101,12 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
         .filter_map(|g| g.to_guild_cached(ctx_discord))
         .collect();
 
+    let total_members = guilds.iter().map(|g| g.member_count).sum::<u64>().to_formatted_string(&Locale::en);
     let total_voice_clients = guilds.iter().filter_map(|g| g.voice_states.get(&bot_user_id)).count();
-    let total_members: u64 = guilds.iter().map(|g| g.member_count).sum();
     let total_guild_count = guilds.len();
 
     let shard_count = ctx_discord.cache.shard_count();
-    let ram_usage = raw_ram_usage / 1024_u64.pow(2);
+    let ram_usage = (raw_ram_usage / 1024_u64.pow(2)).to_formatted_string(&Locale::en);
 
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
     let netural_colour = netural_colour(crate::premium_check(ctx.data(), ctx.guild_id()).await?.is_none());
