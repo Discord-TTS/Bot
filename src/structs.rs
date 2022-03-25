@@ -55,6 +55,7 @@ pub struct Data {
 
     pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
+    pub startup_message: serenity::MessageId,
     pub premium_users: Vec<serenity::UserId>,
     pub start_time: std::time::SystemTime,
     pub premium_avatar_url: String,

@@ -46,8 +46,8 @@ mod logging;
 mod structs;
 mod funcs;
 
-use constants::DM_WELCOME_MESSAGE;
-use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices};
+use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR};
+use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices, generate_status};
 use structs::{TTSMode, Config, Data, Error, PoiseContextAdditions, SerenityContextAdditions, PostgresConfig};
 
 struct LavalinkHandler;
@@ -209,6 +209,9 @@ async fn main() {
                 premium_voices: get_premium_voices(),
                 last_to_xsaid_tracker: dashmap::DashMap::new(),
                 premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
+                startup_message: webhooks["logs"].execute(&ctx.http, true, |b| b.content(format!(
+                    "**{} is starting up**", ready.user.name
+                ))).await?.unwrap().id,
                 premium_users: main.main_server.members(&ctx.http, None, None).await?.into_iter()
                     .filter_map(|m| if m.roles.contains(&main.patreon_role) {Some(m.user.id)} else {None})
                     .collect(),
@@ -241,7 +244,7 @@ async fn main() {
                 }));
             }),
             on_error: |error| Box::pin(on_error(error)),
-            listener: |ctx, event, _, ud| Box::pin(event_listener(ctx, event, ud)),
+            listener: |ctx, event, fw, ud| Box::pin(event_listener(ctx, event, fw, ud)),
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: None,
                 dynamic_prefix: Some(|ctx| {Box::pin(async move {Ok(Some(
@@ -326,7 +329,7 @@ async fn main() {
     framework.start_autosharded().await.unwrap();
 }
 
-async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, data: &Data) -> Result<(), Error> {
+async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, framework: &poise::Framework<Data, Error>, data: &Data) -> Result<(), Error> {
     match event {
         poise::Event::Message { new_message } => {
             let (tts_result, support_result, mention_result) = tokio::join!(
@@ -364,47 +367,7 @@ async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, data:
                 return Ok(());
             }
 
-            // Send to servers channel and DM owner the welcome message
-            let (owner, _) = tokio::join!(
-                guild.owner_id.to_user(ctx),
-                data.webhooks["servers"].execute(&ctx.http, false, |b| {
-                    b.content(format!("Just joined {}!", &guild.name))
-                }),
-            );
-
-            let owner = owner?;
-            match owner.direct_message(ctx, |b| {b.embed(|e| {e
-                .title(format!("Welcome to {}!", ctx.cache.current_user_field(|b| b.name.clone())))
-                .description(format!("
-Hello! Someone invited me to your server `{}`!
-TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
-**Most commands need to be done on your server, such as `-setup` and `-join`**
-I need someone with the administrator permission to do `-setup #channel`
-You can then do `-join` in that channel and I will join your voice channel!
-Then, you can just type normal messages and I will say them, like magic!
-You can view all the commands with `-help`
-Ask questions by either responding here or asking on the support server!",
-                guild.name))
-                .footer(|f| {f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite))})
-                .author(|a| {a.name(format!("{}#{}", &owner.name, &owner.id)); a.icon_url(owner.face())})
-            })}).await {
-                Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
-                Err(error) => return Err(Error::Unexpected(Box::from(error))),
-                _ => {}
-            }
-
-            match ctx.http.add_member_role(
-                data.config.main_server.into(),
-                owner.id.0,
-                data.config.ofs_role,
-                None
-            ).await {
-                Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => {return Ok(())},
-                Err(err) => return Err(Error::Unexpected(Box::new(err))),
-                Ok(_) => (),
-            }
-
-            info!("Added OFS role to {}#{}", owner.name, owner.discriminator);
+            process_new_guild(ctx, data, guild).await?;
         }
         poise::Event::GuildDelete { incomplete, full } => {
             let incomplete: &serenity::UnavailableGuild = incomplete;
@@ -413,18 +376,28 @@ Ask questions by either responding here or asking on the support server!",
             data.guilds_db.delete(incomplete.id.into()).await?;
             match guild {
                 Some(guild) => {
-                    data.webhooks["servers"].execute(&ctx.http, false, |b| {
-                        b.content(format!(
-                            "Just got kicked from {}. I'm now in {} servers",
-                            guild.name, ctx.cache.guilds().len()
-                        ))
-                    }).await?;
+                    data.webhooks["servers"].execute(&ctx.http, false, |b| {b.content(format!(
+                        "Just got kicked from {}. I'm now in {} servers",
+                        guild.name, ctx.cache.guilds().len()
+                    ))}).await?;
                 }
                 None => warn!("Guild ID {} just was deleted without being cached!", incomplete.id),
             }
         }
         poise::Event::Ready { data_about_bot } => {
-            info!("{} has connected in {} seconds!", data_about_bot.user.name, data.start_time.elapsed()?.as_secs());
+            let user_name = &data_about_bot.user.name;
+            let (status, starting) = generate_status(framework).await;
+            data.webhooks["logs"].edit_message(&ctx.http, data.startup_message, |m| {m
+                .content("")
+                .embeds(vec![serenity::Embed::fake(|e| {e
+                    .description(status)
+                    .colour(FREE_NEUTRAL_COLOUR)
+                    .title(
+                        if starting {format!("{user_name} is starting up!")}
+                        else {format!("{user_name} started in {} seconds", data.start_time.elapsed().unwrap().as_secs())
+                    })
+                })])
+            }).await?;
         }
         poise::Event::Resume { event: _ } => {
             data.analytics.log(Cow::Borrowed("on_resumed"));
@@ -622,6 +595,52 @@ async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), 
 }
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     _on_error(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+}
+
+
+async fn process_new_guild(ctx: &serenity::Context, data: &Data, guild: &serenity::Guild) -> Result<(), Error> {
+    // Send to servers channel and DM owner the welcome message
+    let (owner, _) = tokio::join!(
+        guild.owner_id.to_user(ctx),
+        data.webhooks["servers"].execute(&ctx.http, false, |b| {
+            b.content(format!("Just joined {}!", &guild.name))
+        }),
+    );
+
+    let owner = owner?;
+    match owner.direct_message(ctx, |b| {b.embed(|e| {e
+        .title(format!("Welcome to {}!", ctx.cache.current_user_field(|b| b.name.clone())))
+        .description(format!("
+Hello! Someone invited me to your server `{}`!
+TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
+**Most commands need to be done on your server, such as `-setup` and `-join`**
+I need someone with the administrator permission to do `-setup #channel`
+You can then do `-join` in that channel and I will join your voice channel!
+Then, you can just type normal messages and I will say them, like magic!
+You can view all the commands with `-help`
+Ask questions by either responding here or asking on the support server!",
+        guild.name))
+        .footer(|f| {f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite))})
+        .author(|a| {a.name(format!("{}#{}", &owner.name, &owner.id)); a.icon_url(owner.face())})
+    })}).await {
+        Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
+        Err(error) => return Err(Error::Unexpected(Box::from(error))),
+        _ => {}
+    }
+
+    match ctx.http.add_member_role(
+        data.config.main_server.into(),
+        owner.id.0,
+        data.config.ofs_role,
+        None
+    ).await {
+        Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => {return Ok(())},
+        Err(err) => return Err(Error::Unexpected(Box::new(err))),
+        Ok(_) => (),
+    }
+
+    info!("Added OFS role to {}#{}", owner.name, owner.discriminator);
+    Ok(())
 }
 
 async fn process_tts_msg(

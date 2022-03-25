@@ -30,6 +30,21 @@ use serenity::json::prelude as json;
 use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice};
 use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 
+pub async fn generate_status(framework: &poise::Framework<Data, Error>) -> (String, bool) {
+    let shard_manager_lock = framework.shard_manager();
+    let shard_manager = shard_manager_lock.lock().await;
+    let shards = shard_manager.runners.lock().await;
+
+    let mut status: Vec<_> = shards
+        .iter()
+        .map(|(id, shard)| format!("Shard {id}: `{}`", shard.stage))
+        .collect();
+
+    status.sort_unstable();
+
+    (status.join("\n"), shards.values().any(|shard| shard.stage.is_connecting()))
+}
+
 pub const fn default_voice(mode: TTSMode) -> &'static str {
     match mode {
         TTSMode::Gtts => "en",
