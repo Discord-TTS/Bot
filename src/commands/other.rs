@@ -95,7 +95,6 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     let bot_user_id = ctx_discord.cache.current_user_id();
 
     let start_time = std::time::SystemTime::now();
-    let raw_ram_usage = psutil::process::Process::current()?.memory_info()?.rss();
 
     let guilds: Vec<serenity::Guild> = ctx_discord.cache.guilds().iter()
         .filter_map(|g| g.to_guild_cached(ctx_discord))
@@ -106,7 +105,6 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     let total_guild_count = guilds.len();
 
     let shard_count = ctx_discord.cache.shard_count();
-    let ram_usage = (raw_ram_usage / 1024_u64.pow(2)).to_formatted_string(&Locale::en);
 
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
     let netural_colour = netural_colour(crate::premium_check(ctx.data(), ctx.guild_id()).await?.is_none());
@@ -130,7 +128,6 @@ Currently in:
     {sep2} {total_guild_count} servers
 Currently using:
     {sep1} {shard_count} shards
-    {sep1} {ram_usage:.1}MB of RAM
 and can be used by {total_members} people!"))
     })}).await?;
 

@@ -46,11 +46,7 @@ branch = "next"
 [dependencies.lavalink-rs]
 git = "https://gitlab.com/GnomedDev/lavalink-rs"
 features = ["serenity", "rustls"]
-
-[dependencies.psutil]
-version = "3"
-features = ["process"]
-default-features = false
+branch = "update-deps"
 
 
 # lavalink pulls serenity from crates.io. tell it to pull from github instead 
