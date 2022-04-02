@@ -28,10 +28,9 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use regex::Regex;
-use lazy_static::lazy_static;
 use deadpool_postgres::tokio_postgres;
-use tracing::{debug, error, info, warn};
+use sysinfo::SystemExt;
+use tracing::{error, info, warn};
 
 use poise::serenity_prelude as serenity; // re-exports a lot of serenity with shorter paths
 use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
@@ -44,43 +43,37 @@ mod database;
 mod commands;
 mod logging;
 mod structs;
+mod error;
 mod funcs;
 
-use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR};
+use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices, generate_status};
-use structs::{TTSMode, Config, Data, Error, PoiseContextAdditions, SerenityContextAdditions, PostgresConfig};
+use structs::{TTSMode, Config, Data, Error, PoiseContextAdditions, SerenityContextAdditions, PostgresConfig, OptionTryUnwrap};
 
 struct LavalinkHandler;
 impl LavalinkEventHandler for LavalinkHandler {}
 
 async fn get_webhooks(
     http: &serenity::Http,
-    webhooks_raw: &toml::value::Table,
-) -> Option<HashMap<String, serenity::Webhook>> {
-    lazy_static! {
-        static ref WEBHOOK_URL_REGEX: Regex = Regex::new(r"discord(?:app)?.com/api/webhooks/(\d+)/(.+)").unwrap();
-    }
+    webhooks_raw: toml::value::Table,
+) -> HashMap<String, serenity::Webhook> {
+    let mut webhooks = HashMap::with_capacity(webhooks_raw.len());
 
-    let mut webhooks = HashMap::new();
     for (name, url) in webhooks_raw {
-        let captures = WEBHOOK_URL_REGEX.captures(url.as_str()?)?;
+        let url = url.as_str().unwrap().parse().unwrap();
+        let (webhook_id, token) = serenity::parse_webhook(&url).unwrap();
 
-        webhooks.insert(
-            name.clone(),
-            http.get_webhook_with_token(
-                captures.get(1)?.as_str().parse().ok()?,
-                captures.get(2)?.as_str(),
-            ).await.ok()?,
-        );
+        webhooks.insert(name, http.get_webhook_with_token(webhook_id, token).await.unwrap());
     }
 
-    Some(webhooks)
+    webhooks
 }
 
 #[tokio::main]
 #[allow(clippy::too_many_lines)]
 async fn main() {
     let start_time = std::time::SystemTime::now();
+    std::env::set_var("RUST_LIB_BACKTRACE", "1");
 
     let (pool, mut main, lavalink, webhooks) = {
         let mut config_toml: toml::Value = std::fs::read_to_string("config.toml").unwrap().parse().unwrap();
@@ -172,6 +165,16 @@ async fn main() {
         "
     ).await.unwrap();
 
+    let (startup_message, webhooks) = {
+        let http = serenity::Http::new_with_token(main.token.as_deref().unwrap());
+        let webhooks = get_webhooks(&http, webhooks).await;
+        (
+            webhooks["logs"].execute(&http, true, |b| b
+                .content("**TTS Bot is starting up**")
+            ).await.unwrap().unwrap().id, webhooks
+        )
+    };
+
     let framework = poise::Framework::build()
         .token(main.token.take().unwrap())
         .client_settings(move |f| {
@@ -186,7 +189,6 @@ async fn main() {
             .register_songbird()
         })
         .user_data_setup(move |ctx, ready, _framework| {Box::pin(async move {
-            let webhooks = get_webhooks(&ctx.http, &webhooks).await.unwrap();
 
             let (send, rx) = std::sync::mpsc::channel();
             let subscriber = logging::WebhookLogSend::new(send, tracing::Level::from_str(&main.log_level)?);
@@ -208,10 +210,8 @@ async fn main() {
                 reqwest: reqwest::Client::new(),
                 premium_voices: get_premium_voices(),
                 last_to_xsaid_tracker: dashmap::DashMap::new(),
+                system_info: parking_lot::Mutex::new(sysinfo::System::new()),
                 premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
-                startup_message: webhooks["logs"].execute(&ctx.http, true, |b| b.content(format!(
-                    "**{} is starting up**", ready.user.name
-                ))).await?.unwrap().id,
                 premium_users: main.main_server.members(&ctx.http, None, None).await?.into_iter()
                     .filter_map(|m| if m.roles.contains(&main.patreon_role) {Some(m.user.id)} else {None})
                     .collect(),
@@ -224,7 +224,7 @@ async fn main() {
                 config: main,
 
                 guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
-                analytics, webhooks, start_time, pool,
+                analytics, webhooks, start_time, pool, startup_message
             })
         })})
         .options(poise::FrameworkOptions {
@@ -243,7 +243,7 @@ async fn main() {
                     poise::Context::Application(_) => "on_slash_command",
                 }));
             }),
-            on_error: |error| Box::pin(on_error(error)),
+            on_error: |error| Box::pin(async move {error::handle(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err))}),
             listener: |ctx, event, fw, ud| Box::pin(event_listener(ctx, event, fw, ud)),
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: None,
@@ -281,7 +281,7 @@ async fn main() {
 
                 commands::help::help(),
                 commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
-                commands::owner::add_premium(),
+                commands::owner::add_premium(), commands::owner::cause_error(),
 
                 poise::Command {
                     subcommands: vec![
@@ -329,6 +329,7 @@ async fn main() {
     framework.start_autosharded().await.unwrap();
 }
 
+#[allow(clippy::collapsible_match)]
 async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, framework: &poise::Framework<Data, Error>, data: &Data) -> Result<(), Error> {
     match event {
         poise::Event::Message { new_message } => {
@@ -343,7 +344,7 @@ async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, frame
         poise::Event::VoiceStateUpdate { old, new } => {
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user_id();
-            let guild_id = new.guild_id.ok_or("no guild_id")?;
+            let guild_id = new.guild_id.try_unwrap()?;
             let songbird = songbird::get(ctx).await.unwrap();
 
             let bot_voice_client = songbird.get(guild_id);
@@ -354,12 +355,12 @@ async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, frame
                     .map_or(false, |m| m.user.id == bot_id)
                 && !ctx.cache // filter out bots from members
                     .guild_channel(old.as_ref().unwrap().channel_id.unwrap())
-                    .ok_or("no channel")?
+                    .try_unwrap()?
                     .members(&ctx.cache).await?
                     .iter().any(|m| !m.user.bot)
             {
                 songbird.remove(guild_id).await?;
-                data.lavalink.destroy(guild_id).await?;
+                data.lavalink.destroy(guild_id.0).await?;
             }
         }
         poise::Event::GuildCreate { guild, is_new } => {
@@ -384,6 +385,13 @@ async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, frame
                 None => warn!("Guild ID {} just was deleted without being cached!", incomplete.id),
             }
         }
+        poise::Event::InteractionCreate { interaction } => {
+            if let serenity::Interaction::MessageComponent(interaction) = interaction {
+                if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
+                    error::handle_traceback_button(ctx, data, interaction).await?;
+                }
+            }
+        },
         poise::Event::Ready { data_about_bot } => {
             let user_name = &data_about_bot.user.name;
             let (status, starting) = generate_status(framework).await;
@@ -488,115 +496,6 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, Error>
     Ok(false)
 }
 
-async fn _on_error(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), Error> {
-    match error {
-        poise::FrameworkError::DynamicPrefix { error } => error!("Error in dynamic_prefix: {:?}", error),
-        poise::FrameworkError::Command { error, ctx } => {
-            let command = ctx.command();
-            let handle_unexpected = |error: String| {
-                error!("Error in {}: {:?}", command.qualified_name, error);
-                (Cow::Borrowed("an unknown error occurred"), None)
-            };
-
-            let (error, fix) = match error {
-                Error::GuildOnly => (
-                    Cow::Owned(format!("{} cannot be used in private messages", command.qualified_name)),
-                    Some(format!(
-                        "try running it on a server with {} in",
-                        ctx.discord().cache.current_user_field(|b| b.name.clone())
-                    )),
-                ),
-                Error::Unexpected(error) => handle_unexpected(format!("{:?}", error)),
-                Error::None(error) => handle_unexpected(error),
-                Error::DebugLog(_) => unreachable!(),
-            };
-            ctx.send_error(&error, fix.as_deref()).await?;
-        }
-        poise::FrameworkError::Listener{error, event} => {
-            if let Error::DebugLog(msg) = error {
-                debug!(msg);
-            } else {
-                error!("Error in event handler: `{}`: `{:?}`", event.name(), error);
-            }
-        },
-        poise::FrameworkError::MissingBotPermissions{missing_permissions, ctx} => {
-            ctx.send_error(
-                &format!("I cannot run `{}` as I am missing permissions", ctx.command().name),
-                Some(&format!("give me: {}", missing_permissions.get_permission_names().join(", ")))
-            ).await?;
-        },
-        poise::FrameworkError::MissingUserPermissions{missing_permissions, ctx} => {
-            ctx.send_error(
-                "you cannot run this command",
-                Some(&format!(
-                    "ask an administator for the following permissions: {}",
-                    missing_permissions.ok_or("failed to fetch perms")?.get_permission_names().join(", ")
-                ))
-            ).await?;
-        },
-        poise::FrameworkError::ArgumentParse { error, ctx, input } => {
-            let fix = None;
-            let mut reason = None;
-
-            let argument = || input.unwrap().replace('`', "");
-            if error.is::<serenity::MemberParseError>() {
-                reason = Some(format!("I cannot find the member: `{}`", argument()));
-            } else if error.is::<serenity::GuildParseError>() {
-                reason = Some(format!("I cannot find the server: `{}`", argument()));
-            } else if error.is::<serenity::GuildChannelParseError>() {
-                reason = Some(format!("I cannot find the channel: `{}`", argument()));
-            } else if error.is::<std::num::ParseIntError>() {
-                reason = Some(format!("I cannot convert `{}` to a number", argument()));
-            } else if error.is::<std::str::ParseBoolError>() {
-                reason = Some(format!("I cannot convert `{}` to True/False", argument()));
-            }
-
-            ctx.send_error(
-                reason.as_deref().unwrap_or("you typed the command wrong"),
-                Some(&fix.unwrap_or_else(|| format!("check out `{}help {}`", ctx.prefix(), ctx.command().qualified_name)))
-            ).await?;
-        },
-        poise::FrameworkError::CooldownHit { remaining_cooldown, ctx } => {
-            let cooldown_response = ctx.send_error(
-                &format!("{} is on cooldown", ctx.command().name),
-                Some(&format!("try again in {:.1} seconds", remaining_cooldown.as_secs_f32()))
-            ).await?;
-
-            if let poise::Context::Prefix(ctx) = ctx {
-                if let Some(poise::ReplyHandle::Known(error_message)) = cooldown_response {
-                    tokio::time::sleep(remaining_cooldown).await;
-    
-                    let ctx_discord = ctx.discord;
-                    error_message.delete(ctx_discord).await?;
-                    
-                    let bot_user_id = ctx_discord.cache.current_user_id();
-                    let channel = error_message.channel(ctx_discord).await?.guild().unwrap();
-
-                    if channel.permissions_for_user(ctx_discord, bot_user_id)?.manage_messages() {
-                        ctx.msg.delete(ctx_discord).await?;
-                    }
-                }
-            } 
-        },
-
-        poise::FrameworkError::Setup { error } => panic!("{:#?}", error),
-        poise::FrameworkError::CommandCheckFailed { error, ctx } => {
-            if let Some(error) = error {
-                error!("Premium Check Error: {:?}", error);
-                ctx.send_error("an unknown error occurred during the premium check", None).await?;
-            }
-        },
-
-        poise::FrameworkError::CommandStructureMismatch { description: _, ctx: _ } |
-        poise::FrameworkError::NotAnOwner{ctx: _}=> {},
-    }
-
-    Ok(())
-}
-async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
-    _on_error(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
-}
-
 
 async fn process_new_guild(ctx: &serenity::Context, data: &Data, guild: &serenity::Guild) -> Result<(), Error> {
     // Send to servers channel and DM owner the welcome message
@@ -624,7 +523,7 @@ Ask questions by either responding here or asking on the support server!",
         .author(|a| {a.name(format!("{}#{}", &owner.name, &owner.id)); a.icon_url(owner.face())})
     })}).await {
         Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
-        Err(error) => return Err(Error::Unexpected(Box::from(error))),
+        Err(error) => return Err(Error::Unexpected(anyhow::Error::from(error))),
         _ => {}
     }
 
@@ -635,7 +534,7 @@ Ask questions by either responding here or asking on the support server!",
         None
     ).await {
         Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => {return Ok(())},
-        Err(err) => return Err(Error::Unexpected(Box::new(err))),
+        Err(err) => return Err(Error::Unexpected(anyhow::Error::from(err))),
         Ok(_) => (),
     }
 
@@ -700,7 +599,7 @@ async fn process_tts_msg(
         };
     }
 
-    let tts_err = || format!("Guild: {} | Lavalink failed to get track!", guild.id);
+    let tts_err = || anyhow::anyhow!("Guild: {} | Lavalink failed to get track!", guild.id);
     for url in funcs::fetch_url(
         &data.config.tts_service,
         content,
@@ -749,7 +648,7 @@ async fn process_mention_msg(
 
         match result {
             Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
-            Err(error) => return Err(Error::Unexpected(Box::from(error))),
+            Err(error) => return Err(Error::Unexpected(anyhow::Error::from(error))),
             _ => {}
         }
     }

@@ -13,13 +13,13 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use sysinfo::{SystemExt, ProcessExt};
+use poise::serenity_prelude as serenity;
 use num_format::{Locale, ToFormattedString};
 
-use poise::serenity_prelude as serenity;
-
-use crate::structs::{Context, Error, TTSMode};
 use crate::constants::{OPTION_SEPERATORS};
-use crate::funcs::{fetch_audio, netural_colour, parse_user_or_guild};
+use crate::structs::{Context, Error, TTSMode, OptionTryUnwrap};
+use crate::funcs::{fetch_audio, netural_colour, parse_user_or_guild, refresh_kind};
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
@@ -91,6 +91,7 @@ pub async fn tts(
 pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     ctx.defer_or_broadcast().await?;
 
+    let data = ctx.data();
     let ctx_discord = ctx.discord();
     let bot_user_id = ctx_discord.cache.current_user_id();
 
@@ -105,15 +106,22 @@ pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
     let total_guild_count = guilds.len();
 
     let shard_count = ctx_discord.cache.shard_count();
+    let ram_usage = {
+        let mut system_info = data.system_info.lock();
+        system_info.refresh_specifics(refresh_kind());
+
+        let pid = sysinfo::get_current_pid().unwrap();
+        system_info.process(pid).unwrap().memory() / 1024
+    };
 
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
-    let netural_colour = netural_colour(crate::premium_check(ctx.data(), ctx.guild_id()).await?.is_none());
+    let netural_colour = netural_colour(crate::premium_check(data, ctx.guild_id()).await?.is_none());
 
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
     ctx.send(|b| {b.embed(|e| { e
         .title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())))
         .thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
-        .url(&ctx.data().config.main_server_invite)
+        .url(&data.config.main_server_invite)
         .colour(netural_colour)
         .footer(|f| {f
             .text(format!("
@@ -128,6 +136,7 @@ Currently in:
     {sep2} {total_guild_count} servers
 Currently using:
     {sep1} {shard_count} shards
+    {sep1} {ram_usage:.1}MB of RAM
 and can be used by {total_members} people!"))
     })}).await?;
 
@@ -217,7 +226,7 @@ pub async fn invite(ctx: Context<'_>,) -> Result<(), Error> {
         return Ok(())
     }
 
-    let invite_channel = ctx_discord.cache.guild_channel(invite_channel).ok_or("channel is None")?;
+    let invite_channel = ctx_discord.cache.guild_channel(invite_channel).try_unwrap()?;
     ctx.say(format!("Join {} and look in #{} to invite <@{}>", config.main_server_invite, invite_channel.name, bot_user_id)).await?;
 
     Ok(())

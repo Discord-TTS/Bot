@@ -125,6 +125,10 @@ User Data: `{user_data:?}`
     Ok(())
 }
 
+#[poise::command(prefix_command, owners_only, hide_in_help)]
+pub async fn cause_error(_: Context<'_>) -> Result<(), Error> {
+    Err(anyhow::anyhow!("This is a test error!").into())
+}
 
 pub async fn dm_generic(
     ctx: &serenity::Context,

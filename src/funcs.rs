@@ -27,8 +27,15 @@ use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice};
+use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap};
 use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
+
+pub fn refresh_kind() -> sysinfo::RefreshKind {
+    sysinfo::RefreshKind::new()
+        .with_processes(sysinfo::ProcessRefreshKind::new())
+        .with_memory()
+        .with_cpu()
+}
 
 pub async fn generate_status(framework: &poise::Framework<Data, Error>) -> (String, bool) {
     let shard_manager_lock = framework.shard_manager();
@@ -271,7 +278,7 @@ pub async fn run_checks(
             return Ok(None)
         }
 
-        return Err(Error::DebugLog("Failed check: Wrong channel"))
+        return Ok(None)
     }
 
     let mut content = serenity::content_safe(cache, &message.content,
@@ -283,7 +290,7 @@ pub async fn run_checks(
     );
 
     if content.len() >= 1500 {
-        return Err(Error::DebugLog("Failed check: Message too long!"));
+        return Ok(None);
     }
 
     content = content.to_lowercase();
@@ -294,36 +301,34 @@ pub async fn run_checks(
     ); // remove -tts if starts with
 
     if content.starts_with(&prefix) {
-        return Err(Error::DebugLog(
-            "Failed check: Starts with prefix",
-        ));
+        return Ok(None)
     }
 
     let voice_state = guild.voice_states.get(&message.author.id);
     if message.author.bot {
         if bot_ignore || voice_state.is_none() {
-            return Ok(None); // Err(Error::DebugLog("Failed check: Is bot"))
+            return Ok(None) // Is bot
         }
     } else {
         // If the bot is in vc
         if let Some(vc) = guild.voice_states.get(&cache.current_user_id()) {
             // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
             if require_voice && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
-                return Err(Error::DebugLog("Failed check: Wrong vc"));
+                return Ok(None); // Wrong vc
             }
         // Else if the user is in the vc and autojoin is on
         } else if let Some(voice_state) = voice_state && autojoin {
-            let voice_channel = voice_state.channel_id.ok_or("vc.channel_id is None")?;
+            let voice_channel = voice_state.channel_id.try_unwrap()?;
             ctx.join_vc(lavalink, guild.id, voice_channel).await?;
         } else {
-            return Err(Error::DebugLog("Failed check: Bot not in vc"));
+            return Ok(None); // Bot not in vc
         };
 
         if require_voice {
-            let voice_channel = voice_state.unwrap().channel_id.ok_or("vc.channel_id is None")?;
-            if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).ok_or("channel is None")? {
+            let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
+            if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).try_unwrap()? {
                 if channel.kind == serenity::ChannelType::Stage && voice_state.map_or(false, |vs| vs.suppress) && audience_ignore {
-                    return Err(Error::DebugLog("Failed check: Is audience"));
+                    return Ok(None); // Is audience
                 }
             }
         }

@@ -14,13 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::borrow::Cow;
-use std::fmt::Write;
-use std::sync::mpsc::{Receiver, Sender};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Write, sync::{Arc, mpsc::{Receiver, Sender}}};
 
 use poise::serenity_prelude as serenity;
-use itertools::Itertools;
 use parking_lot::Mutex;
 
 use crate::structs::Error;
@@ -102,39 +98,40 @@ impl WebhookLogRecv {
             };
         }
 
-        for (severity, messages) in &message_buf {
-            let severity_name = severity.as_str();
-            let username = format!("TTS-Webhook [{}]", severity_name);
-
-            let message_chunked: Vec<String> =
-                messages.iter().flat_map(|[target, log_message]| {
-                    log_message.trim().split('\n').map(|line| {
-                        format!("`{} [{}]`: {}\n",
-                            self.prefix, target.clone(),
-                            if severity <= &tracing::Level::WARN {
-                                Cow::Owned(format!("**{line}**"))
-                            } else {
-                                Cow::Borrowed(line)
-                            }
-                        )
-                    })
+        for (severity, messages) in message_buf {
+            let mut chunks: Vec<String> = Vec::with_capacity(messages.len());
+            messages
+                .into_iter()
+                .map(|[target, log_message]| {
+                    log_message.trim().split('\n').map(move |line| {
+                        format!("`{} [{}]`: {}\n", self.prefix, target.clone(), line)
+                    }).collect::<String>()
                 })
                 .collect::<String>()
-                .chars().chunks(2000).into_iter()
-                .map(std::iter::Iterator::collect)
-                .collect();
+                .split_inclusive('\n')
+                .for_each(|line| {
+                    if let Some(chunk) = chunks.last_mut() {
+                        if chunk.len() + line.len() > 2000 {
+                            chunks.push(String::from(line));
+                        } else {
+                            chunk.push_str(line);
+                        }
+                    } else {
+                        chunks.push(String::from(line));
+                    }
+                });
 
-            let webhook = if tracing::Level::ERROR >= *severity {
+            let webhook = if tracing::Level::ERROR >= severity {
                 &self.error_logs
             } else {
                 &self.normal_logs
             };
 
-            for chunk in message_chunked {
+            for chunk in chunks {
                 webhook.execute(&self.http, false, |b| {b
                     .content(&chunk)
-                    .username(&username)
-                    .avatar_url(&self.level_lookup.get(severity).unwrap_or(&String::from(
+                    .username(&format!("TTS-Webhook [{}]", severity.as_str()))
+                    .avatar_url(&self.level_lookup.get(&severity).unwrap_or(&String::from(
                         "https://cdn.discordapp.com/embed/avatars/5.png",
                     )))
                 }).await?;

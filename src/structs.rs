@@ -7,6 +7,8 @@ use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 
 use crate::constants::RED;
+pub use crate::error::Error;
+
 
 #[derive(serde::Deserialize)]
 pub struct Config {
@@ -54,6 +56,7 @@ pub struct Data {
     pub guild_voice_db: crate::database::Handler<(i64, TTSMode)>,
 
     pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
+    pub system_info: parking_lot::Mutex<sysinfo::System>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub premium_users: Vec<serenity::UserId>,
@@ -169,34 +172,12 @@ impl std::fmt::Display for Gender {
 }
 
 
-#[derive(Debug)]
-pub enum Error {
-    GuildOnly,
-    None(String),
-    DebugLog(&'static str), // debug log something but ignore
-    Unexpected(Box<dyn std::error::Error + Send + Sync>),
-}
-
-impl<E> From<E> for Error
-where
-    E: Into<Box<dyn std::error::Error + Send + Sync>>,
-{
-    fn from(e: E) -> Self {
-        Self::Unexpected(e.into())
-    }
-}
-impl std::fmt::Display for Error {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
-
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 pub type PremiumVoices = std::collections::BTreeMap<String, std::collections::BTreeMap<String, Gender>>;
 pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, (serenity::UserId, std::time::SystemTime)>;
 
 pub trait OptionTryUnwrap<T> {
-    fn try_unwrap(self) -> Result<T, Error>;
+    fn try_unwrap(self) -> Result<T, anyhow::Error>;
 }
 
 #[serenity::async_trait]
@@ -219,10 +200,10 @@ pub trait SerenityContextAdditions {
 impl PoiseContextAdditions for Context<'_> {
     async fn author_permissions(&self) -> Result<serenity::Permissions, Error> {
         let ctx_discord = self.discord();
-        
-        match ctx_discord.cache.channel(self.channel_id()).ok_or("author perms no channel")? {
+
+        match ctx_discord.cache.channel(self.channel_id()).try_unwrap()? {
             serenity::Channel::Guild(channel) => {
-                let guild = channel.guild(&ctx_discord.cache).ok_or("author perms no guild")?;
+                let guild = channel.guild(&ctx_discord.cache).try_unwrap()?;
                 let member = guild.member(ctx_discord, self.author()).await?;
 
                 Ok(guild.user_permissions_in(&channel, &member)?)
@@ -312,13 +293,13 @@ impl SerenityContextAdditions for serenity::Context {
 
 impl<T> OptionTryUnwrap<T> for Option<T> {
     #[track_caller]
-    fn try_unwrap(self) -> Result<T, Error> {
+    fn try_unwrap(self) -> Result<T, anyhow::Error> {
         match self {
             Some(v) => Ok(v),
-            None => Err(Error::None({
+            None => Err({
                 let location = std::panic::Location::caller();
-                format!("Unexpected None value on line {} in {}", location.line(), location.file())
-            }))
+                anyhow::anyhow!("Unexpected None value on line {} in {}", location.line(), location.file())
+            })
         }
     }
 }

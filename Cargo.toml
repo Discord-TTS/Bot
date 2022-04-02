@@ -12,6 +12,8 @@ serde = "1"
 regex = "1"
 rand = "0.8"
 toml = "0.5"
+anyhow = "1"
+sha2 = "0.10"
 dashmap = "5"
 strfmt = "0.1"
 indexmap = "1"
@@ -19,10 +21,12 @@ tracing = "0.1"
 linkify = "0.8"
 strsim = "0.10"
 reqwest = "0.11"
+sysinfo = "0.23"
 lazy_static = "1"
 itertools = "0.10"
 num-format = "0.4"
 parking_lot = "0.12"
+generic-array = "0.14"
 deadpool-postgres = "0.10"
 #serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = ["simdjson"] }
 
@@ -36,7 +40,6 @@ features = ["macros", "rt-multi-thread", "signal", "parking_lot"]
 
 [dependencies.poise]
 git = "https://github.com/kangalioo/poise"
-features = ["collector"]
 branch = "develop"
 
 [dependencies.songbird]

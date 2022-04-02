@@ -108,6 +108,15 @@ pub async fn run(config: &mut toml::Value, pool: &Arc<deadpool_postgres::Pool>) 
             ADD COLUMN IF NOT EXISTS premium_user     bigint,
             ADD COLUMN IF NOT EXISTS require_voice    bool       DEFAULT True;
 
+        -- The old table had a pkey on traceback, now we hash and pkey on that
+        ALTER TABLE errors
+            ADD COLUMN IF NOT EXISTS traceback_hash bytea;
+        DELETE FROM errors WHERE traceback_hash IS NULL;
+        ALTER TABLE errors
+            DROP CONSTRAINT IF EXISTS errors_pkey,
+            DROP CONSTRAINT IF EXISTS traceback_hash_pkey,
+            ADD CONSTRAINT traceback_hash_pkey PRIMARY KEY (traceback_hash);
+
         INSERT INTO user_voice  (user_id, mode)         VALUES(0, 'gtts')       ON CONFLICT (user_id, mode)  DO NOTHING;
         INSERT INTO guild_voice (guild_id, mode, voice) VALUES(0, 'gtts', 'en') ON CONFLICT (guild_id, mode) DO NOTHING;
     ").await?;
