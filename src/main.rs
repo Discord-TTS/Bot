@@ -572,7 +572,7 @@ async fn process_tts_msg(
     let mut content = match run_checks(
         ctx, message, lavalink_client,
         channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
-    ).await? {
+    )? {
         None => return Ok(()),
         Some(content) => {
             let member = guild.member(ctx, message.author.id.0).await?;

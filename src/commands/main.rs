@@ -162,6 +162,9 @@ pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     required_bot_permissions = "SEND_MESSAGES | ADD_REACTIONS"
 )]
 pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.say("Temporarily disabled due to known bugs.").await?;
+    return Ok(());
+
     let guild = ctx.guild().ok_or(Error::GuildOnly)?;
     if !channel_check(&ctx).await? {
         return Ok(())
