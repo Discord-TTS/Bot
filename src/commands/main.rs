@@ -169,9 +169,11 @@ pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
 
     let lavalink = &ctx.data().lavalink;
     {
-        let nodes = lavalink.nodes().await;
+        let nodes = lavalink.nodes();
         let node = nodes.get_mut(&guild.id.into());
         if node.as_ref().map_or(true, |node| node.queue.is_empty()) {
+            drop(node);
+
             ctx.say("**Error:** Nothing in message queue to skip!").await?;
             return Ok(());
         }

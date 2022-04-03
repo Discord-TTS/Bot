@@ -926,7 +926,7 @@ dependencies = [
 [[package]]
 name = "lavalink-rs"
 version = "0.9.0-rc.3"
-source = "git+https://gitlab.com/GnomedDev/lavalink-rs?branch=update-deps#e9f42d39ef1a942264f985296e9fe9a7630a9e35"
+source = "git+https://gitlab.com/GnomedDev/lavalink-rs?branch=update-deps#5088d647eaca847fee6207fafca42b7546fc364a"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1423,7 +1423,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#1b046e56e9bab38333e458b25c7f6858341184a4"
+source = "git+https://github.com/kangalioo/poise?rev=953f863992ef9f49889be91e108f24ef4a9d1873#953f863992ef9f49889be91e108f24ef4a9d1873"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1440,7 +1440,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.1.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#1b046e56e9bab38333e458b25c7f6858341184a4"
+source = "git+https://github.com/kangalioo/poise?rev=953f863992ef9f49889be91e108f24ef4a9d1873#953f863992ef9f49889be91e108f24ef4a9d1873"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1920,7 +1920,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.10.10"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#806ff1bb3d28885105281d772f980ab3bf3f7581"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#41cc686a9913849bf5f6959b01e4740ee8548e9c"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1949,7 +1949,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#806ff1bb3d28885105281d772f980ab3bf3f7581"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#41cc686a9913849bf5f6959b01e4740ee8548e9c"
 dependencies = [
  "bitflags",
  "enum_primitive",
