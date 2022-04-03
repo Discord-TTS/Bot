@@ -926,7 +926,7 @@ dependencies = [
 [[package]]
 name = "lavalink-rs"
 version = "0.9.0-rc.3"
-source = "git+https://gitlab.com/GnomedDev/lavalink-rs?branch=update-deps#5088d647eaca847fee6207fafca42b7546fc364a"
+source = "git+https://gitlab.com/GnomedDev/lavalink-rs?rev=78b7927d7e72488385550915b3e868bc9e16dd14#78b7927d7e72488385550915b3e868bc9e16dd14"
 dependencies = [
  "async-trait",
  "async-tungstenite",
