@@ -257,7 +257,7 @@ async fn main() {
             },
             // Add all the commands, this ordering is important as it is shown on the help command
             commands: vec![
-                commands::main::join(), commands::main::skip(), commands::main::leave(), commands::main::premium_activate(),
+                commands::main::join(), commands::main::clear(), commands::main::leave(), commands::main::premium_activate(),
 
                 commands::other::tts(), commands::other::uptime(), commands::other::botstats(), commands::other::channel(),
                 commands::other::donate(), commands::other::ping(), commands::other::suggest(), commands::other::invite(),
@@ -572,7 +572,7 @@ async fn process_tts_msg(
     let mut content = match run_checks(
         ctx, message, lavalink_client,
         channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
-    )? {
+    ).await? {
         None => return Ok(()),
         Some(content) => {
             let member = guild.member(ctx, message.author.id.0).await?;

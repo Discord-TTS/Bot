@@ -256,7 +256,7 @@ fn remove_repeated_chars(content: &str, limit: usize) -> String {
 }
 
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
-pub fn run_checks(
+pub async fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
     lavalink: &LavalinkClient,
@@ -316,10 +316,10 @@ pub fn run_checks(
             if require_voice && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
                 return Ok(None); // Wrong vc
             }
-        // Else if the user is in the vc and autojoin is on TEMP DISABLED
-        // } else if let Some(voice_state) = voice_state && autojoin {
-        //     let voice_channel = voice_state.channel_id.try_unwrap()?;
-        //     ctx.join_vc(lavalink, guild.id, voice_channel).await?;
+        // Else if the user is in the vc and autojoin is on
+        } else if let Some(voice_state) = voice_state && autojoin {
+            let voice_channel = voice_state.channel_id.try_unwrap()?;
+            ctx.join_vc(lavalink, guild.id, voice_channel).await?;
         } else {
             return Ok(None); // Bot not in vc
         };

@@ -157,35 +157,21 @@ pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
 
 /// Clears the message queue!
 #[poise::command(
+    aliases("skip"),
     category="Main Commands",
     prefix_command, slash_command,
     required_bot_permissions = "SEND_MESSAGES | ADD_REACTIONS"
 )]
-pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("Temporarily disabled due to known bugs.").await?;
-    return Ok(());
-
-    let guild = ctx.guild().ok_or(Error::GuildOnly)?;
+pub async fn clear(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
     if !channel_check(&ctx).await? {
         return Ok(())
     }
 
     let lavalink = &ctx.data().lavalink;
-    {
-        let lavalink_inner = lavalink.inner.lock();
-        let node = lavalink_inner.nodes.get_mut(&guild.id.into());
-        if node.as_ref().map_or(true, |node| node.queue.is_empty()) {
-            drop(node);
-            drop(lavalink_inner);
+    lavalink.skip(guild_id).await;
+    lavalink.inner.queues.remove(&guild_id.into());
 
-            ctx.say("**Error:** Nothing in message queue to skip!").await?;
-            return Ok(());
-        }
-
-        node.unwrap().queue.clear();
-    }
-
-    lavalink.skip(guild.id).await;
     match ctx {
         poise::Context::Prefix(ctx) => {
             // Prefixed command, just add a thumbsup reaction
