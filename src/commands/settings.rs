@@ -356,13 +356,9 @@ async fn check_valid_voice(data: &Data, voice: String, mode: TTSMode) -> Result<
         TTSMode::Gtts => get_gtts_voices().contains_key(&voice),
         TTSMode::Espeak => get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?.contains(&voice),
         TTSMode::Premium => {
-            let mut voice = voice.split_whitespace();
-            let language = match voice.next() {
-                Some(i) => i,
-                None => return Ok(false)
-            };
-
-            data.premium_voices.contains_key(language)
+            voice.split_once(' ')
+                .and_then(|(language, variant)| data.premium_voices.get(language).map(|l| (l, variant)))
+                .map_or(false, |(ls, v)| ls.contains_key(v))
         }
     })
 }
@@ -916,7 +912,7 @@ pub async fn mode(
 )]
 pub async fn voice(
     ctx: Context<'_>,
-    #[description="The voice to read messages in, leave blank to reset"] voice: Option<String>
+    #[description="The voice to read messages in, leave blank to reset"] #[rest] voice: Option<String>
 ) -> Result<(), Error> {
     let data = ctx.data();
     let author_id = ctx.author().id;
