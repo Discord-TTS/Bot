@@ -531,7 +531,7 @@ pub async fn server_mode(
 )]
 pub async fn server_voice(
     ctx: Context<'_>,
-    #[description="The default voice to read messages in"] voice: String
+    #[description="The default voice to read messages in"] #[rest] voice: String
 ) -> Result<(), Error> {
     let data = ctx.data();
     let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
@@ -882,7 +882,7 @@ Just do `{}join` and start talking!
     category="Settings",
     prefix_command, slash_command,
     required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
-    aliases("voice_mode", "server_mode", "server_tts_mode", "server_ttsmode")
+    aliases("voice_mode", "tts_mode", "ttsmode")
 )]
 pub async fn mode(
     ctx: Context<'_>,
