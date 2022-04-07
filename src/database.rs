@@ -21,7 +21,7 @@ use dashmap::DashMap;
 use tokio_postgres::{Statement, Error as SqlError};
 use deadpool_postgres::{tokio_postgres, Object as Connection};
 
-use crate::structs::{Error, TTSMode};
+use crate::structs::{Result, TTSMode};
 
 #[poise::async_trait]
 pub trait CacheKeyTrait {
@@ -97,7 +97,7 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
         delete: &'static str,
         create_row: &'static str,
         single_insert: &'static str,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         Ok(Self {
             cache: DashMap::new(),
             default_row: Self::_get(
@@ -110,12 +110,12 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
         })
     }
 
-    async fn _get(conn: Connection, select_query: &'static str, identifier: T) -> Result<Option<Arc<tokio_postgres::Row>>, Error> {
+    async fn _get(conn: Connection, select_query: &'static str, identifier: T) -> Result<Option<Arc<tokio_postgres::Row>>> {
         let stmt = conn.prepare_cached(select_query).await?;
         Ok(identifier.get(conn, stmt).await?.map(Arc::new))
     }
 
-    pub async fn get(&self, identifier: T) -> Result<Arc<tokio_postgres::Row>, Error> {
+    pub async fn get(&self, identifier: T) -> Result<Arc<tokio_postgres::Row>> {
         if let Some(row) = self.cache.get(&identifier) {
             return Ok(row.clone());
         }
@@ -133,7 +133,7 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
     pub async fn create_row(
         &self,
         identifier: T
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let conn = self.pool.get().await?;
         let stmt = conn.prepare_cached(self.create_row).await?;
         identifier.execute(conn, stmt).await?;
@@ -146,7 +146,7 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
         identifier: T,
         key: &str,
         value: &(impl tokio_postgres::types::ToSql + Sync),
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let conn = self.pool.get().await?;
 
         let stmt = conn.prepare_cached(&strfmt(self.single_insert, &{
@@ -159,7 +159,7 @@ where T: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + std::marker::Sync + st
         Ok(())
     }
 
-    pub async fn delete(&self, identifier: T) -> Result<(), Error> {
+    pub async fn delete(&self, identifier: T) -> Result<()> {
         let conn = self.pool.get().await?;
 
         let stmt = conn.prepare_cached(self.delete).await?;

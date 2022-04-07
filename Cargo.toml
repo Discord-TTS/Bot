@@ -16,6 +16,7 @@ anyhow = "1"
 sha2 = "0.10"
 strfmt = "0.1"
 indexmap = "1"
+once_cell = "1"
 tracing = "0.1"
 linkify = "0.8"
 strsim = "0.10"
@@ -43,7 +44,7 @@ features = ["macros", "rt-multi-thread", "signal", "parking_lot"]
 
 [dependencies.poise]
 git = "https://github.com/kangalioo/poise"
-rev = "953f863992ef9f49889be91e108f24ef4a9d1873"
+branch = "develop"
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"

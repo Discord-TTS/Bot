@@ -26,9 +26,10 @@
 use std::{collections::HashMap, borrow::Cow};
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use deadpool_postgres::tokio_postgres;
+use once_cell::sync::OnceCell;
 use sysinfo::SystemExt;
 use tracing::{error, info, warn};
 
@@ -48,7 +49,7 @@ mod funcs;
 
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices, generate_status};
-use structs::{TTSMode, Config, Data, Error, PoiseContextAdditions, SerenityContextAdditions, PostgresConfig, OptionTryUnwrap};
+use structs::{TTSMode, Config, Data, Result, PoiseContextAdditions, SerenityContextAdditions, PostgresConfig, OptionTryUnwrap, Framework};
 
 struct LavalinkHandler;
 impl LavalinkEventHandler for LavalinkHandler {}
@@ -175,10 +176,13 @@ async fn main() {
         )
     };
 
+    let framework_oc = Arc::new(once_cell::sync::OnceCell::new());
+    let framework_oc_clone = framework_oc.clone();
+
     let framework = poise::Framework::build()
         .token(main.token.take().unwrap())
-        .client_settings(move |f| {
-            f.intents(
+        .client_settings(move |f| {f
+            .intents(
                 serenity::GatewayIntents::GUILDS
                 | serenity::GatewayIntents::GUILD_MESSAGES
                 | serenity::GatewayIntents::DIRECT_MESSAGES
@@ -186,10 +190,10 @@ async fn main() {
                 | serenity::GatewayIntents::GUILD_MEMBERS
                 | serenity::GatewayIntents::MESSAGE_CONTENT,
             )
+            .event_handler(EventHandler {framework: framework_oc_clone})
             .register_songbird()
         })
         .user_data_setup(move |ctx, ready, _framework| {Box::pin(async move {
-
             let (send, rx) = std::sync::mpsc::channel();
             let subscriber = logging::WebhookLogSend::new(send, tracing::Level::from_str(&main.log_level)?);
             let listener = logging::WebhookLogRecv::new(
@@ -244,7 +248,6 @@ async fn main() {
                 }));
             }),
             on_error: |error| Box::pin(async move {error::handle(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err))}),
-            listener: |ctx, event, fw, ud| Box::pin(event_listener(ctx, event, fw, ud)),
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: None,
                 dynamic_prefix: Some(|ctx| {Box::pin(async move {Ok(Some(
@@ -281,7 +284,7 @@ async fn main() {
 
                 commands::help::help(),
                 commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
-                commands::owner::add_premium(), commands::owner::cause_error(),
+                commands::owner::add_premium(),
 
                 poise::Command {
                     subcommands: vec![
@@ -292,6 +295,8 @@ async fn main() {
             ],..poise::FrameworkOptions::default()
         })
         .build().await.unwrap();
+
+    if framework_oc.set(Arc::downgrade(&framework)).is_err() {unreachable!()};
 
     let framework_copy = framework.clone();
     tokio::spawn(async move {
@@ -329,23 +334,41 @@ async fn main() {
     framework.start_autosharded().await.unwrap();
 }
 
-#[allow(clippy::collapsible_match)]
-async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, framework: &poise::Framework<Data, Error>, data: &Data) -> Result<(), Error> {
-    match event {
-        poise::Event::Message { new_message } => {
+struct EventHandler {
+    framework: Arc<OnceCell<Weak<Framework>>>
+}
+
+impl EventHandler {
+    fn framework(&self) -> Option<Arc<Framework>> {
+        self.framework.get().and_then(Weak::upgrade)
+    }
+}
+
+#[poise::async_trait]
+impl serenity::EventHandler for EventHandler {
+    async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
+        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        error::handle_message(&ctx, &framework, &new_message, (|| async {
+            let data = framework.user_data().await;
+
             let (tts_result, support_result, mention_result) = tokio::join!(
-                process_tts_msg(ctx, new_message, data),
-                process_support_dm(ctx, new_message, data),
-                process_mention_msg(ctx, new_message, data),
+                process_tts_msg(&ctx, &new_message, data),
+                process_support_dm(&ctx, &new_message, data),
+                process_mention_msg(&ctx, &new_message, data),
             );
 
             tts_result?; support_result?; mention_result?;
-        }
-        poise::Event::VoiceStateUpdate { old, new } => {
+            Ok(())
+        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+    }
+
+    async fn voice_state_update(&self, ctx: serenity::Context, old: Option<serenity::VoiceState>, new: serenity::VoiceState) {
+        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        error::handle_unexpected_default(&ctx, &framework, (|| async {
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user_id();
             let guild_id = new.guild_id.try_unwrap()?;
-            let songbird = songbird::get(ctx).await.unwrap();
+            let songbird = songbird::get(&ctx).await.unwrap();
 
             let bot_voice_client = songbird.get(guild_id);
             if bot_voice_client.is_some()
@@ -360,41 +383,105 @@ async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, frame
                     .iter().any(|m| !m.user.bot)
             {
                 songbird.remove(guild_id).await?;
-                data.lavalink.destroy(guild_id.0).await?;
-            }
-        }
-        poise::Event::GuildCreate { guild, is_new } => {
-            if !is_new {
-                return Ok(());
+                framework.user_data().await.lavalink.destroy(guild_id.0).await?;
+            };
+
+            Ok(())
+        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+    }
+
+    async fn guild_create(&self, ctx: serenity::Context, guild: serenity::Guild, is_new: bool) {
+        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let data = framework.user_data().await;
+        if !is_new {return};
+
+        error::handle_guild("GuildCreate", &ctx, &framework, Some(&guild), (|| async {
+            // Send to servers channel and DM owner the welcome message
+
+            let (owner, _) = tokio::join!(
+                guild.owner_id.to_user(&ctx),
+                data.webhooks["servers"].execute(&ctx.http, false, |b| {
+                    b.content(format!("Just joined {}!", &guild.name))
+                }),
+            );
+
+            let owner = owner?;
+            match owner.direct_message(&ctx, |b| {b.embed(|e| {e
+                .title(format!("Welcome to {}!", ctx.cache.current_user_field(|b| b.name.clone())))
+                .description(format!("
+Hello! Someone invited me to your server `{}`!
+TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
+**Most commands need to be done on your server, such as `-setup` and `-join`**
+I need someone with the administrator permission to do `-setup #channel`
+You can then do `-join` in that channel and I will join your voice channel!
+Then, you can just type normal messages and I will say them, like magic!
+You can view all the commands with `-help`
+Ask questions by either responding here or asking on the support server!",
+                guild.name))
+                .footer(|f| {f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite))})
+                .author(|a| {a.name(format!("{}#{}", &owner.name, &owner.id)); a.icon_url(owner.face())})
+            })}).await {
+                Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
+                Err(error) => return Err(anyhow::Error::from(error)),
+                _ => {}
             }
 
-            process_new_guild(ctx, data, guild).await?;
-        }
-        poise::Event::GuildDelete { incomplete, full } => {
-            let incomplete: &serenity::UnavailableGuild = incomplete;
-            let guild: &Option<serenity::Guild> = full;
+            match ctx.http.add_member_role(
+                data.config.main_server.into(),
+                owner.id.0,
+                data.config.ofs_role,
+                None
+            ).await {
+                Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => {return Ok(())},
+                Err(err) => return Err(anyhow::Error::from(err)),
+                Ok(_) => (),
+            }
 
+            info!("Added OFS role to {}#{}", owner.name, owner.discriminator);
+
+            Ok(())
+        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+    }
+
+    async fn guild_delete(&self, ctx: serenity::Context, incomplete: serenity::UnavailableGuild, full: Option<serenity::Guild>) {
+        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let data = framework.user_data().await;
+
+        error::handle_guild("GuildDelete", &ctx, &framework, full.as_ref(), (|| async {
             data.guilds_db.delete(incomplete.id.into()).await?;
-            match guild {
-                Some(guild) => {
-                    data.webhooks["servers"].execute(&ctx.http, false, |b| {b.content(format!(
-                        "Just got kicked from {}. I'm now in {} servers",
-                        guild.name, ctx.cache.guilds().len()
-                    ))}).await?;
-                }
-                None => warn!("Guild ID {} just was deleted without being cached!", incomplete.id),
-            }
-        }
-        poise::Event::InteractionCreate { interaction } => {
+            if let Some(guild) = &full {
+                data.webhooks["servers"].execute(&ctx.http, false, |b| {b.content(format!(
+                    "Just got kicked from {}. I'm now in {} servers",
+                    guild.name, ctx.cache.guilds().len()
+                ))}).await?;
+            };
+
+            Ok(())
+        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+    }
+
+    async fn interaction_create(&self, ctx: serenity::Context, interaction: serenity::Interaction) {
+        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let data = framework.user_data().await;
+
+        error::handle_unexpected_default(&ctx, &framework, (|| async {
             if let serenity::Interaction::MessageComponent(interaction) = interaction {
                 if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
-                    error::handle_traceback_button(ctx, data, interaction).await?;
+                    error::handle_traceback_button(&ctx, data, interaction).await?;
                 }
-            }
-        },
-        poise::Event::Ready { data_about_bot } => {
+            };
+
+            Ok(())
+        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+    }
+
+    async fn ready(&self, ctx: serenity::Context, data_about_bot: serenity::Ready) {
+        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let data = framework.user_data().await;
+
+        error::handle_unexpected_default(&ctx, &framework, (|| async {
             let user_name = &data_about_bot.user.name;
-            let (status, starting) = generate_status(framework).await;
+            let (status, starting) = generate_status(&framework).await;
             data.webhooks["logs"].edit_message(&ctx.http, data.startup_message, |m| {m
                 .content("")
                 .embeds(vec![serenity::Embed::fake(|e| {e
@@ -406,15 +493,18 @@ async fn event_listener(ctx: &serenity::Context, event: &poise::Event<'_>, frame
                     })
                 })])
             }).await?;
-        }
-        poise::Event::Resume { event: _ } => {
-            data.analytics.log(Cow::Borrowed("on_resumed"));
-        }
-        _ => {}
+
+            Ok(())
+        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
-    Ok(())
+    async fn resume(&self, _: serenity::Context, _: serenity::ResumedEvent) {
+        if let Some(framework) = self.framework() {
+            framework.user_data().await.analytics.log(Cow::Borrowed("on_resumed"));
+        }
+    }
 }
+
 
 enum FailurePoint {
     PatreonRole(serenity::UserId),
@@ -422,7 +512,7 @@ enum FailurePoint {
     Guild,
 }
 
-async fn premium_check(data: &Data, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>, Error> {
+async fn premium_check(data: &Data, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>> {
     let guild = match guild_id {
         Some(guild) => guild.0 as i64,
         None => return Ok(Some(FailurePoint::Guild))
@@ -444,7 +534,7 @@ async fn premium_check(data: &Data, guild_id: Option<serenity::GuildId>) -> Resu
     )
 }
 
-async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, Error> {
+async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, error::CommandError> {
     let ctx_discord = ctx.discord();
     let guild = ctx.guild();
     let data = ctx.data();
@@ -496,57 +586,11 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, Error>
     Ok(false)
 }
 
-
-async fn process_new_guild(ctx: &serenity::Context, data: &Data, guild: &serenity::Guild) -> Result<(), Error> {
-    // Send to servers channel and DM owner the welcome message
-    let (owner, _) = tokio::join!(
-        guild.owner_id.to_user(ctx),
-        data.webhooks["servers"].execute(&ctx.http, false, |b| {
-            b.content(format!("Just joined {}!", &guild.name))
-        }),
-    );
-
-    let owner = owner?;
-    match owner.direct_message(ctx, |b| {b.embed(|e| {e
-        .title(format!("Welcome to {}!", ctx.cache.current_user_field(|b| b.name.clone())))
-        .description(format!("
-Hello! Someone invited me to your server `{}`!
-TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
-**Most commands need to be done on your server, such as `-setup` and `-join`**
-I need someone with the administrator permission to do `-setup #channel`
-You can then do `-join` in that channel and I will join your voice channel!
-Then, you can just type normal messages and I will say them, like magic!
-You can view all the commands with `-help`
-Ask questions by either responding here or asking on the support server!",
-        guild.name))
-        .footer(|f| {f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite))})
-        .author(|a| {a.name(format!("{}#{}", &owner.name, &owner.id)); a.icon_url(owner.face())})
-    })}).await {
-        Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
-        Err(error) => return Err(Error::Unexpected(anyhow::Error::from(error))),
-        _ => {}
-    }
-
-    match ctx.http.add_member_role(
-        data.config.main_server.into(),
-        owner.id.0,
-        data.config.ofs_role,
-        None
-    ).await {
-        Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => {return Ok(())},
-        Err(err) => return Err(Error::Unexpected(anyhow::Error::from(err))),
-        Ok(_) => (),
-    }
-
-    info!("Added OFS role to {}#{}", owner.name, owner.discriminator);
-    Ok(())
-}
-
 async fn process_tts_msg(
     ctx: &serenity::Context,
     message: &serenity::Message,
     data: &Data,
-) -> Result<(), Error> {
+) -> Result<()> {
     let guild = match message.guild(&ctx.cache) {
         Some(guild) => guild,
         None => return Ok(()),
@@ -621,7 +665,7 @@ async fn process_mention_msg(
     ctx: &serenity::Context,
     message: &serenity::Message,
     data: &Data,
-) -> Result<(), Error> {
+) -> Result<()> {
     let bot_user = ctx.cache.current_user();
 
     let guild = match message.guild(ctx) {
@@ -648,7 +692,7 @@ async fn process_mention_msg(
 
         match result {
             Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
-            Err(error) => return Err(Error::Unexpected(anyhow::Error::from(error))),
+            Err(error) => return Err(anyhow::Error::from(error)),
             _ => {}
         }
     }
@@ -660,7 +704,7 @@ async fn process_support_dm(
     ctx: &serenity::Context,
     message: &serenity::Message,
     data: &Data,
-) -> Result<(), Error> {
+) -> Result<()> {
     match message.channel(ctx).await? {
         serenity::Channel::Guild(channel) => {
             // Check support server trusted member replies to a DM, if so, pass it through

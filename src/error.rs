@@ -7,21 +7,26 @@ use sha2::Digest;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::{structs::{Data, PoiseContextAdditions, OptionTryUnwrap, Context}, constants::{RED, VIEW_TRACEBACK_CUSTOM_ID}, funcs::refresh_kind};
+use crate::{
+    structs::{Context, Error, Data, Framework, OptionTryUnwrap, PoiseContextAdditions, Result},
+    constants::{RED, VIEW_TRACEBACK_CUSTOM_ID},
+    funcs::refresh_kind
+};
 
 #[derive(Debug)]
-pub enum Error {
+#[allow(clippy::module_name_repetitions)]
+pub enum CommandError {
     GuildOnly,
-    Unexpected(anyhow::Error),
+    Unexpected(Error),
 }
 
-impl<E> From<E> for Error
-where E: Into<anyhow::Error> {
+impl<E> From<E> for CommandError
+where E: Into<Error> {
     fn from(e: E) -> Self {
         Self::Unexpected(e.into())
     }
 }
-impl std::fmt::Display for Error {
+impl std::fmt::Display for CommandError {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
@@ -39,13 +44,13 @@ fn hash(data: &[u8]) -> Vec<u8> {
 
 async fn handle_unexpected(
     ctx: &serenity::Context,
-    framework: &poise::Framework<Data, Error>,
+    framework: &Framework,
     event: &str,
-    error: anyhow::Error,
+    error: Error,
     extra_fields: Vec<(&str, Cow<'_, str>, bool)>,
     author_name: Option<String>,
     icon_url: Option<String>
-) -> Result<(), Error> {
+) -> Result<()> {
     let data = framework.user_data().await;
     let error_webhook = &data.webhooks["errors"];
 
@@ -144,6 +149,50 @@ async fn handle_unexpected(
     Ok(())
 }
 
+pub async fn handle_unexpected_default<T>(ctx: &serenity::Context, framework: &Framework, result: Result<T, Error>) -> Result<()> {
+    let error = if let Some(err) = result.err() {err} else {return Ok(())};
+
+    handle_unexpected(
+        ctx, framework, "VoiceStateUpdate",
+        error, Vec::new(),
+        None, None
+    ).await
+}
+
+
+// Listener Handlers
+pub async fn handle_message<T>(ctx: &serenity::Context, framework: &Framework, message: &serenity::Message, result: Result<T, Error>) -> Result<()> {
+    let error = if let Some(err) = result.err() {err} else {return Ok(())};
+
+    let mut extra_fields = Vec::with_capacity(3);
+    if let Some(guild) = message.guild(&ctx.cache) {
+        extra_fields.extend([
+            ("Guild", Cow::Owned(guild.name), true),
+            ("Guild ID", Cow::Owned(guild.id.0.to_string()), true),
+        ]);
+    }
+
+    extra_fields.push(("Channel Type", Cow::Borrowed(channel_type(message.channel_id.to_channel(&ctx).await?)), true));
+    handle_unexpected(
+        ctx, framework, "MessageCreate",
+        error, extra_fields,
+        Some(message.author.name.clone()), Some(message.author.face())
+    ).await
+}
+
+pub async fn handle_guild<T>(name: &str, ctx: &serenity::Context, framework: &Framework, guild: Option<&serenity::Guild>, result: Result<T, Error>) -> Result<(), Error> {
+    let error = if let Some(err) = result.err() {err} else {return Ok(())};
+
+    handle_unexpected(
+        ctx, framework, name,
+        error, Vec::new(),
+        guild.as_ref().map(|g| g.name.clone()),
+        guild.and_then(serenity::Guild::icon_url),
+    ).await
+}
+
+
+// Command Error handlers
 async fn handle_cooldown(ctx: Context<'_>, remaining_cooldown: std::time::Duration) -> Result<(), Error> {
     let cooldown_response = ctx.send_error(
         &format!("{} is on cooldown", ctx.command().name),
@@ -211,33 +260,20 @@ fn channel_type(channel: serenity::Channel) -> &'static str {
     }
 }
 
-fn guild_event_error<'a>(event: &'a poise::Event<'a>) -> Option<(&'a String, Option<String>)> {
-    let guild = match event {
-        poise::Event::GuildCreate {guild, ..} => guild,
-        poise::Event::GuildDelete {full, ..} => full.as_ref()?,
-        _ => unreachable!()
-    };
-
-    Some((
-        &guild.name,
-        guild.icon_url()
-    ))
-}
-
-pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<(), Error> {
+pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Result<(), Error> {
     match error {
         poise::FrameworkError::DynamicPrefix { error } => error!("Error in dynamic_prefix: {:?}", error),
         poise::FrameworkError::Command { error, ctx } => {
             let command = ctx.command();
             let (error, fix) = match error {
-                Error::GuildOnly => (
+                CommandError::GuildOnly => (
                     Cow::Owned(format!("{} cannot be used in private messages", command.qualified_name)),
                     Some(format!(
                         "try running it on a server with {} in",
                         ctx.discord().cache.current_user_field(|b| b.name.clone())
                     )),
                 ),
-                Error::Unexpected(error) => {
+                CommandError::Unexpected(error) => {
                     let author = ctx.author();
                     let mut extra_fields = vec![
                         ("Command", Cow::Borrowed(command.name), true),
@@ -265,42 +301,6 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<(),
         }
         poise::FrameworkError::ArgumentParse { error, ctx, input } => handle_argparse(ctx, error, input).await?,
         poise::FrameworkError::CooldownHit { remaining_cooldown, ctx } => handle_cooldown(ctx, remaining_cooldown).await?,
-        poise::FrameworkError::Listener{error, event, ctx, framework} => {
-            match error {
-                Error::GuildOnly => {},
-                Error::Unexpected(error) => {
-                    let (author_name, icon_url, extra_fields) = match event {
-                        poise::Event::Message {new_message} => {
-                            let mut extra_fields = Vec::with_capacity(3);
-                            if let Some(guild) = new_message.guild(&ctx.cache) {
-                                extra_fields.extend([
-                                    ("Guild", Cow::Owned(guild.name), true),
-                                    ("Guild ID", Cow::Owned(guild.id.0.to_string()), true),
-                                ]);
-                            }
-
-                            extra_fields.push(("Channel Type", Cow::Borrowed(channel_type(new_message.channel_id.to_channel(&ctx).await?)), true));
-                            (Some(new_message.author.name.clone()), Some(new_message.author.face()), extra_fields)
-                        },
-                        poise::Event::GuildCreate {..} | poise::Event::GuildDelete {..} => {
-                            guild_event_error(event)
-                                .map(|(guild_name, icon_url)| 
-                                    (Some(guild_name.clone()), icon_url, vec![])
-                                )
-                                .unwrap_or((None, None, vec![]))
-                        }
-                        _ => (None, None, vec![])
-                    };
-
-                    handle_unexpected(
-                        &ctx, framework, event.name(),
-                        error, extra_fields,
-                        author_name, icon_url,
-                    ).await?;
-                }
-            }
-        },
-
         poise::FrameworkError::MissingBotPermissions{missing_permissions, ctx} => {
             ctx.send_error(
                 &format!("I cannot run `{}` as I am missing permissions", ctx.command().name),
@@ -325,6 +325,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<(),
             }
         },
 
+        poise::FrameworkError::Listener{..} => unreachable!("Listener error, but no listener???"),
         poise::FrameworkError::CommandStructureMismatch { description: _, ctx: _ } |
         poise::FrameworkError::NotAnOwner{ctx: _}=> {},
     }
@@ -332,7 +333,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<(),
     Ok(())
 }
 
-pub async fn handle_traceback_button(ctx: &serenity::Context, data: &Data, interaction: &serenity::MessageComponentInteraction) -> Result<(), Error> {
+pub async fn handle_traceback_button(ctx: &serenity::Context, data: &Data, interaction: serenity::MessageComponentInteraction) -> Result<(), Error> {
     let conn = data.pool.get().await?;
     let row = conn.query_opt(
         "SELECT traceback FROM errors WHERE message_id = $1",

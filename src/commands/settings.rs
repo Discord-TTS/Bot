@@ -20,16 +20,17 @@ use itertools::Itertools;
 
 use poise::serenity_prelude as serenity;
 
+use crate::error::CommandError;
 use crate::funcs::{get_gtts_voices, get_espeak_voices, netural_colour, parse_user_or_guild};
+use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
-use crate::structs::{Context, Error, TTSMode, Data, TTSModeServerChoice};
 use crate::{random_footer, database};
 
 
 /// Displays the current settings!
 #[poise::command(category="Settings", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
-pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+pub async fn settings(ctx: Context<'_>) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?;
     let author_id = ctx.author().id;
 
     let data = ctx.data();
@@ -390,7 +391,7 @@ const fn to_enabled(value: bool) -> &'static str {
 
 /// Changes a setting!
 #[poise::command(category="Settings", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
-pub async fn set(ctx: Context<'_>, ) -> Result<(), Error> {
+pub async fn set(ctx: Context<'_>, ) -> CommandResult {
     crate::commands::help::_help(ctx, Some("set")).await
 }
 
@@ -405,7 +406,7 @@ pub async fn block(
     ctx: Context<'_>,
     user: serenity::UserId,
     value: bool
-) -> Result<(), Error> {
+) -> CommandResult {
     ctx.data().userinfo_db.set_one(user.into(), "dm_blocked", &value).await?;
     ctx.say("Done!").await?;
     Ok(())
@@ -421,8 +422,8 @@ pub async fn block(
 pub async fn xsaid(
     ctx: Context<'_>,
     #[description="Whether to say \"<user> said\" before each message"] value: Option<bool>
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?.into();
 
     let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "xsaid", &value).await?;
@@ -442,8 +443,8 @@ pub async fn xsaid(
 pub async fn autojoin(
     ctx: Context<'_>,
     #[description="Whether to autojoin voice channels"] value: Option<bool>
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?.into();
 
     let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "auto_join", &value).await?;
@@ -463,8 +464,8 @@ pub async fn autojoin(
 pub async fn botignore(
     ctx: Context<'_>,
     #[description="Whether to ignore messages sent by bots and webhooks"] value: Option<bool>
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?.into();
 
     let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "bot_ignore", &value).await?;
@@ -484,8 +485,8 @@ pub async fn botignore(
 pub async fn require_voice(
     ctx: Context<'_>,
     #[description="Whether to require people to be in the voice channel to TTS"] value: Option<bool>
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?.into();
 
     let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "require_voice", &value).await?;
@@ -505,8 +506,8 @@ pub async fn require_voice(
 pub async fn server_mode(
     ctx: Context<'_>,
     #[description="The TTS Mode to change to"] mode: TTSModeServerChoice
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?;
 
     let data = ctx.data();
     let to_send = change_mode(
@@ -532,9 +533,9 @@ pub async fn server_mode(
 pub async fn server_voice(
     ctx: Context<'_>,
     #[description="The default voice to read messages in"] #[rest] voice: String
-) -> Result<(), Error> {
+) -> CommandResult {
     let data = ctx.data();
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?;
 
     let to_send = change_voice(
         &ctx, &data.guilds_db, &data.guild_voice_db,
@@ -555,8 +556,8 @@ pub async fn server_voice(
     required_bot_permissions="SEND_MESSAGES",
     aliases("translate", "to_translate", "should_translate")
 )]
-pub async fn translation(ctx: Context<'_>, #[description="Whether to translate all messages to the same language"] value: Option<bool>) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+pub async fn translation(ctx: Context<'_>, #[description="Whether to translate all messages to the same language"] value: Option<bool>) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?.into();
 
     let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "to_translate", &value).await?;
@@ -577,10 +578,9 @@ pub async fn translation(ctx: Context<'_>, #[description="Whether to translate a
 pub async fn translation_lang(
     ctx: Context<'_>,
     #[description="The language to translate all TTS messages to"] lang: Option<String>
-) -> Result<(), Error> {
-
+) -> CommandResult {
     let data = ctx.data();
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?.into();
 
     let translation_langs = get_translation_langs(
         &data.reqwest,
@@ -621,8 +621,8 @@ pub async fn translation_lang(
 pub async fn prefix(
     ctx: Context<'_>,
     #[description="The prefix to be used before commands"] #[rest] prefix: String
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?.into();
 
     let to_send = if prefix.len() <= 5 && prefix.matches(' ').count() <= 1 {
         ctx.data().guilds_db.set_one(guild_id, "prefix", &prefix).await?;
@@ -643,8 +643,8 @@ pub async fn prefix(
     required_bot_permissions="SEND_MESSAGES",
     aliases("repeated_chars", "repeated_letters", "chars")
 )]
-pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeated characters"] chars: u8) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeated characters"] chars: u8) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?.into();
 
     let to_send = {
         if chars > 100 {
@@ -672,8 +672,8 @@ pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeat
 pub async fn audienceignore(
     ctx: Context<'_>,
     #[description="Whether to ignore messages sent by the audience"] value: Option<bool>
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?.into();
+) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?.into();
 
     let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
     ctx.data().guilds_db.set_one(guild_id, "audience_ignore", &value).await?;
@@ -692,7 +692,7 @@ pub async fn audienceignore(
 pub async fn speaking_rate(
     ctx: Context<'_>,
     #[description="The speed to speak at (0.25-4.0)"] #[min=0.25] #[max=4.0] multiplier: f32
-) -> Result<(), Error> {
+) -> CommandResult {
     let to_send = {
         if multiplier > 4.0 {
             Cow::Borrowed("**Error**: Cannot set the speaking rate multiplier above 4x")
@@ -719,9 +719,9 @@ pub async fn nick(
     ctx: Context<'_>,
     #[description="The user to set the nick for, defaults to you"] user: Option<serenity::User>,
     #[description="The nickname to set, leave blank to reset"] #[rest] nickname: Option<String>
-) -> Result<(), Error> {
+) -> CommandResult {
     let ctx_discord = ctx.discord();
-    let guild = ctx.guild().ok_or(Error::GuildOnly)?;
+    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
 
     let author = ctx.author();
     let user = user.map_or_else(|| Cow::Borrowed(author), Cow::Owned);
@@ -778,8 +778,8 @@ pub async fn setup(
     ctx: Context<'_>,
     #[description="The channel for the bot to read messages from"] #[channel_types("Text")]
     channel: Option<serenity::GuildChannel>
-) -> Result<(), Error> {
-    let guild = ctx.guild().ok_or(Error::GuildOnly)?;
+) -> CommandResult {
+    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
 
     let ctx_discord = ctx.discord();
     let cache = &ctx_discord.cache;
@@ -887,8 +887,8 @@ Just do `{}join` and start talking!
 pub async fn mode(
     ctx: Context<'_>,
     #[description="The TTS Mode to change to, leave blank for server default"] mode: Option<crate::structs::TTSModeChoice>
-) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?;
 
     let data = ctx.data();
     let to_send = change_mode(
@@ -913,10 +913,10 @@ pub async fn mode(
 pub async fn voice(
     ctx: Context<'_>,
     #[description="The voice to read messages in, leave blank to reset"] #[rest] voice: Option<String>
-) -> Result<(), Error> {
+) -> CommandResult {
     let data = ctx.data();
     let author_id = ctx.author().id;
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?;
 
     let to_send = change_voice(
         &ctx, &data.userinfo_db, &data.user_voice_db,
@@ -938,7 +938,7 @@ pub async fn voice(
 pub async fn voices(
     ctx: Context<'_>,
     #[description="The mode to see the voices for, leave blank for current"] mode: Option<TTSModeServerChoice>
-) -> Result<(), Error> {
+) -> CommandResult {
     let author = ctx.author();
     let data = ctx.data();
 
@@ -951,7 +951,7 @@ pub async fn voices(
         let mut supported_langs = match mode {
             TTSMode::Gtts => crate::funcs::get_gtts_voices().into_iter().map(|(k, _)| k).collect(),
             TTSMode::Espeak => crate::funcs::get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?,
-            TTSMode::Premium => return list_premium_voices(ctx).await
+            TTSMode::Premium => return list_premium_voices(ctx).await.map_err(Into::into)
         };
 
         supported_langs.sort_unstable();
@@ -985,7 +985,7 @@ pub async fn voices(
 }
 
 
-pub async fn list_premium_voices(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn list_premium_voices(ctx: Context<'_>) -> Result<()> {
     let http = &ctx.discord().http; 
     if let poise::Context::Application(ctx) = ctx {
         if let poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) = ctx.interaction {

@@ -6,9 +6,8 @@ use lazy_static::lazy_static;
 use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 
-use crate::constants::RED;
-pub use crate::error::Error;
-
+use crate::{constants::RED, error::CommandError};
+pub use anyhow::{Error, Result};
 
 #[derive(serde::Deserialize)]
 pub struct Config {
@@ -172,18 +171,22 @@ impl std::fmt::Display for Gender {
 }
 
 
-pub type Context<'a> = poise::Context<'a, Data, Error>;
+pub type Command = poise::Command<Data, CommandError>;
+pub type Framework = poise::Framework<Data, CommandError>;
+pub type Context<'a> = poise::Context<'a, Data, CommandError>;
+
+pub type CommandResult = std::result::Result<(), CommandError>;
 pub type PremiumVoices = std::collections::BTreeMap<String, std::collections::BTreeMap<String, Gender>>;
 pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, (serenity::UserId, std::time::SystemTime)>;
 
 pub trait OptionTryUnwrap<T> {
-    fn try_unwrap(self) -> Result<T, anyhow::Error>;
+    fn try_unwrap(self) -> Result<T>;
 }
 
 #[serenity::async_trait]
 pub trait PoiseContextAdditions {
-    async fn author_permissions(&self) -> Result<serenity::Permissions, Error>;
-    async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>, Error>;
+    async fn author_permissions(&self) -> Result<serenity::Permissions>;
+    async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>>;
 }
 #[serenity::async_trait]
 pub trait SerenityContextAdditions {
@@ -193,12 +196,12 @@ pub trait SerenityContextAdditions {
         lavalink: &LavalinkClient,
         guild_id: serenity::GuildId,
         channel_id: serenity::ChannelId,
-    ) -> Result<(), Error>;
+    ) -> Result<()>;
 }
 
 #[serenity::async_trait]
 impl PoiseContextAdditions for Context<'_> {
-    async fn author_permissions(&self) -> Result<serenity::Permissions, Error> {
+    async fn author_permissions(&self) -> Result<serenity::Permissions> {
         let ctx_discord = self.discord();
 
         match ctx_discord.cache.channel(self.channel_id()).try_unwrap()? {
@@ -216,7 +219,7 @@ impl PoiseContextAdditions for Context<'_> {
             }
         }
     }
-    async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>, Error> {
+    async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>> {
         let author = self.author();
         let ctx_discord = self.discord();
 
@@ -283,7 +286,7 @@ impl SerenityContextAdditions for serenity::Context {
         lavalink: &LavalinkClient,
         guild_id: serenity::GuildId,
         channel_id: serenity::ChannelId,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let manager = songbird::get(self).await.unwrap();
 
         let (_, handler) = manager.join_gateway(guild_id.0, channel_id.0).await;
@@ -293,7 +296,7 @@ impl SerenityContextAdditions for serenity::Context {
 
 impl<T> OptionTryUnwrap<T> for Option<T> {
     #[track_caller]
-    fn try_unwrap(self) -> Result<T, anyhow::Error> {
+    fn try_unwrap(self) -> Result<T> {
         match self {
             Some(v) => Ok(v),
             None => Err({

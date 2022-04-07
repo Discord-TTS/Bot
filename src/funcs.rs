@@ -27,7 +27,7 @@ use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap};
+use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result};
 use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
@@ -37,7 +37,7 @@ pub fn refresh_kind() -> sysinfo::RefreshKind {
         .with_cpu()
 }
 
-pub async fn generate_status(framework: &poise::Framework<Data, Error>) -> (String, bool) {
+pub async fn generate_status(framework: &Framework) -> (String, bool) {
     let shard_manager_lock = framework.shard_manager();
     let shard_manager = shard_manager_lock.lock().await;
     let shards = shard_manager.runners.lock().await;
@@ -64,7 +64,7 @@ pub async fn parse_user_or_guild(
     data: &Data,
     author_id: serenity::UserId,
     guild_id: Option<serenity::GuildId>,
-) -> Result<(Cow<'static, str>, TTSMode), Error> {
+) -> Result<(Cow<'static, str>, TTSMode)> {
     let user_row = data.userinfo_db.get(author_id.into()).await?;
     let mode =
         if let Some(mode) = user_row.get("voice_mode") {
@@ -267,7 +267,7 @@ pub async fn run_checks(
     bot_ignore: bool,
     require_voice: bool,
     audience_ignore: bool,
-) -> Result<Option<String>, Error> {
+) -> Result<Option<String>> {
     let cache = &ctx.cache;
     let guild = message
         .guild(cache)
@@ -287,6 +287,7 @@ pub async fn run_checks(
             .clean_everyone(false)
             .show_discriminator(false)
             .display_as_member_from(&guild),
+        &message.mentions
     );
 
     if content.len() >= 1500 {
@@ -457,7 +458,7 @@ pub fn clean_msg(
 }
 
 
-pub async fn translate(content: &str, target_lang: &str, data: &crate::structs::Data) -> Result<Option<String>, Error> {
+pub async fn translate(content: &str, target_lang: &str, data: &crate::structs::Data) -> Result<Option<String>> {
     let url = format!("{}/translate", crate::constants::TRANSLATION_URL);
     let response: crate::structs::DeeplTranslateResponse = data.reqwest.get(url)
         .query(&serenity::json::prelude::json!({

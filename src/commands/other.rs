@@ -18,12 +18,13 @@ use poise::serenity_prelude as serenity;
 use num_format::{Locale, ToFormattedString};
 
 use crate::constants::{OPTION_SEPERATORS};
-use crate::structs::{Context, Error, TTSMode, OptionTryUnwrap};
+use crate::error::CommandError;
+use crate::structs::{Context, TTSMode, OptionTryUnwrap, CommandResult};
 use crate::funcs::{fetch_audio, netural_colour, parse_user_or_guild, refresh_kind};
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
-pub async fn uptime(ctx: Context<'_>,) -> Result<(), Error> {
+pub async fn uptime(ctx: Context<'_>,) -> CommandResult {
     ctx.say(format!(
         "<@{}> has been up since: <t:{}:R>", 
         ctx.discord().cache.current_user_id(),
@@ -38,7 +39,7 @@ pub async fn uptime(ctx: Context<'_>,) -> Result<(), Error> {
 pub async fn tts(
     ctx: Context<'_>, 
     #[description="The text to TTS"] #[rest] message: String
-) -> Result<(), Error> {
+) -> CommandResult {
     let data = ctx.data();
     let author = ctx.author();
 
@@ -88,7 +89,7 @@ pub async fn tts(
 
 /// Shows various different stats
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
-pub async fn botstats(ctx: Context<'_>,) -> Result<(), Error> {
+pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
     ctx.defer_or_broadcast().await?;
 
     let data = ctx.data();
@@ -145,8 +146,8 @@ and can be used by {total_members} people!"))
 
 /// Shows the current setup channel!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
-pub async fn channel(ctx: Context<'_>,) -> Result<(), Error> {
-    let guild = ctx.guild().ok_or(Error::GuildOnly)?;
+pub async fn channel(ctx: Context<'_>,) -> CommandResult {
+    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
     let channel: i64 = ctx.data().guilds_db.get(guild.id.into()).await?.get("channel");
 
     if channel as u64 == ctx.channel_id().0 {
@@ -162,7 +163,7 @@ pub async fn channel(ctx: Context<'_>,) -> Result<(), Error> {
 
 /// Shows how you can help support TTS Bot's development and hosting!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES", aliases("purchase", "premium"))]
-pub async fn donate(ctx: Context<'_>,) -> Result<(), Error> {
+pub async fn donate(ctx: Context<'_>,) -> CommandResult {
     ctx.say(format!("
 To donate to support the development and hosting of {} and get access to TTS Bot Premium, a more stable version of this bot \
 with more and better voices you can donate via Patreon!\nhttps://www.patreon.com/Gnome_the_Bot_Maker
@@ -173,7 +174,7 @@ with more and better voices you can donate via Patreon!\nhttps://www.patreon.com
 
 /// Gets current ping to discord!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES", aliases("lag"))]
-pub async fn ping(ctx: Context<'_>,) -> Result<(), Error> {
+pub async fn ping(ctx: Context<'_>,) -> CommandResult {
     let ping_before = std::time::SystemTime::now();
     let ping_msg = ctx.say("Loading!").await?;
     let content = format!("Current Latency: {}ms", ping_before.elapsed()?.as_millis());
@@ -192,7 +193,7 @@ pub async fn ping(ctx: Context<'_>,) -> Result<(), Error> {
 
 /// Suggests a new feature!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
-pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"] #[rest] suggestion: String) -> Result<(), Error> {
+pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"] #[rest] suggestion: String) -> CommandResult {
     if suggestion.to_lowercase().replace('<', ">") == "suggestion" {
         ctx.say("Hey! You are meant to replace `<suggestion>` with your actual suggestion!").await?;
         return Ok(())
@@ -214,7 +215,7 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
 
 /// Sends the instructions to invite TTS Bot and join the support server!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
-pub async fn invite(ctx: Context<'_>,) -> Result<(), Error> {
+pub async fn invite(ctx: Context<'_>,) -> CommandResult {
     let ctx_discord = ctx.discord();
     let bot_user_id = ctx_discord.cache.current_user_id();
 

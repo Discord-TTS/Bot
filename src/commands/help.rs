@@ -16,10 +16,8 @@
 
 use indexmap::IndexMap;
 
-use crate::structs::{Context, Data, Error};
+use crate::structs::{Context, Command, CommandResult};
 use crate::funcs::netural_colour;
-
-type Command = poise::Command<Data, Error>;
 
 enum HelpCommandMode<'a> {
     Root,
@@ -97,13 +95,13 @@ async fn help_autocomplete(ctx: Context<'_>, searching: String) -> Vec<String> {
 pub async fn help(
     ctx: Context<'_>,
     #[rest] #[description="The command to get help with"] #[autocomplete="help_autocomplete"] command: Option<String>
-) -> Result<(), Error> {
+) -> CommandResult {
     _help(ctx, command.as_deref()).await
 }
 
-pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> Result<(), Error> {
+pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
     let commands = &ctx.framework().options().commands;
-    
+
     let remaining_args: String;
     let mode = match command {
         None => HelpCommandMode::Root,

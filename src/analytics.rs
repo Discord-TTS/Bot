@@ -19,7 +19,7 @@ use std::{sync::Arc, borrow::Cow};
 use dashmap::DashMap;
 use tracing::error;
 
-use crate::structs::Error;
+use crate::structs::Result;
 
 pub struct Handler {
     log_buffer: DashMap<Cow<'static, str>, i32>,
@@ -45,7 +45,7 @@ impl Handler {
         }
     }
 
-    async fn send_info_to_db(&self) -> Result<(), Error> {
+    async fn send_info_to_db(&self) -> Result<()> {
         let log_buffer = self.log_buffer.clone();
         self.log_buffer.clear();
 

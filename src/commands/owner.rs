@@ -13,21 +13,19 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#![allow(clippy::unused_async)]
-
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Error, TTSModeServerChoice};
+use crate::{structs::{Context, CommandResult, Result, TTSModeServerChoice}, error::CommandError};
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {
+pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
     poise::samples::register_application_commands(ctx, global).await?;
 
     Ok(())
 }
 
 #[poise::command(prefix_command, hide_in_help, owners_only)]
-pub async fn dm(ctx: Context<'_>, todm: serenity::User, #[rest] message: String) -> Result<(), Error> {
+pub async fn dm(ctx: Context<'_>, todm: serenity::User, #[rest] message: String) -> CommandResult {
     let ctx_discord = ctx.discord();
     let (content, embed) = dm_generic(ctx_discord, ctx.author(), &todm, &message).await?;
     
@@ -43,7 +41,7 @@ pub async fn dm(ctx: Context<'_>, todm: serenity::User, #[rest] message: String)
 }
 
 #[poise::command(prefix_command, hide_in_help, owners_only)]
-pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn close(ctx: Context<'_>) -> CommandResult {
     ctx.say(format!("Shutting down {} shards!", ctx.discord().cache.shard_count())).await?;
     ctx.framework().shard_manager().lock().await.shutdown_all().await;
 
@@ -51,7 +49,7 @@ pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn add_premium(ctx: Context<'_>, guild: serenity::Guild, user: serenity::User) -> Result<(), Error> {
+pub async fn add_premium(ctx: Context<'_>, guild: serenity::Guild, user: serenity::User) -> CommandResult {
     let data = ctx.data();
     let user_id = user.id.into();
 
@@ -66,34 +64,34 @@ pub async fn add_premium(ctx: Context<'_>, guild: serenity::Guild, user: serenit
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn remove_cache(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn remove_cache(ctx: Context<'_>) -> CommandResult {
     ctx.say("Please run a subcommand!").await?;
     Ok(())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn guild(ctx: Context<'_>, guild: i64) -> Result<(), Error> {
+pub async fn guild(ctx: Context<'_>, guild: i64) -> CommandResult {
     ctx.data().guilds_db.invalidate_cache(&guild);
     ctx.say("Done!").await?;
     Ok(())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn user(ctx: Context<'_>, user: i64) -> Result<(), Error> {
+pub async fn user(ctx: Context<'_>, user: i64) -> CommandResult {
     ctx.data().userinfo_db.invalidate_cache(&user);
     ctx.say("Done!").await?;
     Ok(())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn guild_voice(ctx: Context<'_>, guild: i64, mode: TTSModeServerChoice) -> Result<(), Error> {
+pub async fn guild_voice(ctx: Context<'_>, guild: i64, mode: TTSModeServerChoice) -> CommandResult {
     ctx.data().guild_voice_db.invalidate_cache(&(guild, mode.into()));
     ctx.say("Done!").await?;
     Ok(())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeServerChoice) -> Result<(), Error> {
+pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeServerChoice) -> CommandResult {
     ctx.data().user_voice_db.invalidate_cache(&(user, mode.into()));
     ctx.say("Done!").await?;
     Ok(())
@@ -101,8 +99,8 @@ pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeServerChoice) 
 
 
 #[poise::command(prefix_command, hide_in_help)]
-pub async fn debug(ctx: Context<'_>) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+pub async fn debug(ctx: Context<'_>) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?;
 
     let data = ctx.data();
     let ctx_discord = ctx.discord();
@@ -125,17 +123,13 @@ User Data: `{user_data:?}`
     Ok(())
 }
 
-#[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn cause_error(_: Context<'_>) -> Result<(), Error> {
-    Err(anyhow::anyhow!("This is a test error!").into())
-}
 
 pub async fn dm_generic(
     ctx: &serenity::Context,
     author: &serenity::User,
     todm: &serenity::User,
     message: &str,
-) -> Result<(String, serenity::Embed), Error> {
+) -> Result<(String, serenity::Embed)> {
     let sent = todm.direct_message(ctx, |b| {b.embed(|e| {e
         .title("Message from the developers:")
         .description(message)

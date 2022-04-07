@@ -17,10 +17,11 @@ use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Error, PoiseContextAdditions, SerenityContextAdditions, TTSMode};
+use crate::error::CommandError;
+use crate::structs::{Context, Result, CommandResult, PoiseContextAdditions, SerenityContextAdditions, TTSMode};
 use crate::funcs::random_footer;
 
-async fn channel_check(ctx: &Context<'_>) -> Result<bool, Error> {
+async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
     let guild_id = ctx.guild_id().unwrap();
     let channel_id: i64 = ctx.data().guilds_db.get(guild_id.into()).await?.get("channel");
 
@@ -42,8 +43,8 @@ async fn channel_check(ctx: &Context<'_>) -> Result<bool, Error> {
     prefix_command, slash_command,
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
-pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
-    let guild = ctx.guild().ok_or(Error::GuildOnly)?;
+pub async fn join(ctx: Context<'_>) -> CommandResult {
+    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
     if !channel_check(&ctx).await? {
         return Ok(())
     }
@@ -122,8 +123,8 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
     prefix_command, slash_command,
     required_bot_permissions = "SEND_MESSAGES"
 )]
-pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
-    let guild = ctx.guild().ok_or(Error::GuildOnly)?;
+pub async fn leave(ctx: Context<'_>) -> CommandResult {
+    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
     if !channel_check(&ctx).await? {
         return Ok(())
     }
@@ -162,8 +163,8 @@ pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     prefix_command, slash_command,
     required_bot_permissions = "SEND_MESSAGES | ADD_REACTIONS"
 )]
-pub async fn clear(ctx: Context<'_>) -> Result<(), Error> {
-    let guild_id = ctx.guild_id().ok_or(Error::GuildOnly)?;
+pub async fn clear(ctx: Context<'_>) -> CommandResult {
+    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?;
     if !channel_check(&ctx).await? {
         return Ok(())
     }
@@ -193,9 +194,9 @@ pub async fn clear(ctx: Context<'_>) -> Result<(), Error> {
     aliases("activate"),
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS | ADD_REACTIONS"
 )]
-pub async fn premium_activate(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
-    let guild = ctx.guild().ok_or(Error::GuildOnly)?;
+    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
 
     if crate::premium_check(data, Some(guild.id)).await?.is_none() {
         ctx.say("Hey, this server is already premium!").await?;
