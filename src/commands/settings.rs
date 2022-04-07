@@ -85,7 +85,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let target_lang = guild_row.get::<_, Option<_>>("target_lang").unwrap_or("none");
     let nickname = nickname_row.get::<_, Option<_>>("name").unwrap_or("none");
 
-    let netural_colour = netural_colour(crate::premium_check(data, Some(guild_id)).await?.is_none());
+    let netural_colour = netural_colour(crate::premium_check(ctx_discord, data, Some(guild_id)).await?.is_none());
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
     ctx.send(|b| {b.embed(|e| {e
         .title("Current Settings")
@@ -303,7 +303,7 @@ async fn change_mode<T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq
     target: &str
 ) -> Result<Option<String>, Error> {
     let data = ctx.data();
-    if mode == Some(TTSMode::Premium) && crate::premium_check(data, Some(guild_id)).await?.is_some() {
+    if mode == Some(TTSMode::Premium) && crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_some() {
         ctx.send(|b| b.embed(|e| {e
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)

@@ -216,9 +216,6 @@ async fn main() {
                 last_to_xsaid_tracker: dashmap::DashMap::new(),
                 system_info: parking_lot::Mutex::new(sysinfo::System::new()),
                 premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
-                premium_users: main.main_server.members(&ctx.http, None, None).await?.into_iter()
-                    .filter_map(|m| if m.roles.contains(&main.patreon_role) {Some(m.user.id)} else {None})
-                    .collect(),
                 lavalink: LavalinkClient::builder(ready.application.id.0)
                     .set_password(&lavalink.password)
                     .set_host(&lavalink.host)
@@ -507,31 +504,33 @@ Ask questions by either responding here or asking on the support server!",
 
 
 enum FailurePoint {
+    InSupportGuild(serenity::UserId),
     PatreonRole(serenity::UserId),
     PremiumUser,
     Guild,
 }
 
-async fn premium_check(data: &Data, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>> {
-    let guild = match guild_id {
-        Some(guild) => guild.0 as i64,
+async fn premium_check(ctx: &serenity::Context, data: &Data, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>> {
+    let guild_id = match guild_id {
+        Some(guild) => guild,
         None => return Ok(Some(FailurePoint::Guild))
     };
 
     let premium_user_id = data
-        .guilds_db.get(guild).await?
+        .guilds_db.get(guild_id.0 as i64).await?
         .get::<&str, Option<i64>>("premium_user")
         .map(|u| serenity::UserId(u as u64));
 
-    premium_user_id.map_or(
-        Ok(Some(FailurePoint::PremiumUser)),
-        |premium_user_id|
-            if data.premium_users.contains(&premium_user_id) {
-                Ok(None)
-            } else {
-                Ok(Some(FailurePoint::PatreonRole(premium_user_id)))
+    match premium_user_id {
+        Some(premium_user_id) => {
+            match guild_id.member(ctx, premium_user_id).await {
+                Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => Ok(Some(FailurePoint::InSupportGuild(premium_user_id))),
+                Ok(premium_user) => Ok((!premium_user.roles.contains(&data.config.patreon_role)).then(|| FailurePoint::PatreonRole(premium_user_id))),
+                Err(err) => Err(anyhow::Error::from(err)),
             }
-    )
+        }
+        None => Ok(Some(FailurePoint::PremiumUser))
+    }
 }
 
 async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, error::CommandError> {
@@ -540,18 +539,25 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, error:
     let data = ctx.data();
 
     let main_msg =
-        match premium_check(data, guild.as_ref().map(|g| g.id)).await? {
+        match premium_check(ctx_discord, data, guild.as_ref().map(|g| g.id)).await? {
             None => return Ok(true),
             Some(FailurePoint::Guild) => Cow::Borrowed("Hey, this is a premium command so it must be run in a server!"),
             Some(FailurePoint::PremiumUser) => {Cow::Owned(
                 format!("Hey, this server isn't premium, please purchase TTS Bot Premium via Patreon! (`{}donate`)", ctx.prefix())
             )}
+            Some(FailurePoint::InSupportGuild(premium_user_id)) => {
+                let premium_user = premium_user_id.to_user(ctx_discord).await?;
+                Cow::Owned(format!(concat!(
+                    "Hey, this server has a premium user setup, however they are not longer in the support server! ",
+                    "Please ask {}#{} to rejoin with {}invite",
+                ), premium_user.name, premium_user.discriminator, ctx.prefix()))
+            },
             Some(FailurePoint::PatreonRole(premium_user_id)) => {
                 let premium_user = premium_user_id.to_user(ctx_discord).await?;
                 Cow::Owned(format!(concat!(
-                    "Hey, this server has a premium user setup, however they are not longer a patreon!",
+                    "Hey, this server has a premium user setup, however they are not longer a patreon! ",
                     "Please ask {}#{} to renew their membership."
-                ),premium_user.name, premium_user.discriminator))
+                ), premium_user.name, premium_user.discriminator))
             }
         };
 
@@ -638,7 +644,7 @@ async fn process_tts_msg(
 
     let speaking_rate: f32 = data.userinfo_db.get(message.author.id.into()).await?.get("speaking_rate");
     if let Some(target_lang) = guild_row.get("target_lang") {
-        if guild_row.get("to_translate") && premium_check(data, Some(guild.id)).await?.is_none() {
+        if guild_row.get("to_translate") && premium_check(ctx, data, Some(guild.id)).await?.is_none() {
             content = funcs::translate(&content, target_lang, data).await?.unwrap_or(content);
         };
     }

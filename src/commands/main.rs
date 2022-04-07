@@ -195,17 +195,17 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS | ADD_REACTIONS"
 )]
 pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
-    let data = ctx.data();
     let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
+    let ctx_discord = ctx.discord();
+    let data = ctx.data();
 
-    if crate::premium_check(data, Some(guild.id)).await?.is_none() {
+    if crate::premium_check(ctx_discord, data, Some(guild.id)).await?.is_none() {
         ctx.say("Hey, this server is already premium!").await?;
         return Ok(())
     }
 
     let author = ctx.author();
     let author_id = author.id.into();
-    let ctx_discord = ctx.discord();
 
     let mut error_msg: Option<Cow<'_, str>> = match data.config.main_server.member(ctx_discord, author.id).await {
         Ok(m) if !m.roles.contains(&data.config.patreon_role) => Some(

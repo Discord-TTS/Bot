@@ -116,7 +116,7 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
     };
 
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
-    let netural_colour = netural_colour(crate::premium_check(data, ctx.guild_id()).await?.is_none());
+    let netural_colour = netural_colour(crate::premium_check(ctx_discord, data, ctx.guild_id()).await?.is_none());
 
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
     ctx.send(|b| {b.embed(|e| { e

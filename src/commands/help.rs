@@ -137,7 +137,7 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
     };
 
     let prefix = ctx.prefix();
-    let netural_colour = netural_colour(crate::premium_check(ctx.data(), ctx.guild_id()).await?.is_none());
+    let netural_colour = netural_colour(crate::premium_check(ctx.discord(), ctx.data(), ctx.guild_id()).await?.is_none());
     ctx.send(|b| {b.embed(|e| {e
         .title(format!("{} Help!", match &mode {
             HelpCommandMode::Root => ctx.discord().cache.current_user_field(|u| u.name.clone()),
