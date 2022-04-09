@@ -18,7 +18,6 @@ use poise::serenity_prelude as serenity;
 use num_format::{Locale, ToFormattedString};
 
 use crate::constants::{OPTION_SEPERATORS};
-use crate::error::CommandError;
 use crate::structs::{Context, TTSMode, OptionTryUnwrap, CommandResult};
 use crate::funcs::{fetch_audio, netural_colour, parse_user_or_guild, refresh_kind};
 
@@ -145,10 +144,9 @@ and can be used by {total_members} people!"))
 }
 
 /// Shows the current setup channel!
-#[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
+#[poise::command(category="Extra Commands", guild_only, prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
 pub async fn channel(ctx: Context<'_>,) -> CommandResult {
-    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
-    let channel: i64 = ctx.data().guilds_db.get(guild.id.into()).await?.get("channel");
+    let channel: i64 = ctx.data().guilds_db.get(ctx.guild_id().unwrap().into()).await?.get("channel");
 
     if channel as u64 == ctx.channel_id().0 {
         ctx.say("You are in the setup channel already!").await?;

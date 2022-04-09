@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 
-use crate::{constants::RED, error::CommandError};
+use crate::constants::RED;
 pub use anyhow::{Error, Result};
 
 #[derive(serde::Deserialize)]
@@ -174,7 +174,8 @@ pub type Command = poise::Command<Data, CommandError>;
 pub type Framework = poise::Framework<Data, CommandError>;
 pub type Context<'a> = poise::Context<'a, Data, CommandError>;
 
-pub type CommandResult = std::result::Result<(), CommandError>;
+pub type CommandError = Error;
+pub type CommandResult<E=Error> = Result<(), E>;
 pub type PremiumVoices = std::collections::BTreeMap<String, std::collections::BTreeMap<String, Gender>>;
 pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, (serenity::UserId, std::time::SystemTime)>;
 

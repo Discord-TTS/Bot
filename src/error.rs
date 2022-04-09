@@ -13,24 +13,8 @@ use crate::{
     funcs::refresh_kind
 };
 
-#[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
-pub enum CommandError {
-    GuildOnly,
-    Unexpected(Error),
-}
-
-impl<E> From<E> for CommandError
-where E: Into<Error> {
-    fn from(e: E) -> Self {
-        Self::Unexpected(e.into())
-    }
-}
-impl std::fmt::Display for CommandError {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
+pub type CommandError = Error;
 
 const fn blank_field() -> (&'static str, Cow<'static, str>, bool) {
     ("\u{200B}", Cow::Borrowed("\u{200B}"), true)
@@ -264,40 +248,30 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
     match error {
         poise::FrameworkError::DynamicPrefix { error } => error!("Error in dynamic_prefix: {:?}", error),
         poise::FrameworkError::Command { error, ctx } => {
+            let author = ctx.author();
             let command = ctx.command();
-            let (error, fix) = match error {
-                CommandError::GuildOnly => (
-                    Cow::Owned(format!("{} cannot be used in private messages", command.qualified_name)),
-                    Some(format!(
-                        "try running it on a server with {} in",
-                        ctx.discord().cache.current_user_field(|b| b.name.clone())
-                    )),
-                ),
-                CommandError::Unexpected(error) => {
-                    let author = ctx.author();
-                    let mut extra_fields = vec![
-                        ("Command", Cow::Borrowed(command.name), true),
-                        ("Slash Command", Cow::Owned(matches!(ctx, poise::Context::Application(..)).to_string()), true),
-                        ("Channel Type", Cow::Borrowed(channel_type(ctx.channel_id().to_channel(ctx.discord()).await?)), true),
-                    ];
 
-                    if let Some(guild) = ctx.guild() {
-                        extra_fields.extend([
-                            ("Guild", Cow::Owned(guild.name), true),
-                            ("Guild ID", Cow::Owned(guild.id.0.to_string()), true),
-                            blank_field()
-                        ]);
-                    }
-                    handle_unexpected(
-                        ctx.discord(), ctx.framework(),
-                        "command", error, extra_fields,
-                        Some(author.name.clone()), Some(author.face())
-                    ).await?;
+            let mut extra_fields = vec![
+                ("Command", Cow::Borrowed(command.name), true),
+                ("Slash Command", Cow::Owned(matches!(ctx, poise::Context::Application(..)).to_string()), true),
+                ("Channel Type", Cow::Borrowed(channel_type(ctx.channel_id().to_channel(ctx.discord()).await?)), true),
+            ];
 
-                    (Cow::Borrowed("an unknown error occurred"), None)
-                },
-            };
-            ctx.send_error(&error, fix.as_deref()).await?;
+            if let Some(guild) = ctx.guild() {
+                extra_fields.extend([
+                    ("Guild", Cow::Owned(guild.name), true),
+                    ("Guild ID", Cow::Owned(guild.id.0.to_string()), true),
+                    blank_field()
+                ]);
+            }
+
+            handle_unexpected(
+                ctx.discord(), ctx.framework(),
+                "command", error, extra_fields,
+                Some(author.name.clone()), Some(author.face())
+            ).await?;
+
+            ctx.send_error("an unknown error occurred", None).await?;
         }
         poise::FrameworkError::ArgumentParse { error, ctx, input } => handle_argparse(ctx, error, input).await?,
         poise::FrameworkError::CooldownHit { remaining_cooldown, ctx } => handle_cooldown(ctx, remaining_cooldown).await?,
@@ -326,8 +300,20 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
         },
 
         poise::FrameworkError::Listener{..} => unreachable!("Listener error, but no listener???"),
-        poise::FrameworkError::CommandStructureMismatch { description: _, ctx: _ } |
-        poise::FrameworkError::NotAnOwner{ctx: _}=> {},
+        poise::FrameworkError::CommandStructureMismatch {description: _, ctx: _} |
+        poise::FrameworkError::DmOnly {ctx: _ } |
+        poise::FrameworkError::NsfwOnly {ctx: _} | 
+        poise::FrameworkError::NotAnOwner{ctx: _} => {},
+        poise::FrameworkError::GuildOnly {ctx} => {
+            ctx.send_error(
+                &format!("{} cannot be used in private messages", ctx.command().qualified_name),
+                Some(&format!(
+                    "try running it on a server with {} in",
+                    ctx.discord().cache.current_user_field(|b| b.name.clone())
+                ))
+            ).await?;
+        },
+
     }
 
     Ok(())

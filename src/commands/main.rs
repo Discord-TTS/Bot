@@ -17,7 +17,6 @@ use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
 
-use crate::error::CommandError;
 use crate::structs::{Context, Result, CommandResult, PoiseContextAdditions, SerenityContextAdditions, TTSMode};
 use crate::funcs::random_footer;
 
@@ -40,11 +39,11 @@ async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
 /// Joins the voice channel you're in!
 #[poise::command(
     category="Main Commands",
-    prefix_command, slash_command,
+    guild_only, prefix_command, slash_command,
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
-    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
+    let guild = ctx.guild().unwrap();
     if !channel_check(&ctx).await? {
         return Ok(())
     }
@@ -120,11 +119,11 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 /// Leaves voice channel TTS Bot is in!
 #[poise::command(
     category="Main Commands",
-    prefix_command, slash_command,
+    guild_only, prefix_command, slash_command,
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
-    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
+    let guild = ctx.guild().unwrap();
     if !channel_check(&ctx).await? {
         return Ok(())
     }
@@ -160,14 +159,15 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
 #[poise::command(
     aliases("skip"),
     category="Main Commands",
-    prefix_command, slash_command,
+    guild_only, prefix_command, slash_command,
     required_bot_permissions = "SEND_MESSAGES | ADD_REACTIONS"
 )]
 pub async fn clear(ctx: Context<'_>) -> CommandResult {
-    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?;
     if !channel_check(&ctx).await? {
         return Ok(())
     }
+
+    let guild_id = ctx.guild_id().unwrap();
 
     let lavalink = &ctx.data().lavalink;
     lavalink.skip(guild_id).await;
@@ -190,13 +190,13 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
 /// Activates a server for TTS Bot Premium!
 #[poise::command(
     category="Main Commands",
-    prefix_command, slash_command,
+    guild_only, prefix_command, slash_command,
     aliases("activate"),
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS | ADD_REACTIONS"
 )]
 pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
-    let guild = ctx.guild().ok_or(CommandError::GuildOnly)?;
     let ctx_discord = ctx.discord();
+    let guild = ctx.guild().unwrap();
     let data = ctx.data();
 
     if crate::premium_check(ctx_discord, data, Some(guild.id)).await?.is_none() {

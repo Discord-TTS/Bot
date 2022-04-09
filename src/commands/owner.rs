@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use poise::serenity_prelude as serenity;
 
-use crate::{structs::{Context, CommandResult, Result, TTSModeServerChoice}, error::CommandError};
+use crate::structs::{Context, CommandResult, Result, TTSModeServerChoice};
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
@@ -98,9 +98,9 @@ pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeServerChoice) 
 }
 
 
-#[poise::command(prefix_command, hide_in_help)]
+#[poise::command(prefix_command, guild_only, hide_in_help)]
 pub async fn debug(ctx: Context<'_>) -> CommandResult {
-    let guild_id = ctx.guild_id().ok_or(CommandError::GuildOnly)?;
+    let guild_id = ctx.guild_id().unwrap();
 
     let data = ctx.data();
     let ctx_discord = ctx.discord();
