@@ -523,7 +523,7 @@ async fn premium_check(ctx: &serenity::Context, data: &Data, guild_id: Option<se
 
     match premium_user_id {
         Some(premium_user_id) => {
-            match guild_id.member(ctx, premium_user_id).await {
+            match data.config.main_server.member(ctx, premium_user_id).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => Ok(Some(FailurePoint::InSupportGuild(premium_user_id))),
                 Ok(premium_user) => Ok((!premium_user.roles.contains(&data.config.patreon_role)).then(|| FailurePoint::PatreonRole(premium_user_id))),
                 Err(err) => Err(anyhow::Error::from(err)),

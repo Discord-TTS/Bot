@@ -105,11 +105,6 @@ pub async fn fetch_audio(
     mode: TTSMode,
     speaking_rate: f32
 ) -> Result<Vec<u8>, Error> {
-    assert!(
-        !((speaking_rate - 1.0).abs() > f32::EPSILON && mode != TTSMode::Premium),
-        "speaking_rate was set without premium mode"
-    );
-
     let mut data = Vec::new();
     for url in fetch_url(tts_service, content, lang, mode, speaking_rate) {
         data.push(reqwest.get(url).send().await?.error_for_status()?.bytes().await?);
