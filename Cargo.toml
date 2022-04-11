@@ -26,6 +26,7 @@ lazy_static = "1"
 itertools = "0.10"
 num-format = "0.4"
 parking_lot = "0.12"
+strum_macros = "0.24"
 generic-array = "0.14"
 deadpool-postgres = "0.10"
 #serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = ["simdjson"] }

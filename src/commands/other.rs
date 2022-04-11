@@ -67,11 +67,11 @@ pub async fn tts(
         serenity::AttachmentType::Bytes {
             data: std::borrow::Cow::Owned(fetch_audio(
                 &data.reqwest, &data.config.tts_service,
-                message, &voice, &mode.to_string(), speaking_rate
+                message, &voice, mode, speaking_rate
             ).await?),
             filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
-                TTSMode::Gtts => "mp3",
-                TTSMode::Espeak => "wav",
+                TTSMode::gTTS => "mp3",
+                TTSMode::eSpeak => "wav",
                 TTSMode::Premium => "ogg"
             })
         }

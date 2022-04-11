@@ -125,10 +125,8 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep3} Voice: `{user_voice}`
 {sep3} Voice Mode: `{}`
 {sep3} Nickname: `{nickname}`
-        ", user_mode.map_or_else(
-            || Cow::Borrowed("none"),
-            |v| Cow::Owned(format!("{:#}", v))
-        )), false)
+        ", user_mode.map_or("none", Into::into)
+        ), false)
     })}).await?;
 
     Ok(())
@@ -357,8 +355,8 @@ async fn change_voice<T>(
 
 async fn check_valid_voice(data: &Data, voice: String, mode: TTSMode) -> Result<bool, Error> {
     Ok(match mode {
-        TTSMode::Gtts => get_gtts_voices().contains_key(&voice),
-        TTSMode::Espeak => get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?.contains(&voice),
+        TTSMode::gTTS => get_gtts_voices().contains_key(&voice),
+        TTSMode::eSpeak => get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?.contains(&voice),
         TTSMode::Premium => {
             voice.split_once(' ')
                 .and_then(|(language, variant)| data.premium_voices.get(language).map(|l| (l, variant)))
@@ -948,8 +946,8 @@ pub async fn voices(
 
     let voices: String = {
         let mut supported_langs = match mode {
-            TTSMode::Gtts => crate::funcs::get_gtts_voices().into_iter().map(|(k, _)| k).collect(),
-            TTSMode::Espeak => crate::funcs::get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?,
+            TTSMode::gTTS => crate::funcs::get_gtts_voices().into_iter().map(|(k, _)| k).collect(),
+            TTSMode::eSpeak => crate::funcs::get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?,
             TTSMode::Premium => return list_premium_voices(ctx).await.map_err(Into::into)
         };
 

@@ -1,7 +1,9 @@
 use std::{sync::Arc, borrow::Cow};
 
-use regex::Regex;
+use postgres_types::{ToSql, FromSql};
+use strum_macros::IntoStaticStr;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
@@ -70,52 +72,51 @@ pub struct Data {
 
 
 #[derive(
-    postgres_types::ToSql, postgres_types::FromSql,
-    Debug, Hash, PartialEq, Eq, Copy, Clone
+    IntoStaticStr, ToSql, FromSql,
+    Debug, Hash, PartialEq, Eq, Copy, Clone,
 )]
+#[allow(non_camel_case_types)]
 #[postgres(name="ttsmode")]
 pub enum TTSMode {
-    #[postgres(name="gtts")] Gtts,
-    #[postgres(name="espeak")] Espeak,
+    #[postgres(name="gtts")] gTTS,
+    #[postgres(name="espeak")] eSpeak,
     #[postgres(name="premium")] Premium
-}
-
-impl Default for TTSMode {
-    fn default() -> Self {
-        Self::Gtts
-    }
 }
 
 impl std::fmt::Display for TTSMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Gtts => "gTTS",
-            Self::Espeak => "eSpeak",
-            Self::Premium => "Premium"
-        })
+        f.write_str(self.into())
+    }
+}
+
+impl Default for TTSMode {
+    fn default() -> Self {
+        Self::gTTS
     }
 }
 
 #[derive(poise::ChoiceParameter)]
+#[allow(non_camel_case_types)]
 pub enum TTSModeServerChoice {
     // Name to show in slash command invoke           Aliases for prefix
-    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       Gtts,
-    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     Espeak,
-    #[name="Premium TTS (changable)"]                 #[name="premium"]    Premium
+    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       gTTS,
+    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     eSpeak,
+    #[name="Premium TTS (changable)"]                 #[name="premium"]    Premium,
 }
 
 #[derive(poise::ChoiceParameter)]
+#[allow(non_camel_case_types)]
 pub enum TTSModeChoice {
     // Name to show in slash command invoke           Aliases for prefix
-    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       Gtts,
-    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     Espeak,
+    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       gTTS,
+    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     eSpeak,
 }
 
 impl From<TTSModeServerChoice> for TTSMode {
     fn from(mode: TTSModeServerChoice) -> Self {
         match mode {
-            TTSModeServerChoice::Gtts => TTSMode::Gtts,
-            TTSModeServerChoice::Espeak => TTSMode::Espeak,
+            TTSModeServerChoice::gTTS => TTSMode::gTTS,
+            TTSModeServerChoice::eSpeak => TTSMode::eSpeak,
             TTSModeServerChoice::Premium => TTSMode::Premium
         }
     }
@@ -124,8 +125,8 @@ impl From<TTSModeServerChoice> for TTSMode {
 impl From<TTSModeChoice> for TTSMode {
     fn from(mode: TTSModeChoice) -> Self {
         match mode {
-            TTSModeChoice::Gtts => TTSMode::Gtts,
-            TTSModeChoice::Espeak => TTSMode::Espeak,
+            TTSModeChoice::gTTS => TTSMode::gTTS,
+            TTSModeChoice::eSpeak => TTSMode::eSpeak,
         }
     }
 }

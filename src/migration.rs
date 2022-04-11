@@ -34,8 +34,8 @@ async fn migrate_single_to_modes(transaction: &mut deadpool_postgres::Transactio
             if let Some(voice) = voice {
                 let column_id: i64 = row.get(id_column);
 
-                transaction.execute(&insert_query_voice, &[&column_id, &TTSMode::Gtts]).await?;
-                transaction.execute(&insert_query_mode, &[&column_id, &TTSMode::Gtts, &voice]).await?;
+                transaction.execute(&insert_query_voice, &[&column_id, &TTSMode::gTTS]).await?;
+                transaction.execute(&insert_query_mode, &[&column_id, &TTSMode::gTTS, &voice]).await?;
             }
         } else {
             break

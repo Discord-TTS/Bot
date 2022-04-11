@@ -141,7 +141,7 @@ async fn main() {
             ON CONFLICT (guild_id, user_id) DO UPDATE SET {key} = $3
         "
     ).await.unwrap();
-    let user_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::Gtts),
+    let user_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::gTTS),
         "SELECT * FROM user_voice WHERE user_id = $1 AND mode = $2",
         "DELETE FROM user_voice WHERE user_id = $1 AND mode = $2",
         "
@@ -153,7 +153,7 @@ async fn main() {
             ON CONFLICT (user_id, mode) DO UPDATE SET {key} = $3
         "
     ).await.unwrap();
-    let guild_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::Gtts),
+    let guild_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::gTTS),
         "SELECT * FROM guild_voice WHERE guild_id = $1 AND mode = $2",
         "DELETE FROM guild_voice WHERE guild_id = $1 AND mode = $2",
         "
@@ -654,7 +654,7 @@ async fn process_tts_msg(
         &data.config.tts_service,
         content,
         &voice,
-        &mode.to_string(),
+        mode,
         speaking_rate
     ) {
         let tracks = lavalink_client.get_tracks(&url).await?.tracks;
@@ -663,7 +663,8 @@ async fn process_tts_msg(
         lavalink_client.play(guild.id, track).queue().await?;
     }
 
-    data.analytics.log(Cow::Owned(format!("on_{}_tts", mode)));
+    let mode: &'static str = mode.into();
+    data.analytics.log(Cow::Owned(format!("on_{mode}_tts")));
     Ok(())
 }
 

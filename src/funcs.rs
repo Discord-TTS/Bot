@@ -54,8 +54,8 @@ pub async fn generate_status(framework: &Framework) -> (String, bool) {
 
 pub const fn default_voice(mode: TTSMode) -> &'static str {
     match mode {
-        TTSMode::Gtts => "en",
-        TTSMode::Espeak => "en1",
+        TTSMode::gTTS => "en",
+        TTSMode::eSpeak => "en1",
         TTSMode::Premium => "en-US A",
     }
 }
@@ -73,7 +73,7 @@ pub async fn parse_user_or_guild(
             let settings = data.guilds_db.get(guild_id.into()).await?;
             settings.get("voice_mode")
         } else {
-            TTSMode::Gtts
+            TTSMode::gTTS
         };
 
     let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
@@ -102,11 +102,11 @@ pub async fn fetch_audio(
     tts_service: &reqwest::Url,
     content: String,
     lang: &str,
-    mode: &str,
+    mode: TTSMode,
     speaking_rate: f32
 ) -> Result<Vec<u8>, Error> {
     assert!(
-        !((speaking_rate - 1.0).abs() > f32::EPSILON && mode != "premium"),
+        !((speaking_rate - 1.0).abs() > f32::EPSILON && mode != TTSMode::Premium),
         "speaking_rate was set without premium mode"
     );
 
@@ -117,20 +117,20 @@ pub async fn fetch_audio(
     Ok(data.into_iter().flatten().collect())
 }
 
-pub fn fetch_url(tts_service: &reqwest::Url, content: String, lang: &str, mode: &str, speaking_rate: f32) -> Vec<reqwest::Url> {
+pub fn fetch_url(tts_service: &reqwest::Url, content: String, lang: &str, mode: TTSMode, speaking_rate: f32) -> Vec<reqwest::Url> {
     let fetch_url = |chunk: String| {
         let mut url = tts_service.clone();
         url.set_path("tts");
         url.query_pairs_mut()
             .append_pair("text", &chunk)
             .append_pair("lang", lang)
-            .append_pair("mode", mode)
+            .append_pair("mode", mode.into())
             .append_pair("speaking_rate", &speaking_rate.to_string())
             .finish();
         url
     };
 
-    if mode == "gTTS" {
+    if mode == TTSMode::gTTS {
         content.chars().chunks(200).into_iter().map(std::iter::Iterator::collect::<String>).map(|chunk| {
             fetch_url(chunk)
         }).collect()
