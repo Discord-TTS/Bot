@@ -673,14 +673,14 @@ async fn process_mention_msg(
     message: &serenity::Message,
     data: &Data,
 ) -> Result<()> {
-    let bot_user = ctx.cache.current_user();
+    let bot_user = ctx.cache.current_user_id();
 
     let guild = match message.guild(ctx) {
         Some(guild) => guild,
         None => return Ok(()),
     };
 
-    if ![format!("<@{}>", bot_user.id), format!("<@!{}>", bot_user.id)].contains(&message.content) {
+    if ![format!("<@{}>", bot_user), format!("<@!{}>", bot_user)].contains(&message.content) {
         return Ok(());
     };
 
