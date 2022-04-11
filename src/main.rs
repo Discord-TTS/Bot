@@ -361,7 +361,7 @@ impl serenity::EventHandler for EventHandler {
 
     async fn voice_state_update(&self, ctx: serenity::Context, old: Option<serenity::VoiceState>, new: serenity::VoiceState) {
         let framework = if let Some(fw) = self.framework() {fw} else {return};
-        error::handle_unexpected_default(&ctx, &framework, (|| async {
+        error::handle_unexpected_default(&ctx, &framework, "VoiceStateUpdate", (|| async {
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user_id();
             let guild_id = new.guild_id.try_unwrap()?;
@@ -461,7 +461,7 @@ Ask questions by either responding here or asking on the support server!",
         let framework = if let Some(fw) = self.framework() {fw} else {return};
         let data = framework.user_data().await;
 
-        error::handle_unexpected_default(&ctx, &framework, (|| async {
+        error::handle_unexpected_default(&ctx, &framework, "InteractionCreate", (|| async {
             if let serenity::Interaction::MessageComponent(interaction) = interaction {
                 if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
                     error::handle_traceback_button(&ctx, data, interaction).await?;
@@ -476,7 +476,7 @@ Ask questions by either responding here or asking on the support server!",
         let framework = if let Some(fw) = self.framework() {fw} else {return};
         let data = framework.user_data().await;
 
-        error::handle_unexpected_default(&ctx, &framework, (|| async {
+        error::handle_unexpected_default(&ctx, &framework, "Ready", (|| async {
             let user_name = &data_about_bot.user.name;
             let (status, starting) = generate_status(&framework).await;
             data.webhooks["logs"].edit_message(&ctx.http, data.startup_message, |m| {m

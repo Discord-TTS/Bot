@@ -8,7 +8,7 @@ use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
 use crate::{
-    structs::{Context, Error, Data, Framework, OptionTryUnwrap, PoiseContextAdditions, Result},
+    structs::{Context, Error, Data, Framework, PoiseContextAdditions, Result},
     constants::{RED, VIEW_TRACEBACK_CUSTOM_ID},
     funcs::refresh_kind
 };
@@ -133,11 +133,11 @@ async fn handle_unexpected(
     Ok(())
 }
 
-pub async fn handle_unexpected_default<T>(ctx: &serenity::Context, framework: &Framework, result: Result<T, Error>) -> Result<()> {
+pub async fn handle_unexpected_default<T>(ctx: &serenity::Context, framework: &Framework, name: &str, result: Result<T, Error>) -> Result<()> {
     let error = if let Some(err) = result.err() {err} else {return Ok(())};
 
     handle_unexpected(
-        ctx, framework, "VoiceStateUpdate",
+        ctx, framework, name,
         error, Vec::new(),
         None, None
     ).await
@@ -284,10 +284,10 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
         poise::FrameworkError::MissingUserPermissions{missing_permissions, ctx} => {
             ctx.send_error(
                 "you cannot run this command",
-                Some(&format!(
+                missing_permissions.map(|missing_permissions| format!(
                     "ask an administator for the following permissions: {}",
-                    missing_permissions.try_unwrap()?.get_permission_names().join(", ")
-                ))
+                    missing_permissions.get_permission_names().join(", ")
+                )).as_deref()
             ).await?;
         },
 
@@ -313,7 +313,6 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
                 ))
             ).await?;
         },
-
     }
 
     Ok(())

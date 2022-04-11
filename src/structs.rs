@@ -249,7 +249,7 @@ impl PoiseContextAdditions for Context<'_> {
         };
 
 
-        self.send(|b| {b
+        let send_ret = self.send(|b| {b
             .ephemeral(true)
             .embed(|e| {e
                 .colour(RED)
@@ -266,7 +266,13 @@ impl PoiseContextAdditions for Context<'_> {
                     "Support Server: {}", self.data().config.main_server_invite
                 )))
             })
-        }).await.map(Some).map_err(Into::into)
+        }).await;
+
+        match send_ret {
+            Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => Ok(None),
+            Ok(reply_handle) => Ok(Some(reply_handle)),
+            Err(err) => Err(err.into()),
+        }
     }
 }
 
