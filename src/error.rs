@@ -133,7 +133,7 @@ async fn handle_unexpected(
     Ok(())
 }
 
-pub async fn handle_unexpected_default<T>(ctx: &serenity::Context, framework: &Framework, name: &str, result: Result<T, Error>) -> Result<()> {
+pub async fn handle_unexpected_default(ctx: &serenity::Context, framework: &Framework, name: &str, result: Result<()>) -> Result<()> {
     let error = if let Some(err) = result.err() {err} else {return Ok(())};
 
     handle_unexpected(
@@ -145,7 +145,7 @@ pub async fn handle_unexpected_default<T>(ctx: &serenity::Context, framework: &F
 
 
 // Listener Handlers
-pub async fn handle_message<T>(ctx: &serenity::Context, framework: &Framework, message: &serenity::Message, result: Result<T, Error>) -> Result<()> {
+pub async fn handle_message(ctx: &serenity::Context, framework: &Framework, message: &serenity::Message, result: Result<()>) -> Result<()> {
     let error = if let Some(err) = result.err() {err} else {return Ok(())};
 
     let mut extra_fields = Vec::with_capacity(3);
@@ -156,7 +156,7 @@ pub async fn handle_message<T>(ctx: &serenity::Context, framework: &Framework, m
         ]);
     }
 
-    extra_fields.push(("Channel Type", Cow::Borrowed(channel_type(message.channel_id.to_channel(&ctx).await?)), true));
+    extra_fields.push(("Channel Type", Cow::Borrowed(channel_type(&message.channel_id.to_channel(&ctx).await?)), true));
     handle_unexpected(
         ctx, framework, "MessageCreate",
         error, extra_fields,
@@ -164,7 +164,7 @@ pub async fn handle_message<T>(ctx: &serenity::Context, framework: &Framework, m
     ).await
 }
 
-pub async fn handle_guild<T>(name: &str, ctx: &serenity::Context, framework: &Framework, guild: Option<&serenity::Guild>, result: Result<T, Error>) -> Result<(), Error> {
+pub async fn handle_guild(name: &str, ctx: &serenity::Context, framework: &Framework, guild: Option<&serenity::Guild>, result: Result<()>) -> Result<()> {
     let error = if let Some(err) = result.err() {err} else {return Ok(())};
 
     handle_unexpected(
@@ -228,7 +228,7 @@ async fn handle_argparse(ctx: Context<'_>, error: Box<dyn std::error::Error + Se
 }
 
 
-fn channel_type(channel: serenity::Channel) -> &'static str {
+const fn channel_type(channel: &serenity::Channel) -> &'static str {
     match channel {
         serenity::Channel::Guild(channel)  => match channel.kind {
             serenity::ChannelType::Text | serenity::ChannelType::News => "Text Channel",   
@@ -254,7 +254,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
             let mut extra_fields = vec![
                 ("Command", Cow::Borrowed(command.name), true),
                 ("Slash Command", Cow::Owned(matches!(ctx, poise::Context::Application(..)).to_string()), true),
-                ("Channel Type", Cow::Borrowed(channel_type(ctx.channel_id().to_channel(ctx.discord()).await?)), true),
+                ("Channel Type", Cow::Borrowed(channel_type(&ctx.channel_id().to_channel(ctx.discord()).await?)), true),
             ];
 
             if let Some(guild) = ctx.guild() {

@@ -115,9 +115,9 @@ pub enum TTSModeChoice {
 impl From<TTSModeServerChoice> for TTSMode {
     fn from(mode: TTSModeServerChoice) -> Self {
         match mode {
-            TTSModeServerChoice::gTTS => TTSMode::gTTS,
-            TTSModeServerChoice::eSpeak => TTSMode::eSpeak,
-            TTSModeServerChoice::Premium => TTSMode::Premium
+            TTSModeServerChoice::gTTS => Self::gTTS,
+            TTSModeServerChoice::eSpeak => Self::eSpeak,
+            TTSModeServerChoice::Premium => Self::Premium
         }
     }
 }
@@ -125,8 +125,8 @@ impl From<TTSModeServerChoice> for TTSMode {
 impl From<TTSModeChoice> for TTSMode {
     fn from(mode: TTSModeChoice) -> Self {
         match mode {
-            TTSModeChoice::gTTS => TTSMode::gTTS,
-            TTSModeChoice::eSpeak => TTSMode::eSpeak,
+            TTSModeChoice::gTTS => Self::gTTS,
+            TTSModeChoice::eSpeak => Self::eSpeak,
         }
     }
 }
@@ -164,8 +164,8 @@ pub enum Gender {
 impl std::fmt::Display for Gender {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            Gender::Male => "Male",
-            Gender::Female => "Female"
+            Self::Male => "Male",
+            Self::Female => "Female"
         })
     }
 }

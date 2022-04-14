@@ -409,7 +409,7 @@ pub fn clean_msg(
 
     if xsaid && match last_to_xsaid.map(|i| *i) {
         Some((u_id, last_time)) => {
-            if let Some(voice_channel_id) = voice_channel_id {
+            voice_channel_id.map_or(true, |voice_channel_id|
                 (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) && {
                     // If more than 2 users in vc
                     guild.voice_states.values()
@@ -418,7 +418,7 @@ pub fn clean_msg(
                         .filter(|member| !member.user.bot)
                         .count() > 2
                 })
-            } else {true}
+            )
         }, None => true
     } {
         if contained_url {

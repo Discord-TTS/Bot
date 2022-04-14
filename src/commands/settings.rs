@@ -80,9 +80,10 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 
     let user_voice: Cow<'static, str> =
         if let Some(mode) =  user_mode {
-            if let Some(user_voice) = data.user_voice_db.get((author_id.into(), mode)).await?.get("voice") {
-                Cow::Owned(format_voice(user_voice, mode))
-            } else {Cow::Borrowed("none")}
+            data.user_voice_db
+                .get((author_id.into(), mode)).await?
+                .get::<_, Option<_>>("voice")
+                .map_or(Cow::Borrowed("none"), |user_voice| Cow::Owned(format_voice(user_voice, mode)))
         } else {Cow::Borrowed("none")};
 
     let target_lang = guild_row.get::<_, Option<_>>("target_lang").unwrap_or("none");

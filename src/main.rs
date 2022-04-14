@@ -167,7 +167,7 @@ async fn main() {
     ).await.unwrap();
 
     let (startup_message, webhooks) = {
-        let http = serenity::Http::new_with_token(main.token.as_deref().unwrap());
+        let http = serenity::Http::new(main.token.as_deref().unwrap());
         let webhooks = get_webhooks(&http, webhooks).await;
         (
             webhooks["logs"].execute(&http, true, |b| b

@@ -44,8 +44,8 @@ version = "1"
 features = ["macros", "rt-multi-thread", "signal", "parking_lot"]
 
 [dependencies.poise]
-git = "https://github.com/kangalioo/poise"
-branch = "develop"
+git = "https://github.com/GnomedDev/poise"
+branch = "update-serenity"
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
