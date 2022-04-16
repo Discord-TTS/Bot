@@ -16,8 +16,7 @@
 
 use indexmap::IndexMap;
 
-use crate::structs::{Context, Command, CommandResult};
-use crate::funcs::netural_colour;
+use crate::structs::{Context, Command, CommandResult, PoiseContextExt};
 
 enum HelpCommandMode<'a> {
     Root,
@@ -147,7 +146,7 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
     };
 
     let prefix = ctx.prefix();
-    let netural_colour = netural_colour(crate::premium_check(ctx.discord(), ctx.data(), ctx.guild_id()).await?.is_none());
+    let neutral_colour = ctx.neutral_colour().await;
     ctx.send(|b| {b.embed(|e| {e
         .title(format!("{} Help!", match &mode {
             HelpCommandMode::Root => ctx.discord().cache.current_user_field(|u| u.name.clone()),
@@ -178,7 +177,7 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
                 map
             }),
         })
-        .colour(netural_colour)
+        .colour(neutral_colour)
         .author(|a| {
             a.name(ctx.author().name.clone());
             a.icon_url(ctx.author().face())

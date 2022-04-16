@@ -20,8 +20,8 @@ use itertools::Itertools;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult};
-use crate::funcs::{get_gtts_voices, get_espeak_voices, netural_colour, parse_user_or_guild};
+use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult, PoiseContextExt};
+use crate::funcs::{get_gtts_voices, get_espeak_voices, parse_user_or_guild};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::{random_footer, database};
 use crate::macros::require_guild;
@@ -90,12 +90,12 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let target_lang = guild_row.get::<_, Option<_>>("target_lang").unwrap_or("none");
     let nickname = nickname_row.get::<_, Option<_>>("name").unwrap_or("none");
 
-    let netural_colour = netural_colour(guild_mode == TTSMode::Premium);
+    let neutral_colour = ctx.neutral_colour().await;
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
     ctx.send(|b| {b.embed(|e| {e
         .title("Current Settings")
         .url(&data.config.main_server_invite)
-        .colour(netural_colour)
+        .colour(neutral_colour)
         .footer(|f| {
             f.text(format!(concat!(
                 "Change these settings with {prefix}set property value!\n",

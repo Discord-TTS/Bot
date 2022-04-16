@@ -19,8 +19,8 @@ use poise::serenity_prelude as serenity;
 use num_format::{Locale, ToFormattedString};
 
 use crate::constants::{OPTION_SEPERATORS};
-use crate::structs::{Context, TTSMode, OptionTryUnwrap, CommandResult};
-use crate::funcs::{fetch_audio, netural_colour, parse_user_or_guild, sysinfo};
+use crate::funcs::{fetch_audio, parse_user_or_guild, sysinfo};
+use crate::structs::{Context, TTSMode, OptionTryUnwrap, CommandResult, PoiseContextExt};
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
@@ -112,14 +112,14 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
         .map_or_else(|| Cow::Borrowed("Unknown"), Cow::Owned);
 
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
-    let netural_colour = netural_colour(crate::premium_check(ctx_discord, data, ctx.guild_id()).await?.is_none());
+    let neutral_colour = ctx.neutral_colour().await;
 
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
     ctx.send(|b| {b.embed(|e| { e
         .title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())))
         .thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
         .url(&data.config.main_server_invite)
-        .colour(netural_colour)
+        .colour(neutral_colour)
         .footer(|f| {f
             .text(format!("
 Time to fetch: {time_to_fetch:.2}ms

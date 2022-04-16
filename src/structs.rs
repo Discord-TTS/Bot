@@ -8,7 +8,7 @@ use regex::Regex;
 use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 
-use crate::constants::RED;
+use crate::constants::{RED, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 pub use anyhow::{Error, Result};
 
 #[derive(serde::Deserialize)]
@@ -185,12 +185,13 @@ pub trait OptionTryUnwrap<T> {
 }
 
 #[serenity::async_trait]
-pub trait PoiseContextAdditions {
+pub trait PoiseContextExt {
+    async fn neutral_colour(&self) -> u32;
     async fn author_permissions(&self) -> Result<serenity::Permissions>;
     async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>>;
 }
 #[serenity::async_trait]
-pub trait SerenityContextAdditions {
+pub trait SerenityContextExt {
     async fn user_from_dm(&self, dm_name: &str) -> Option<serenity::User>;
     async fn join_vc(
         &self,
@@ -201,7 +202,18 @@ pub trait SerenityContextAdditions {
 }
 
 #[serenity::async_trait]
-impl PoiseContextAdditions for Context<'_> {
+impl PoiseContextExt for Context<'_> {
+    async fn neutral_colour(&self) -> u32 {
+        if let Some(guild_id) = self.guild_id() {
+            let row = self.data().guilds_db.get(guild_id.0 as i64).await;
+            if row.map(|row| row.get::<_, TTSMode>("voice_mode") == TTSMode::Premium).unwrap_or(false) {
+                return PREMIUM_NEUTRAL_COLOUR
+            }
+        }
+
+        FREE_NEUTRAL_COLOUR
+    }
+
     async fn author_permissions(&self) -> Result<serenity::Permissions> {
         let ctx_discord = self.discord();
 
@@ -220,6 +232,7 @@ impl PoiseContextAdditions for Context<'_> {
             }
         }
     }
+
     async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>> {
         let author = self.author();
         let ctx_discord = self.discord();
@@ -277,7 +290,7 @@ impl PoiseContextAdditions for Context<'_> {
 }
 
 #[serenity::async_trait]
-impl SerenityContextAdditions for serenity::Context {
+impl SerenityContextExt for serenity::Context {
     async fn user_from_dm(&self, dm_name: &str) -> Option<serenity::User> {
         lazy_static! {
             static ref ID_IN_BRACKETS_REGEX: Regex = Regex::new(r"\((\d+)\)").unwrap();

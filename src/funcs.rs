@@ -27,8 +27,7 @@ use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result};
-use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
+use crate::structs::{Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result};
 
 pub async fn sysinfo(data: &Data) -> Result<Option<(f64, u64)>> {
     let (send_resp, response) = tokio::sync::oneshot::channel();
@@ -177,14 +176,6 @@ pub async fn get_espeak_voices(reqwest: &reqwest::Client, mut tts_service: reqwe
 
 pub fn get_gtts_voices() -> BTreeMap<String, String> {
     json::from_str(std::include_str!("data/langs-free.json")).unwrap()
-}
-
-pub const fn netural_colour(premium: bool) -> u32{
-    if premium {
-        PREMIUM_NEUTRAL_COLOUR
-    } else {
-        FREE_NEUTRAL_COLOUR
-    }
 }
 
 pub fn random_footer(prefix: &str, server_invite: &str, client_id: u64) -> String {

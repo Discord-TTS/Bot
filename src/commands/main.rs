@@ -17,7 +17,7 @@ use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Result, CommandResult, PoiseContextAdditions, SerenityContextAdditions, TTSMode};
+use crate::structs::{Context, Result, CommandResult, PoiseContextExt, SerenityContextExt, TTSMode};
 use crate::macros::require_guild;
 use crate::funcs::random_footer;
 

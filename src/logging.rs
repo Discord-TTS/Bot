@@ -202,7 +202,7 @@ impl tracing::Subscriber for WebhookLogSend {
         if metadata.target().starts_with("discord_tts_bot") {
             self.max_verbosity >= *metadata.level()
         } else {
-            tracing::Level::ERROR >= *metadata.level()
+            tracing::Level::WARN >= *metadata.level()
         }
     }
 }

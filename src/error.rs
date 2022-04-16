@@ -7,7 +7,7 @@ use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
 use crate::{
-    structs::{Context, Error, Data, Framework, PoiseContextAdditions, Result},
+    structs::{Context, Error, Data, Framework, PoiseContextExt, Result},
     constants::{RED, VIEW_TRACEBACK_CUSTOM_ID},
     funcs::sysinfo
 };

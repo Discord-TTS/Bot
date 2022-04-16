@@ -51,7 +51,9 @@ mod funcs;
 use macros::require;
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices, generate_status};
-use structs::{TTSMode, Config, Data, Result, PoiseContextAdditions, SerenityContextAdditions, PostgresConfig, OptionTryUnwrap, Framework};
+use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework};
+
+use crate::constants::PREMIUM_NEUTRAL_COLOUR;
 
 struct LavalinkHandler;
 impl LavalinkEventHandler for LavalinkHandler {}
@@ -603,7 +605,7 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, error:
                 b.embed(|e| {e
                     .title("TTS Bot Premium - Premium Only Command!")
                     .description(main_msg)
-                    .colour(constants::PREMIUM_NEUTRAL_COLOUR)
+                    .colour(PREMIUM_NEUTRAL_COLOUR)
                     .thumbnail(data.premium_avatar_url.clone())
                     .footer(|f| f.text(FOOTER_MSG))
                 })
