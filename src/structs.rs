@@ -262,7 +262,7 @@ impl PoiseContextExt for Context<'_> {
         };
 
 
-        let send_ret = self.send(|b| {b
+        match self.send(|b| {b
             .ephemeral(true)
             .embed(|e| {e
                 .colour(RED)
@@ -279,12 +279,9 @@ impl PoiseContextExt for Context<'_> {
                     "Support Server: {}", self.data().config.main_server_invite
                 )))
             })
-        }).await;
-
-        match send_ret {
-            Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => Ok(None),
-            Ok(reply_handle) => Ok(Some(reply_handle)),
-            Err(err) => Err(err.into()),
+        }).await {
+            Ok(handle) => Ok(Some(handle)),
+            Err(_) => Ok(None)
         }
     }
 }
