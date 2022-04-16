@@ -104,7 +104,8 @@ pub async fn help(
 }
 
 pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
-    let commands = &ctx.framework().options().commands;
+    let framework_options = ctx.framework().options();
+    let commands = &framework_options.commands;
 
     let remaining_args: String;
     let mode = match command {
@@ -132,6 +133,11 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
                     }
             };
 
+            if command_obj.owners_only && !framework_options.owners.contains(&ctx.author().id) {
+                ctx.say("This command is only available to the bot owner!").await?;
+                return Ok(())
+            }
+
             if command_obj.subcommands.is_empty() {
                 HelpCommandMode::Command(command_obj)
             } else {
@@ -153,7 +159,8 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
             },
             HelpCommandMode::Command(command_obj) => {
                 format!("{}\n```{}{} {}```\n{}",
-                command_obj.inline_help.unwrap(), prefix, command_obj.qualified_name, format_params(command_obj),
+                command_obj.inline_help.unwrap_or("Command description not found!"),
+                prefix, command_obj.qualified_name, format_params(command_obj),
                     if command_obj.parameters.is_empty() {
                         String::new()
                     } else {
