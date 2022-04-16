@@ -757,7 +757,7 @@ pub async fn nick(
 
 fn can_send(guild: &serenity::Guild, channel: &serenity::GuildChannel, member: &serenity::Member) -> bool {
     const REQUIRED_PERMISSIONS: serenity::Permissions = serenity::Permissions::from_bits_truncate(
-        serenity::Permissions::SEND_MESSAGES.bits() | serenity::Permissions::READ_MESSAGES.bits()
+        serenity::Permissions::SEND_MESSAGES.bits() | serenity::Permissions::VIEW_CHANNEL.bits()
     );
 
     guild.user_permissions_in(channel, member)
