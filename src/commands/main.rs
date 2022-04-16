@@ -18,6 +18,7 @@ use std::borrow::Cow;
 use poise::serenity_prelude as serenity;
 
 use crate::structs::{Context, Result, CommandResult, PoiseContextAdditions, SerenityContextAdditions, TTSMode};
+use crate::macros::require_guild;
 use crate::funcs::random_footer;
 
 async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
@@ -43,7 +44,7 @@ async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
-    let guild = ctx.guild().unwrap();
+    let guild = require_guild!(ctx);
     if !channel_check(&ctx).await? {
         return Ok(())
     }
@@ -93,6 +94,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
             return Ok(());
         }
     };
+
     {
         let _typing = ctx.defer_or_broadcast().await?;
         ctx_discord.join_vc(&ctx.data().lavalink, guild.id, channel_id).await?;
@@ -123,7 +125,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
-    let guild = ctx.guild().unwrap();
+    let guild = require_guild!(ctx);
     if !channel_check(&ctx).await? {
         return Ok(())
     }
@@ -196,7 +198,7 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
 )]
 pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let ctx_discord = ctx.discord();
-    let guild = ctx.guild().unwrap();
+    let guild = require_guild!(ctx);
     let data = ctx.data();
 
     if crate::premium_check(ctx_discord, data, Some(guild.id)).await?.is_none() {

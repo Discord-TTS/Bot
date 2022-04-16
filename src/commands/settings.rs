@@ -20,10 +20,11 @@ use itertools::Itertools;
 
 use poise::serenity_prelude as serenity;
 
-use crate::funcs::{get_gtts_voices, get_espeak_voices, netural_colour, parse_user_or_guild};
 use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult};
+use crate::funcs::{get_gtts_voices, get_espeak_voices, netural_colour, parse_user_or_guild};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::{random_footer, database};
+use crate::macros::require_guild;
 
 
 /// Displays the current settings!
@@ -89,7 +90,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let target_lang = guild_row.get::<_, Option<_>>("target_lang").unwrap_or("none");
     let nickname = nickname_row.get::<_, Option<_>>("name").unwrap_or("none");
 
-    let netural_colour = netural_colour(crate::premium_check(ctx_discord, data, Some(guild_id)).await?.is_none());
+    let netural_colour = netural_colour(guild_mode == TTSMode::Premium);
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
     ctx.send(|b| {b.embed(|e| {e
         .title("Current Settings")
@@ -719,7 +720,7 @@ pub async fn nick(
     #[description="The nickname to set, leave blank to reset"] #[rest] nickname: Option<String>
 ) -> CommandResult {
     let ctx_discord = ctx.discord();
-    let guild = ctx.guild().unwrap();
+    let guild = require_guild!(ctx);
 
     let author = ctx.author();
     let user = user.map_or_else(|| Cow::Borrowed(author), Cow::Owned);
@@ -778,7 +779,7 @@ pub async fn setup(
     #[description="The channel for the bot to read messages from"] #[channel_types("Text")]
     channel: Option<serenity::GuildChannel>
 ) -> CommandResult {
-    let guild = ctx.guild().unwrap();
+    let guild = require_guild!(ctx);
 
     let ctx_discord = ctx.discord();
     let cache = &ctx_discord.cache;

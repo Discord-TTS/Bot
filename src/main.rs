@@ -44,9 +44,11 @@ mod database;
 mod commands;
 mod logging;
 mod structs;
+mod macros;
 mod error;
 mod funcs;
 
+use macros::require;
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices, generate_status};
 use structs::{TTSMode, Config, Data, Result, PoiseContextAdditions, SerenityContextAdditions, PostgresConfig, OptionTryUnwrap, Framework};
@@ -366,7 +368,7 @@ impl EventHandler {
 #[poise::async_trait]
 impl serenity::EventHandler for EventHandler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
-        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let framework = require!(self.framework());
         error::handle_message(&ctx, &framework, &new_message, (|| async {
             let data = framework.user_data().await;
 
@@ -382,7 +384,7 @@ impl serenity::EventHandler for EventHandler {
     }
 
     async fn voice_state_update(&self, ctx: serenity::Context, old: Option<serenity::VoiceState>, new: serenity::VoiceState) {
-        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let framework = require!(self.framework());
         error::handle_unexpected_default(&ctx, &framework, "VoiceStateUpdate", (|| async {
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user_id();
@@ -410,7 +412,7 @@ impl serenity::EventHandler for EventHandler {
     }
 
     async fn guild_create(&self, ctx: serenity::Context, guild: serenity::Guild, is_new: bool) {
-        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let framework = require!(self.framework());
         let data = framework.user_data().await;
         if !is_new {return};
 
@@ -463,7 +465,7 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn guild_delete(&self, ctx: serenity::Context, incomplete: serenity::UnavailableGuild, full: Option<serenity::Guild>) {
-        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let framework = require!(self.framework());
         let data = framework.user_data().await;
 
         error::handle_guild("GuildDelete", &ctx, &framework, full.as_ref(), (|| async {
@@ -480,7 +482,7 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn interaction_create(&self, ctx: serenity::Context, interaction: serenity::Interaction) {
-        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let framework = require!(self.framework());
         let data = framework.user_data().await;
 
         error::handle_unexpected_default(&ctx, &framework, "InteractionCreate", (|| async {
@@ -495,7 +497,7 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn ready(&self, ctx: serenity::Context, data_about_bot: serenity::Ready) {
-        let framework = if let Some(fw) = self.framework() {fw} else {return};
+        let framework = require!(self.framework());
         let data = framework.user_data().await;
 
         error::handle_unexpected_default(&ctx, &framework, "Ready", (|| async {

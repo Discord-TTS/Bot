@@ -30,7 +30,6 @@ use serenity::json::prelude as json;
 use crate::structs::{Data, SerenityContextAdditions, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result};
 use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 
-
 pub async fn sysinfo(data: &Data) -> Result<Option<(f64, u64)>> {
     let (send_resp, response) = tokio::sync::oneshot::channel();
     if data.system_info_pipe.send(send_resp).await.is_ok() {

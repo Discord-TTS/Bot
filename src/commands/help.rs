@@ -70,6 +70,10 @@ async fn help_autocomplete(ctx: Context<'_>, searching: String) -> Vec<String> {
         let mut result = Vec::new();
 
         for command in commands {
+            if command.owners_only || command.hide_in_help {
+                continue
+            }
+
             if command.subcommands.is_empty() {
                 if command.qualified_name.starts_with(searching) {
                     result.push(command.qualified_name.clone());
