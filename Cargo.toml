@@ -49,16 +49,8 @@ branch = "update-serenity"
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
+features = ["builtin-queue"]
 branch = "next"
 
-[dependencies.lavalink-rs]
-git = "https://gitlab.com/GnomedDev/lavalink-rs"
-features = ["serenity", "rustls"]
-branch = "update-deps"
-
-
-# lavalink pulls serenity from crates.io. tell it to pull from github instead 
 [patch.crates-io]
 serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next" }
-songbird = { git = "https://github.com/serenity-rs/songbird", branch = "next" }
-# parking_lot = { git = "https://github.com/GnomedDev/parking_lot", branch = "master" }

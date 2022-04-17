@@ -22,7 +22,6 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use rand::prelude::SliceRandom;
-use lavalink_rs::LavalinkClient;
 
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
@@ -247,7 +246,6 @@ fn remove_repeated_chars(content: &str, limit: usize) -> String {
 pub async fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
-    lavalink: &LavalinkClient,
 
     channel: u64,
     prefix: &str,
@@ -308,7 +306,7 @@ pub async fn run_checks(
         // Else if the user is in the vc and autojoin is on
         } else if let Some(voice_state) = voice_state && autojoin {
             let voice_channel = voice_state.channel_id.try_unwrap()?;
-            ctx.join_vc(lavalink, guild.id, voice_channel).await?;
+            ctx.join_vc(guild.id, voice_channel).await?;
         } else {
             return Ok(None); // Bot not in vc
         };

@@ -1,6 +1,6 @@
 # TTS Bot - Rust Rewrite
 
-Text to speech Discord Bot using Serenity, Poise, and lavalink-rs
+Text to speech Discord Bot using Serenity, Songbird, and Poise
 
 ## Setup Guide:
 ### Easy (Public Bot):

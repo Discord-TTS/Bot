@@ -6,4 +6,3 @@ target
 Dockerfile
 docker-compose.*
 config.toml
-lavalink_config.yml

@@ -5,7 +5,6 @@ use strum_macros::IntoStaticStr;
 use lazy_static::lazy_static;
 use regex::Regex;
 
-use lavalink_rs::LavalinkClient;
 use poise::serenity_prelude as serenity;
 
 use crate::constants::{RED, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
@@ -14,7 +13,6 @@ pub use anyhow::{Error, Result};
 #[derive(serde::Deserialize)]
 pub struct Config {
     #[serde(rename="Main")] pub main: MainConfig,
-    #[serde(rename="Lavalink")] pub lavalink: LavalinkConfig,
     #[serde(rename="Webhook-Info")] pub webhooks: toml::value::Table,
 }
 
@@ -39,14 +37,6 @@ pub struct PostgresConfig {
     pub password: String,
 }
 
-#[derive(serde::Deserialize)]
-pub struct LavalinkConfig {
-    pub password: String,
-    pub host: String,
-    pub port: u16,
-    pub ssl: bool
-}
-
 
 pub struct Data {
     pub analytics: Arc<crate::analytics::Handler>,
@@ -56,13 +46,12 @@ pub struct Data {
     pub user_voice_db: crate::database::Handler<(i64, TTSMode)>,
     pub guild_voice_db: crate::database::Handler<(i64, TTSMode)>,
 
-    pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
     pub system_info_pipe: tokio::sync::mpsc::Sender<tokio::sync::oneshot::Sender<(f64, u64)>>,
+    pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub start_time: std::time::SystemTime,
     pub premium_avatar_url: String,
-    pub lavalink: LavalinkClient,
     pub reqwest: reqwest::Client,
     pub config: MainConfig,
 
@@ -195,7 +184,6 @@ pub trait SerenityContextExt {
     async fn user_from_dm(&self, dm_name: &str) -> Option<serenity::User>;
     async fn join_vc(
         &self,
-        lavalink: &LavalinkClient,
         guild_id: serenity::GuildId,
         channel_id: serenity::ChannelId,
     ) -> Result<()>;
@@ -300,14 +288,12 @@ impl SerenityContextExt for serenity::Context {
 
     async fn join_vc(
         &self,
-        lavalink: &LavalinkClient,
         guild_id: serenity::GuildId,
         channel_id: serenity::ChannelId,
     ) -> Result<()> {
         let manager = songbird::get(self).await.unwrap();
-
-        let (_, handler) = manager.join_gateway(guild_id.0, channel_id.0).await;
-        Ok(lavalink.create_session_with_songbird(&handler?).await?)
+        let (_, r) = manager.join(guild_id, channel_id).await;
+        r.map(|_| ()).map_err(Into::into)
     }
 }
 

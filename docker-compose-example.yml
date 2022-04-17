@@ -6,17 +6,8 @@ services:
             source: ./config.toml
             target: /config.toml
 
-        depends_on: [database, lavalink, tts-service]
+        depends_on: [database, tts-service]
         network_mode: "host"
-    lavalink:
-        image: fredboat/lavalink:dev
-        volumes:
-          - type: bind
-            source: ./lavalink_config.yml
-            target: /opt/Lavalink/application.yml
-
-        network_mode: "host"
-        expose: [2333]
     database:
         image: postgres:13
         ports: [5432:5432]

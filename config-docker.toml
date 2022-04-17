@@ -1,9 +1,3 @@
-[Lavalink]
-host = 'localhost'
-password = 'youshallnotpass' 
-port = 2333
-ssl = false
-
 [Main]
 log_level = 'info'
 tts_service = 'https://localhost:20310'

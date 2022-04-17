@@ -1,9 +1,3 @@
-[Lavalink]
-#host = 
-#password = 
-#port =
-#ssl = 
-
 [Main]
 log_level = 'info'
 #tts_service = instance of https://github.com/GnomedDev/tts-service

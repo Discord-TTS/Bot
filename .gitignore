@@ -5,7 +5,6 @@ config.ini
 keydb.conf
 config.toml
 docker-compose.yml
-lavalink-plugins/*
 
 # Added by cargo
 

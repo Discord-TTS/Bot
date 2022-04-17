@@ -97,7 +97,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
     {
         let _typing = ctx.defer_or_broadcast().await?;
-        ctx_discord.join_vc(&ctx.data().lavalink, guild.id, channel_id).await?;
+        ctx_discord.join_vc(guild.id, channel_id).await?;
     }
 
     ctx.send(|m| {
@@ -146,7 +146,6 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         let data = ctx.data();
 
         manager.remove(guild.id).await?;
-        data.lavalink.destroy(guild.id).await?;
         data.last_to_xsaid_tracker.remove(&guild.id);
 
         ctx.say("Left voice channel!").await?;
@@ -170,21 +169,28 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     }
 
     let guild_id = ctx.guild_id().unwrap();
+    let manager = songbird::get(ctx.discord()).await.unwrap();
+    if let Some(call_lock) = manager.get(guild_id) {
+        call_lock
+            .lock().await
+            .queue().modify_queue(|queue| queue
+                .drain(..)
+                .try_for_each(|t| t.stop())
+            )?;
 
-    let lavalink = &ctx.data().lavalink;
-    lavalink.skip(guild_id).await;
-    lavalink.inner.queues.remove(&guild_id.into());
-
-    match ctx {
-        poise::Context::Prefix(ctx) => {
-            // Prefixed command, just add a thumbsup reaction
-            ctx.msg.react(ctx.discord, '👍').await?;
+        match ctx {
+            poise::Context::Prefix(ctx) => {
+                // Prefixed command, just add a thumbsup reaction
+                ctx.msg.react(ctx.discord, '👍').await?;
+            }
+            poise::Context::Application(_) => {
+                // Slash command, no message to react to, just say thumbsup
+                ctx.say('👍').await?;
+            }
         }
-        poise::Context::Application(_) => {
-            // Slash command, no message to react to, just say thumbsup
-            ctx.say('👍').await?;
-        }
-    }
+    } else {
+        ctx.say("**Error**: I am not in a voice channel!").await?;
+    };
 
     Ok(())
 }

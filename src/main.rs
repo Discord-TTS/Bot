@@ -35,7 +35,6 @@ use tracing::{error, info, warn};
 
 use poise::serenity_prelude as serenity; // re-exports a lot of serenity with shorter paths
 use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
-use lavalink_rs::{gateway::LavalinkEventHandler, LavalinkClient};
 
 mod migration;
 mod analytics;
@@ -54,9 +53,6 @@ use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premi
 use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework};
 
 use crate::constants::PREMIUM_NEUTRAL_COLOUR;
-
-struct LavalinkHandler;
-impl LavalinkEventHandler for LavalinkHandler {}
 
 async fn get_webhooks(
     http: &serenity::Http,
@@ -80,7 +76,7 @@ async fn main() {
     let start_time = std::time::SystemTime::now();
     std::env::set_var("RUST_LIB_BACKTRACE", "1");
 
-    let (pool, mut main, lavalink, webhooks) = {
+    let (pool, mut main, webhooks) = {
         let mut config_toml: toml::Value = std::fs::read_to_string("config.toml").unwrap().parse().unwrap();
         let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone()).unwrap();
 
@@ -98,8 +94,8 @@ async fn main() {
 
         migration::run(&mut config_toml, &pool).await.unwrap();
 
-        let Config{main, lavalink, webhooks} = config_toml.try_into().unwrap();
-        (pool, main, lavalink, webhooks)
+        let Config{main, webhooks} = config_toml.try_into().unwrap();
+        (pool, main, webhooks)
     };
 
     // CLEANUP
@@ -197,7 +193,7 @@ async fn main() {
             .event_handler(EventHandler {framework: framework_oc_clone})
             .register_songbird()
         })
-        .user_data_setup(move |ctx, ready, _framework| {Box::pin(async move {
+        .user_data_setup(move |ctx, _, _| {Box::pin(async move {
             let (send, rx) = std::sync::mpsc::channel();
             let subscriber = logging::WebhookLogSend::new(send, tracing::Level::from_str(&main.log_level)?);
             let listener = logging::WebhookLogRecv::new(
@@ -237,18 +233,12 @@ async fn main() {
             });
 
             Ok(Data {
+                config: main,
                 system_info_pipe: send_req,
                 reqwest: reqwest::Client::new(),
                 premium_voices: get_premium_voices(),
                 last_to_xsaid_tracker: dashmap::DashMap::new(),
                 premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
-                lavalink: LavalinkClient::builder(ready.application.id.0)
-                    .set_password(&lavalink.password)
-                    .set_host(&lavalink.host)
-                    .set_port(lavalink.port)
-                    .set_is_ssl(lavalink.ssl)
-                    .build(LavalinkHandler).await?,
-                config: main,
 
                 guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
                 analytics, webhooks, start_time, pool, startup_message
@@ -406,7 +396,6 @@ impl serenity::EventHandler for EventHandler {
                     .iter().any(|m| !m.user.bot)
             {
                 songbird.remove(guild_id).await?;
-                framework.user_data().await.lavalink.destroy(guild_id.0).await?;
             };
 
             Ok(())
@@ -644,10 +633,8 @@ async fn process_tts_msg(
     let mode;
     let voice;
 
-    let lavalink_client = &data.lavalink;
     let mut content = match run_checks(
-        ctx, message, lavalink_client,
-        channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
+        ctx, message, channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
     ).await? {
         None => return Ok(()),
         Some(content) => {
@@ -675,18 +662,18 @@ async fn process_tts_msg(
         };
     }
 
-    let tts_err = || anyhow::anyhow!("Guild: {} | Lavalink failed to get track!", guild.id);
-    for url in funcs::fetch_url(
-        &data.config.tts_service,
-        content,
-        &voice,
-        mode,
-        speaking_rate
-    ) {
-        let tracks = lavalink_client.get_tracks(&url).await?.tracks;
-        let track = tracks.into_iter().next().ok_or_else(tts_err)?;
+    let mut tracks = Vec::new();
+    for url in funcs::fetch_url(&data.config.tts_service, content, &voice, mode, speaking_rate) {
+        tracks.push(songbird::ffmpeg(url.as_str()).await?);
+    }
 
-        lavalink_client.play(guild.id, track).queue().await?;
+    let call_lock = songbird::get(ctx).await.unwrap().get(guild.id).try_unwrap()?;
+
+    {
+        let mut call = call_lock.lock().await;
+        for track in tracks {
+            call.enqueue_source(track);
+        }
     }
 
     let mode: &'static str = mode.into();
