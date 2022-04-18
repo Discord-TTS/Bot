@@ -191,7 +191,7 @@ async fn main() {
                 | serenity::GatewayIntents::MESSAGE_CONTENT,
             )
             .event_handler(EventHandler {framework: framework_oc_clone})
-            .register_songbird()
+            .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
         })
         .user_data_setup(move |ctx, _, _| {Box::pin(async move {
             let (send, rx) = std::sync::mpsc::channel();
