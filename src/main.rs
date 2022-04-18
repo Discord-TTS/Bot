@@ -210,34 +210,12 @@ async fn main() {
             tokio::spawn(async move {listener.listener().await;});
             tracing::subscriber::set_global_default(subscriber).unwrap();
 
-            let (send_req, mut recv_req) =
-                tokio::sync::mpsc::channel::<tokio::sync::oneshot::Sender<(f64, u64)>>(1);
-
-            tokio::task::spawn_blocking(move || {
-                let mut system_info = sysinfo::System::new();
-                while let Some(respond) = recv_req.blocking_recv() {
-                    system_info.refresh_specifics(
-                        sysinfo::RefreshKind::new()
-                            .with_processes(sysinfo::ProcessRefreshKind::new())
-                            .with_memory()
-                            .with_cpu()
-                    );
-
-                    if respond.send((
-                        system_info.load_average().five,
-                        system_info.used_memory() / 1024
-                    )).is_err() {
-                        return;
-                    };
-                }
-            });
-
             Ok(Data {
                 config: main,
-                system_info_pipe: send_req,
                 reqwest: reqwest::Client::new(),
                 premium_voices: get_premium_voices(),
                 last_to_xsaid_tracker: dashmap::DashMap::new(),
+                system_info: parking_lot::Mutex::new(sysinfo::System::new()),
                 premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
 
                 guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,

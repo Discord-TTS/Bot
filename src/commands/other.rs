@@ -13,13 +13,12 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::borrow::Cow;
-
+use sysinfo::{SystemExt, ProcessExt};
 use poise::serenity_prelude as serenity;
 use num_format::{Locale, ToFormattedString};
 
 use crate::constants::{OPTION_SEPERATORS};
-use crate::funcs::{fetch_audio, parse_user_or_guild, sysinfo};
+use crate::funcs::{fetch_audio, parse_user_or_guild, refresh_kind};
 use crate::structs::{Context, TTSMode, OptionTryUnwrap, CommandResult, PoiseContextExt};
 
 /// Shows how long TTS Bot has been online
@@ -109,9 +108,13 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
     let total_guild_count = guilds_info.len();
 
     let shard_count = ctx_discord.cache.shard_count();
-    let ram_usage = sysinfo(data).await?
-        .map(|(_, ram_usage)| ram_usage.to_formatted_string(&Locale::en))
-        .map_or(Cow::Borrowed("Unknown"), Cow::Owned);
+    let ram_usage = {
+        let mut system_info = data.system_info.lock();
+        system_info.refresh_specifics(refresh_kind());
+
+        let pid = sysinfo::get_current_pid().unwrap();
+        system_info.process(pid).unwrap().memory() / 1024
+    };
 
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
     let neutral_colour = ctx.neutral_colour().await;

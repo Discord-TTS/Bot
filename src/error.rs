@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use sysinfo::SystemExt;
 use tracing::error;
 use sha2::Digest;
 
@@ -9,7 +10,7 @@ use serenity::json::prelude as json;
 use crate::{
     structs::{Context, Error, Data, Framework, PoiseContextExt, Result},
     constants::{RED, VIEW_TRACEBACK_CUSTOM_ID},
-    funcs::sysinfo
+    funcs::refresh_kind
 };
 
 #[allow(clippy::module_name_repetitions)]
@@ -59,7 +60,15 @@ async fn handle_unexpected(
             json::to_value(embed).unwrap()
         ])}).await?;
     } else {
-        let (cpu_usage, mem_usage) = if let Some(resp) = sysinfo(data).await? {resp} else {return Ok(())};
+        let (cpu_usage, mem_usage) ={
+            let mut system = data.system_info.lock();
+            system.refresh_specifics(refresh_kind());
+
+            (
+                system.load_average().five.to_string(),
+                (system.used_memory() / 1024).to_string()
+            )
+        };
 
         let before_fields = [
             ("Event", Cow::Borrowed(event), true),
@@ -68,8 +77,8 @@ async fn handle_unexpected(
         ];
 
         let after_fields = [
-            ("CPU Usage (5 minutes)", Cow::Owned(cpu_usage.to_string()), true),
-            ("System Memory Usage", Cow::Owned(mem_usage.to_string()), true),
+            ("CPU Usage (5 minutes)", Cow::Owned(cpu_usage), true),
+            ("System Memory Usage", Cow::Owned(mem_usage), true),
             ("Shard Count", Cow::Owned(framework.shard_manager().lock().await.shards_instantiated().await.len().to_string()), true),
         ];
 

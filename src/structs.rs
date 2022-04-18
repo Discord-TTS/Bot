@@ -46,8 +46,8 @@ pub struct Data {
     pub user_voice_db: crate::database::Handler<(i64, TTSMode)>,
     pub guild_voice_db: crate::database::Handler<(i64, TTSMode)>,
 
-    pub system_info_pipe: tokio::sync::mpsc::Sender<tokio::sync::oneshot::Sender<(f64, u64)>>,
     pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
+    pub system_info: parking_lot::Mutex<sysinfo::System>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub start_time: std::time::SystemTime,

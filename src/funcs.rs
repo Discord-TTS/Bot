@@ -28,13 +28,11 @@ use serenity::json::prelude as json;
 
 use crate::{structs::{Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result}, macros::require};
 
-pub async fn sysinfo(data: &Data) -> Result<Option<(f64, u64)>> {
-    let (send_resp, response) = tokio::sync::oneshot::channel();
-    if data.system_info_pipe.send(send_resp).await.is_ok() {
-        response.await.map(Some).map_err(Into::into)
-    } else {
-        Ok(None)
-    }
+pub fn refresh_kind() -> sysinfo::RefreshKind {
+    sysinfo::RefreshKind::new()
+        .with_processes(sysinfo::ProcessRefreshKind::new())
+        .with_memory()
+        .with_cpu()
 }
 
 pub async fn generate_status(framework: &Framework) -> (String, bool) {
