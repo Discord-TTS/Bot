@@ -336,7 +336,7 @@ pub fn clean_msg(
     member: &serenity::Member,
     attachments: &[serenity::Attachment],
 
-    lang: &str,
+    voice: &str,
     xsaid: bool,
     repeated_limit: usize,
     nickname: Option<&str>,
@@ -378,7 +378,7 @@ pub fn clean_msg(
         };
 
 
-        if lang == "en" {
+        if voice.starts_with("en") {
             content = parse_acronyms(&content);
         }
 
