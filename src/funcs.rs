@@ -50,13 +50,6 @@ pub async fn generate_status(framework: &Framework) -> (String, bool) {
     (status.join("\n"), shards.values().any(|shard| shard.stage.is_connecting()))
 }
 
-pub const fn default_voice(mode: TTSMode) -> &'static str {
-    match mode {
-        TTSMode::gTTS => "en",
-        TTSMode::eSpeak => "en1",
-        TTSMode::Premium => "en-US A",
-    }
-}
 
 pub async fn parse_user_or_guild(
     data: &Data,
@@ -78,7 +71,7 @@ pub async fn parse_user_or_guild(
     let voice =
         // Get user voice for user mode
         if user_voice_row.get::<_, i64>("user_id") != 0 {
-            Some(Cow::Owned(user_voice_row.get("voice")))
+            user_voice_row.get::<_, Option<_>>("voice").map(Cow::Owned)
         } else if let Some(guild_id) = guild_id {
             // Get default server voice for user mode
             let guild_voice_row = data.guild_voice_db.get((guild_id.into(), mode)).await?;
@@ -89,7 +82,7 @@ pub async fn parse_user_or_guild(
             }
         } else {
             None
-        }.unwrap_or_else(|| Cow::Borrowed(default_voice(mode)));
+        }.unwrap_or_else(|| Cow::Borrowed(mode.default_voice()));
 
     Ok((voice, mode))
 }
@@ -101,7 +94,7 @@ pub async fn fetch_audio(
     content: String,
     lang: &str,
     mode: TTSMode,
-    speaking_rate: f32
+    speaking_rate: &str
 ) -> Result<Vec<u8>, Error> {
     let mut data = Vec::new();
     for url in fetch_url(tts_service, content, lang, mode, speaking_rate) {
@@ -110,7 +103,7 @@ pub async fn fetch_audio(
     Ok(data.into_iter().flatten().collect())
 }
 
-pub fn fetch_url(tts_service: &reqwest::Url, content: String, lang: &str, mode: TTSMode, speaking_rate: f32) -> Vec<reqwest::Url> {
+pub fn fetch_url(tts_service: &reqwest::Url, content: String, lang: &str, mode: TTSMode, speaking_rate: &str) -> Vec<reqwest::Url> {
     let fetch_url = |chunk: String| {
         let mut url = tts_service.clone();
         url.set_path("tts");
@@ -118,7 +111,7 @@ pub fn fetch_url(tts_service: &reqwest::Url, content: String, lang: &str, mode: 
             .append_pair("text", &chunk)
             .append_pair("lang", lang)
             .append_pair("mode", mode.into())
-            .append_pair("speaking_rate", &speaking_rate.to_string())
+            .append_pair("speaking_rate", speaking_rate)
             .finish();
         url
     };

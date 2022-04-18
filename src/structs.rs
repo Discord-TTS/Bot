@@ -72,6 +72,25 @@ pub enum TTSMode {
     #[postgres(name="premium")] Premium
 }
 
+impl TTSMode {
+    pub const fn default_voice(self) -> &'static str {
+        match self {
+            Self::gTTS => "en",
+            Self::eSpeak => "en1",
+            Self::Premium => "en-US A",
+        }
+    }
+
+    // min default max kind
+    pub const fn speaking_rate_info(self) -> Option<(f32, f32, f32, &'static str)> {
+        match self {
+            Self::gTTS => None,
+            Self::Premium => Some((0.25, 1.0, 4.0, "x")),
+            Self::eSpeak => Some((100.0, 175.0, 400.0, " words per minute")),
+        }
+    }
+}
+
 impl std::fmt::Display for TTSMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.into())

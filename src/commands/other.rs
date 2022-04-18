@@ -62,12 +62,18 @@ pub async fn tts(
         let (voice, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
 
         let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
-        let speaking_rate = data.userinfo_db.get(author.id.into()).await?.get("speaking_rate");
+        let speaking_rate = data.user_voice_db
+            .get((author.id.into(), mode)).await?
+            .get::<_, Option<f32>>("speaking_rate")
+            .map_or_else(
+                || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).unwrap_or_default(),
+                |r| r.to_string()
+            );
 
         serenity::AttachmentType::Bytes {
             data: std::borrow::Cow::Owned(fetch_audio(
                 &data.reqwest, &data.config.tts_service,
-                message, &voice, mode, speaking_rate
+                message, &voice, mode, &speaking_rate.to_string()
             ).await?),
             filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
                 TTSMode::gTTS => "mp3",

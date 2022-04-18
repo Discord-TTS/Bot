@@ -630,7 +630,14 @@ async fn process_tts_msg(
         }
     };
 
-    let speaking_rate: f32 = data.userinfo_db.get(message.author.id.into()).await?.get("speaking_rate");
+    let speaking_rate = data.user_voice_db
+        .get((message.author.id.into(), mode)).await?
+        .get::<_, Option<f32>>("speaking_rate")
+        .map_or_else(
+            || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).unwrap_or_default(),
+            |r| r.to_string()
+        );
+
     if let Some(target_lang) = guild_row.get("target_lang") {
         if guild_row.get("to_translate") && premium_check(ctx, data, Some(guild_id)).await?.is_none() {
             content = funcs::translate(&content, target_lang, data).await?.unwrap_or(content);
@@ -638,7 +645,7 @@ async fn process_tts_msg(
     }
 
     let mut tracks = Vec::new();
-    for url in funcs::fetch_url(&data.config.tts_service, content, &voice, mode, speaking_rate) {
+    for url in funcs::fetch_url(&data.config.tts_service, content, &voice, mode, &speaking_rate) {
         tracks.push(songbird::ffmpeg(url.as_str()).await?);
     }
 

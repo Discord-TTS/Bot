@@ -48,7 +48,6 @@ pub const DB_SETUP_QUERY: &str = "
         user_id       bigint     PRIMARY KEY,
         dm_blocked    bool       DEFAULT False,
         dm_welcomed   bool       DEFAULT false,
-        speaking_rate real       DEFAULT 1,
         voice_mode    TTSMode
     );
 
@@ -89,6 +88,7 @@ pub const DB_SETUP_QUERY: &str = "
         user_id       bigint,
         mode          TTSMode,
         voice         text,
+        speaking_rate real,
 
         PRIMARY KEY (user_id, mode),
 

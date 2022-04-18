@@ -73,19 +73,29 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let default_voice = {
         let guild_voice_row = data.guild_voice_db.get((guild_id.into(), guild_mode)).await?;
         if guild_voice_row.get::<_, i64>("guild_id") == 0 {
-            Cow::Borrowed(crate::funcs::default_voice(guild_mode))
+            Cow::Borrowed(guild_mode.default_voice())
         } else {
             Cow::Owned(format_voice(guild_voice_row.get("voice"), guild_mode))
         }
     };
 
-    let user_voice: Cow<'static, str> =
+    let (user_voice, speaking_rate, speaking_rate_kind) =
         if let Some(mode) =  user_mode {
-            data.user_voice_db
-                .get((author_id.into(), mode)).await?
-                .get::<_, Option<_>>("voice")
-                .map_or(Cow::Borrowed("none"), |user_voice| Cow::Owned(format_voice(user_voice, mode)))
-        } else {Cow::Borrowed("none")};
+            let row = data.user_voice_db.get((author_id.into(), mode)).await?;
+
+            let (default, kind) = mode.speaking_rate_info()
+                .map_or((1.0, "x"), |(_, d, _, k)| (d, k));
+
+            (
+                row
+                    .get::<_, Option<_>>("voice")
+                    .map_or(Cow::Borrowed("none"), |user_voice| Cow::Owned(format_voice(user_voice, mode))),
+                Cow::Owned(row.get::<_, Option<f32>>("speaking_rate").unwrap_or(default).to_string()),
+                kind,
+            )
+        } else {
+            (Cow::Borrowed("none"), Cow::Borrowed("1.0"), "x")
+        };
 
     let target_lang = guild_row.get::<_, Option<_>>("target_lang").unwrap_or("none");
     let nickname = nickname_row.get::<_, Option<_>>("name").unwrap_or("none");
@@ -127,6 +137,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep3} Voice: `{user_voice}`
 {sep3} Voice Mode: `{}`
 {sep3} Nickname: `{nickname}`
+{sep3} Speaking Rate: `{speaking_rate}{speaking_rate_kind}`
         ", user_mode.map_or("none", Into::into)
         ), false)
     })}).await?;
@@ -682,23 +693,34 @@ pub async fn audienceignore(
 /// Changes the multiplier for how fast to speak
 #[poise::command(
     category="Settings",
-    check="crate::premium_command_check",
     prefix_command, slash_command,
     required_bot_permissions="SEND_MESSAGES",
     aliases("speed", "speed_multiplier", "speaking_rate_multiplier", "speaking_speed", "tts_speed")
 )]
 pub async fn speaking_rate(
     ctx: Context<'_>,
-    #[description="The speed to speak at (0.25-4.0)"] #[min=0.25] #[max=4.0] multiplier: f32
+    #[description="The speed to speak at"] #[min=0] #[max=400.0] speaking_rate: f32
 ) -> CommandResult {
-    let to_send = {
-        if multiplier > 4.0 {
-            Cow::Borrowed("**Error**: Cannot set the speaking rate multiplier above 4x")
-        } else if multiplier < 0.25 {
-            Cow::Borrowed("**Error**: Cannot set the speaking rate multiplier below 0.25x")
+    let data = ctx.data();
+    let author = ctx.author();
+
+    let (_, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
+    let (min, _, max, kind) =
+        if let Some(info) = mode.speaking_rate_info() {
+            info
         } else {
-            ctx.data().userinfo_db.set_one(ctx.author().id.into(), "speaking_rate", &multiplier).await?;
-            Cow::Owned(format!("The speaking rate multiplier is now: {multiplier}"))
+            ctx.say(format!("**Error**: Cannot set speaking rate for the {mode} mode")).await?;
+            return Ok(())
+        };
+
+    let to_send = {
+        if speaking_rate > max {
+            format!("**Error**: Cannot set the speaking rate multiplier above {max}{kind}")
+        } else if speaking_rate < min {
+            format!("**Error**: Cannot set the speaking rate multiplier below {min}{kind}")
+        } else {
+            data.user_voice_db.set_one((author.id.0 as i64, mode), "speaking_rate", &speaking_rate).await?;
+            format!("Your speaking rate is now: {speaking_rate}{kind}")
         }
     };
 

@@ -16,10 +16,12 @@
 
 use std::{sync::Arc, io::Write};
 
-use crate::structs::{Error, TTSMode};
+use deadpool_postgres::Transaction;
+
+use crate::structs::{Error, TTSMode, Result};
 use crate::constants::DB_SETUP_QUERY;
 
-async fn migrate_single_to_modes(transaction: &mut deadpool_postgres::Transaction<'_>, table: &str, new_table: &str, old_column: &str, id_column: &str) -> Result<(), Error> {
+async fn migrate_single_to_modes(transaction: &mut Transaction<'_>, table: &str, new_table: &str, old_column: &str, id_column: &str) -> Result<()> {
     let insert_query_mode = transaction.prepare_cached(&format!("INSERT INTO {new_table}({id_column}, mode, voice) VALUES ($1, $2, $3)")).await?;
     let insert_query_voice = transaction.prepare_cached(&format!("
         INSERT INTO {table}({id_column}, voice_mode) VALUES ($1, $2)
@@ -44,6 +46,34 @@ async fn migrate_single_to_modes(transaction: &mut deadpool_postgres::Transactio
 
     if delete_voice {
         transaction.execute(&format!("ALTER TABLE {table} DROP COLUMN {old_column}"), &[]).await?;
+    };
+
+    Ok(())
+}
+
+async fn migrate_speaking_rate_to_mode(transaction: &mut Transaction<'_>) -> Result<()> {
+    let insert_query = transaction.prepare_cached("
+        INSERT INTO user_voice(user_id, mode, speaking_rate) VALUES ($1, $2, $3)
+        ON CONFLICT (user_id, mode) DO UPDATE SET speaking_rate = EXCLUDED.speaking_rate
+    ").await?;
+
+    let mut delete_column = false;
+    for row in transaction.query("SELECT * FROM userinfo", &[]).await? {
+        let speaking_rate: Result<f32> = row.try_get("speaking_rate").map_err(Into::into);
+        if let Ok(speaking_rate) = speaking_rate {
+            delete_column = true;
+
+            if (speaking_rate - 1.0).abs() > f32::EPSILON {
+                let user_id: i64 = row.get("user_id");
+                transaction.execute(&insert_query, &[&user_id, &TTSMode::Premium, &speaking_rate]).await?;
+            }
+        } else {
+            break
+        }
+    };
+
+    if delete_column {
+        transaction.execute("ALTER TABLE userinfo DROP COLUMN speaking_rate", &[]).await?;
     };
 
     Ok(())
@@ -98,8 +128,7 @@ pub async fn run(config: &mut toml::Value, pool: &Arc<deadpool_postgres::Pool>) 
         );
 
         ALTER TABLE userinfo
-            ADD COLUMN IF NOT EXISTS voice_mode     TTSMode,
-            ADD COLUMN IF NOT EXISTS speaking_rate  real       DEFAULT 1;
+            ADD COLUMN IF NOT EXISTS voice_mode     TTSMode;
         ALTER TABLE guilds
             ADD COLUMN IF NOT EXISTS audience_ignore  bool       DEFAULT True,
             ADD COLUMN IF NOT EXISTS voice_mode       TTSMode    DEFAULT 'gtts',
@@ -107,6 +136,8 @@ pub async fn run(config: &mut toml::Value, pool: &Arc<deadpool_postgres::Pool>) 
             ADD COLUMN IF NOT EXISTS target_lang      varchar(5),
             ADD COLUMN IF NOT EXISTS premium_user     bigint,
             ADD COLUMN IF NOT EXISTS require_voice    bool       DEFAULT True;
+        ALTER TABLE user_voice
+            ADD COLUMN IF NOT EXISTS speaking_rate real;
 
         -- The old table had a pkey on traceback, now we hash and pkey on that
         ALTER TABLE errors
@@ -123,6 +154,7 @@ pub async fn run(config: &mut toml::Value, pool: &Arc<deadpool_postgres::Pool>) 
 
     migrate_single_to_modes(&mut transaction, "userinfo", "user_voice", "voice", "user_id").await?;
     migrate_single_to_modes(&mut transaction, "guilds", "guild_voice", "default_voice", "guild_id").await?;
+    migrate_speaking_rate_to_mode(&mut transaction).await?;
 
     if &starting_conf != config {
         let mut config_file = std::fs::File::create("config.toml")?;
