@@ -199,10 +199,6 @@ async fn main() {
             let listener = logging::WebhookLogRecv::new(
                 rx,
                 ctx.http.clone(),
-                format!("[{}]",
-                    if cfg!(debug_assertions) {"Debug"}
-                    else {"Main"}
-                ),
                 webhooks["logs"].clone(),
                 webhooks["errors"].clone(),
             );

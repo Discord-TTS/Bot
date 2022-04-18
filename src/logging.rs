@@ -29,7 +29,6 @@ use crate::structs::Error;
 type LogMessage = [String; 2];
 
 pub struct WebhookLogRecv {
-    prefix: String,
     http: Arc<serenity::Http>,
     level_lookup: HashMap<tracing::Level, String>,
 
@@ -43,7 +42,6 @@ impl WebhookLogRecv {
     pub fn new(
         rx: Receiver<(tracing::Level, LogMessage)>,
         http: Arc<serenity::Http>,
-        prefix: String,
         normal_logs: serenity::Webhook,
         error_logs: serenity::Webhook,
     ) -> Self {
@@ -64,12 +62,7 @@ impl WebhookLogRecv {
         }
 
         Self {
-            http,
-            prefix,
-            level_lookup,
-            error_logs,
-            normal_logs,
-
+            http, level_lookup, error_logs,normal_logs,
             rx: Mutex::new(rx),
         }
     }
@@ -104,7 +97,7 @@ impl WebhookLogRecv {
                 .into_iter()
                 .map(|[target, log_message]| {
                     log_message.trim().split('\n').map(move |line| {
-                        format!("`{} [{}]`: {}\n", self.prefix, target.clone(), line)
+                        format!("`[{}]`: {}\n", target.clone(), line)
                     }).collect::<String>()
                 })
                 .collect::<String>()
