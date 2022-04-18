@@ -45,8 +45,8 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let nickname_row = data.nickname_db.get([guild_id.into(), author_id.into()]).await?;
 
     let channel_name = guild_row.get::<_, Option<i64>>("channel")
-        .and_then(|c| ctx_discord.cache.guild_channel_field(c as u64, |c| c.name.clone()).map(Cow::Owned))
-        .unwrap_or(Cow::Borrowed("has not been set up yet"));
+        .and_then(|c| ctx_discord.cache.guild_channel_field(c as u64, |c| c.name.clone()))
+        .map_or(Cow::Borrowed("has not been set up yet"), Cow::Owned);
 
     let xsaid: bool = guild_row.get("xsaid");
     let prefix: String = guild_row.get("prefix");
@@ -723,7 +723,7 @@ pub async fn nick(
     let guild = require_guild!(ctx);
 
     let author = ctx.author();
-    let user = user.map_or_else(|| Cow::Borrowed(author), Cow::Owned);
+    let user = user.map_or(Cow::Borrowed(author), Cow::Owned);
 
     if author.id != user.id && !guild.member(ctx_discord, author).await?.permissions(ctx_discord)?.administrator() {
         ctx.say("**Error**: You need admin to set other people's nicknames!").await?;

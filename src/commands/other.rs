@@ -98,18 +98,20 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
 
     let start_time = std::time::SystemTime::now();
 
-    let guilds: Vec<serenity::Guild> = ctx_discord.cache.guilds().iter()
-        .filter_map(|g| g.to_guild_cached(ctx_discord))
+    let guilds_info: Vec<(u64, bool)> = ctx_discord.cache.guilds().iter()
+        .filter_map(|id| ctx_discord.cache.guild_field(id, |guild| {
+            (guild.member_count, guild.voice_states.get(&bot_user_id).is_some())
+        }))
         .collect();
 
-    let total_members = guilds.iter().map(|g| g.member_count).sum::<u64>().to_formatted_string(&Locale::en);
-    let total_voice_clients = guilds.iter().filter_map(|g| g.voice_states.get(&bot_user_id)).count();
-    let total_guild_count = guilds.len();
+    let total_members = guilds_info.iter().map(|(mcount, _)| mcount).sum::<u64>().to_formatted_string(&Locale::en);
+    let total_voice_clients = guilds_info.iter().filter(|(_, has_vs)| *has_vs).count();
+    let total_guild_count = guilds_info.len();
 
     let shard_count = ctx_discord.cache.shard_count();
     let ram_usage = sysinfo(data).await?
         .map(|(_, ram_usage)| ram_usage.to_formatted_string(&Locale::en))
-        .map_or_else(|| Cow::Borrowed("Unknown"), Cow::Owned);
+        .map_or(Cow::Borrowed("Unknown"), Cow::Owned);
 
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
     let neutral_colour = ctx.neutral_colour().await;
@@ -222,8 +224,8 @@ pub async fn invite(ctx: Context<'_>,) -> CommandResult {
         return Ok(())
     }
 
-    let invite_channel = ctx_discord.cache.guild_channel(invite_channel).try_unwrap()?;
-    ctx.say(format!("Join {} and look in #{} to invite <@{}>", config.main_server_invite, invite_channel.name, bot_user_id)).await?;
+    let invite_channel = ctx_discord.cache.guild_channel_field(invite_channel, |channel| channel.name.clone()).try_unwrap()?;
+    ctx.say(format!("Join {} and look in #{} to invite <@{}>", config.main_server_invite, invite_channel, bot_user_id)).await?;
 
     Ok(())
 }

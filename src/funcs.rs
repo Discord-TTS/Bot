@@ -26,7 +26,7 @@ use rand::prelude::SliceRandom;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::structs::{Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result};
+use crate::{structs::{Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result}, macros::require};
 
 pub async fn sysinfo(data: &Data) -> Result<Option<(f64, u64)>> {
     let (send_resp, response) = tokio::sync::oneshot::channel();
@@ -253,11 +253,9 @@ pub async fn run_checks(
     bot_ignore: bool,
     require_voice: bool,
     audience_ignore: bool,
-) -> Result<Option<String>> {
+) -> Result<Option<(serenity::Guild, String)>> {
     let cache = &ctx.cache;
-    let guild = message
-        .guild(cache)
-        .expect("guild not in cache after check");
+    let guild_id = require!(message.guild_id, Ok(None));
 
     if channel as u64 != message.channel_id.0 {
         if message.author.bot {
@@ -272,7 +270,7 @@ pub async fn run_checks(
             .clean_here(false)
             .clean_everyone(false)
             .show_discriminator(false)
-            .display_as_member_from(&guild),
+            .display_as_member_from(&guild_id),
         &message.mentions
     );
 
@@ -291,7 +289,9 @@ pub async fn run_checks(
         return Ok(None)
     }
 
+    let guild = require!(cache.guild(guild_id), Ok(None));
     let voice_state = guild.voice_states.get(&message.author.id);
+
     if message.author.bot {
         if bot_ignore || voice_state.is_none() {
             return Ok(None) // Is bot
@@ -327,7 +327,7 @@ pub async fn run_checks(
         return Ok(None)
     }
 
-    Ok(Some(content))
+    Ok(Some((guild, content)))
 }
 
 #[allow(clippy::too_many_arguments)]

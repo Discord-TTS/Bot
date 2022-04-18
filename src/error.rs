@@ -140,11 +140,12 @@ pub async fn handle_message(ctx: &serenity::Context, framework: &Framework, mess
     let error = if let Some(err) = result.err() {err} else {return Ok(())};
 
     let mut extra_fields = Vec::with_capacity(3);
-    if let Some(guild) = message.guild(&ctx.cache) {
-        extra_fields.extend([
-            ("Guild", Cow::Owned(guild.name), true),
-            ("Guild ID", Cow::Owned(guild.id.0.to_string()), true),
-        ]);
+    if let Some(guild_id) = message.guild_id {
+        if let Some(guild_name) = ctx.cache.guild_field(guild_id, |g| g.name.clone()) {
+            extra_fields.push(("Guild", Cow::Owned(guild_name), true));
+        }
+
+        extra_fields.push(("Guild ID", Cow::Owned(guild_id.0.to_string()), true));
     }
 
     extra_fields.push(("Channel Type", Cow::Borrowed(channel_type(&message.channel_id.to_channel(&ctx).await?)), true));

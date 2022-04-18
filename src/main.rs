@@ -612,15 +612,12 @@ async fn process_tts_msg(
     message: &serenity::Message,
     data: &Data,
 ) -> Result<()> {
-    let guild = match message.guild(&ctx.cache) {
-        Some(guild) => guild,
-        None => return Ok(()),
-    };
+    let guild_id = require!(message.guild_id, Ok(()));
 
     let guilds_db = &data.guilds_db;
     let nicknames = &data.nickname_db;
 
-    let guild_row = guilds_db.get(guild.id.into()).await?;
+    let guild_row = guilds_db.get(guild_id.into()).await?;
     let xsaid = guild_row.get("xsaid");
     let prefix = guild_row.get("prefix");
     let channel: i64 = guild_row.get("channel");
@@ -637,7 +634,7 @@ async fn process_tts_msg(
         ctx, message, channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
     ).await? {
         None => return Ok(()),
-        Some(content) => {
+        Some((guild, content)) => {
             let member = guild.member(ctx, message.author.id.0).await?;
             let voice_mode = parse_user_or_guild(data, message.author.id, Some(guild.id)).await?;
 
@@ -657,7 +654,7 @@ async fn process_tts_msg(
 
     let speaking_rate: f32 = data.userinfo_db.get(message.author.id.into()).await?.get("speaking_rate");
     if let Some(target_lang) = guild_row.get("target_lang") {
-        if guild_row.get("to_translate") && premium_check(ctx, data, Some(guild.id)).await?.is_none() {
+        if guild_row.get("to_translate") && premium_check(ctx, data, Some(guild_id)).await?.is_none() {
             content = funcs::translate(&content, target_lang, data).await?.unwrap_or(content);
         };
     }
@@ -667,12 +664,12 @@ async fn process_tts_msg(
         tracks.push(songbird::ffmpeg(url.as_str()).await?);
     }
 
-    let call_lock = match songbird::get(ctx).await.unwrap().get(guild.id) {
+    let call_lock = match songbird::get(ctx).await.unwrap().get(guild_id) {
         Some(call) => call,
         None => {
             // At this point, the bot is "in" the voice channel, but without a voice client,
             // this is usually if the bot restarted but the bot is still in the vc from the last boot.
-            ctx.join_vc(guild.id, message.channel_id).await?
+            ctx.join_vc(guild_id, message.channel_id).await?
         }
     };
 
@@ -694,28 +691,27 @@ async fn process_mention_msg(
     data: &Data,
 ) -> Result<()> {
     let bot_user = ctx.cache.current_user_id();
-
-    let guild = match message.guild(ctx) {
-        Some(guild) => guild,
-        None => return Ok(()),
-    };
-
     if ![format!("<@{}>", bot_user), format!("<@!{}>", bot_user)].contains(&message.content) {
         return Ok(());
     };
 
+    let guild_id = require!(message.guild_id, Ok(()));
     let channel = message.channel(ctx).await?.guild().unwrap();
     let permissions = channel.permissions_for_user(ctx, bot_user)?;
 
-    let mut prefix: String = data.guilds_db.get(guild.id.into()).await?.get("prefix");
+    let mut prefix: String = data.guilds_db.get(guild_id.into()).await?.get("prefix");
     prefix = prefix.replace('`', "").replace('\\', "");
 
     if permissions.send_messages() {
         channel.say(ctx,format!("Current prefix for this server is: {}", prefix)).await?;
     } else {
-        let result = message.author.direct_message(ctx, |b|
-            b.content(format!("My prefix for `{}` is {} however I do not have permission to send messages so I cannot respond to your commands!", guild.name, prefix))
-        ).await;
+        let guild_name= ctx.cache
+            .guild_field(guild_id, |g| g.name.clone())
+            .map_or(Cow::Borrowed("Unknown Server"), Cow::Owned);
+
+        let result = message.author.direct_message(ctx, |b| b.content(format!(
+            "My prefix for `{guild_name}` is {prefix} however I do not have permission to send messages so I cannot respond to your commands!",
+        ))).await;
 
         match result {
             Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
