@@ -667,7 +667,14 @@ async fn process_tts_msg(
         tracks.push(songbird::ffmpeg(url.as_str()).await?);
     }
 
-    let call_lock = songbird::get(ctx).await.unwrap().get(guild.id).try_unwrap()?;
+    let call_lock = match songbird::get(ctx).await.unwrap().get(guild.id) {
+        Some(call) => call,
+        None => {
+            // At this point, the bot is "in" the voice channel, but without a voice client,
+            // this is usually if the bot restarted but the bot is still in the vc from the last boot.
+            ctx.join_vc(guild.id, message.channel_id).await?
+        }
+    };
 
     {
         let mut call = call_lock.lock().await;

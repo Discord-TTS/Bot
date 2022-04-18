@@ -186,7 +186,7 @@ pub trait SerenityContextExt {
         &self,
         guild_id: serenity::GuildId,
         channel_id: serenity::ChannelId,
-    ) -> Result<()>;
+    ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>>;
 }
 
 #[serenity::async_trait]
@@ -290,10 +290,11 @@ impl SerenityContextExt for serenity::Context {
         &self,
         guild_id: serenity::GuildId,
         channel_id: serenity::ChannelId,
-    ) -> Result<()> {
+    ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>> {
         let manager = songbird::get(self).await.unwrap();
-        let (_, r) = manager.join(guild_id, channel_id).await;
-        r.map(|_| ()).map_err(Into::into)
+        let (call, r) = manager.join(guild_id, channel_id).await;
+        r?;
+        Ok(call)
     }
 }
 
