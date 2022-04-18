@@ -171,12 +171,7 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let manager = songbird::get(ctx.discord()).await.unwrap();
     if let Some(call_lock) = manager.get(guild_id) {
-        call_lock
-            .lock().await
-            .queue().modify_queue(|queue| queue
-                .drain(..)
-                .try_for_each(|t| t.stop())
-            )?;
+        call_lock.lock().await.queue().stop();
 
         match ctx {
             poise::Context::Prefix(ctx) => {
