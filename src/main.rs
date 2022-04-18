@@ -47,7 +47,7 @@ mod macros;
 mod error;
 mod funcs;
 
-use macros::require;
+use macros::{require, async_try};
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices, generate_status};
 use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework};
@@ -339,7 +339,7 @@ impl EventHandler {
 impl serenity::EventHandler for EventHandler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
         let framework = require!(self.framework());
-        error::handle_message(&ctx, &framework, &new_message, (|| async {
+        error::handle_message(&ctx, &framework, &new_message, async_try!({
             let data = framework.user_data().await;
 
             let (tts_result, support_result, mention_result) = tokio::join!(
@@ -350,12 +350,12 @@ impl serenity::EventHandler for EventHandler {
 
             tts_result?; support_result?; mention_result?;
             Ok(())
-        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+        })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
     async fn voice_state_update(&self, ctx: serenity::Context, old: Option<serenity::VoiceState>, new: serenity::VoiceState) {
         let framework = require!(self.framework());
-        error::handle_unexpected_default(&ctx, &framework, "VoiceStateUpdate", (|| async {
+        error::handle_unexpected_default(&ctx, &framework, "VoiceStateUpdate", async_try!({
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user_id();
             let guild_id = new.guild_id.try_unwrap()?;
@@ -377,7 +377,7 @@ impl serenity::EventHandler for EventHandler {
             };
 
             Ok(())
-        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+        })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
     async fn guild_create(&self, ctx: serenity::Context, guild: serenity::Guild, is_new: bool) {
@@ -385,7 +385,7 @@ impl serenity::EventHandler for EventHandler {
         let data = framework.user_data().await;
         if !is_new {return};
 
-        error::handle_guild("GuildCreate", &ctx, &framework, Some(&guild), (|| async {
+        error::handle_guild("GuildCreate", &ctx, &framework, Some(&guild), async_try!({
             // Send to servers channel and DM owner the welcome message
 
             let (owner, _) = tokio::join!(
@@ -430,14 +430,14 @@ Ask questions by either responding here or asking on the support server!",
             info!("Added OFS role to {}#{}", owner.name, owner.discriminator);
 
             Ok(())
-        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+        })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
     async fn guild_delete(&self, ctx: serenity::Context, incomplete: serenity::UnavailableGuild, full: Option<serenity::Guild>) {
         let framework = require!(self.framework());
         let data = framework.user_data().await;
 
-        error::handle_guild("GuildDelete", &ctx, &framework, full.as_ref(), (|| async {
+        error::handle_guild("GuildDelete", &ctx, &framework, full.as_ref(), async_try!({
             data.guilds_db.delete(incomplete.id.into()).await?;
             if let Some(guild) = &full {
                 data.webhooks["servers"].execute(&ctx.http, false, |b| {b.content(format!(
@@ -447,14 +447,14 @@ Ask questions by either responding here or asking on the support server!",
             };
 
             Ok(())
-        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+        })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
     async fn interaction_create(&self, ctx: serenity::Context, interaction: serenity::Interaction) {
         let framework = require!(self.framework());
         let data = framework.user_data().await;
 
-        error::handle_unexpected_default(&ctx, &framework, "InteractionCreate", (|| async {
+        error::handle_unexpected_default(&ctx, &framework, "InteractionCreate", async_try!({
             if let serenity::Interaction::MessageComponent(interaction) = interaction {
                 if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
                     error::handle_traceback_button(&ctx, data, interaction).await?;
@@ -462,14 +462,14 @@ Ask questions by either responding here or asking on the support server!",
             };
 
             Ok(())
-        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+        })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
     async fn ready(&self, ctx: serenity::Context, data_about_bot: serenity::Ready) {
         let framework = require!(self.framework());
         let data = framework.user_data().await;
 
-        error::handle_unexpected_default(&ctx, &framework, "Ready", (|| async {
+        error::handle_unexpected_default(&ctx, &framework, "Ready", async_try!({
             let user_name = &data_about_bot.user.name;
             let (status, starting) = generate_status(&framework).await;
             data.webhooks["logs"].edit_message(&ctx.http, data.startup_message, |m| {m
@@ -485,7 +485,7 @@ Ask questions by either responding here or asking on the support server!",
             }).await?;
 
             Ok(())
-        })().await).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+        })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
     async fn resume(&self, _: serenity::Context, _: serenity::ResumedEvent) {
@@ -614,10 +614,7 @@ async fn process_tts_msg(
         None => return Ok(()),
         Some((guild, content)) => {
             let member = guild.member(ctx, message.author.id.0).await?;
-            let voice_mode = parse_user_or_guild(data, message.author.id, Some(guild.id)).await?;
-
-            voice = voice_mode.0;
-            mode = voice_mode.1;
+            (voice, mode) = parse_user_or_guild(data, message.author.id, Some(guild.id)).await?;
 
             let nickname_row = nicknames.get([guild.id.into(), message.author.id.into()]).await?;
             let nickname: Option<_> = nickname_row.get("name");

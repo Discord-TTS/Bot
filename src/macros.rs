@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+macro_rules! async_try {
+    ($inner:block) => {(|| async {$inner})().await};
+}
+
 macro_rules! require {
     ($to_check:expr) => {
         require!($to_check, ())
@@ -36,5 +40,4 @@ macro_rules! require_guild {
     };
 }
 
-
-pub(crate) use {require, require_guild};
+pub(crate) use {async_try, require, require_guild};
