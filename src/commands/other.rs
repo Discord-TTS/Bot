@@ -186,6 +186,7 @@ pub async fn ping(ctx: Context<'_>,) -> CommandResult {
     let content = format!("Current Latency: {}ms", ping_before.elapsed()?.as_millis());
 
     match ping_msg {
+        poise::ReplyHandle::Autocomplete => unreachable!(),
         poise::ReplyHandle::Known(mut msg) => {
             msg.edit(ctx.discord(), |b| b.content(content)).await?;
         },

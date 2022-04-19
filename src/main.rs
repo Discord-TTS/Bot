@@ -181,15 +181,15 @@ async fn main() {
 
     let framework = poise::Framework::build()
         .token(main.token.take().unwrap())
+        .intents(
+            serenity::GatewayIntents::GUILDS
+            | serenity::GatewayIntents::GUILD_MESSAGES
+            | serenity::GatewayIntents::DIRECT_MESSAGES
+            | serenity::GatewayIntents::GUILD_VOICE_STATES
+            | serenity::GatewayIntents::GUILD_MEMBERS
+            | serenity::GatewayIntents::MESSAGE_CONTENT,
+        )
         .client_settings(move |f| {f
-            .intents(
-                serenity::GatewayIntents::GUILDS
-                | serenity::GatewayIntents::GUILD_MESSAGES
-                | serenity::GatewayIntents::DIRECT_MESSAGES
-                | serenity::GatewayIntents::GUILD_VOICE_STATES
-                | serenity::GatewayIntents::GUILD_MEMBERS
-                | serenity::GatewayIntents::MESSAGE_CONTENT,
-            )
             .event_handler(EventHandler {framework: framework_oc_clone})
             .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
         })
