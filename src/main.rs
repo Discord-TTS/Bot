@@ -259,7 +259,8 @@ async fn main() {
                         commands::settings::voice(), commands::settings::server_voice(), commands::settings::mode(),
                         commands::settings::server_mode(), commands::settings::prefix(),
                         commands::settings::translation(), commands::settings::translation_lang(), commands::settings::speaking_rate(),
-                        commands::settings::nick(), commands::settings::repeated_characters(), commands::settings::audienceignore()
+                        commands::settings::nick(), commands::settings::repeated_characters(), commands::settings::audienceignore(),
+                        commands::settings::require_voice(), commands::settings::block(),
                     ],
                     ..commands::settings::set()
                 },

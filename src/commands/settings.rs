@@ -21,10 +21,10 @@ use itertools::Itertools;
 use poise::serenity_prelude as serenity;
 
 use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult, PoiseContextExt};
-use crate::funcs::{get_gtts_voices, get_espeak_voices, parse_user_or_guild};
+use crate::funcs::{get_gtts_voices, get_espeak_voices, random_footer, parse_user_or_guild};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
-use crate::{random_footer, database};
-use crate::macros::require_guild;
+use crate::macros::{require_guild, require};
+use crate::database;
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
     if mode == TTSMode::Premium {
@@ -68,6 +68,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let msg_length = guild_row.msg_length;
     let bot_ignore = guild_row.bot_ignore;
     let to_translate = guild_row.to_translate;
+    let require_voice = guild_row.require_voice;
     let repeated_chars = guild_row.repeated_chars;
     let audience_ignore = guild_row.audience_ignore;
 
@@ -125,6 +126,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep2} <User> said: message: `{xsaid}`
 {sep2} Ignore bot's messages: `{bot_ignore}`
 {sep2} Ignore audience messages: `{audience_ignore}`
+{sep2} Require users in voice channel: `{require_voice}`
 
 **{sep2} Default Server Voice Mode: `{guild_mode}`**
 **{sep2} Default Server Voice: `{default_voice}`**
@@ -422,9 +424,9 @@ pub async fn set(ctx: Context<'_>, ) -> CommandResult {
 
 /// Owner only: used to block a user from dms
 #[poise::command(
+    prefix_command,
     category="Settings",
-    owners_only,
-    prefix_command, hide_in_help,
+    owners_only, hide_in_help,
     required_bot_permissions="SEND_MESSAGES"
 )]
 pub async fn block(
@@ -449,7 +451,8 @@ pub async fn xsaid(
     ctx: Context<'_>,
     #[description="Whether to say \"<user> said\" before each message"] value: Option<bool>
 ) -> CommandResult {
-    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
+    let value = require!(bool_button(ctx, value).await?, Ok(()));
+
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "xsaid", &value).await?;
     ctx.say(format!("xsaid is now: {}", to_enabled(value))).await?;
 
@@ -469,7 +472,8 @@ pub async fn autojoin(
     ctx: Context<'_>,
     #[description="Whether to autojoin voice channels"] value: Option<bool>
 ) -> CommandResult {
-    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
+    let value = require!(bool_button(ctx, value).await?, Ok(()));
+
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "auto_join", &value).await?;
     ctx.say(format!("Auto Join is now: {}", to_enabled(value))).await?;
 
@@ -489,7 +493,8 @@ pub async fn botignore(
     ctx: Context<'_>,
     #[description="Whether to ignore messages sent by bots and webhooks"] value: Option<bool>
 ) -> CommandResult {
-    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
+    let value = require!(bool_button(ctx, value).await?, Ok(()));
+
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "bot_ignore", &value).await?;
     ctx.say(format!("Ignoring bots is now: {}", to_enabled(value))).await?;
 
@@ -503,13 +508,14 @@ pub async fn botignore(
     prefix_command, slash_command,
     required_permissions="ADMINISTRATOR",
     required_bot_permissions="SEND_MESSAGES",
-    aliases("bot_ignore", "ignore_bots", "ignorebots")
+    aliases("voice_require", "require_in_vc")
 )]
 pub async fn require_voice(
     ctx: Context<'_>,
     #[description="Whether to require people to be in the voice channel to TTS"] value: Option<bool>
 ) -> CommandResult {
-    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
+    let value = require!(bool_button(ctx, value).await?, Ok(()));
+
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "require_voice", &value).await?;
     ctx.say(format!("Requiring users to be in voice channel for TTS is now: {}", to_enabled(value))).await?;
 
@@ -581,7 +587,8 @@ pub async fn server_voice(
     aliases("translate", "to_translate", "should_translate")
 )]
 pub async fn translation(ctx: Context<'_>, #[description="Whether to translate all messages to the same language"] value: Option<bool>) -> CommandResult {
-    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
+    let value = require!(bool_button(ctx, value).await?, Ok(()));
+
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "to_translate", &value).await?;
     ctx.say(format!("Translation is now: {}", to_enabled(value))).await?;
 
@@ -695,7 +702,8 @@ pub async fn audienceignore(
     ctx: Context<'_>,
     #[description="Whether to ignore messages sent by the audience"] value: Option<bool>
 ) -> CommandResult {
-    let value = if let Some(value) = bool_button(ctx, value).await? {value} else {return Ok(())};
+    let value = require!(bool_button(ctx, value).await?, Ok(()));
+
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "audience_ignore", &value).await?;
     ctx.say(format!("Ignoring audience is now: {}", to_enabled(value))).await?;
     Ok(())
