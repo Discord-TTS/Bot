@@ -26,6 +26,15 @@ use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::{random_footer, database};
 use crate::macros::require_guild;
 
+fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
+    if mode == TTSMode::Premium {
+        let (lang, variant) = voice.split_once(' ').unwrap();
+        let gender = &data.premium_voices[lang][variant];
+        Cow::Owned(format!("{lang} - {variant} ({gender})"))
+    } else {
+        Cow::Borrowed(voice)
+    }
+}
 
 /// Displays the current settings!
 #[poise::command(
@@ -44,61 +53,55 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let userinfo_row = data.userinfo_db.get(author_id.into()).await?;
     let nickname_row = data.nickname_db.get([guild_id.into(), author_id.into()]).await?;
 
-    let channel_name = guild_row.get::<_, Option<i64>>("channel")
-        .and_then(|c| ctx_discord.cache.guild_channel_field(c as u64, |c| c.name.clone()))
-        .map_or(Cow::Borrowed("has not been set up yet"), Cow::Owned);
-
-    let xsaid: bool = guild_row.get("xsaid");
-    let prefix: String = guild_row.get("prefix");
-    let autojoin: bool = guild_row.get("auto_join");
-    let msg_length: i16 = guild_row.get("msg_length");
-    let bot_ignore: bool = guild_row.get("bot_ignore");
-    let to_translate: bool = guild_row.get("to_translate");
-    let repeated_chars: i16 = guild_row.get("repeated_chars");
-    let audience_ignore: bool = guild_row.get("audience_ignore");
-
-    let guild_mode: TTSMode = guild_row.get("voice_mode");
-    let user_mode: Option<TTSMode> = userinfo_row.get("voice_mode");
-
-    let format_voice = |voice: String, mode: TTSMode| {
-        if mode == TTSMode::Premium {
-            let (lang, variant) = voice.split_once(' ').unwrap();
-            let gender = &data.premium_voices[lang][variant];
-            format!("{lang} - {variant} ({gender})")
-        } else {
-            voice
-        }
+    let default_channel_name = || Cow::Borrowed("has not been set up yet");
+    let channel_name = if guild_row.channel == 0 {
+        ctx_discord.cache
+            .guild_channel_field(guild_row.channel as u64, |c| c.name.clone())
+            .map_or_else(default_channel_name, Cow::Owned)
+    } else {
+        default_channel_name()
     };
 
+    let xsaid = guild_row.xsaid;
+    let prefix = &guild_row.prefix;
+    let autojoin = guild_row.auto_join;
+    let msg_length = guild_row.msg_length;
+    let bot_ignore = guild_row.bot_ignore;
+    let to_translate = guild_row.to_translate;
+    let repeated_chars = guild_row.repeated_chars;
+    let audience_ignore = guild_row.audience_ignore;
+
+    let guild_mode = guild_row.voice_mode;
+    let user_mode = userinfo_row.voice_mode;
+
+    let guild_voice_row = data.guild_voice_db.get((guild_id.into(), guild_mode)).await?;
     let default_voice = {
-        let guild_voice_row = data.guild_voice_db.get((guild_id.into(), guild_mode)).await?;
-        if guild_voice_row.get::<_, i64>("guild_id") == 0 {
+        if guild_voice_row.guild_id == 0 {
             Cow::Borrowed(guild_mode.default_voice())
         } else {
-            Cow::Owned(format_voice(guild_voice_row.get("voice"), guild_mode))
+            format_voice(data, &guild_voice_row.voice, guild_mode)
         }
     };
 
+    let row;
     let (user_voice, speaking_rate, speaking_rate_kind) =
-        if let Some(mode) =  user_mode {
-            let row = data.user_voice_db.get((author_id.into(), mode)).await?;
+        if let Some(mode) = user_mode {
+            row = data.user_voice_db.get((author_id.into(), mode)).await?;
 
             let (default, kind) = mode.speaking_rate_info()
                 .map_or((1.0, "x"), |(_, d, _, k)| (d, k));
 
             (
-                row
-                    .get::<_, Option<_>>("voice")
-                    .map_or(Cow::Borrowed("none"), |user_voice| Cow::Owned(format_voice(user_voice, mode))),
-                Cow::Owned(row.get::<_, Option<f32>>("speaking_rate").unwrap_or(default).to_string()),
+                row.voice.as_deref().map_or(Cow::Borrowed("none"), |user_voice| format_voice(data, user_voice, mode)),
+                Cow::Owned(row.speaking_rate.unwrap_or(default).to_string()),
                 kind,
             )
         } else {
             (Cow::Borrowed("none"), Cow::Borrowed("1.0"), "x")
         };
 
-    let target_lang = guild_row.get::<_, Option<_>>("target_lang").unwrap_or("none");
-    let nickname = nickname_row.get::<_, Option<_>>("name").unwrap_or("none");
+    let target_lang = guild_row.target_lang.as_deref().unwrap_or("none");
+    let nickname = nickname_row.name.as_deref().unwrap_or("none");
 
     let neutral_colour = ctx.neutral_colour().await;
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
@@ -309,13 +312,17 @@ async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<boo
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn change_mode<T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy>(
+async fn change_mode<CacheKey, RowT>(
     ctx: &Context<'_>,
-    general_db: &database::Handler<T>,
+    general_db: &database::Handler<CacheKey, RowT>,
     guild_id: serenity::GuildId,
-    key: T, mode: Option<TTSMode>,
+    key: CacheKey, mode: Option<TTSMode>,
     target: &str
-) -> Result<Option<String>, Error> {
+) -> Result<Option<String>, Error>
+where
+    CacheKey: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
+    RowT: for<'a> sqlx::FromRow<'a, sqlx::postgres::PgRow> + Send + Sync + Unpin,
+{
     let data = ctx.data();
     if mode == Some(TTSMode::Premium) && crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_some() {
         ctx.send(|b| b.embed(|e| {e
@@ -340,16 +347,20 @@ async fn change_mode<T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn change_voice<T>(
+async fn change_voice<T, RowT1, RowT2>(
     ctx: &Context<'_>,
-    general_db: &database::Handler<T>,
-    voice_db: &database::Handler<(T, TTSMode)>,
+    general_db: &database::Handler<T, RowT1>,
+    voice_db: &database::Handler<(T, TTSMode), RowT2>,
     author_id: serenity::UserId, guild_id: serenity::GuildId,
     key: T, voice: Option<String>,
     target: &str,
 ) -> Result<String, Error>
-    where T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
-    (T, TTSMode): database::CacheKeyTrait
+where
+    RowT1: for<'a> sqlx::FromRow<'a, sqlx::postgres::PgRow> + Send + Sync + Unpin,
+    RowT2: for<'a> sqlx::FromRow<'a, sqlx::postgres::PgRow> + Send + Sync + Unpin,
+
+    T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
+    (T, TTSMode): database::CacheKeyTrait,
 {
     let (_, mode) = parse_user_or_guild(ctx.data(), author_id, Some(guild_id)).await?;
     Ok(if let Some(voice) = voice {
@@ -604,7 +615,7 @@ pub async fn translation_lang(
             data.guilds_db.set_one(guild_id, "target_lang", &lang).await?;
             ctx.say(format!(
                 "The target translation language is now: {lang}{}",
-                if data.guilds_db.get(guild_id).await?.get::<_, bool>("to_translate") {
+                if data.guilds_db.get(guild_id).await?.to_translate {
                     String::new()
                 } else {
                     format!(". You may want to enable translation with `{}set translation on`", ctx.prefix())
@@ -980,7 +991,7 @@ pub async fn voices(
     };
 
     let cache = &ctx.discord().cache;
-    let current_lang: Option<String> = data.user_voice_db.get((author.id.into(), mode)).await?.get("voice");
+    let user_voice_row = data.user_voice_db.get((author.id.into(), mode)).await?;
     ctx.send(|b| {b.embed(|e| {e
         .title(format!("{} Voices | Mode: `{}`", cache.current_user_field(|u| u.name.clone()), mode))
         .footer(|f| f.text(random_footer(
@@ -997,7 +1008,7 @@ pub async fn voices(
         )
         .field(
             "Current voice used",
-            current_lang.as_ref().map_or("None", std::ops::Deref::deref),
+            user_voice_row.voice.as_ref().map_or("None", std::ops::Deref::deref),
             false
         )
     })}).await?;

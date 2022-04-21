@@ -28,9 +28,8 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
-use deadpool_postgres::tokio_postgres;
-use once_cell::sync::OnceCell;
 use sysinfo::SystemExt;
+use once_cell::sync::OnceCell;
 use tracing::{error, info, warn};
 
 use poise::serenity_prelude as serenity; // re-exports a lot of serenity with shorter paths
@@ -81,16 +80,13 @@ async fn main() {
         let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone()).unwrap();
 
         // Setup database pool
-        let mut db_config = deadpool_postgres::Config::new();
-        db_config.user = Some(postgres.user);
-        db_config.host = Some(postgres.host);
-        db_config.dbname = Some(postgres.database);
-        db_config.password = Some(postgres.password);
-
-        let pool = Arc::new(db_config.create_pool(
-            Some(deadpool_postgres::Runtime::Tokio1),
-            tokio_postgres::NoTls,
-        ).unwrap());
+        let pool = sqlx::PgPool::connect_with(
+            sqlx::postgres::PgConnectOptions::new()
+            .host(&postgres.host)
+            .username(&postgres.user)
+            .database(&postgres.database)
+            .password(&postgres.password)
+        ).await.unwrap();
 
         migration::run(&mut config_toml, &pool).await.unwrap();
 
@@ -239,7 +235,7 @@ async fn main() {
                 prefix: None,
                 dynamic_prefix: Some(|ctx| {Box::pin(async move {Ok(Some(
                     match ctx.guild_id.map(Into::into) {
-                        Some(guild_id) => ctx.data.guilds_db.get(guild_id).await?.get("prefix"),
+                        Some(guild_id) => ctx.data.guilds_db.get(guild_id).await?.prefix.clone(),
                         None => String::from("-"),
                     }
                 ))})}),
@@ -507,7 +503,7 @@ async fn premium_check(ctx: &serenity::Context, data: &Data, guild_id: Option<se
 
     let premium_user_id = data
         .guilds_db.get(guild_id.0 as i64).await?
-        .get::<&str, Option<i64>>("premium_user")
+        .premium_user
         .map(|u| serenity::UserId(u as u64));
 
     match premium_user_id {
@@ -592,14 +588,14 @@ async fn process_tts_msg(
     let nicknames = &data.nickname_db;
 
     let guild_row = guilds_db.get(guild_id.into()).await?;
-    let xsaid = guild_row.get("xsaid");
-    let prefix = guild_row.get("prefix");
-    let channel: i64 = guild_row.get("channel");
-    let autojoin = guild_row.get("auto_join");
-    let bot_ignore = guild_row.get("bot_ignore");
-    let require_voice = guild_row.get("require_voice");
-    let repeated_limit: i16 = guild_row.get("repeated_chars");
-    let audience_ignore = guild_row.get("audience_ignore");
+    let xsaid = guild_row.xsaid;
+    let channel: i64 = guild_row.channel;
+    let prefix = &guild_row.prefix;
+    let autojoin = guild_row.auto_join;
+    let bot_ignore = guild_row.bot_ignore;
+    let require_voice = guild_row.require_voice;
+    let repeated_limit: i16 = guild_row.repeated_chars;
+    let audience_ignore = guild_row.audience_ignore;
 
     let mode;
     let voice;
@@ -613,11 +609,10 @@ async fn process_tts_msg(
             (voice, mode) = parse_user_or_guild(data, message.author.id, Some(guild.id)).await?;
 
             let nickname_row = nicknames.get([guild.id.into(), message.author.id.into()]).await?;
-            let nickname: Option<_> = nickname_row.get("name");
 
             clean_msg(
                 &content, &guild, &member, &message.attachments, &voice,
-                xsaid, repeated_limit as usize, nickname,
+                xsaid, repeated_limit as usize, nickname_row.name.as_deref(),
                 &data.last_to_xsaid_tracker
             )
         }
@@ -625,14 +620,14 @@ async fn process_tts_msg(
 
     let speaking_rate = data.user_voice_db
         .get((message.author.id.into(), mode)).await?
-        .get::<_, Option<f32>>("speaking_rate")
+        .speaking_rate
         .map_or_else(
             || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).unwrap_or_default(),
             |r| r.to_string()
         );
 
-    if let Some(target_lang) = guild_row.get("target_lang") {
-        if guild_row.get("to_translate") && premium_check(ctx, data, Some(guild_id)).await?.is_none() {
+    if let Some(target_lang) = guild_row.target_lang.as_deref() {
+        if guild_row.to_translate && premium_check(ctx, data, Some(guild_id)).await?.is_none() {
             content = funcs::translate(&content, target_lang, data).await?.unwrap_or(content);
         };
     }
@@ -677,7 +672,7 @@ async fn process_mention_msg(
     let channel = message.channel(ctx).await?.guild().unwrap();
     let permissions = channel.permissions_for_user(ctx, bot_user)?;
 
-    let mut prefix: String = data.guilds_db.get(guild_id.into()).await?.get("prefix");
+    let mut prefix = data.guilds_db.get(guild_id.into()).await?.prefix.clone();
     prefix = prefix.replace('`', "").replace('\\', "");
 
     if permissions.send_messages() {
@@ -749,8 +744,7 @@ async fn process_support_dm(
             data.analytics.log(Cow::Borrowed("on_dm"));
 
             let userinfo = data.userinfo_db.get(message.author.id.into()).await?;
-            if userinfo.get("dm_welcomed") {
-                let is_blocked: bool = userinfo.get("dm_blocked");
+            if userinfo.dm_welcomed {
                 let content = message.content.to_lowercase();
 
                 if content.contains("discord.gg") {
@@ -760,7 +754,7 @@ async fn process_support_dm(
                     )).await?;
                 } else if content.as_str() == "help" {
                     channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
-                } else if !is_blocked {
+                } else if !userinfo.dm_blocked {
                     let display_name = format!("{}#{}", &message.author.name, &message.author.discriminator);
                     let webhook_username = format!("{} ({})", display_name, message.author.id.0);
                     let paths: Vec<serenity::AttachmentType<'_>> = message.attachments.iter()

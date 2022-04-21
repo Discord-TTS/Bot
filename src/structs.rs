@@ -1,13 +1,14 @@
 use std::{sync::Arc, borrow::Cow};
 
-use postgres_types::{ToSql, FromSql};
 use strum_macros::IntoStaticStr;
 use lazy_static::lazy_static;
 use regex::Regex;
 
 use poise::serenity_prelude as serenity;
 
+use crate::{database, analytics};
 use crate::constants::{RED, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
+
 pub use anyhow::{Error, Result};
 
 #[derive(serde::Deserialize)]
@@ -39,12 +40,12 @@ pub struct PostgresConfig {
 
 
 pub struct Data {
-    pub analytics: Arc<crate::analytics::Handler>,
-    pub guilds_db: crate::database::Handler<i64>,
-    pub userinfo_db: crate::database::Handler<i64>,
-    pub nickname_db: crate::database::Handler<[i64; 2]>,
-    pub user_voice_db: crate::database::Handler<(i64, TTSMode)>,
-    pub guild_voice_db: crate::database::Handler<(i64, TTSMode)>,
+    pub analytics: Arc<analytics::Handler>,
+    pub guilds_db: database::Handler<i64, database::GuildRow>,
+    pub userinfo_db: database::Handler<i64, database::UserRow>,
+    pub nickname_db: database::Handler<[i64; 2], database::NicknameRow>,
+    pub user_voice_db: database::Handler<(i64, TTSMode), database::UserVoiceRow>,
+    pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRow>,
 
     pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
     pub system_info: parking_lot::Mutex<sysinfo::System>,
@@ -56,20 +57,21 @@ pub struct Data {
     pub config: MainConfig,
 
     pub premium_voices: PremiumVoices,
-    pub pool: Arc<deadpool_postgres::Pool>,
+    pub pool: sqlx::PgPool,
 }
 
 
 #[derive(
-    IntoStaticStr, ToSql, FromSql,
+    IntoStaticStr, sqlx::Type,
     Debug, Hash, PartialEq, Eq, Copy, Clone,
 )]
 #[allow(non_camel_case_types)]
-#[postgres(name="ttsmode")]
+#[sqlx(rename_all="lowercase")]
+#[sqlx(type_name="ttsmode")]
 pub enum TTSMode {
-    #[postgres(name="gtts")] gTTS,
-    #[postgres(name="espeak")] eSpeak,
-    #[postgres(name="premium")] Premium
+    gTTS,
+    eSpeak,
+    Premium
 }
 
 impl TTSMode {
@@ -213,7 +215,7 @@ impl PoiseContextExt for Context<'_> {
     async fn neutral_colour(&self) -> u32 {
         if let Some(guild_id) = self.guild_id() {
             let row = self.data().guilds_db.get(guild_id.0 as i64).await;
-            if row.map(|row| row.get::<_, TTSMode>("voice_mode") == TTSMode::Premium).unwrap_or(false) {
+            if row.map(|row| row.voice_mode == TTSMode::Premium).unwrap_or(false) {
                 return PREMIUM_NEUTRAL_COLOUR
             }
         }

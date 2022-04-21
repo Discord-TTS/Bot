@@ -14,20 +14,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{sync::Arc, borrow::Cow};
+use std::borrow::Cow;
 
 use dashmap::DashMap;
+use sqlx::Connection;
 use tracing::error;
 
 use crate::structs::Result;
 
 pub struct Handler {
     log_buffer: DashMap<Cow<'static, str>, i32>,
-    pool: Arc<deadpool_postgres::Pool>
+    pool: sqlx::PgPool
 }
 
 impl Handler {
-    pub fn new(pool: Arc<deadpool_postgres::Pool>) -> Self {
+    pub fn new(pool: sqlx::PgPool) -> Self {
         Self {
             pool, 
             log_buffer: DashMap::new()
@@ -49,22 +50,22 @@ impl Handler {
         let log_buffer = self.log_buffer.clone();
         self.log_buffer.clear();
 
-        let mut conn = self.pool.get().await?;
-        let transaction = conn.transaction().await?;
+        let mut conn = self.pool.acquire().await?;
+        conn.transaction::<'_, _, _, anyhow::Error>(move |transaction| Box::pin(async {
+            for (raw_event, count) in log_buffer {
+                let query = sqlx::query("
+                    INSERT INTO analytics(event, is_command, count)
+                    VALUES($1, $2, $3)
+                    ON CONFLICT ON CONSTRAINT analytics_pkey
+                    DO UPDATE SET count = analytics.count + EXCLUDED.count
+                ;");
 
-        let query = transaction.prepare_cached("
-            INSERT INTO analytics(event, is_command, count)
-            VALUES($1, $2, $3)
-            ON CONFLICT ON CONSTRAINT analytics_pkey
-            DO UPDATE SET count = analytics.count + EXCLUDED.count
-        ;").await?;
+                let event = raw_event.strip_prefix("on_").unwrap_or(&raw_event);
+                query.bind(event).bind(raw_event == event).bind(count).execute(&mut *transaction).await?;
+            }
 
-        for (raw_event, count) in log_buffer {
-            let event = raw_event.strip_prefix("on_").unwrap_or(&raw_event);
-            transaction.execute(&query, &[&event, &(raw_event == event), &count]).await?;
-        }
-
-        transaction.commit().await?;
+            Ok(())
+        })).await?;
         Ok(())
     }
 

@@ -14,13 +14,13 @@ rand = "0.8"
 toml = "0.5"
 anyhow = "1"
 sha2 = "0.10"
+poise = "0.1"
 strfmt = "0.1"
 indexmap = "1"
 once_cell = "1"
 tracing = "0.1"
 linkify = "0.8"
 strsim = "0.10"
-reqwest = "0.11"
 sysinfo = "0.23"
 lazy_static = "1"
 itertools = "0.10"
@@ -28,12 +28,16 @@ num-format = "0.4"
 parking_lot = "0.12"
 strum_macros = "0.24"
 generic-array = "0.14"
-deadpool-postgres = "0.10"
 #serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next", default-features = false, features = ["simdjson"] }
 
-[dependencies.postgres-types]
-version = "0.2"
-features = ["derive"]
+[dependencies.sqlx]
+version = "0.5"
+default-features = false
+features = ["macros", "postgres", "runtime-tokio-rustls"]
+
+[dependencies.reqwest]
+version = "0.11"
+features = ["rustls-tls"]
 
 [dependencies.dashmap]
 version = "5"
@@ -42,10 +46,6 @@ default-features = false
 [dependencies.tokio]
 version = "1"
 features = ["macros", "rt-multi-thread", "signal", "parking_lot"]
-
-[dependencies.poise]
-git = "https://github.com/kangalioo/poise"
-branch = "develop"
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"

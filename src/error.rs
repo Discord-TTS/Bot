@@ -16,6 +16,23 @@ use crate::{
 #[allow(clippy::module_name_repetitions)]
 pub type CommandError = Error;
 
+#[derive(sqlx::FromRow)]
+struct ErrorRowWithOccurrences {
+    pub message_id: i64,
+    pub occurrences: i32,
+}
+
+#[derive(sqlx::FromRow)]
+struct ErrorRow {
+    pub message_id: i64
+}
+
+#[derive(sqlx::FromRow)]
+struct TracebackRow {
+    pub traceback: String
+}
+
+
 const fn blank_field() -> (&'static str, Cow<'static, str>, bool) {
     ("\u{200B}", Cow::Borrowed("\u{200B}"), true)
 }
@@ -42,18 +59,18 @@ async fn handle_unexpected(
     let traceback_hash = hash(traceback.as_bytes());
 
     let short_error = error.to_string();
-    let conn = data.pool.get().await?;
+    let mut conn = data.pool.acquire().await?;
 
-    if let Some(row) = conn.query_opt("
+    if let Some(ErrorRowWithOccurrences{message_id, occurrences}) = sqlx::query_as("
         UPDATE errors SET occurrences = occurrences + 1
         WHERE traceback_hash = $1
         RETURNING message_id, occurrences
-    ", &[&traceback_hash]).await? {
-        let message_id = serenity::MessageId(row.get::<_, i64>("message_id") as u64);
+    ").bind(traceback_hash.clone()).fetch_optional(&mut conn).await? {
+        let message_id = serenity::MessageId(message_id as u64);
         let mut message = error_webhook.get_message(&ctx.http, message_id).await?;
         let embed = &mut message.embeds[0];
 
-        let footer = format!("This error has occurred {} times!", row.get::<_, i32>("occurrences"));
+        let footer = format!("This error has occurred {} times!", occurrences);
         embed.footer.as_mut().unwrap().text = footer;
 
         error_webhook.edit_message(ctx, message_id,  |m| {m.embeds(vec![
@@ -116,16 +133,17 @@ async fn handle_unexpected(
                 .style(serenity::ButtonStyle::Danger)
             })))
         }).await?.unwrap();
-        let row = conn.query_one("
+
+        let ErrorRow{message_id} = sqlx::query_as("
             INSERT INTO errors(traceback_hash, traceback, message_id)
             VALUES($1, $2, $3)
 
             ON CONFLICT (traceback_hash)
             DO UPDATE SET occurrences = errors.occurrences + 1
             RETURNING errors.message_id
-        ", &[&traceback_hash, &traceback, &(message.id.0 as i64)]).await?;
+        ",).bind(traceback_hash).bind(traceback).bind(message.id.0 as i64).fetch_one(&mut conn).await?;
 
-        if message.id.0 != (row.get::<_, i64>("message_id") as u64) {
+        if message.id.0 != (message_id as u64) {
             error_webhook.delete_message(&ctx.http, message.id).await?;
         }
     };
@@ -320,20 +338,19 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
 }
 
 pub async fn handle_traceback_button(ctx: &serenity::Context, data: &Data, interaction: serenity::MessageComponentInteraction) -> Result<(), Error> {
-    let conn = data.pool.get().await?;
-    let row = conn.query_opt(
-        "SELECT traceback FROM errors WHERE message_id = $1",
-        &[&(interaction.message.id.0 as i64)]
-    ).await?;
+    let row: Option<TracebackRow> = sqlx::query_as("SELECT traceback FROM errors WHERE message_id = $1")
+        .bind(interaction.message.id.0 as i64)
+        .fetch_optional(&data.pool)
+        .await?;
 
     interaction.create_interaction_response(&ctx.http, |r| {r
         .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
         .interaction_response_data(move |d| {
             d.ephemeral(true);
 
-            if let Some(row) = row {
+            if let Some(TracebackRow{traceback}) = row {
                 d.files([serenity::AttachmentType::Bytes {
-                    data: Cow::Owned(row.get::<_, String>("traceback").into_bytes()),
+                    data: Cow::Owned(traceback.into_bytes()),
                     filename: String::from("traceback.txt")
                 }])
             } else {

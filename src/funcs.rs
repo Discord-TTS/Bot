@@ -58,11 +58,11 @@ pub async fn parse_user_or_guild(
 ) -> Result<(Cow<'static, str>, TTSMode)> {
     let user_row = data.userinfo_db.get(author_id.into()).await?;
     let mode =
-        if let Some(mode) = user_row.get("voice_mode") {
+        if let Some(mode) = user_row.voice_mode {
             mode
         } else if let Some(guild_id) = guild_id {
             let settings = data.guilds_db.get(guild_id.into()).await?;
-            settings.get("voice_mode")
+            settings.voice_mode
         } else {
             TTSMode::gTTS
         };
@@ -70,15 +70,15 @@ pub async fn parse_user_or_guild(
     let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
     let voice =
         // Get user voice for user mode
-        if user_voice_row.get::<_, i64>("user_id") != 0 {
-            user_voice_row.get::<_, Option<_>>("voice").map(Cow::Owned)
+        if user_voice_row.user_id != 0 {
+            user_voice_row.voice.clone().map(Cow::Owned)
         } else if let Some(guild_id) = guild_id {
             // Get default server voice for user mode
             let guild_voice_row = data.guild_voice_db.get((guild_id.into(), mode)).await?;
-            if guild_voice_row.get::<_, i64>("guild_id") == 0 {
+            if guild_voice_row.guild_id == 0 {
                 None
             } else {
-                Some(Cow::Owned(guild_voice_row.get("voice")))
+                Some(Cow::Owned(guild_voice_row.voice.clone()))
             }
         } else {
             None
@@ -435,7 +435,7 @@ pub fn clean_msg(
 }
 
 
-pub async fn translate(content: &str, target_lang: &str, data: &crate::structs::Data) -> Result<Option<String>> {
+pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<Option<String>> {
     let url = format!("{}/translate", crate::constants::TRANSLATION_URL);
     let response: crate::structs::DeeplTranslateResponse = data.reqwest.get(url)
         .query(&serenity::json::prelude::json!({

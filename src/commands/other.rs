@@ -48,7 +48,7 @@ pub async fn tts(
             let bot_voice_state = guild.voice_states.get(&ctx.discord().cache.current_user_id());
             if let (Some(bot_voice_state), Some(author_voice_state)) = (bot_voice_state, author_voice_state) {
                 if bot_voice_state.channel_id == author_voice_state.channel_id {
-                    let setup_channel: i64 = data.guilds_db.get(guild.id.into()).await?.get("channel");
+                    let setup_channel: i64 = data.guilds_db.get(guild.id.into()).await?.channel;
                     if setup_channel as u64 == ctx.channel_id().0 {
                         ctx.say(format!("You don't need to include the `{}tts` for messages to be said!", ctx.prefix())).await?;
                         return Ok(())
@@ -64,7 +64,7 @@ pub async fn tts(
         let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
         let speaking_rate = data.user_voice_db
             .get((author.id.into(), mode)).await?
-            .get::<_, Option<f32>>("speaking_rate")
+            .speaking_rate
             .map_or_else(
                 || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).unwrap_or_default(),
                 |r| r.to_string()
@@ -154,7 +154,7 @@ and can be used by {total_members} people!"))
 /// Shows the current setup channel!
 #[poise::command(category="Extra Commands", guild_only, prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
 pub async fn channel(ctx: Context<'_>,) -> CommandResult {
-    let channel: i64 = ctx.data().guilds_db.get(ctx.guild_id().unwrap().into()).await?.get("channel");
+    let channel = ctx.data().guilds_db.get(ctx.guild_id().unwrap().into()).await?.channel;
 
     if channel as u64 == ctx.channel_id().0 {
         ctx.say("You are in the setup channel already!").await?;
@@ -208,7 +208,7 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
 
     let data = ctx.data();
     let author = ctx.author();
-    if !data.userinfo_db.get(author.id.into()).await?.get::<_, bool>("dm_blocked") {
+    if !data.userinfo_db.get(author.id.into()).await?.dm_blocked {
         data.webhooks["suggestions"].execute(&ctx.discord().http, false, |b| {b
             .content(suggestion)
             .avatar_url(author.face())

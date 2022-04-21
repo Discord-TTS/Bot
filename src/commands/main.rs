@@ -16,6 +16,7 @@
 use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
+use sqlx::Row;
 
 use crate::structs::{Context, Result, CommandResult, PoiseContextExt, SerenityContextExt, TTSMode};
 use crate::macros::require_guild;
@@ -23,7 +24,7 @@ use crate::funcs::random_footer;
 
 async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
     let guild_id = ctx.guild_id().unwrap();
-    let channel_id: i64 = ctx.data().guilds_db.get(guild_id.into()).await?.get("channel");
+    let channel_id = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
 
     if channel_id == ctx.channel_id().0 as i64 {
         Ok(true)
@@ -228,11 +229,10 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     };
 
     let linked_guilds: i64 = {
-        let db_conn = data.pool.get().await?;
-        db_conn.query_one(
-            "SELECT count(*) FROM guilds WHERE premium_user = $1",
-            &[&(author_id as i64)]
-        ).await?.get("count")
+        sqlx::query("SELECT count(*) FROM guilds WHERE premium_user = $1")
+            .bind(&(author_id as i64))
+            .fetch_one(&data.pool)
+            .await?.get("count")
     };
 
     if error_msg.is_none() && linked_guilds >= 2 {
