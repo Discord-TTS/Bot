@@ -18,8 +18,9 @@ use poise::serenity_prelude as serenity;
 use num_format::{Locale, ToFormattedString};
 
 use crate::constants::{OPTION_SEPERATORS};
-use crate::funcs::{fetch_audio, parse_user_or_guild, refresh_kind};
+use crate::funcs::{bool_button, fetch_audio, parse_user_or_guild, refresh_kind};
 use crate::structs::{Context, TTSMode, OptionTryUnwrap, CommandResult, PoiseContextExt};
+use crate::require;
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
@@ -206,13 +207,18 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
         return Ok(())
     }
 
+    if !require!(bool_button(ctx, format!("Are you sure you want to make a suggestion to {}?", ctx.discord().cache.current_user_field(|b| b.name.clone())).as_str(), "Yes", "Cancel", None).await?, Ok(())) {
+        ctx.say("Suggestion cancelled").await?;
+        return Ok(());
+    }
+
     let data = ctx.data();
     let author = ctx.author();
     if !data.userinfo_db.get(author.id.into()).await?.dm_blocked {
         data.webhooks["suggestions"].execute(&ctx.discord().http, false, |b| {b
             .content(suggestion)
             .avatar_url(author.face())
-            .username(format!("{}#{} ({})", author.name, author.discriminator, author.id))
+            .username(format!("{}#{:04} ({})", author.name, author.discriminator, author.id))
         }).await?;
     }
 

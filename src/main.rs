@@ -706,8 +706,9 @@ async fn process_support_dm(
         serenity::Channel::Guild(channel) => {
             // Check support server trusted member replies to a DM, if so, pass it through
             if let Some(reference) = &message.message_reference {
-                if data.config.main_server != channel.guild_id.0
-                    || ["dm_logs", "suggestions"].contains(&channel.name.as_str())
+                if ![data.webhooks["dm_logs"].channel_id.try_unwrap()?,
+                     data.webhooks["suggestions"].channel_id.try_unwrap()?]
+                    .contains(&channel.id)
                 {
                     return Ok(());
                 };
@@ -756,7 +757,7 @@ async fn process_support_dm(
                 } else if content.as_str() == "help" {
                     channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
                 } else if !userinfo.dm_blocked {
-                    let display_name = format!("{}#{}", &message.author.name, &message.author.discriminator);
+                    let display_name = format!("{}#{:04}", &message.author.name, &message.author.discriminator);
                     let webhook_username = format!("{} ({})", display_name, message.author.id.0);
                     let paths: Vec<serenity::AttachmentType<'_>> = message.attachments.iter()
                         .map(|a| serenity::AttachmentType::Path(Path::new(&a.url)))

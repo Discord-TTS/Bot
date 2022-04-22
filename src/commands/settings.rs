@@ -24,7 +24,7 @@ use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice,
 use crate::funcs::{get_gtts_voices, get_espeak_voices, random_footer, parse_user_or_guild};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::macros::{require_guild, require};
-use crate::database;
+use crate::{database, funcs};
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
     if mode == TTSMode::Premium {
@@ -271,46 +271,7 @@ impl<'a> MenuPaginator<'a> {
 }
 
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
-    if let Some(value) = value {
-        Ok(Some(value))
-    } else {
-        let message = ctx.send(|b| {b
-            .content("What would you like to set this to?")
-            .components(|c| {c
-                .create_action_row(|r| {r
-                    .create_button(|b| {b
-                        .style(serenity::ButtonStyle::Success)
-                        .custom_id("True")
-                        .label("True")
-                    })
-                    .create_button(|b| {b
-                        .style(serenity::ButtonStyle::Danger)
-                        .custom_id("False")
-                        .label("False")
-                    })
-                })
-            })
-        }).await?.message().await?;
-
-        let ctx_discord = ctx.discord();
-        let interaction = message
-            .await_component_interaction(&ctx_discord.shard)
-            .timeout(std::time::Duration::from_secs(60 * 5))
-            .author_id(ctx.author().id)
-            .collect_limit(1)
-            .await;
-
-        if let Some(interaction) = interaction {
-            interaction.defer(&ctx_discord.http).await?;
-            match &*interaction.data.custom_id {
-                "True" => Ok(Some(true)),
-                "False" => Ok(Some(false)),
-                _ => unreachable!()
-            }
-        } else {
-            Ok(None)
-        }
-    }
+    funcs::bool_button(ctx, "What would you like to set this to?", "True", "False", value).await
 }
 
 #[allow(clippy::too_many_arguments)]
