@@ -212,7 +212,7 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
         data.webhooks["suggestions"].execute(&ctx.discord().http, false, |b| {b
             .content(suggestion)
             .avatar_url(author.face())
-            .username(format!("{}#{} ({})", author.name, author.discriminator, author.id))
+            .username(format!("{}#{:04} ({})", author.name, author.discriminator, author.id))
         }).await?;
     }
 

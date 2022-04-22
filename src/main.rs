@@ -756,7 +756,7 @@ async fn process_support_dm(
                 } else if content.as_str() == "help" {
                     channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
                 } else if !userinfo.dm_blocked {
-                    let display_name = format!("{}#{}", &message.author.name, &message.author.discriminator);
+                    let display_name = format!("{}#{:04}", &message.author.name, &message.author.discriminator);
                     let webhook_username = format!("{} ({})", display_name, message.author.id.0);
                     let paths: Vec<serenity::AttachmentType<'_>> = message.attachments.iter()
                         .map(|a| serenity::AttachmentType::Path(Path::new(&a.url)))
