@@ -48,9 +48,9 @@ version = "1"
 features = ["macros", "rt-multi-thread", "signal", "parking_lot"]
 
 [dependencies.songbird]
-git = "https://github.com/serenity-rs/songbird"
+git = "https://github.com/GnomedDev/songbird"
 features = ["builtin-queue"]
-branch = "next"
+branch = "without-spin-sleep"
 
 [patch."https://github.com/serenity-rs/serenity"]
 serenity = { version = "0.11.1" }

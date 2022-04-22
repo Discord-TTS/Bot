@@ -1870,7 +1870,7 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.2"
-source = "git+https://github.com/serenity-rs/songbird?branch=next#99818e961cfb9ff6b86d853bc23b0ecf6a70e097"
+source = "git+https://github.com/GnomedDev/songbird?branch=without-spin-sleep#6c7dd3d94dab2fd4262bc48d0d677032686d5aaa"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1888,7 +1888,6 @@ dependencies = [
  "serde_json",
  "serenity",
  "serenity-voice-model",
- "spin_sleep",
  "streamcatcher",
  "symphonia-core",
  "tokio",
@@ -1913,16 +1912,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c530c2b0d0bf8b69304b39fe2001993e267461948b890cd037d8ad4293fa1a0d"
 dependencies = [
  "lock_api",
-]
-
-[[package]]
-name = "spin_sleep"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cafa7900db085f4354dbc7025e25d7a839a14360ea13b5fc4fd717f2d3b23134"
-dependencies = [
- "once_cell",
- "winapi",
 ]
 
 [[package]]
