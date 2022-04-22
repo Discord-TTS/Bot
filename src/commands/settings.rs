@@ -685,13 +685,10 @@ pub async fn speaking_rate(
     let author = ctx.author();
 
     let (_, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
-    let (min, _, max, kind) =
-        if let Some(info) = mode.speaking_rate_info() {
-            info
-        } else {
-            ctx.say(format!("**Error**: Cannot set speaking rate for the {mode} mode")).await?;
-            return Ok(())
-        };
+    let (min, _, max, kind) = require!(mode.speaking_rate_info(), {
+        ctx.say(format!("**Error**: Cannot set speaking rate for the {mode} mode")).await?;
+        Ok(())
+    });
 
     let to_send = {
         if speaking_rate > max {
@@ -699,6 +696,7 @@ pub async fn speaking_rate(
         } else if speaking_rate < min {
             format!("**Error**: Cannot set the speaking rate multiplier below {min}{kind}")
         } else {
+            data.userinfo_db.create_row(author.id.0 as i64).await?;
             data.user_voice_db.set_one((author.id.0 as i64, mode), "speaking_rate", &speaking_rate).await?;
             format!("Your speaking rate is now: {speaking_rate}{kind}")
         }
@@ -739,10 +737,10 @@ pub async fn nick(
             if nick.contains('<') && nick.contains('>') {
                 Cow::Borrowed("**Error**: You can't have mentions/emotes in your nickname!")
             } else {
-                let (r1, r2) = tokio::join!(
+                tokio::try_join!(
                     data.guilds_db.create_row(guild.id.into()),
                     data.userinfo_db.create_row(user.id.into())
-                ); r1?; r2?;
+                )?;
 
                 data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nick).await?;
                 Cow::Owned(format!("Changed {}'s nickname to {}", user.name, nick))

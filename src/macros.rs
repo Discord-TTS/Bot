@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 macro_rules! async_try {
-    ($inner:block) => {(|| async {$inner})().await};
+    ($inner:block) => {async {$inner}.await};
 }
 
 macro_rules! require {

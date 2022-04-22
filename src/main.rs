@@ -333,18 +333,13 @@ impl EventHandler {
 impl serenity::EventHandler for EventHandler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
         let framework = require!(self.framework());
-        error::handle_message(&ctx, &framework, &new_message, async_try!({
-            let data = framework.user_data().await;
+        let data = framework.user_data().await;
 
-            let (tts_result, support_result, mention_result) = tokio::join!(
-                process_tts_msg(&ctx, &new_message, data),
-                process_support_dm(&ctx, &new_message, data),
-                process_mention_msg(&ctx, &new_message, data),
-            );
-
-            tts_result?; support_result?; mention_result?;
-            Ok(())
-        })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+        error::handle_message(&ctx, &framework, &new_message, tokio::try_join!(
+            process_tts_msg(&ctx, &new_message, data),
+            process_support_dm(&ctx, &new_message, data),
+            process_mention_msg(&ctx, &new_message, data),
+        )).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
     async fn voice_state_update(&self, ctx: serenity::Context, old: Option<serenity::VoiceState>, new: serenity::VoiceState) {

@@ -10,7 +10,7 @@ use serenity::json::prelude as json;
 use crate::{
     structs::{Context, Error, Data, Framework, PoiseContextExt, Result},
     constants::{RED, VIEW_TRACEBACK_CUSTOM_ID},
-    funcs::refresh_kind
+    funcs::refresh_kind, macros::require
 };
 
 #[allow(clippy::module_name_repetitions)]
@@ -152,7 +152,7 @@ async fn handle_unexpected(
 }
 
 pub async fn handle_unexpected_default(ctx: &serenity::Context, framework: &Framework, name: &str, result: Result<()>) -> Result<()> {
-    let error = if let Some(err) = result.err() {err} else {return Ok(())};
+    let error = require!(result.err(), Ok(()));
 
     handle_unexpected(
         ctx, framework, name,
@@ -163,8 +163,8 @@ pub async fn handle_unexpected_default(ctx: &serenity::Context, framework: &Fram
 
 
 // Listener Handlers
-pub async fn handle_message(ctx: &serenity::Context, framework: &Framework, message: &serenity::Message, result: Result<()>) -> Result<()> {
-    let error = if let Some(err) = result.err() {err} else {return Ok(())};
+pub async fn handle_message<T>(ctx: &serenity::Context, framework: &Framework, message: &serenity::Message, result: Result<T>) -> Result<()> {
+    let error = require!(result.err(), Ok(()));
 
     let mut extra_fields = Vec::with_capacity(3);
     if let Some(guild_id) = message.guild_id {
@@ -184,7 +184,7 @@ pub async fn handle_message(ctx: &serenity::Context, framework: &Framework, mess
 }
 
 pub async fn handle_guild(name: &str, ctx: &serenity::Context, framework: &Framework, guild: Option<&serenity::Guild>, result: Result<()>) -> Result<()> {
-    let error = if let Some(err) = result.err() {err} else {return Ok(())};
+    let error = require!(result.err(), Ok(()));
 
     handle_unexpected(
         ctx, framework, name,
