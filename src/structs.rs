@@ -38,6 +38,14 @@ pub struct PostgresConfig {
     pub password: String,
 }
 
+pub struct JoinVCToken (pub serenity::GuildId);
+impl JoinVCToken {
+    pub fn acquire(data: &Data, guild_id: serenity::GuildId) -> Arc<tokio::sync::Mutex<Self>> {
+        data.join_vc_tokens.entry(guild_id).or_insert_with(|| {
+            Arc::new(tokio::sync::Mutex::new(Self(guild_id)))
+        }).clone()
+    }
+}
 
 pub struct Data {
     pub analytics: Arc<analytics::Handler>,
@@ -47,6 +55,7 @@ pub struct Data {
     pub user_voice_db: database::Handler<(i64, TTSMode), database::UserVoiceRow>,
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRow>,
 
+    pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
     pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
     pub system_info: parking_lot::Mutex<sysinfo::System>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
@@ -205,7 +214,7 @@ pub trait SerenityContextExt {
     async fn user_from_dm(&self, dm_name: &str) -> Option<serenity::User>;
     async fn join_vc(
         &self,
-        guild_id: serenity::GuildId,
+        guild_id: tokio::sync::MutexGuard<'_, JoinVCToken>,
         channel_id: serenity::ChannelId,
     ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>>;
 }
@@ -309,11 +318,11 @@ impl SerenityContextExt for serenity::Context {
 
     async fn join_vc(
         &self,
-        guild_id: serenity::GuildId,
+        guild_id: tokio::sync::MutexGuard<'_, JoinVCToken>,
         channel_id: serenity::ChannelId,
     ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>> {
         let manager = songbird::get(self).await.unwrap();
-        let (call, r) = manager.join(guild_id, channel_id).await;
+        let (call, r) = manager.join(guild_id.0, channel_id).await;
         r?;
         Ok(call)
     }

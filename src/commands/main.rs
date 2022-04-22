@@ -18,7 +18,7 @@ use std::borrow::Cow;
 use poise::serenity_prelude as serenity;
 use sqlx::Row;
 
-use crate::structs::{Context, Result, CommandResult, PoiseContextExt, SerenityContextExt, TTSMode};
+use crate::structs::{Context, Result, CommandResult, PoiseContextExt, SerenityContextExt, TTSMode, JoinVCToken};
 use crate::macros::require_guild;
 use crate::funcs::random_footer;
 
@@ -98,7 +98,9 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
     {
         let _typing = ctx.defer_or_broadcast().await?;
-        ctx_discord.join_vc(guild.id, channel_id).await?;
+
+        let join_vc_lock = JoinVCToken::acquire(ctx.data(), guild.id);
+        ctx_discord.join_vc(join_vc_lock.lock().await, channel_id).await?;
     }
 
     ctx.send(|m| {

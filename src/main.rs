@@ -49,7 +49,7 @@ mod funcs;
 use macros::{require, async_try};
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices, generate_status};
-use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework};
+use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework, JoinVCToken};
 
 use crate::constants::PREMIUM_NEUTRAL_COLOUR;
 
@@ -206,6 +206,7 @@ async fn main() {
                 config: main,
                 reqwest: reqwest::Client::new(),
                 premium_voices: get_premium_voices(),
+                join_vc_tokens: dashmap::DashMap::new(),
                 last_to_xsaid_tracker: dashmap::DashMap::new(),
                 system_info: parking_lot::Mutex::new(sysinfo::System::new()),
                 premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
@@ -602,7 +603,8 @@ async fn process_tts_msg(
     let voice;
 
     let mut content = match run_checks(
-        ctx, message, channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
+        ctx, message, data,
+        channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
     ).await? {
         None => return Ok(()),
         Some((guild, content)) => {
@@ -643,7 +645,8 @@ async fn process_tts_msg(
         None => {
             // At this point, the bot is "in" the voice channel, but without a voice client,
             // this is usually if the bot restarted but the bot is still in the vc from the last boot.
-            ctx.join_vc(guild_id, message.channel_id).await?
+            let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+            ctx.join_vc(join_vc_lock.lock().await, message.channel_id).await?
         }
     };
 

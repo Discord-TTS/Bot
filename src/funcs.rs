@@ -26,7 +26,8 @@ use rand::prelude::SliceRandom;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::{structs::{Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, Context}, macros::require};
+use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, JoinVCToken};
+use crate::macros::require;
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
     sysinfo::RefreshKind::new()
@@ -237,6 +238,7 @@ fn remove_repeated_chars(content: &str, limit: usize) -> String {
 pub async fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
+    data: &Data,
 
     channel: u64,
     prefix: &str,
@@ -297,7 +299,9 @@ pub async fn run_checks(
         // Else if the user is in the vc and autojoin is on
         } else if let Some(voice_state) = voice_state && autojoin {
             let voice_channel = voice_state.channel_id.try_unwrap()?;
-            ctx.join_vc(guild.id, voice_channel).await?;
+            let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+
+            ctx.join_vc(join_vc_lock.lock().await, voice_channel).await?;
         } else {
             return Ok(None); // Bot not in vc
         };
