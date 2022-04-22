@@ -26,7 +26,7 @@ use rand::prelude::SliceRandom;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::{structs::{Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result}, macros::require};
+use crate::{structs::{Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, Context}, macros::require};
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
     sysinfo::RefreshKind::new()
@@ -454,4 +454,47 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
     }
 
     Ok(None)
+}
+
+pub async fn bool_button(ctx: Context<'_>, prompt: &str, positive: &str, negative: &str, value: Option<bool>) -> Result<Option<bool>, Error> {
+    if let Some(value) = value {
+        Ok(Some(value))
+    } else {
+        let message = ctx.send(|b| {b
+            .content(prompt)
+            .components(|c| {c
+                .create_action_row(|r| {r
+                    .create_button(|b| {b
+                        .style(serenity::ButtonStyle::Success)
+                        .custom_id("True")
+                        .label(positive)
+                    })
+                    .create_button(|b| {b
+                        .style(serenity::ButtonStyle::Danger)
+                        .custom_id("False")
+                        .label(negative)
+                    })
+                })
+            })
+        }).await?.message().await?;
+
+        let ctx_discord = ctx.discord();
+        let interaction = message
+            .await_component_interaction(&ctx_discord.shard)
+            .timeout(std::time::Duration::from_secs(60 * 5))
+            .author_id(ctx.author().id)
+            .collect_limit(1)
+            .await;
+
+        if let Some(interaction) = interaction {
+            interaction.defer(&ctx_discord.http).await?;
+            match &*interaction.data.custom_id {
+                "True" => Ok(Some(true)),
+                "False" => Ok(Some(false)),
+                _ => unreachable!()
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }
