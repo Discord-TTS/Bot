@@ -15,7 +15,7 @@ services:
             POSTGRES_USER: tts
             POSTGRES_PASSWORD: tts_password
     tts-service:
-        build: gnomeddev/tts-service
+        image: gnomeddev/tts-service
         volumes:
           - type: bind
             source: ${GOOGLE_APPLICATION_CREDENTIALS}
