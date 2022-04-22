@@ -706,8 +706,9 @@ async fn process_support_dm(
         serenity::Channel::Guild(channel) => {
             // Check support server trusted member replies to a DM, if so, pass it through
             if let Some(reference) = &message.message_reference {
-                if data.config.main_server != channel.guild_id.0
-                    || ["dm_logs", "suggestions"].contains(&channel.name.as_str())
+                if ![data.webhooks["dm_logs"].channel_id.try_unwrap()?,
+                     data.webhooks["suggestions"].channel_id.try_unwrap()?]
+                    .contains(&channel.id)
                 {
                     return Ok(());
                 };
