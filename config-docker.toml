@@ -1,6 +1,6 @@
 [Main]
 log_level = 'info'
-tts_service = 'https://localhost:20310'
+tts_service = 'http://localhost:20310'
 #translation_token = token from https://deepl.com/
 #main_server_invite = 'https://discord.gg/example'
 #invite_channel = id here
