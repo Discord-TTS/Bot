@@ -11,6 +11,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
 
+use std::borrow::Cow;
+
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use sysinfo::{SystemExt, ProcessExt};
@@ -67,8 +69,8 @@ pub async fn tts(
             .get((author.id.into(), mode)).await?
             .speaking_rate
             .map_or_else(
-                || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).unwrap_or_default(),
-                |r| r.to_string()
+                || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).map_or(Cow::Borrowed("1.0"), Cow::Owned),
+                |r| Cow::Owned(r.to_string())
             );
 
         serenity::AttachmentType::Bytes {

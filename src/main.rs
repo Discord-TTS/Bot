@@ -620,8 +620,8 @@ async fn process_tts_msg(
         .get((message.author.id.into(), mode)).await?
         .speaking_rate
         .map_or_else(
-            || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).unwrap_or_default(),
-            |r| r.to_string()
+            || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).map_or(Cow::Borrowed("1.0"), Cow::Owned),
+            |r| Cow::Owned(r.to_string())
         );
 
     if let Some(target_lang) = guild_row.target_lang.as_deref() {
