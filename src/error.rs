@@ -198,8 +198,8 @@ pub async fn handle_guild(name: &str, ctx: &serenity::Context, framework: &Frame
 // Command Error handlers
 async fn handle_cooldown(ctx: Context<'_>, remaining_cooldown: std::time::Duration) -> Result<(), Error> {
     let cooldown_response = ctx.send_error(
-        &format!("{} is on cooldown", ctx.command().name),
-        Some(&format!("try again in {:.1} seconds", remaining_cooldown.as_secs_f32()))
+        &ctx.gettext("{command_name} is on cooldown").replace("{command_name}", ctx.command().name),
+        Some(&ctx.gettext("try again in {} seconds").replace("{}", &format!("{:.1}", remaining_cooldown.as_secs_f32())))
     ).await?;
 
     if let poise::Context::Prefix(ctx) = ctx {
@@ -225,22 +225,25 @@ async fn handle_argparse(ctx: Context<'_>, error: Box<dyn std::error::Error + Se
     let fix = None;
     let mut reason = None;
 
-    let argument = || input.unwrap().replace('`', "");
     if error.is::<serenity::MemberParseError>() {
-        reason = Some(format!("I cannot find the member: `{}`", argument()));
+        reason = Some(ctx.gettext("I cannot find the member: `{}`"));
     } else if error.is::<serenity::GuildParseError>() {
-        reason = Some(format!("I cannot find the server: `{}`", argument()));
+        reason = Some(ctx.gettext("I cannot find the server: `{}`"));
     } else if error.is::<serenity::GuildChannelParseError>() {
-        reason = Some(format!("I cannot find the channel: `{}`", argument()));
+        reason = Some(ctx.gettext("I cannot find the channel: `{}`"));
     } else if error.is::<std::num::ParseIntError>() {
-        reason = Some(format!("I cannot convert `{}` to a number", argument()));
+        reason = Some(ctx.gettext("I cannot convert `{}` to a number"));
     } else if error.is::<std::str::ParseBoolError>() {
-        reason = Some(format!("I cannot convert `{}` to True/False", argument()));
+        reason = Some(ctx.gettext("I cannot convert `{}` to True/False"));
     }
 
     ctx.send_error(
-        reason.as_deref().unwrap_or("you typed the command wrong"),
-        Some(&fix.unwrap_or_else(|| format!("check out `{}help {}`", ctx.prefix(), ctx.command().qualified_name)))
+        reason.map(|r| r.replace("{}", &input.unwrap()).replace('`', "")).as_deref().unwrap_or("you typed the command wrong"),
+        Some(&fix.unwrap_or_else(|| ctx
+            .gettext("check out `{prefix}help {command}`")
+            .replace("command", &ctx.command().qualified_name))
+            .replace("{prefix}", ctx.prefix())
+        )
     ).await?;
 
     Ok(())
@@ -296,16 +299,16 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
         poise::FrameworkError::CooldownHit { remaining_cooldown, ctx } => handle_cooldown(ctx, remaining_cooldown).await?,
         poise::FrameworkError::MissingBotPermissions{missing_permissions, ctx} => {
             ctx.send_error(
-                &format!("I cannot run `{}` as I am missing permissions", ctx.command().name),
-                Some(&format!("give me: {}", missing_permissions.get_permission_names().join(", ")))
+                &ctx.gettext("I cannot run `{command}` as I am missing permissions").replace("{command}", ctx.command().name),
+                Some(&ctx.gettext("give me: {}").replace("{}", &missing_permissions.get_permission_names().join(", ")))
             ).await?;
         },
         poise::FrameworkError::MissingUserPermissions{missing_permissions, ctx} => {
             ctx.send_error(
-                "you cannot run this command",
-                missing_permissions.map(|missing_permissions| format!(
-                    "ask an administator for the following permissions: {}",
-                    missing_permissions.get_permission_names().join(", ")
+                ctx.gettext("you cannot run this command"),
+                missing_permissions.map(|missing_permissions| (ctx
+                    .gettext("ask an administator for the following permissions: {}")
+                    .replace("{}", &missing_permissions.get_permission_names().join(", "))
                 )).as_deref()
             ).await?;
         },
@@ -314,7 +317,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
         poise::FrameworkError::CommandCheckFailed { error, ctx } => {
             if let Some(error) = error {
                 error!("Premium Check Error: {:?}", error);
-                ctx.send_error("an unknown error occurred during the premium check", None).await?;
+                ctx.send_error(ctx.gettext("an unknown error occurred during the premium check"), None).await?;
             }
         },
 
@@ -325,10 +328,10 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
         poise::FrameworkError::NotAnOwner{ctx: _} => {},
         poise::FrameworkError::GuildOnly {ctx} => {
             ctx.send_error(
-                &format!("{} cannot be used in private messages", ctx.command().qualified_name),
-                Some(&format!(
-                    "try running it on a server with {} in",
-                    ctx.discord().cache.current_user_field(|b| b.name.clone())
+                &ctx.gettext("{command_name} cannot be used in private messages").replace("{}", &ctx.command().qualified_name),
+                Some(&ctx.discord().cache.current_user_field(|b| ctx
+                    .gettext("try running it on a server with {bot_name} in")
+                    .replace("{bot_name}", &b.name)
                 ))
             ).await?;
         },

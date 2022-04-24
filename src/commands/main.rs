@@ -30,8 +30,8 @@ async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
         Ok(true)
     } else {
         ctx.send_error(
-            "you ran this command in the wrong channel",
-            Some(&format!("do {}channel get the channel that has been setup", ctx.prefix()))
+            ctx.gettext("you ran this command in the wrong channel"),
+            Some(&ctx.gettext("do {prefix}channel get the channel that has been setup").replace("{prefix}", ctx.prefix()))
         ).await?;
         Ok(false)
     }
@@ -57,8 +57,8 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
             channel
         } else {
             ctx.send_error(
-                "you need to be in a voice channel to make me join your voice channel",
-                Some("join a voice channel and try again"),
+                ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
+                Some(ctx.gettext("join a voice channel and try again")),
             ).await?;
             return Ok(())
         }
@@ -74,10 +74,10 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let missing_permissions = required_permissions - permissions;
     if !missing_permissions.is_empty() {
         ctx.send_error(
-            "I do not have permissions to TTS in your voice channel!",
-            Some(&format!(
-                "please ask an administrator to give me: {}",
-                missing_permissions.get_permission_names().join(", ")
+            ctx.gettext("I do not have permissions to TTS in your voice channel!"),
+            Some(&ctx.gettext("please ask an administrator to give me: {missing_permissions}").replace(
+                "{missing_permissions}",
+                &missing_permissions.get_permission_names().join(", ")
             ))
         ).await?;
         return Ok(());
@@ -87,33 +87,35 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
             if bot_channel_id.0 == channel_id.0 {
-                ctx.say("I am already in your voice channel!").await?;
+                ctx.say(ctx.gettext("I am already in your voice channel!")).await?;
                 return Ok(());
             };
 
-            ctx.say(format!("I am already in <#{}>!", bot_channel_id)).await?;
+            ctx.say(&ctx.gettext("I am already in <#{channel_id}>!").replace("channel_id", &bot_channel_id.0.to_string())).await?;
             return Ok(());
         }
     };
 
+    let data = ctx.data();
+
     {
         let _typing = ctx.defer_or_broadcast().await?;
 
-        let join_vc_lock = JoinVCToken::acquire(ctx.data(), guild.id);
+        let join_vc_lock = JoinVCToken::acquire(data, guild.id);
         ctx_discord.join_vc(join_vc_lock.lock().await, channel_id).await?;
     }
 
     ctx.send(|m| {
         m.embed(|e| {e
-            .title("Joined your voice channel!")
-            .description("Just type normally and TTS Bot will say your messages!")
+            .title(ctx.gettext("Joined your voice channel!"))
+            .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
             .thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
             .author(|a| {a
                 .name(member.nick.unwrap_or_else(|| author.name.clone()))
                 .icon_url(author.face())
             })
             .footer(|f| f.text(random_footer(
-                ctx.prefix(), &ctx.data().config.main_server_invite, ctx_discord.cache.current_user_id().0
+                ctx.prefix(), &data.config.main_server_invite, ctx_discord.cache.current_user_id().0, ctx.current_catalog()
             )))
         })
     })
@@ -142,7 +144,7 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
     let manager = songbird::get(ctx.discord()).await.unwrap();
     if let Some(handler) = manager.get(guild.id) {
         if handler.lock().await.current_channel().map(|c| c.0) != author_channel_id {
-            ctx.say("Error: You need to be in the same voice channel as me to make me leave!").await?;
+            ctx.say(ctx.gettext("Error: You need to be in the same voice channel as me to make me leave!")).await?;
             return Ok(());
         }
 
@@ -151,9 +153,9 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         manager.remove(guild.id).await?;
         data.last_to_xsaid_tracker.remove(&guild.id);
 
-        ctx.say("Left voice channel!").await?;
+        ctx.say(ctx.gettext("Left voice channel!")).await?;
     } else {
-        ctx.say("Error: How do I leave a voice channel if I am not in one?").await?;
+        ctx.say(ctx.gettext("Error: How do I leave a voice channel if I am not in one?")).await?;
     }
 
     Ok(())
@@ -187,7 +189,7 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
             }
         }
     } else {
-        ctx.say("**Error**: I am not in a voice channel!").await?;
+        ctx.say(ctx.gettext("**Error**: I am not in a voice channel!")).await?;
     };
 
     Ok(())
@@ -206,7 +208,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
 
     if crate::premium_check(ctx_discord, data, Some(guild.id)).await?.is_none() {
-        ctx.say("Hey, this server is already premium!").await?;
+        ctx.say(ctx.gettext("Hey, this server is already premium!")).await?;
         return Ok(())
     }
 
@@ -215,17 +217,17 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
 
     let mut error_msg: Option<Cow<'_, str>> = match data.config.main_server.member(ctx_discord, author.id).await {
         Ok(m) if !m.roles.contains(&data.config.patreon_role) => Some(
-            Cow::Borrowed(concat!(
+            Cow::Borrowed(ctx.gettext(concat!(
                 "Hey, you do not have the Patreon Role on the Support Server! Please link your ",
                 "[patreon account to your discord account](https://support.patreon.com/hc/en-gb/articles/212052266) ",
                 "or [purchase TTS Bot Premium via Patreon](https://patreon.com/Gnome_The_Bot_Maker)!"
-            ))
+            )))
         ),
         Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => Some(
-            Cow::Owned(format!(
-                "Hey, you are not in the [Support Server]({}) so I cannot validate your membership!",
-                data.config.main_server_invite
-            ))
+            Cow::Owned(ctx
+                .gettext("Hey, you are not in the [Support Server]({server_invite}) so I cannot validate your membership!")
+                .replace("{server_invite}", &data.config.main_server_invite)
+            )
         ),
         _ => None
     };
@@ -238,7 +240,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     };
 
     if error_msg.is_none() && linked_guilds >= 2 {
-        error_msg = Some(Cow::Borrowed("Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier"));
+        error_msg = Some(Cow::Borrowed(ctx.gettext("Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier")));
     }
 
     if let Some(error_msg) = error_msg {
@@ -256,7 +258,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     data.guilds_db.set_one(guild.id.into(), "premium_user", &author_id).await?;
     data.guilds_db.set_one(guild.id.into(), "voice_mode", &TTSMode::Premium).await?;
 
-    ctx.say("Done! This server is now premium!").await?;
+    ctx.say(ctx.gettext("Done! This server is now premium!")).await?;
 
     tracing::info!(
         "{}#{} | {} linked premium to {} | {}, they had {} linked servers",

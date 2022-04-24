@@ -24,7 +24,7 @@ use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice,
 use crate::funcs::{get_gtts_voices, get_espeak_voices, random_footer, parse_user_or_guild};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::macros::{require_guild, require};
-use crate::{database, funcs};
+use crate::database;
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
     if mode == TTSMode::Premium {
@@ -42,6 +42,7 @@ fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> 
     guild_only, prefix_command, slash_command,
     required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")
 ]
+#[allow(clippy::too_many_lines)]
 pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let author_id = ctx.author().id;
@@ -62,15 +63,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         default_channel_name()
     };
 
-    let xsaid = guild_row.xsaid;
     let prefix = &guild_row.prefix;
-    let autojoin = guild_row.auto_join;
-    let msg_length = guild_row.msg_length;
-    let bot_ignore = guild_row.bot_ignore;
-    let to_translate = guild_row.to_translate;
-    let require_voice = guild_row.require_voice;
-    let repeated_chars = guild_row.repeated_chars;
-    let audience_ignore = guild_row.audience_ignore;
 
     let guild_mode = guild_row.voice_mode;
     let user_mode = userinfo_row.voice_mode;
@@ -111,18 +104,23 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         .url(&data.config.main_server_invite)
         .colour(neutral_colour)
         .footer(|f| {
-            f.text(format!(concat!(
-                "Change these settings with {prefix}set property value!\n",
-                "None = setting has not been set yet!"
-            ), prefix=prefix))
+            f.text(ctx
+                .gettext("Change these settings with {prefix}set property value!\nNone = setting has not been set yet!")
+                .replace("{prefix}", prefix)
+            )
         })
 
-        .field("**General Server Settings**", format!("
+        .field(ctx.gettext("**General Server Settings**"), ctx.gettext("
 {sep1} Setup Channel: `#{channel_name}`
 {sep1} Command Prefix: `{prefix}`
 {sep1} Auto Join: `{autojoin}`
-        "), false)
-        .field("**TTS Settings**", format!("
+        ")
+            .replace("{sep1}", sep1)
+            .replace("{prefix}", prefix)
+            .replace("{autojoin}", &guild_row.auto_join.to_string())
+            .replace("{channel_name}", &channel_name),
+        false)
+        .field("**TTS Settings**", ctx.gettext("
 {sep2} <User> said: message: `{xsaid}`
 {sep2} Ignore bot's messages: `{bot_ignore}`
 {sep2} Ignore audience messages: `{audience_ignore}`
@@ -133,18 +131,38 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 
 {sep2} Max Time to Read: `{msg_length} seconds`
 {sep2} Max Repeated Characters: `{repeated_chars}`
-        "), false)
-        .field("**Translation Settings (Premium Only)**", format!("
+        ")
+            .replace("{sep2}", sep2)
+            .replace("{xsaid}", &guild_row.xsaid.to_string())
+            .replace("{bot_ignore}", &guild_row.bot_ignore.to_string())
+            .replace("{audience_ignore}", &guild_row.audience_ignore.to_string())
+            .replace("{require_voice}", &guild_row.require_voice.to_string())
+            .replace("{guild_mode}", guild_mode.into())
+            .replace("{default_voice}", &default_voice)
+            .replace("{msg_length}", &guild_row.msg_length.to_string())
+            .replace("{repeated_chars}", &guild_row.repeated_chars.to_string()),
+        false)
+        .field(ctx.gettext("**Translation Settings (Premium Only)**"), ctx.gettext("
 {sep4} Translation: `{to_translate}`
 {sep4} Translation Language: `{target_lang}`
-        "), false)
-        .field("**User Specific**", format!("
+        ")
+            .replace("{sep4}", sep4)
+            .replace("{to_translate}", &guild_row.to_translate.to_string())
+            .replace("{target_lang}", target_lang),
+        false)
+        .field("**User Specific**", ctx.gettext("
 {sep3} Voice: `{user_voice}`
-{sep3} Voice Mode: `{}`
+{sep3} Voice Mode: `{voice_mode}`
 {sep3} Nickname: `{nickname}`
 {sep3} Speaking Rate: `{speaking_rate}{speaking_rate_kind}`
-        ", user_mode.map_or("none", Into::into)
-        ), false)
+        ")
+            .replace("{sep3}", sep3)
+            .replace("{user_voice}", &user_voice)
+            .replace("{voice_mode}", user_mode.map_or("none", Into::into))
+            .replace("{nickname}", nickname)
+            .replace("{speaking_rate}", &speaking_rate)
+            .replace("{speaking_rate_kind}", speaking_rate_kind),
+        false)
     })}).await?;
 
     Ok(())
@@ -176,16 +194,19 @@ impl<'a> MenuPaginator<'a> {
         let (bot_id, bot_name) = cache.current_user_field(|u| (u.id, u.name.clone()));
 
         embed
-            .title(format!("{bot_name} Languages"))
-            .description(format!("**Currently Supported Languages**\n{page}"))
-            .field("Current Language used", &self.current_lang, false)
-            .author(|a| {a
+            .title(&self.ctx.gettext("{bot_name} Premium Voice").replace("{bot_name}", &bot_name))
+            .description(self.ctx.gettext("**Currently Supported Voice**\n{page}").replace("{page}", page))
+            .field(self.ctx.gettext("Current voice used"), &self.current_lang, false)
+            .author(|a| a
                 .name(author.name.clone())
                 .icon_url(author.face())
-            })
-            .footer(|f| {f.text(random_footer(
-                self.ctx.prefix(), &self.ctx.data().config.main_server_invite, bot_id.into()
-            ))})
+            )
+            .footer(|f| f.text(random_footer(
+                self.ctx.prefix(),
+                &self.ctx.data().config.main_server_invite,
+                bot_id.into(),
+                self.ctx.current_catalog()
+            )))
     }
 
     fn create_action_row<'b>(&self, builder: &'b mut serenity::CreateActionRow, disabled: bool) -> &'b mut serenity::CreateActionRow {
@@ -271,20 +292,31 @@ impl<'a> MenuPaginator<'a> {
 }
 
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
-    funcs::bool_button(ctx, "What would you like to set this to?", "True", "False", value).await
+    crate::funcs::bool_button(
+        ctx,
+        ctx.gettext("What would you like to set this to?"),
+        ctx.gettext("True"), ctx.gettext("False"),
+        value
+    ).await
+}
+
+
+enum Target {
+    Guild,
+    User
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn change_mode<CacheKey, RowT>(
-    ctx: &Context<'_>,
+async fn change_mode<'a, CacheKey, RowT>(
+    ctx: &'a Context<'_>,
     general_db: &database::Handler<CacheKey, RowT>,
     guild_id: serenity::GuildId,
     key: CacheKey, mode: Option<TTSMode>,
-    target: &str
-) -> Result<Option<String>, Error>
+    target: Target
+) -> Result<Option<Cow<'a, str>>, Error>
 where
     CacheKey: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
-    RowT: for<'a> sqlx::FromRow<'a, sqlx::postgres::PgRow> + Send + Sync + Unpin,
+    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
 {
     let data = ctx.data();
     if mode == Some(TTSMode::Premium) && crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_some() {
@@ -293,50 +325,62 @@ where
             .colour(PREMIUM_NEUTRAL_COLOUR)
             .thumbnail(data.premium_avatar_url.clone())
             .url("https://www.patreon.com/Gnome_the_Bot_Maker")
-            .footer(|f| f.text("If this is an error, please contact Gnome!#6669."))
-            .description(format!("
+            .footer(|f| f.text(ctx.gettext("If this is an error, please contact Gnome!#6669.")))
+            .description(ctx.gettext("
                 The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `{prefix}premium` command!
                 If this server has purchased premium, please run the `{prefix}activate` command to link yourself to this server!
-            ", prefix=ctx.prefix()))
+            ").replace("{prefix}", ctx.prefix()))
         })).await?;
         Ok(None)
     } else {
         general_db.set_one(key, "voice_mode", &mode).await?;
         Ok(Some(match mode {
-            Some(mode) => format!("Changed {target} TTS Mode to: {mode}"),
-            None => format!("Reset {target} mode")
+            Some(mode) => Cow::Owned(match target {
+                Target::Guild => ctx.gettext("Changed the server TTS Mode to: {mode}"),
+                Target::User => ctx.gettext("Changed your TTS Mode to: {mode}")
+            }.replace("{mode}", mode.into())),
+            None => Cow::Borrowed(match target {
+                Target::Guild => ctx.gettext("Reset the server mode"),
+                Target::User => ctx.gettext("Reset your mode")
+            })
         }))
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn change_voice<T, RowT1, RowT2>(
-    ctx: &Context<'_>,
+async fn change_voice<'a, T, RowT1, RowT2>(
+    ctx: &'a Context<'a>,
     general_db: &database::Handler<T, RowT1>,
     voice_db: &database::Handler<(T, TTSMode), RowT2>,
     author_id: serenity::UserId, guild_id: serenity::GuildId,
     key: T, voice: Option<String>,
-    target: &str,
-) -> Result<String, Error>
+    target: Target,
+) -> Result<Cow<'a, str>, Error>
 where
-    RowT1: for<'a> sqlx::FromRow<'a, sqlx::postgres::PgRow> + Send + Sync + Unpin,
-    RowT2: for<'a> sqlx::FromRow<'a, sqlx::postgres::PgRow> + Send + Sync + Unpin,
+    RowT1: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
+    RowT2: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
 
     T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
     (T, TTSMode): database::CacheKeyTrait,
 {
     let (_, mode) = parse_user_or_guild(ctx.data(), author_id, Some(guild_id)).await?;
     Ok(if let Some(voice) = voice {
-        if check_valid_voice(ctx.data(), voice.clone(), mode).await? {
+        Cow::Owned(if check_valid_voice(ctx.data(), voice.clone(), mode).await? {
             general_db.set_one(key, "voice_mode", &mode).await?;
             voice_db.set_one((key, mode), "voice", &voice).await?;
-            format!("Changed {target} voice to: {voice}")
+            match target {
+                Target::Guild => ctx.gettext("Changed the server voice to: {voice}").replace("{voice}", &voice),
+                Target::User => ctx.gettext("Changed your voice to {voice}").replace("{voice}", &voice)
+            }
         } else {
-            format!("Invalid voice, do `{}voices`", ctx.prefix())
-        }
+            ctx.gettext("Invalid voice, do `{prefix}voices`").replace("prefix", ctx.prefix())
+        })
     } else {
         voice_db.delete((key, mode)).await?;
-        format!("Reset {target} voice")
+        match target {
+            Target::Guild => Cow::Borrowed(ctx.gettext("Reset the server voice")),
+            Target::User => Cow::Borrowed(ctx.gettext("Reset your voice"))
+        }
     })
 }
 
@@ -396,7 +440,7 @@ pub async fn block(
     value: bool
 ) -> CommandResult {
     ctx.data().userinfo_db.set_one(user.into(), "dm_blocked", &value).await?;
-    ctx.say("Done!").await?;
+    ctx.say(ctx.gettext("Done!")).await?;
     Ok(())
 }
 
@@ -415,7 +459,7 @@ pub async fn xsaid(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "xsaid", &value).await?;
-    ctx.say(format!("xsaid is now: {}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("xsaid is now: {}").replace("{}", to_enabled(value))).await?;
 
     Ok(())
 }
@@ -436,7 +480,7 @@ pub async fn autojoin(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "auto_join", &value).await?;
-    ctx.say(format!("Auto Join is now: {}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Auto Join is now: {}").replace("{}", to_enabled(value))).await?;
 
     Ok(())
 }
@@ -457,7 +501,7 @@ pub async fn botignore(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "bot_ignore", &value).await?;
-    ctx.say(format!("Ignoring bots is now: {}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Ignoring bots is now: {}").replace("{}", to_enabled(value))).await?;
 
     Ok(())
 }
@@ -478,7 +522,7 @@ pub async fn require_voice(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "require_voice", &value).await?;
-    ctx.say(format!("Requiring users to be in voice channel for TTS is now: {}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Requiring users to be in voice channel for TTS is now: {}").replace("{}", to_enabled(value))).await?;
 
     Ok(())
 }
@@ -502,7 +546,7 @@ pub async fn server_mode(
     let to_send = change_mode(
         &ctx, &data.guilds_db,
         guild_id, guild_id.into(),
-        Some(TTSMode::from(mode)), "the server"
+        Some(TTSMode::from(mode)), Target::Guild
     ).await?;
 
     if let Some(to_send) = to_send {
@@ -530,7 +574,7 @@ pub async fn server_voice(
     let to_send = change_voice(
         &ctx, &data.guilds_db, &data.guild_voice_db,
         ctx.author().id, guild_id, guild_id.into(), Some(voice),
-        "the server"
+        Target::Guild
     ).await?;
 
     ctx.say(to_send).await?;
@@ -551,7 +595,7 @@ pub async fn translation(ctx: Context<'_>, #[description="Whether to translate a
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "to_translate", &value).await?;
-    ctx.say(format!("Translation is now: {}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Translation is now: {}").replace("{}", to_enabled(value))).await?;
 
     Ok(())
 }
@@ -581,18 +625,20 @@ pub async fn translation_lang(
     match lang {
         Some(lang) if translation_langs.contains(&lang) => {
             data.guilds_db.set_one(guild_id, "target_lang", &lang).await?;
-            ctx.say(format!(
-                "The target translation language is now: {lang}{}",
-                if data.guilds_db.get(guild_id).await?.to_translate {
-                    String::new()
-                } else {
-                    format!(". You may want to enable translation with `{}set translation on`", ctx.prefix())
-                }
-            )).await?;
+
+            let mut to_say = ctx.gettext("The target translation language is now: {}").replace("{}", &lang);
+            if data.guilds_db.get(guild_id).await?.to_translate {
+                to_say.push_str(&ctx
+                    .gettext("You may want to enable translation with `{}set translation on`")
+                    .replace("{}", ctx.prefix())
+                );
+            };
+
+            ctx.say(to_say).await?;
         },
         _ => {
             ctx.send(|b| b.embed(|e| {e
-                .title("DeepL Translation - Supported languages")
+                .title(ctx.gettext("DeepL Translation - Supported languages"))
                 .description(format!("```{}```", translation_langs.iter().join(", ")))
             })).await?;
         }
@@ -616,9 +662,9 @@ pub async fn prefix(
 ) -> CommandResult {
     let to_send = if prefix.len() <= 5 && prefix.matches(' ').count() <= 1 {
         ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "prefix", &prefix).await?;
-        Cow::Owned(format!("Command prefix for this server is now: {}", prefix))
+        Cow::Owned(ctx.gettext("Command prefix for this server is now: {prefix}").replace("{prefix}", &prefix))
     } else {
-        Cow::Borrowed("**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space")
+        Cow::Borrowed(ctx.gettext("**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space"))
     };
 
     ctx.say(to_send).await?;
@@ -637,12 +683,12 @@ pub async fn prefix(
 pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeated characters"] chars: u8) -> CommandResult {
     let to_send = {
         if chars > 100 {
-            Cow::Borrowed("**Error**: Cannot set the max repeated characters above 100")
+            Cow::Borrowed(ctx.gettext("**Error**: Cannot set the max repeated characters above 100"))
         } else if chars < 5 && chars != 0 {
-            Cow::Borrowed("**Error**: Cannot set the max repeated characters below 5")
+            Cow::Borrowed(ctx.gettext("**Error**: Cannot set the max repeated characters below 5"))
         } else {
             ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "repeated_chars", &(chars as i16)).await?;
-            Cow::Owned(format!("Max repeated characters is now: {chars}"))
+            Cow::Owned(ctx.gettext("Max repeated characters is now: {}").replace("{chars}", &chars.to_string()))
         }
     };
 
@@ -666,7 +712,7 @@ pub async fn audienceignore(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "audience_ignore", &value).await?;
-    ctx.say(format!("Ignoring audience is now: {}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Ignoring audience is now: {}").replace("{}", to_enabled(value))).await?;
     Ok(())
 }
 
@@ -686,21 +732,21 @@ pub async fn speaking_rate(
 
     let (_, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
     let (min, _, max, kind) = require!(mode.speaking_rate_info(), {
-        ctx.say(format!("**Error**: Cannot set speaking rate for the {mode} mode")).await?;
+        ctx.say(ctx.gettext("**Error**: Cannot set speaking rate for the {mode} mode").replace("{mode}", mode.into())).await?;
         Ok(())
     });
 
     let to_send = {
         if speaking_rate > max {
-            format!("**Error**: Cannot set the speaking rate multiplier above {max}{kind}")
+            ctx.gettext("**Error**: Cannot set the speaking rate multiplier above {max}{kind}").replace("{max}", &max.to_string())
         } else if speaking_rate < min {
-            format!("**Error**: Cannot set the speaking rate multiplier below {min}{kind}")
+            ctx.gettext("**Error**: Cannot set the speaking rate multiplier below {min}{kind}").replace("{min}", &min.to_string())
         } else {
             data.userinfo_db.create_row(author.id.0 as i64).await?;
             data.user_voice_db.set_one((author.id.0 as i64, mode), "speaking_rate", &speaking_rate).await?;
-            format!("Your speaking rate is now: {speaking_rate}{kind}")
+            ctx.gettext("Your speaking rate is now: {speaking_rate}{kind}").replace("{speaking_rate}", &speaking_rate.to_string())
         }
-    };
+    }.replace("{kind}", kind);
 
     ctx.say(to_send).await?;
     Ok(())
@@ -726,7 +772,7 @@ pub async fn nick(
     let user = user.map_or(Cow::Borrowed(author), Cow::Owned);
 
     if author.id != user.id && !guild.member(ctx_discord, author).await?.permissions(ctx_discord)?.administrator() {
-        ctx.say("**Error**: You need admin to set other people's nicknames!").await?;
+        ctx.say(ctx.gettext("**Error**: You need admin to set other people's nicknames!")).await?;
         return Ok(())
     }
 
@@ -735,7 +781,7 @@ pub async fn nick(
     let to_send =
         if let Some(nick) = nickname {
             if nick.contains('<') && nick.contains('>') {
-                Cow::Borrowed("**Error**: You can't have mentions/emotes in your nickname!")
+                Cow::Borrowed(ctx.gettext("**Error**: You can't have mentions/emotes in your nickname!"))
             } else {
                 tokio::try_join!(
                     data.guilds_db.create_row(guild.id.into()),
@@ -743,11 +789,11 @@ pub async fn nick(
                 )?;
 
                 data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nick).await?;
-                Cow::Owned(format!("Changed {}'s nickname to {}", user.name, nick))
+                Cow::Owned(ctx.gettext("Changed {user}'s nickname to {new_nick}").replace("{user}", &user.name).replace("{new_nick}", &nick))
             }
         } else {
             data.nickname_db.delete([guild.id.into(), user.id.into()]).await?;
-            Cow::Owned(format!("Reset {}'s nickname", user.name))
+            Cow::Owned(ctx.gettext("Reset {user}'s nickname").replace("{user}", &user.name))
         };
 
     ctx.say(to_send).await?;
@@ -785,14 +831,15 @@ pub async fn setup(
     let cache = &ctx_discord.cache;
 
     let author = ctx.author();
-    let bot_user = cache.current_user();
+    let (bot_user_id, bot_user_name, bot_user_face) =
+        cache.current_user_field(|u| (u.id, u.name.clone(), u.face()));
 
     let channel: u64 =
         if let Some(channel) = channel {
             channel.id.into()
         } else {
             let author_member = guild.member(ctx_discord, author).await?;
-            let bot_member = guild.member(ctx_discord, bot_user.id).await?;
+            let bot_member = guild.member(ctx_discord, bot_user_id).await?;
 
             let mut text_channels: Vec<&serenity::GuildChannel> = guild.channels.values()
                 .filter_map(|c| {match c {
@@ -807,17 +854,20 @@ pub async fn setup(
                 .collect();
 
             if text_channels.is_empty() {
-                ctx.say("**Error** This server doesn't have any text channels that we both have Read/Send Messages in!").await?;
+                ctx.say(ctx.gettext("**Error** This server doesn't have any text channels that we both have Read/Send Messages in!")).await?;
                 return Ok(())
             } else if text_channels.len() >= (25 * 5) {
-                ctx.say(format!("**Error** This server has too many text channels to show in a menu! Please run `{}setup #channel`", ctx.prefix())).await?;
+                ctx.say(ctx
+                    .gettext("**Error** This server has too many text channels to show in a menu! Please run `{prefix}setup #channel`")
+                    .replace("{prefix}", ctx.prefix())
+                ).await?;
                 return Ok(())
             };
 
             text_channels.sort_by(|f, s| Ord::cmp(&f.position, &s.position));
 
             let message = ctx.send(|b| {b
-                .content("Select a channel!")
+                .content(ctx.gettext("Select a channel!"))
                 .components(|c| {
                     for (i, chunked_channels) in text_channels.chunks(25).enumerate() {
                         c.create_action_row(|r| {
@@ -858,16 +908,16 @@ pub async fn setup(
     let data = ctx.data();
     data.guilds_db.set_one(guild.id.into(), "channel", &(channel as i64)).await?;
     ctx.send(|b| b.embed(|e| {e
-        .title(format!("{} has been setup!", bot_user.name))
-        .thumbnail(bot_user.face())
-        .description(format!("
+        .title(ctx.gettext("{bot_name} has been setup!").replace("{bot_name}", &bot_user_name))
+        .thumbnail(bot_user_face)
+        .description(ctx.gettext("
 TTS Bot will now accept commands and read from <#{channel}>.
-Just do `{}join` and start talking!
-        ", ctx.prefix()))
+Just do `{prefix}join` and start talking!
+").replace("{channel}", &channel.to_string()).replace("{prefix}", ctx.prefix()))
 
-        .footer(|f| {f.text(random_footer(
-            ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0
-        ))})
+        .footer(|f| f.text(random_footer(
+            ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
+        )))
         .author(|a| {
             a.name(&author.name);
             a.icon_url(author.face())
@@ -892,7 +942,7 @@ pub async fn mode(
     let to_send = change_mode(
         &ctx, &ctx.data().userinfo_db,
         ctx.guild_id().unwrap(), ctx.author().id.into(),
-        mode.map(TTSMode::from), "your"
+        mode.map(TTSMode::from), Target::User
     ).await?;
 
     if let Some(to_send) = to_send {
@@ -920,7 +970,7 @@ pub async fn voice(
     let to_send = change_voice(
         &ctx, &data.userinfo_db, &data.user_voice_db,
         author_id, guild_id, author_id.into(), voice,
-        "your"
+        Target::User,
     ).await?;
 
     ctx.say(to_send).await?;
@@ -948,9 +998,9 @@ pub async fn voices(
 
     let voices: String = {
         let mut supported_langs = match mode {
-            TTSMode::gTTS => crate::funcs::get_gtts_voices().into_iter().map(|(k, _)| k).collect(),
-            TTSMode::eSpeak => crate::funcs::get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?,
-            TTSMode::Premium => return list_premium_voices(ctx).await.map_err(Into::into)
+            TTSMode::gTTS => get_gtts_voices().into_iter().map(|(k, _)| k).collect(),
+            TTSMode::eSpeak => get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?,
+            TTSMode::Premium => return list_premium_voices(ctx).await
         };
 
         supported_langs.sort_unstable();
@@ -960,22 +1010,26 @@ pub async fn voices(
     let cache = &ctx.discord().cache;
     let user_voice_row = data.user_voice_db.get((author.id.into(), mode)).await?;
     ctx.send(|b| {b.embed(|e| {e
-        .title(format!("{} Voices | Mode: `{}`", cache.current_user_field(|u| u.name.clone()), mode))
+        .title(cache.current_user_field(|u| ctx
+            .gettext("{bot_user} Voices | Mode: `{mode}`")
+            .replace("{bot_user}", &u.name)
+            .replace("{mode}", mode.into())
+        ))
         .footer(|f| f.text(random_footer(
-            ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0
+            ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
         )))
         .author(|a| {a
             .name(author.name.clone())
             .icon_url(author.face())
         })
         .field(
-            "Currently supported voices",
+            ctx.gettext("Currently supported voices"),
             voices.strip_suffix(", ").unwrap_or(&voices),
             true
         )
         .field(
-            "Current voice used",
-            user_voice_row.voice.as_ref().map_or("None", std::ops::Deref::deref),
+            ctx.gettext("Current voice used"),
+            user_voice_row.voice.as_ref().map_or_else(|| ctx.gettext("None"), std::ops::Deref::deref),
             false
         )
     })}).await?;

@@ -16,7 +16,7 @@
 
 use indexmap::IndexMap;
 
-use crate::structs::{Context, Command, CommandResult, PoiseContextExt};
+use crate::{structs::{Context, Command, CommandResult, PoiseContextExt}, macros::require};
 
 enum HelpCommandMode<'a> {
     Root,
@@ -113,27 +113,24 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
             let mut subcommand_iterator = command.split(' ');
 
             let top_level_command = subcommand_iterator.next().unwrap();
-            let mut command_obj =
-                if let Some((command_obj, _, _)) = poise::find_command(commands, top_level_command, true) {
-                    command_obj
-                } else {
-                    ctx.say(format!("No command called {} found!", top_level_command)).await?;
-                    return Ok(())
-                };
+            let (mut command_obj, _, _) = require!(poise::find_command(commands, top_level_command, true), {
+                ctx.say(ctx.gettext("No command called {} found!").replace("{}", top_level_command)).await?;
+                Ok(())
+            });
 
             remaining_args = subcommand_iterator.collect();
             if !remaining_args.is_empty() {
-                command_obj =
-                    if let Some((command_obj, _, _)) = poise::find_command(&command_obj.subcommands, &remaining_args, true) {
-                        command_obj
-                    } else {
-                        ctx.say(format!("The group {} does not have a subcommand called {}!", command_obj.name, remaining_args)).await?;
-                        return Ok(())
-                    }
+                (command_obj, _, _) = require!(poise::find_command(&command_obj.subcommands, &remaining_args, true), {
+                    ctx.say(ctx
+                        .gettext("The group {group_name} does not have a subcommand called {subcommand_name}!")
+                        .replace("{subcommand_name}", &remaining_args).replace("{group_name}", command_obj.name)
+                    ).await?;
+                    Ok(())
+                });
             };
 
             if command_obj.owners_only && !framework_options.owners.contains(&ctx.author().id) {
-                ctx.say("This command is only available to the bot owner!").await?;
+                ctx.say(ctx.gettext("This command is only available to the bot owner!")).await?;
                 return Ok(())
             }
 
@@ -148,28 +145,26 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
     let prefix = ctx.prefix();
     let neutral_colour = ctx.neutral_colour().await;
     ctx.send(|b| {b.embed(|e| {e
-        .title(format!("{} Help!", match &mode {
+        .title(ctx.gettext("{command_name} Help!").replace("{command_name}", &match &mode {
             HelpCommandMode::Root => ctx.discord().cache.current_user_field(|u| u.name.clone()),
             HelpCommandMode::Group(c) | HelpCommandMode::Command(c) => format!("`{}`", c.qualified_name) 
         }))
         .description(match &mode {
-            HelpCommandMode::Root => {
-                show_group_description(&get_command_mapping(commands))
-            },
+            HelpCommandMode::Root => show_group_description(&get_command_mapping(commands)),
             HelpCommandMode::Command(command_obj) => {
-                format!("{}\n```{}{} {}```\n{}",
-                command_obj.inline_help.unwrap_or("Command description not found!"),
-                prefix, command_obj.qualified_name, format_params(command_obj),
-                    if command_obj.parameters.is_empty() {
-                        String::new()
-                    } else {
-                        format!("__**Parameter Descriptions**__\n{}",
-                            command_obj.parameters.iter().map(|p| {
-                                format!("`{}`: {}\n", p.name, p.description.unwrap_or("no description"))
-                            }).collect::<String>()
-                        )
-                    }
-                )
+                let mut msg = format!("{}\n```{}{} {}```\n",
+                    command_obj.inline_help.unwrap_or_else(|| ctx.gettext("Command description not found!")),
+                    prefix, command_obj.qualified_name, format_params(command_obj),
+                );
+
+                if !command_obj.parameters.is_empty() {
+                    msg.push_str(ctx.gettext("__**Parameter Descriptions**__\n"));
+                    msg.push_str(&command_obj.parameters.iter().map(|p|
+                        format!("`{}`: {}\n", p.name, p.description.unwrap_or_else(|| ctx.gettext("no description")))
+                    ).collect::<String>());
+                };
+
+                msg
             },
             HelpCommandMode::Group(group) => show_group_description(&{
                 let mut map: IndexMap<&str, Vec<&Command>> = IndexMap::new();
@@ -183,8 +178,12 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
             a.icon_url(ctx.author().face())
         })
         .footer(|f| f.text(match mode {
-            HelpCommandMode::Group(c) => format!("Use {prefix}help {} [command] for more info on a command", c.qualified_name),
-            HelpCommandMode::Command(_) |HelpCommandMode::Root => format!("Use {prefix}help [command] for more info on a command"),
+            HelpCommandMode::Group(c) => ctx
+                .gettext("Use {prefix}help {command_name} [command] for more info on a command")
+                .replace("{command_name}", &c.qualified_name),
+            HelpCommandMode::Command(_) |HelpCommandMode::Root => ctx
+                .gettext("Use {prefix}help [command] for more info on a command")
+                .replace("{prefix}", prefix),
         }))
     })}).await?;
 

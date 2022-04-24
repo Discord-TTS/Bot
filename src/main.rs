@@ -53,6 +53,11 @@ use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt
 
 use crate::constants::PREMIUM_NEUTRAL_COLOUR;
 
+enum EntryCheck {
+    IsFile,
+    IsDir,
+}
+
 async fn get_webhooks(
     http: &serenity::Http,
     webhooks_raw: toml::value::Table,
@@ -202,6 +207,28 @@ async fn main() {
             tokio::spawn(async move {listener.listener().await;});
             tracing::subscriber::set_global_default(subscriber).unwrap();
 
+            let filter_entry = |to_check| move |entry: &std::fs::DirEntry| entry
+                .metadata()
+                .map(|m| match to_check {
+                    EntryCheck::IsFile => m.is_file(),
+                    EntryCheck::IsDir => m.is_dir(),
+                }).unwrap_or(false);
+
+            let translations =
+                std::fs::read_dir("translations")?
+                    .map(Result::unwrap)
+                    .filter(filter_entry(EntryCheck::IsDir))
+                    .flat_map(|d| std::fs::read_dir(d.path()).unwrap()
+                        .map(Result::unwrap)
+                        .filter(filter_entry(EntryCheck::IsFile))
+                        .filter(|e| e.path().extension().map_or(false, |e| e == "mo"))
+                        .map(|entry| Ok((
+                            entry.file_name().to_str().unwrap().split('.').next().unwrap().to_string(),
+                            gettext::Catalog::parse(std::fs::File::open(entry.path())?)?
+                        )))
+                    )
+                    .collect::<Result<_, anyhow::Error>>()?;
+
             Ok(Data {
                 config: main,
                 reqwest: reqwest::Client::new(),
@@ -212,7 +239,7 @@ async fn main() {
                 premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
 
                 guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
-                analytics, webhooks, start_time, pool, startup_message
+                analytics, webhooks, start_time, pool, startup_message, translations,
             })
         })})
         .options(poise::FrameworkOptions {
@@ -390,10 +417,13 @@ impl serenity::EventHandler for EventHandler {
                 .description(format!("
 Hello! Someone invited me to your server `{}`!
 TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
+
 **Most commands need to be done on your server, such as `-setup` and `-join`**
+
 I need someone with the administrator permission to do `-setup #channel`
 You can then do `-join` in that channel and I will join your voice channel!
 Then, you can just type normal messages and I will say them, like magic!
+
 You can view all the commands with `-help`
 Ask questions by either responding here or asking on the support server!",
                 guild.name))
@@ -675,7 +705,7 @@ async fn process_mention_msg(
     prefix = prefix.replace('`', "").replace('\\', "");
 
     if permissions.send_messages() {
-        channel.say(ctx,format!("Current prefix for this server is: {}", prefix)).await?;
+        channel.say(ctx, format!("Current prefix for this server is: {}", prefix)).await?;
     } else {
         let guild_name= ctx.cache
             .guild_field(guild_id, |g| g.name.clone())
@@ -777,7 +807,10 @@ async fn process_support_dm(
                     ))
                     .description(DM_WELCOME_MESSAGE)
                     .footer(|f| {f.text(random_footer(
-                        "-", &data.config.main_server_invite, ctx.cache.current_user_id().0
+                        "-",
+                        &data.config.main_server_invite,
+                        ctx.cache.current_user_id().0,
+                        data.default_catalog(),
                     ))}
                 )})}).await?;
 

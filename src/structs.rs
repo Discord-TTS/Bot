@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::{sync::Arc, borrow::Cow};
 
 use strum_macros::IntoStaticStr;
@@ -56,8 +57,9 @@ pub struct Data {
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRow>,
 
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
-    pub webhooks: std::collections::HashMap<String, serenity::Webhook>,
     pub system_info: parking_lot::Mutex<sysinfo::System>,
+    pub translations: HashMap<String, gettext::Catalog>,
+    pub webhooks: HashMap<String, serenity::Webhook>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub start_time: std::time::SystemTime,
@@ -67,6 +69,12 @@ pub struct Data {
 
     pub premium_voices: PremiumVoices,
     pub pool: sqlx::PgPool,
+}
+
+impl Data {
+    pub fn default_catalog(&self) -> &gettext::Catalog {
+        self.translations.get("en-US").unwrap()
+    }
 }
 
 
@@ -206,6 +214,8 @@ pub trait OptionTryUnwrap<T> {
 #[serenity::async_trait]
 pub trait PoiseContextExt {
     async fn neutral_colour(&self) -> u32;
+    fn current_catalog(&self) -> &gettext::Catalog;
+    fn gettext<'a>(&'a self, translate: &'a str) -> &'a str;
     async fn author_permissions(&self) -> Result<serenity::Permissions>;
     async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>>;
 }
@@ -221,6 +231,20 @@ pub trait SerenityContextExt {
 
 #[serenity::async_trait]
 impl PoiseContextExt for Context<'_> {
+    fn gettext<'a>(&'a self, translate: &'a str) -> &'a str {
+        self.current_catalog().gettext(translate)
+    }
+
+    fn current_catalog(&self) -> &gettext::Catalog {
+        let catalog = if let poise::Context::Application(ctx) = self {
+            ctx.data.translations.get(&ctx.interaction.unwrap().locale)
+        } else {
+            None
+        };
+
+        catalog.unwrap_or_else(|| self.data().default_catalog())
+    }
+
     async fn neutral_colour(&self) -> u32 {
         if let Some(guild_id) = self.guild_id() {
             let row = self.data().guilds_db.get(guild_id.0 as i64).await;
