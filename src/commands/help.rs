@@ -179,7 +179,8 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
         .footer(|f| f.text(match mode {
             HelpCommandMode::Group(c) => ctx
                 .gettext("Use {prefix}help {command_name} [command] for more info on a command")
-                .replace("{command_name}", &c.qualified_name),
+                .replace("{command_name}", &c.qualified_name)
+                .replace("{prefix}", prefix),
             HelpCommandMode::Command(_) |HelpCommandMode::Root => ctx
                 .gettext("Use {prefix}help [command] for more info on a command")
                 .replace("{prefix}", prefix),

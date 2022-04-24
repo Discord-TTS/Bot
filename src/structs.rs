@@ -237,7 +237,11 @@ impl PoiseContextExt for Context<'_> {
 
     fn current_catalog(&self) -> &gettext::Catalog {
         let catalog = if let poise::Context::Application(ctx) = self {
-            ctx.data.translations.get(&ctx.interaction.unwrap().locale)
+            ctx.data.translations.get(match ctx.interaction.unwrap().locale.as_str() {
+                "ko" => "ko-KR",
+                "pt-BR" => "pt",
+                l => l
+            })
         } else {
             None
         };
