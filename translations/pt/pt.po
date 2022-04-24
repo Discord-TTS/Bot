@@ -1,4 +1,4 @@
-# Language ko-KR translations for PACKAGE package.
+# Portuguese translations for PACKAGE package.
 # Copyright (C) 2022 THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 #  <gnome@gnomearch>, 2022.
@@ -8,13 +8,14 @@ msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-24 19:29+0000\n"
-"PO-Revision-Date: 2022-04-24 20:30+0100\n"
+"PO-Revision-Date: 2022-04-24 20:31+0100\n"
 "Last-Translator:  <gnome@gnomearch>\n"
-"Language-Team: Language ko-KR\n"
-"Language: ko-KR\n"
+"Language-Team: Portuguese <translation-team-pt@lists.sourceforge.net>\n"
+"Language: pt\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: src/commands/main.rs:33
 msgid "you ran this command in the wrong channel"

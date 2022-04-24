@@ -1,4 +1,4 @@
-# Korean translations for PACKAGE package.
+# Language jp translations for PACKAGE package.
 # Copyright (C) 2022 THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 #  <gnome@gnomearch>, 2022.
@@ -7,15 +7,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-04-24 18:10+0000\n"
-"PO-Revision-Date: 2022-04-24 18:38+0100\n"
+"POT-Creation-Date: 2022-04-24 19:29+0000\n"
+"PO-Revision-Date: 2022-04-24 20:31+0100\n"
 "Last-Translator:  <gnome@gnomearch>\n"
-"Language-Team: Korean <translation-team-ko@googlegroups.com>\n"
-"Language: ko\n"
+"Language-Team: Language jp\n"
+"Language: jp\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=1; plural=0;\n"
 
 #: src/commands/main.rs:33
 msgid "you ran this command in the wrong channel"
@@ -25,71 +24,71 @@ msgstr ""
 msgid "do {prefix}channel get the channel that has been setup"
 msgstr ""
 
-#: src/commands/main.rs:60
+#: src/commands/main.rs:57
 msgid "you need to be in a voice channel to make me join your voice channel"
 msgstr ""
 
-#: src/commands/main.rs:61
+#: src/commands/main.rs:58
 msgid "join a voice channel and try again"
 msgstr ""
 
-#: src/commands/main.rs:77
+#: src/commands/main.rs:72
 msgid "I do not have permissions to TTS in your voice channel!"
 msgstr ""
 
-#: src/commands/main.rs:78
+#: src/commands/main.rs:73
 msgid "please ask an administrator to give me: {missing_permissions}"
 msgstr ""
 
-#: src/commands/main.rs:90
+#: src/commands/main.rs:85
 msgid "I am already in your voice channel!"
 msgstr ""
 
-#: src/commands/main.rs:94
+#: src/commands/main.rs:89
 msgid "I am already in <#{channel_id}>!"
 msgstr ""
 
-#: src/commands/main.rs:110
+#: src/commands/main.rs:105
 msgid "Joined your voice channel!"
 msgstr ""
 
-#: src/commands/main.rs:111
+#: src/commands/main.rs:106
 msgid "Just type normally and TTS Bot will say your messages!"
 msgstr ""
 
-#: src/commands/main.rs:147
+#: src/commands/main.rs:142
 msgid "Error: You need to be in the same voice channel as me to make me leave!"
 msgstr ""
 
-#: src/commands/main.rs:156
+#: src/commands/main.rs:151
 msgid "Left voice channel!"
 msgstr ""
 
-#: src/commands/main.rs:158
+#: src/commands/main.rs:153
 msgid "Error: How do I leave a voice channel if I am not in one?"
 msgstr ""
 
-#: src/commands/main.rs:192
+#: src/commands/main.rs:187
 msgid "**Error**: I am not in a voice channel!"
 msgstr ""
 
-#: src/commands/main.rs:211
+#: src/commands/main.rs:206
 msgid "Hey, this server is already premium!"
 msgstr ""
 
-#: src/commands/main.rs:228
+#: src/commands/main.rs:223
 msgid ""
 "Hey, you are not in the [Support Server]({server_invite}) so I cannot "
 "validate your membership!"
 msgstr ""
 
-#: src/commands/main.rs:243
+#: src/commands/main.rs:238
 msgid ""
 "Hey, you have too many servers linked! Please contact Gnome!#6669 if you "
 "have purchased the 5 Servers tier"
 msgstr ""
 
-#: src/commands/main.rs:261
+#: src/commands/main.rs:256
 msgid "Done! This server is now premium!"
 msgstr ""
 
@@ -102,31 +101,31 @@ msgid ""
 "The group {group_name} does not have a subcommand called {subcommand_name}!"
 msgstr ""
 
-#: src/commands/help.rs:134
+#: src/commands/help.rs:132
 msgid "This command is only available to the bot owner!"
 msgstr ""
 
-#: src/commands/help.rs:149
+#: src/commands/help.rs:147
 msgid "{command_name} Help!"
 msgstr ""
 
-#: src/commands/help.rs:157
+#: src/commands/help.rs:155
 msgid "Command description not found!"
 msgstr ""
 
-#: src/commands/help.rs:162
+#: src/commands/help.rs:160
 msgid "__**Parameter Descriptions**__\n"
 msgstr ""
 
-#: src/commands/help.rs:164
+#: src/commands/help.rs:162
 msgid "no description"
 msgstr ""
 
-#: src/commands/help.rs:183
+#: src/commands/help.rs:181
 msgid "Use {prefix}help {command_name} [command] for more info on a command"
 msgstr ""
 
-#: src/commands/help.rs:186
+#: src/commands/help.rs:184
 msgid "Use {prefix}help [command] for more info on a command"
 msgstr ""
 
