@@ -19,7 +19,7 @@ use poise::serenity_prelude as serenity;
 use sqlx::Row;
 
 use crate::structs::{Context, Result, CommandResult, PoiseContextExt, SerenityContextExt, TTSMode, JoinVCToken};
-use crate::macros::require_guild;
+use crate::macros::{require_guild, require};
 use crate::funcs::random_footer;
 
 async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
@@ -52,17 +52,12 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
     let author = ctx.author();
 
-    let channel_id = {
-        if let Some(channel) = guild.voice_states.get(&author.id).and_then(|vc| vc.channel_id) {
-            channel
-        } else {
-            ctx.send_error(
-                ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
-                Some(ctx.gettext("join a voice channel and try again")),
-            ).await?;
-            return Ok(())
-        }
-    };
+    let channel_id = require!(guild.voice_states.get(&author.id).and_then(|vc| vc.channel_id), {
+        ctx.send_error(
+            ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
+            Some(ctx.gettext("join a voice channel and try again")),
+        ).await.map(|_| ())
+    });
 
     let ctx_discord = ctx.discord();
     let member = guild.member(ctx_discord, author.id).await?;

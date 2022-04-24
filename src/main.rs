@@ -747,11 +747,8 @@ async fn process_support_dm(
                         return Ok(());
                     }
 
-                    let todm = match ctx.user_from_dm(&resolved.author.name).await {
-                        Some(user) => user,
-                        None => return Ok(())
-                    };
-                    
+                    let todm = require!(ctx.user_from_dm(&resolved.author.name).await, Ok(()));
+
                     let (content, embed) = commands::owner::dm_generic(
                         ctx,
                         &message.author,

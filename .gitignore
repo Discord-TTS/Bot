@@ -5,7 +5,7 @@ config.ini
 keydb.conf
 config.toml
 docker-compose.yml
-
+*~
 # Added by cargo
 
 /target
