@@ -31,7 +31,7 @@ async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
     } else {
         ctx.send_error(
             ctx.gettext("you ran this command in the wrong channel"),
-            Some(&ctx.gettext("do {prefix}channel get the channel that has been setup").replace("{prefix}", ctx.prefix()))
+            Some(ctx.gettext("do `/channel` get the channel that has been setup"))
         ).await?;
         Ok(false)
     }
@@ -110,7 +110,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 .icon_url(author.face())
             })
             .footer(|f| f.text(random_footer(
-                ctx.prefix(), &data.config.main_server_invite, ctx_discord.cache.current_user_id().0, ctx.current_catalog()
+                &data.config.main_server_invite, ctx_discord.cache.current_user_id().0, ctx.current_catalog()
             )))
         })
     })

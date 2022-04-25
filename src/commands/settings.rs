@@ -103,12 +103,9 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         .title("Current Settings")
         .url(&data.config.main_server_invite)
         .colour(neutral_colour)
-        .footer(|f| {
-            f.text(ctx
-                .gettext("Change these settings with {prefix}set property value!\nNone = setting has not been set yet!")
-                .replace("{prefix}", prefix)
-            )
-        })
+        .footer(|f| f.text(ctx.gettext(
+            "Change these settings with `/set {property} {value}`!\nNone = setting has not been set yet!"
+        )))
 
         .field(ctx.gettext("**General Server Settings**"), ctx.gettext("
 {sep1} Setup Channel: `#{channel_name}`
@@ -202,7 +199,6 @@ impl<'a> MenuPaginator<'a> {
                 .icon_url(author.face())
             )
             .footer(|f| f.text(random_footer(
-                self.ctx.prefix(),
                 &self.ctx.data().config.main_server_invite,
                 bot_id.into(),
                 self.ctx.current_catalog()
@@ -327,9 +323,9 @@ where
             .url("https://www.patreon.com/Gnome_the_Bot_Maker")
             .footer(|f| f.text(ctx.gettext("If this is an error, please contact Gnome!#6669.")))
             .description(ctx.gettext("
-                The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `{prefix}premium` command!
-                If this server has purchased premium, please run the `{prefix}activate` command to link yourself to this server!
-            ").replace("{prefix}", ctx.prefix()))
+                The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
+                If this server has purchased premium, please run the `/activate` command to link yourself to this server!
+            "))
         })).await?;
         Ok(None)
     } else {
@@ -365,22 +361,22 @@ where
 {
     let (_, mode) = parse_user_or_guild(ctx.data(), author_id, Some(guild_id)).await?;
     Ok(if let Some(voice) = voice {
-        Cow::Owned(if check_valid_voice(ctx.data(), voice.clone(), mode).await? {
+        if check_valid_voice(ctx.data(), voice.clone(), mode).await? {
             general_db.set_one(key, "voice_mode", &mode).await?;
             voice_db.set_one((key, mode), "voice", &voice).await?;
-            match target {
-                Target::Guild => ctx.gettext("Changed the server voice to: {voice}").replace("{voice}", &voice),
-                Target::User => ctx.gettext("Changed your voice to {voice}").replace("{voice}", &voice)
-            }
+            Cow::Owned(match target {
+                Target::Guild => ctx.gettext("Changed the server voice to: {voice}"),
+                Target::User => ctx.gettext("Changed your voice to {voice}")
+            }.replace("{voice}", &voice))
         } else {
-            ctx.gettext("Invalid voice, do `{prefix}voices`").replace("prefix", ctx.prefix())
-        })
+            Cow::Borrowed(ctx.gettext("Invalid voice, do `/voices`"))
+        }
     } else {
         voice_db.delete((key, mode)).await?;
-        match target {
-            Target::Guild => Cow::Borrowed(ctx.gettext("Reset the server voice")),
-            Target::User => Cow::Borrowed(ctx.gettext("Reset your voice"))
-        }
+        Cow::Borrowed(match target {
+            Target::Guild => ctx.gettext("Reset the server voice"),
+            Target::User => ctx.gettext("Reset your voice")
+        })
     })
 }
 
@@ -413,11 +409,11 @@ async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Result
 
 
 
-const fn to_enabled(value: bool) -> &'static str {
+fn to_enabled(catalog: &gettext::Catalog, value: bool) -> &str {
     if value {
-        "Enabled"
+        catalog.gettext("Enabled")
     } else {
-        "Disabled"
+        catalog.gettext("Disabled")
     }
 }
 
@@ -459,7 +455,7 @@ pub async fn xsaid(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "xsaid", &value).await?;
-    ctx.say(ctx.gettext("xsaid is now: {}").replace("{}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("xsaid is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
 
     Ok(())
 }
@@ -480,7 +476,7 @@ pub async fn autojoin(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "auto_join", &value).await?;
-    ctx.say(ctx.gettext("Auto Join is now: {}").replace("{}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Auto Join is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
 
     Ok(())
 }
@@ -501,7 +497,7 @@ pub async fn botignore(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "bot_ignore", &value).await?;
-    ctx.say(ctx.gettext("Ignoring bots is now: {}").replace("{}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Ignoring bots is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
 
     Ok(())
 }
@@ -522,7 +518,7 @@ pub async fn require_voice(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "require_voice", &value).await?;
-    ctx.say(ctx.gettext("Requiring users to be in voice channel for TTS is now: {}").replace("{}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Requiring users to be in voice channel for TTS is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
 
     Ok(())
 }
@@ -595,7 +591,7 @@ pub async fn translation(ctx: Context<'_>, #[description="Whether to translate a
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "to_translate", &value).await?;
-    ctx.say(ctx.gettext("Translation is now: {}").replace("{}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Translation is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
 
     Ok(())
 }
@@ -628,10 +624,7 @@ pub async fn translation_lang(
 
             let mut to_say = ctx.gettext("The target translation language is now: {}").replace("{}", &lang);
             if data.guilds_db.get(guild_id).await?.to_translate {
-                to_say.push_str(&ctx
-                    .gettext("You may want to enable translation with `{}set translation on`")
-                    .replace("{}", ctx.prefix())
-                );
+                to_say.push_str(ctx.gettext("You may want to enable translation with `/set translation on`"));
             };
 
             ctx.say(to_say).await?;
@@ -712,7 +705,7 @@ pub async fn audienceignore(
     let value = require!(bool_button(ctx, value).await?, Ok(()));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "audience_ignore", &value).await?;
-    ctx.say(ctx.gettext("Ignoring audience is now: {}").replace("{}", to_enabled(value))).await?;
+    ctx.say(ctx.gettext("Ignoring audience is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
     Ok(())
 }
 
@@ -854,13 +847,10 @@ pub async fn setup(
                 .collect();
 
             if text_channels.is_empty() {
-                ctx.say(ctx.gettext("**Error** This server doesn't have any text channels that we both have Read/Send Messages in!")).await?;
+                ctx.say(ctx.gettext("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!")).await?;
                 return Ok(())
             } else if text_channels.len() >= (25 * 5) {
-                ctx.say(ctx
-                    .gettext("**Error** This server has too many text channels to show in a menu! Please run `{prefix}setup #channel`")
-                    .replace("{prefix}", ctx.prefix())
-                ).await?;
+                ctx.say(ctx.gettext("**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`")).await?;
                 return Ok(())
             };
 
@@ -912,11 +902,11 @@ pub async fn setup(
         .thumbnail(bot_user_face)
         .description(ctx.gettext("
 TTS Bot will now accept commands and read from <#{channel}>.
-Just do `{prefix}join` and start talking!
-").replace("{channel}", &channel.to_string()).replace("{prefix}", ctx.prefix()))
+Just do `/join` and start talking!
+").replace("{channel}", &channel.to_string()))
 
         .footer(|f| f.text(random_footer(
-            ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
+            &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
         )))
         .author(|a| {
             a.name(&author.name);
@@ -1016,7 +1006,7 @@ pub async fn voices(
             .replace("{mode}", mode.into())
         ))
         .footer(|f| f.text(random_footer(
-            ctx.prefix(), &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
+            &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
         )))
         .author(|a| {a
             .name(author.name.clone())

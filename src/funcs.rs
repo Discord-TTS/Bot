@@ -169,12 +169,12 @@ pub fn get_gtts_voices() -> BTreeMap<String, String> {
     json::from_str(std::include_str!("data/langs-free.json")).unwrap()
 }
 
-pub fn random_footer(prefix: &str, server_invite: &str, client_id: u64, catalog: &gettext::Catalog) -> String {
+pub fn random_footer<'a>(server_invite: &str, client_id: u64, catalog: &'a gettext::Catalog) -> Cow<'a, str> {
     [
-        catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite),
-        catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string()),
-        catalog.gettext("If you want to support the development and hosting of TTS Bot, check out {prefix}donate!").replace("{prefix}", prefix),
-        catalog.gettext("There are loads of customizable settings, check out {prefix}settings help").replace("{prefix}", prefix),
+        Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
+        Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
+        Cow::Borrowed(catalog.gettext("If you want to support the development and hosting of TTS Bot, check out `/donate`!")),
+        Cow::Borrowed(catalog.gettext("There are loads of customizable settings, check out `/help set`")),
     ].choose(&mut rand::thread_rng()).unwrap().clone()
 }
 

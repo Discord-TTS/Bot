@@ -141,7 +141,6 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
         }
     };
 
-    let prefix = ctx.prefix();
     let neutral_colour = ctx.neutral_colour().await;
     ctx.send(|b| {b.embed(|e| {e
         .title(ctx.gettext("{command_name} Help!").replace("{command_name}", &match &mode {
@@ -151,9 +150,9 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
         .description(match &mode {
             HelpCommandMode::Root => show_group_description(&get_command_mapping(commands)),
             HelpCommandMode::Command(command_obj) => {
-                let mut msg = format!("{}\n```{}{} {}```\n",
+                let mut msg = format!("{}\n```/{} {}```\n",
                     command_obj.inline_help.unwrap_or_else(|| ctx.gettext("Command description not found!")),
-                    prefix, command_obj.qualified_name, format_params(command_obj),
+                    command_obj.qualified_name, format_params(command_obj),
                 );
 
                 if !command_obj.parameters.is_empty() {
@@ -178,12 +177,11 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
         })
         .footer(|f| f.text(match mode {
             HelpCommandMode::Group(c) => ctx
-                .gettext("Use {prefix}help {command_name} [command] for more info on a command")
-                .replace("{command_name}", &c.qualified_name)
-                .replace("{prefix}", prefix),
+                .gettext("Use `/help {command_name} [command]` for more info on a command")
+                .replace("{command_name}", &c.qualified_name),
             HelpCommandMode::Command(_) |HelpCommandMode::Root => ctx
-                .gettext("Use {prefix}help [command] for more info on a command")
-                .replace("{prefix}", prefix),
+                .gettext("Use `/help [command]` for more info on a command")
+                .to_string()
         }))
     })}).await?;
 

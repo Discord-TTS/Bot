@@ -803,13 +803,12 @@ async fn process_support_dm(
                         ctx.cache.current_user_field(|b| b.name.clone())
                     ))
                     .description(DM_WELCOME_MESSAGE)
-                    .footer(|f| {f.text(random_footer(
-                        "-",
+                    .footer(|f| f.text(random_footer(
                         &data.config.main_server_invite,
                         ctx.cache.current_user_id().0,
                         data.default_catalog(),
-                    ))}
-                )})}).await?;
+                    )))
+                })}).await?;
 
                 data.userinfo_db.set_one(message.author.id.into(), "dm_welcomed", &true).await?;
                 if channel.pins(&ctx.http).await?.len() < 50 {

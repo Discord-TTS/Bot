@@ -53,7 +53,7 @@ pub async fn tts(
                 if bot_voice_state.channel_id == author_voice_state.channel_id {
                     let setup_channel: i64 = data.guilds_db.get(guild.id.into()).await?.channel;
                     if setup_channel as u64 == ctx.channel_id().0 {
-                        ctx.say(format!("You don't need to include the `{}tts` for messages to be said!", ctx.prefix())).await?;
+                        ctx.say(ctx.gettext("You don't need to include the `/tts` for messages to be said!")).await?;
                         return Ok(())
                     }
                 }
@@ -160,11 +160,11 @@ pub async fn channel(ctx: Context<'_>,) -> CommandResult {
     let channel = ctx.data().guilds_db.get(ctx.guild_id().unwrap().into()).await?.channel;
 
     if channel as u64 == ctx.channel_id().0 {
-        ctx.say("You are in the setup channel already!").await?;
-    } else if channel != 0 {
-        ctx.say(format!("The current setup channel is: <#{channel}>")).await?;
+        ctx.say(ctx.gettext("You are in the setup channel already!")).await?;
+    } else if channel == 0 {
+        ctx.say(ctx.gettext("The channel hasn't been setup, do `/setup #textchannel`")).await?;
     } else {
-        ctx.say(format!("The channel hasn't been setup, do `{}setup #textchannel`", ctx.prefix())).await?;
+        ctx.say(ctx.gettext("The current setup channel is: <#{channel}>").replace("{channel}", &channel.to_string())).await?;
     }
 
     Ok(())
