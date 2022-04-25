@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-25 16:51+0000\n"
-"PO-Revision-Date: 2022-04-25 22:02\n"
+"PO-Revision-Date: 2022-04-25 23:00\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -43,11 +43,11 @@ msgstr "por favor pregunta un administrador darme: {missing_permissions}"
 
 #: src/commands/main.rs:85
 msgid "I am already in your voice channel!"
-msgstr ""
+msgstr "¡ya estoy en tu canal de voz!"
 
 #: src/commands/main.rs:89
 msgid "I am already in <#{channel_id}>!"
-msgstr ""
+msgstr "¡ya estoy en <#{channel_id}>!"
 
 #: src/commands/main.rs:105
 msgid "Joined your voice channel!"
@@ -87,7 +87,7 @@ msgstr ""
 
 #: src/commands/main.rs:256
 msgid "Done! This server is now premium!"
-msgstr ""
+msgstr "¡completada! este servido es ahora premium"
 
 #: src/commands/help.rs:117
 msgid "No command called {} found!"
@@ -277,7 +277,7 @@ msgstr "¡completada!"
 
 #: src/commands/settings.rs:458
 msgid "xsaid is now: {}"
-msgstr ""
+msgstr "xdijo es ahora: {}"
 
 #: src/commands/settings.rs:479
 msgid "Auto Join is now: {}"
