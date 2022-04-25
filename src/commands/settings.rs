@@ -1044,7 +1044,7 @@ pub async fn list_premium_voices(ctx: Context<'_>) -> Result<()> {
     let data = ctx.data();
     let pages = data.premium_voices.iter().map(|(language, variants)| {
         variants.iter().map(|(variant, gender)| {
-            format!("{language} - {variant} ({gender})\n")
+            format!("{language} {variant} ({gender})\n")
         }).collect()
     }).collect();
 
