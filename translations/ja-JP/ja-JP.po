@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-24 19:31+0000\n"
-"PO-Revision-Date: 2022-04-24 22:19\n"
+"PO-Revision-Date: 2022-04-25 01:24\n"
 "Last-Translator: \n"
 "Language-Team: Japanese\n"
 "Language: ja_JP\n"
@@ -55,11 +55,11 @@ msgstr "ボイスチャンネルに参加しました"
 
 #: src/commands/main.rs:106
 msgid "Just type normally and TTS Bot will say your messages!"
-msgstr ""
+msgstr "普通にチャットに送信するとTTSBotが代わりにボイスチャンネルで発言します"
 
 #: src/commands/main.rs:142
 msgid "Error: You need to be in the same voice channel as me to make me leave!"
-msgstr ""
+msgstr "エラー：同じボイスチャンネルに参加していないため、抜けさせることができません"
 
 #: src/commands/main.rs:151
 msgid "Left voice channel!"
@@ -67,11 +67,11 @@ msgstr "ボイスチャンネルを抜けました"
 
 #: src/commands/main.rs:153
 msgid "Error: How do I leave a voice channel if I am not in one?"
-msgstr ""
+msgstr "エラー： ボイスチャンネルに参加していないため、抜けることができません"
 
 #: src/commands/main.rs:187
 msgid "**Error**: I am not in a voice channel!"
-msgstr ""
+msgstr "**エラー** ー ボイスチャンネルに参加していません！"
 
 #: src/commands/main.rs:206
 msgid "Hey, this server is already premium!"
