@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-24 19:31+0000\n"
-"PO-Revision-Date: 2022-04-25 01:24\n"
+"PO-Revision-Date: 2022-04-25 02:25\n"
 "Last-Translator: \n"
 "Language-Team: Japanese\n"
 "Language: ja_JP\n"
@@ -47,7 +47,7 @@ msgstr "TTS-Botはすでにこのボイスチャットに参加しています"
 
 #: src/commands/main.rs:89
 msgid "I am already in <#{channel_id}>!"
-msgstr ""
+msgstr "すでに#{channel_id}に参加しています！"
 
 #: src/commands/main.rs:105
 msgid "Joined your voice channel!"
@@ -190,7 +190,7 @@ msgstr ""
 
 #: src/commands/settings.rs:297
 msgid "What would you like to set this to?"
-msgstr ""
+msgstr "どんな設定にしますか？"
 
 #: src/commands/settings.rs:298
 msgid "True"
@@ -213,11 +213,11 @@ msgstr ""
 
 #: src/commands/settings.rs:339
 msgid "Changed the server TTS Mode to: {mode}"
-msgstr ""
+msgstr "サーバーのTTSモードは{mode}に変更されました"
 
 #: src/commands/settings.rs:340
 msgid "Changed your TTS Mode to: {mode}"
-msgstr ""
+msgstr "TTSモードは{mode}に変更されました"
 
 #: src/commands/settings.rs:343
 msgid "Reset the server mode"
@@ -229,11 +229,11 @@ msgstr "モードをリセットしました"
 
 #: src/commands/settings.rs:372
 msgid "Changed the server voice to: {voice}"
-msgstr ""
+msgstr "サーバーボイスは{voice}に変更されました"
 
 #: src/commands/settings.rs:373
 msgid "Changed your voice to {voice}"
-msgstr ""
+msgstr "{voice}に変更されました"
 
 #: src/commands/settings.rs:376
 msgid "Invalid voice, do `{prefix}voices`"
@@ -325,7 +325,7 @@ msgstr ""
 
 #: src/commands/settings.rs:775
 msgid "**Error**: You need admin to set other people's nicknames!"
-msgstr ""
+msgstr "**エラー**：他人のニックネームを設定するにはアドミンが必要です"
 
 #: src/commands/settings.rs:784
 msgid "**Error**: You can't have mentions/emotes in your nickname!"
