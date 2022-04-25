@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-25 16:51+0000\n"
-"PO-Revision-Date: 2022-04-25 16:52\n"
+"PO-Revision-Date: 2022-04-25 22:02\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -39,7 +39,7 @@ msgstr "¡No tengo permisos para TTS en su canal de voz!"
 
 #: src/commands/main.rs:73
 msgid "please ask an administrator to give me: {missing_permissions}"
-msgstr ""
+msgstr "por favor pregunta un administrador darme: {missing_permissions}"
 
 #: src/commands/main.rs:85
 msgid "I am already in your voice channel!"
@@ -273,7 +273,7 @@ msgstr ""
 
 #: src/commands/settings.rs:439
 msgid "Done!"
-msgstr ""
+msgstr "¡completada!"
 
 #: src/commands/settings.rs:458
 msgid "xsaid is now: {}"
