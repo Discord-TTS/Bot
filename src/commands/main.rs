@@ -86,7 +86,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 return Ok(());
             };
 
-            ctx.say(&ctx.gettext("I am already in <#{channel_id}>!").replace("channel_id", &bot_channel_id.0.to_string())).await?;
+            ctx.say(&ctx.gettext("I am already in <#{channel_id}>!").replace("{channel_id}", &bot_channel_id.0.to_string())).await?;
             return Ok(());
         }
     };

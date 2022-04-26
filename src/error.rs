@@ -241,7 +241,7 @@ async fn handle_argparse(ctx: Context<'_>, error: Box<dyn std::error::Error + Se
         reason.map(|r| r.replace("{}", &input.unwrap()).replace('`', "")).as_deref().unwrap_or("you typed the command wrong"),
         Some(&fix.unwrap_or_else(|| ctx
                 .gettext("check out `/help {command}`")
-                .replace("command", &ctx.command().qualified_name)))
+                .replace("{command}", &ctx.command().qualified_name)))
     ).await?;
 
     Ok(())
