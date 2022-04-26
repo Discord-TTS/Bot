@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-26 15:44+0000\n"
-"PO-Revision-Date: 2022-04-26 16:40\n"
+"PO-Revision-Date: 2022-04-26 22:15\n"
 "Last-Translator: \n"
 "Language-Team: Japanese\n"
 "Language: ja_JP\n"
@@ -204,7 +204,7 @@ msgstr ""
 
 #: src/commands/settings.rs:52
 msgid "none"
-msgstr ""
+msgstr "なし"
 
 #: src/commands/settings.rs:109
 msgid "Change these settings with `/set {property} {value}`!\n"
@@ -520,7 +520,7 @@ msgstr ""
 
 #: src/error.rs:331
 msgid "try running it on a server with {bot_name} in"
-msgstr ""
+msgstr "{bot_name}が参加しているサーバーで使ってみてください"
 
 #: src/funcs.rs:174
 msgid "If you find a bug or want to ask a question, join the support server: {server_invite}"
@@ -534,7 +534,7 @@ msgstr "top.ggでは投票やレビューができますよ！\n"
 
 #: src/funcs.rs:176
 msgid "If you want to support the development and hosting of TTS Bot, check out `/donate`!"
-msgstr ""
+msgstr "TTS Botの開発やホスティングを補助したい方は`/donate`を使ってみてください！"
 
 #: src/funcs.rs:177
 msgid "There are loads of customizable settings, check out `/help set`"
