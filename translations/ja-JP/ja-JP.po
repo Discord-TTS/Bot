@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-26 15:44+0000\n"
-"PO-Revision-Date: 2022-04-26 22:15\n"
+"PO-Revision-Date: 2022-04-26 23:21\n"
 "Last-Translator: \n"
 "Language-Team: Japanese\n"
 "Language: ja_JP\n"
@@ -516,7 +516,7 @@ msgstr ""
 
 #: src/error.rs:329
 msgid "{command_name} cannot be used in private messages"
-msgstr ""
+msgstr "{command_name}はプライベートメッセージで使うことができません"
 
 #: src/error.rs:331
 msgid "try running it on a server with {bot_name} in"
@@ -524,7 +524,7 @@ msgstr "{bot_name}が参加しているサーバーで使ってみてくださ�
 
 #: src/funcs.rs:174
 msgid "If you find a bug or want to ask a question, join the support server: {server_invite}"
-msgstr ""
+msgstr "バグを見つけたり質問をしたい方は、サポートサーバーに参加してください：{server_invite}"
 
 #: src/funcs.rs:175
 msgid "You can vote for me or review me on top.gg!\n"
