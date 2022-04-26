@@ -3,6 +3,8 @@ ENV RUSTFLAGS="-C target-cpu=native"
 
 WORKDIR /bot
 
+RUN apt-get update && apt-get install -y cmake && apt-get clean
+
 # This is a dummy build to get the dependencies cached.
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && \
