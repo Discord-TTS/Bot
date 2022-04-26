@@ -2,8 +2,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-04-25 16:51+0000\n"
-"PO-Revision-Date: 2022-04-25 16:52\n"
+"POT-Creation-Date: 2022-04-26 15:44+0000\n"
+"PO-Revision-Date: 2022-04-26 16:40\n"
 "Last-Translator: \n"
 "Language-Team: Portuguese, Brazilian\n"
 "Language: pt_BR\n"
@@ -125,32 +125,97 @@ msgstr ""
 msgid "Use `/help [command]` for more info on a command"
 msgstr ""
 
-#: src/commands/other.rs:56
+#: src/commands/other.rs:32
+msgid "{user_mention} has been up since: <t:{timestamp}:R>"
+msgstr ""
+
+#: src/commands/other.rs:55
 msgid "You don't need to include the `/tts` for messages to be said!"
 msgstr ""
 
-#: src/commands/other.rs:163
-msgid "You are in the setup channel already!"
+#: src/commands/other.rs:90
+msgid "Generated some TTS!"
 msgstr ""
 
-#: src/commands/other.rs:165
-msgid "The channel hasn't been setup, do `/setup #textchannel`"
+#: src/commands/other.rs:132
+msgid "{bot_name}: Freshly rewritten in Rust!"
+msgstr ""
+
+#: src/commands/other.rs:136
+msgid "\n"
+"Time to fetch: {time_to_fetch}ms\n"
+"Support Server: {main_server_invite}\n"
+"Repository: https://github.com/GnomedDev/Discord-TTS-Bot"
+msgstr ""
+
+#: src/commands/other.rs:143
+msgid "\n"
+"Currently in:\n"
+"    {sep2} {total_voice_clients} voice channels\n"
+"    {sep2} {total_guild_count} servers\n"
+"Currently using:\n"
+"    {sep1} {shard_count} shards\n"
+"    {sep1} {ram_usage}MB of RAM\n"
+"and can be used by {total_members} people!"
 msgstr ""
 
 #: src/commands/other.rs:167
+msgid "You are in the setup channel already!"
+msgstr ""
+
+#: src/commands/other.rs:169
+msgid "The channel hasn't been setup, do `/setup #textchannel`"
+msgstr ""
+
+#: src/commands/other.rs:171
 msgid "The current setup channel is: <#{channel}>"
 msgstr ""
 
-#: src/commands/settings.rs:107
+#: src/commands/other.rs:180
+msgid "\n"
+"To donate to support the development and hosting of TTS Bot and get access to TTS Bot Premium, a more stable version of this bot with more and better voices you can donate via Patreon!\n"
+"https://www.patreon.com/Gnome_the_Bot_Maker\n"
+"    "
+msgstr ""
+
+#: src/commands/other.rs:193
+msgid "Current Latency: {}ms"
+msgstr ""
+
+#: src/commands/other.rs:213
+msgid "Are you sure you want to make a suggestion to {bot_name}?"
+msgstr ""
+
+#: src/commands/other.rs:218
+msgid "Suggestion cancelled"
+msgstr ""
+
+#: src/commands/other.rs:232
+msgid "Suggestion noted"
+msgstr ""
+
+#: src/commands/other.rs:247
+msgid "Check out {channel_mention} to invite {bot_mention}!"
+msgstr ""
+
+#: src/commands/other.rs:252
+msgid "Join {server_invite} and look in #{channel_name} to invite <@{bot_mention}>"
+msgstr ""
+
+#: src/commands/settings.rs:52
+msgid "none"
+msgstr ""
+
+#: src/commands/settings.rs:109
 msgid "Change these settings with `/set {property} {value}`!\n"
 "None = setting has not been set yet!"
 msgstr ""
 
-#: src/commands/settings.rs:110
+#: src/commands/settings.rs:112
 msgid "**General Server Settings**"
 msgstr ""
 
-#: src/commands/settings.rs:110
+#: src/commands/settings.rs:112
 msgid "\n"
 "{sep1} Setup Channel: `#{channel_name}`\n"
 "{sep1} Command Prefix: `{prefix}`\n"
@@ -158,7 +223,7 @@ msgid "\n"
 "        "
 msgstr ""
 
-#: src/commands/settings.rs:120
+#: src/commands/settings.rs:122
 msgid "\n"
 "{sep2} <User> said: message: `{xsaid}`\n"
 "{sep2} Ignore bot's messages: `{bot_ignore}`\n"
@@ -171,18 +236,18 @@ msgid "\n"
 "        "
 msgstr ""
 
-#: src/commands/settings.rs:142
+#: src/commands/settings.rs:144
 msgid "**Translation Settings (Premium Only)**"
 msgstr ""
 
-#: src/commands/settings.rs:142
+#: src/commands/settings.rs:144
 msgid "\n"
 "{sep4} Translation: `{to_translate}`\n"
 "{sep4} Translation Language: `{target_lang}`\n"
 "        "
 msgstr ""
 
-#: src/commands/settings.rs:150
+#: src/commands/settings.rs:152
 msgid "\n"
 "{sep3} Voice: `{user_voice}`\n"
 "{sep3} Voice Mode: `{voice_mode}`\n"
