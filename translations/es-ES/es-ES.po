@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-26 15:44+0000\n"
-"PO-Revision-Date: 2022-04-26 16:40\n"
+"PO-Revision-Date: 2022-04-26 22:15\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -131,11 +131,11 @@ msgstr ""
 
 #: src/commands/other.rs:55
 msgid "You don't need to include the `/tts` for messages to be said!"
-msgstr ""
+msgstr "¡No necesitas incluir el `/tts` para que se digan los mensajes!"
 
 #: src/commands/other.rs:90
 msgid "Generated some TTS!"
-msgstr ""
+msgstr "¡Generó algunos TTS!"
 
 #: src/commands/other.rs:132
 msgid "{bot_name}: Freshly rewritten in Rust!"
