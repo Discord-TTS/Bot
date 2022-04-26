@@ -65,9 +65,10 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     };
 
     let prefix = &guild_row.prefix;
-
     let guild_mode = guild_row.voice_mode;
     let user_mode = userinfo_row.voice_mode;
+    let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
+    let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
 
     let guild_voice_row = data.guild_voice_db.get((guild_id.into(), guild_mode)).await?;
     let default_voice = {
@@ -78,25 +79,29 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         }
     };
 
-    let row;
-    let (user_voice, speaking_rate, speaking_rate_kind) =
-        if let Some(mode) = user_mode {
-            row = data.user_voice_db.get((author_id.into(), mode)).await?;
+    let user_voice_row;
+    let user_voice = {
+        let currently_set_voice_mode = user_mode.unwrap_or(guild_mode);
+        user_voice_row = data.user_voice_db.get((author_id.into(), currently_set_voice_mode)).await?;
 
-            let (default, kind) = mode.speaking_rate_info()
-                .map_or((1.0, "x"), |(_, d, _, k)| (d, k));
+        user_voice_row.voice.as_ref().map_or(
+            Cow::Borrowed(none_str),
+            |voice| format_voice(data, voice, currently_set_voice_mode)
+        )
+    };
+
+    let (speaking_rate, speaking_rate_kind) =
+        if let Some(mode) = user_mode {
+            let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
+            let (default, kind) = mode.speaking_rate_info().map_or((1.0, "x"), |(_, d, _, k)| (d, k));
 
             (
-                row.voice.as_deref().map_or(Cow::Borrowed(none_str), |user_voice| format_voice(data, user_voice, mode)),
-                Cow::Owned(row.speaking_rate.unwrap_or(default).to_string()),
+                Cow::Owned(user_voice_row.speaking_rate.unwrap_or(default).to_string()),
                 kind,
             )
         } else {
-            (Cow::Borrowed(none_str), Cow::Borrowed("1.0"), "x")
+            (Cow::Borrowed("1.0"), "x")
         };
-
-    let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
-    let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
 
     let neutral_colour = ctx.neutral_colour().await;
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
@@ -361,8 +366,8 @@ where
 {
     let (_, mode) = parse_user_or_guild(ctx.data(), author_id, Some(guild_id)).await?;
     Ok(if let Some(voice) = voice {
-        if check_valid_voice(ctx.data(), voice.clone(), mode).await? {
-            general_db.set_one(key, "voice_mode", &mode).await?;
+        if check_valid_voice(ctx.data(), &voice, mode).await? {
+            general_db.create_row(key).await?;
             voice_db.set_one((key, mode), "voice", &voice).await?;
             Cow::Owned(match target {
                 Target::Guild => ctx.gettext("Changed the server voice to: {voice}"),
@@ -380,10 +385,10 @@ where
     })
 }
 
-async fn check_valid_voice(data: &Data, voice: String, mode: TTSMode) -> Result<bool, Error> {
+async fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> Result<bool, Error> {
     Ok(match mode {
-        TTSMode::gTTS => get_gtts_voices().contains_key(&voice),
-        TTSMode::eSpeak => get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?.contains(&voice),
+        TTSMode::gTTS => get_gtts_voices().contains_key(voice),
+        TTSMode::eSpeak => get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?.contains(voice),
         TTSMode::Premium => {
             voice.split_once(' ')
                 .and_then(|(language, variant)| data.premium_voices.get(language).map(|l| (l, variant)))
