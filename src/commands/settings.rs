@@ -49,6 +49,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 
     let data = ctx.data();
     let ctx_discord = ctx.discord();
+    let none_str = ctx.gettext("none");
 
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
     let userinfo_row = data.userinfo_db.get(author_id.into()).await?;
@@ -86,19 +87,20 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
                 .map_or((1.0, "x"), |(_, d, _, k)| (d, k));
 
             (
-                row.voice.as_deref().map_or(Cow::Borrowed("none"), |user_voice| format_voice(data, user_voice, mode)),
+                row.voice.as_deref().map_or(Cow::Borrowed(none_str), |user_voice| format_voice(data, user_voice, mode)),
                 Cow::Owned(row.speaking_rate.unwrap_or(default).to_string()),
                 kind,
             )
         } else {
-            (Cow::Borrowed("none"), Cow::Borrowed("1.0"), "x")
+            (Cow::Borrowed(none_str), Cow::Borrowed("1.0"), "x")
         };
 
-    let target_lang = guild_row.target_lang.as_deref().unwrap_or("none");
-    let nickname = nickname_row.name.as_deref().unwrap_or("none");
+    let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
+    let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
 
     let neutral_colour = ctx.neutral_colour().await;
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
+
     ctx.send(|b| {b.embed(|e| {e
         .title("Current Settings")
         .url(&data.config.main_server_invite)
@@ -147,7 +149,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{to_translate}", &guild_row.to_translate.to_string())
             .replace("{target_lang}", target_lang),
         false)
-        .field("**User Specific**", ctx.gettext("
+        .field("**User Specific**", #[allow(clippy::redundant_closure_for_method_calls)] ctx.gettext("
 {sep3} Voice: `{user_voice}`
 {sep3} Voice Mode: `{voice_mode}`
 {sep3} Nickname: `{nickname}`
@@ -155,14 +157,12 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         ")
             .replace("{sep3}", sep3)
             .replace("{user_voice}", &user_voice)
-            .replace("{voice_mode}", user_mode.map_or("none", Into::into))
+            .replace("{voice_mode}", user_mode.map_or(none_str, |m| m.into()))
             .replace("{nickname}", nickname)
             .replace("{speaking_rate}", &speaking_rate)
             .replace("{speaking_rate_kind}", speaking_rate_kind),
         false)
-    })}).await?;
-
-    Ok(())
+    })}).await.map(|_| ()).map_err(Into::into)
 }
 
 

@@ -16,7 +16,7 @@
 use std::borrow::Cow;
 
 use sysinfo::{SystemExt, ProcessExt};
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity, Mentionable};
 use num_format::{Locale, ToFormattedString};
 
 use crate::constants::{OPTION_SEPERATORS};
@@ -27,13 +27,12 @@ use crate::require;
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
 pub async fn uptime(ctx: Context<'_>,) -> CommandResult {
-    ctx.say(format!(
-        "<@{}> has been up since: <t:{}:R>", 
-        ctx.discord().cache.current_user_id(),
-        ctx.data().start_time.duration_since(std::time::UNIX_EPOCH)?.as_secs()
-    )).await?;
-
-    Ok(())
+    let timestamp = ctx.data().start_time.duration_since(std::time::UNIX_EPOCH)?.as_secs();
+    ctx.say(ctx
+        .gettext("{user_mention} has been up since: <t:{timestamp}:R>")
+        .replace("{user_mention}", &ctx.author().mention().to_string())
+        .replace("{timestamp}", &timestamp.to_string())
+    ).await.map(|_| ()).map_err(Into::into)
 }
 
 /// Generates TTS and sends it in the current text channel!
@@ -51,7 +50,7 @@ pub async fn tts(
             let bot_voice_state = guild.voice_states.get(&ctx.discord().cache.current_user_id());
             if let (Some(bot_voice_state), Some(author_voice_state)) = (bot_voice_state, author_voice_state) {
                 if bot_voice_state.channel_id == author_voice_state.channel_id {
-                    let setup_channel: i64 = data.guilds_db.get(guild.id.into()).await?.channel;
+                    let setup_channel = data.guilds_db.get(guild.id.into()).await?.channel;
                     if setup_channel as u64 == ctx.channel_id().0 {
                         ctx.say(ctx.gettext("You don't need to include the `/tts` for messages to be said!")).await?;
                         return Ok(())
@@ -88,7 +87,7 @@ pub async fn tts(
 
     ctx.defer().await?;
     ctx.send(|b| {b
-        .content("Generated some TTS!")
+        .content(ctx.gettext("Generated some TTS!"))
         .attachment(attachment)
     }).await?;
 
@@ -112,9 +111,9 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
         }))
         .collect();
 
-    let total_members = guilds_info.iter().map(|(mcount, _)| mcount).sum::<u64>().to_formatted_string(&Locale::en);
-    let total_voice_clients = guilds_info.iter().filter(|(_, has_vs)| *has_vs).count();
     let total_guild_count = guilds_info.len();
+    let total_members = guilds_info.iter().map(|(mcount, _)| mcount).sum::<u64>().to_formatted_string(&Locale::en);
+    let total_voice_clients = guilds_info.into_iter().filter(|(_, has_vs)| *has_vs).count();
 
     let shard_count = ctx_discord.cache.shard_count();
     let ram_usage = {
@@ -130,28 +129,33 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
 
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
     ctx.send(|b| {b.embed(|e| { e
-        .title(format!("{}: Freshly rewritten in Rust!", ctx_discord.cache.current_user_field(|u| u.name.clone())))
+        .title(ctx_discord.cache.current_user_field(|u| ctx.gettext("{bot_name}: Freshly rewritten in Rust!").replace("{bot_name}",  &u.name)))
         .thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
-        .url(&data.config.main_server_invite)
+        .url(data.config.main_server_invite.clone())
         .colour(neutral_colour)
-        .footer(|f| {f
-            .text(format!("
-Time to fetch: {time_to_fetch:.2}ms
-Support Server: https://discord.gg/zWPWwQC
-Repository: https://github.com/GnomedDev/Discord-TTS-Bot
-            ", ))
-        })
-        .description(format!("
+        .footer(|f| f.text(ctx.gettext("
+Time to fetch: {time_to_fetch}ms
+Support Server: {main_server_invite}
+Repository: https://github.com/GnomedDev/Discord-TTS-Bot")
+            .replace("{time_to_fetch}", &format!("{time_to_fetch:.2}"))
+            .replace("{main_server_invite}", &data.config.main_server_invite)
+        ))
+        .description(ctx.gettext("
 Currently in:
     {sep2} {total_voice_clients} voice channels
     {sep2} {total_guild_count} servers
 Currently using:
     {sep1} {shard_count} shards
-    {sep1} {ram_usage:.1}MB of RAM
-and can be used by {total_members} people!"))
-    })}).await?;
-
-    Ok(())
+    {sep1} {ram_usage}MB of RAM
+and can be used by {total_members} people!")
+            .replace("{sep1}", sep1)
+            .replace("{sep2}", sep2)
+            .replace("{total_guild_count}", &total_guild_count.to_string())
+            .replace("{total_voice_clients}", &total_voice_clients.to_string())
+            .replace("{total_members}", &total_members)
+            .replace("{shard_count}", &shard_count.to_string())
+            .replace("{ram_usage}", &format!("{ram_usage:.1}"))
+    )})}).await.map(|_| ()).map_err(Into::into)
 }
 
 /// Shows the current setup channel!
@@ -173,12 +177,10 @@ pub async fn channel(ctx: Context<'_>,) -> CommandResult {
 /// Shows how you can help support TTS Bot's development and hosting!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES", aliases("purchase", "premium"))]
 pub async fn donate(ctx: Context<'_>,) -> CommandResult {
-    ctx.say(format!("
-To donate to support the development and hosting of {} and get access to TTS Bot Premium, a more stable version of this bot \
-with more and better voices you can donate via Patreon!\nhttps://www.patreon.com/Gnome_the_Bot_Maker
-    ", ctx.discord().cache.current_user_field(|u| u.name.clone()))).await?;
-
-    Ok(())
+    ctx.say(ctx.gettext("
+To donate to support the development and hosting of TTS Bot and get access to TTS Bot Premium, a more stable version of this bot with more and better voices you can donate via Patreon!
+https://www.patreon.com/Gnome_the_Bot_Maker
+    ")).await.map(|_| ()).map_err(Into::into)
 }
 
 /// Gets current ping to discord!
@@ -186,7 +188,10 @@ with more and better voices you can donate via Patreon!\nhttps://www.patreon.com
 pub async fn ping(ctx: Context<'_>,) -> CommandResult {
     let ping_before = std::time::SystemTime::now();
     let ping_msg = ctx.say("Loading!").await?;
-    let content = format!("Current Latency: {}ms", ping_before.elapsed()?.as_millis());
+
+    let content = ctx
+        .gettext("Current Latency: {}ms")
+        .replace("{}", &ping_before.elapsed()?.as_millis().to_string());
 
     match ping_msg {
         poise::ReplyHandle::Autocomplete => unreachable!(),
@@ -204,13 +209,13 @@ pub async fn ping(ctx: Context<'_>,) -> CommandResult {
 /// Suggests a new feature!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
 pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"] #[rest] suggestion: String) -> CommandResult {
-    if suggestion.to_lowercase().replace('<', ">") == "suggestion" {
-        ctx.say("Hey! You are meant to replace `<suggestion>` with your actual suggestion!").await?;
-        return Ok(())
-    }
+    let confirm_message = ctx.discord().cache.current_user_field(|b| ctx
+        .gettext("Are you sure you want to make a suggestion to {bot_name}?")
+        .replace("{bot_name}", &b.name)
+    );
 
-    if !require!(bool_button(ctx, format!("Are you sure you want to make a suggestion to {}?", ctx.discord().cache.current_user_field(|b| b.name.clone())).as_str(), "Yes", "Cancel", None).await?, Ok(())) {
-        ctx.say("Suggestion cancelled").await?;
+    if !require!(bool_button(ctx, &confirm_message, "Yes", "Cancel", None).await?, Ok(())) {
+        ctx.say(ctx.gettext("Suggestion cancelled")).await?;
         return Ok(());
     }
 
@@ -224,7 +229,7 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
         }).await?;
     }
 
-    ctx.say("Suggestion noted").await?;
+    ctx.say(ctx.gettext("Suggestion noted")).await?;
     Ok(())
 }
 
@@ -232,18 +237,23 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
 pub async fn invite(ctx: Context<'_>,) -> CommandResult {
     let ctx_discord = ctx.discord();
-    let bot_user_id = ctx_discord.cache.current_user_id();
-
     let config = &ctx.data().config;
+    let bot_mention = ctx_discord.cache.current_user_id().mention().to_string();
+
     let invite_channel = config.invite_channel;
-
-    if ctx.guild_id() == Some(config.main_server) {
-        ctx.say(format!("Check out <#{}> to invite <@{}>!", invite_channel, bot_user_id)).await?;
-        return Ok(())
-    }
-
-    let invite_channel = ctx_discord.cache.guild_channel_field(invite_channel, |channel| channel.name.clone()).try_unwrap()?;
-    ctx.say(format!("Join {} and look in #{} to invite <@{}>", config.main_server_invite, invite_channel, bot_user_id)).await?;
-
-    Ok(())
+    ctx.say(
+        if ctx.guild_id() == Some(config.main_server) {
+            ctx
+                .gettext("Check out {channel_mention} to invite {bot_mention}!")
+                .replace("{invite_channel}", &serenity::ChannelId(invite_channel).mention().to_string())
+                .replace("{bot_mention}", &bot_mention)
+        } else {
+            ctx_discord.cache.guild_channel_field(invite_channel, |c| ctx
+                .gettext("Join {server_invite} and look in #{channel_name} to invite <@{bot_mention}>")
+                .replace("{channel_name}", &c.name)
+                .replace("{bot_mention}", &bot_mention)
+                .replace("{server_invite}", &config.main_server_invite)
+            ).try_unwrap()?
+        }
+    ).await.map(|_| ()).map_err(Into::into)
 }
