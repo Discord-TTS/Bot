@@ -175,39 +175,35 @@ struct MenuPaginator<'a> {
     index: usize,
     ctx: Context<'a>,
     pages: Vec<String>,
+    footer: Cow<'a, str>,
     current_lang: String,
 }
 
 impl<'a> MenuPaginator<'a> {
-    pub fn new(ctx: Context<'a>, pages: Vec<String>, current_lang: String) -> Self {
+    pub fn new(ctx: Context<'a>, pages: Vec<String>, current_lang: String, footer: Cow<'a, str>) -> Self {
         Self {
-            ctx,
-            pages,
-            current_lang,
+            ctx, pages, current_lang, footer,
             index: 0,
         }
     }
 
-    
+
     fn create_page<'b>(&self, embed: &'b mut serenity::CreateEmbed, page: &str) -> &'b mut serenity::CreateEmbed {
         let author = self.ctx.author();
-        let ctx_discord = self.ctx.discord();
-        let cache = &ctx_discord.cache;
-        let (bot_id, bot_name) = cache.current_user_field(|u| (u.id, u.name.clone()));
 
         embed
-            .title(&self.ctx.gettext("{bot_name} Premium Voice").replace("{bot_name}", &bot_name))
-            .description(self.ctx.gettext("**Currently Supported Voice**\n{page}").replace("{page}", page))
-            .field(self.ctx.gettext("Current voice used"), &self.current_lang, false)
+            .title(self.ctx.discord().cache.current_user_field(|u| self.ctx
+                .gettext("{bot_user} Voices | Mode: `Premium`")
+                .replace("{bot_name}", &u.name))
+            )
             .author(|a| a
                 .name(author.name.clone())
                 .icon_url(author.face())
             )
-            .footer(|f| f.text(random_footer(
-                &self.ctx.data().config.main_server_invite,
-                bot_id.into(),
-                self.ctx.current_catalog()
-            )))
+            .description(self.ctx.gettext("**Currently Supported Voice**\n{page}").replace("{page}", page))
+            .field(self.ctx.gettext("Current voice used"), &self.current_lang, false)
+            .footer(|f| f.text(self.footer.to_string()))
+
     }
 
     fn create_action_row<'b>(&self, builder: &'b mut serenity::CreateActionRow, disabled: bool) -> &'b mut serenity::CreateActionRow {
@@ -226,26 +222,22 @@ impl<'a> MenuPaginator<'a> {
         builder
     }
 
-    async fn create_message(&self) -> Result<serenity::Message, Error> {
-        let message = self.ctx.channel_id().send_message(&self.ctx.discord().http, |b| {
-            b.embed(|e| self.create_page(e, &self.pages[self.index]));
-            b.components(|c| c.create_action_row(|r| self.create_action_row(r, false)))
-        }).await?;
-
-        Ok(message)
+    async fn create_message(&self) -> serenity::Result<serenity::Message> {
+        self.ctx.send(|b| b
+            .embed(|e| self.create_page(e, &self.pages[self.index]))
+            .components(|c| c.create_action_row(|r| self.create_action_row(r, false)))
+        ).await?.message().await
     }
 
-    async fn edit_message(&self, message: &mut serenity::Message, disable: bool) -> Result<(), Error> {
-        message.edit(self.ctx.discord(), |b| {b
+    async fn edit_message(&self, message: &mut serenity::Message, disable: bool) -> serenity::Result<()> {
+        message.edit(self.ctx.discord(), |b| b
             .embed(|e| self.create_page(e, &self.pages[self.index]))
             .components(|c| c.create_action_row(|r| self.create_action_row(r, disable)))
-        }).await?;
-
-        Ok(())
+        ).await
     }
 
 
-    pub async fn start(mut self) -> Result<(), Error> {
+    pub async fn start(mut self) -> serenity::Result<()> {
         let ctx_discord = self.ctx.discord();
         let mut message = self.create_message().await?;
 
@@ -256,13 +248,8 @@ impl<'a> MenuPaginator<'a> {
                 .author_id(self.ctx.author().id)
                 .collect_limit(1);
 
-            let interaction = match collector.await {
-                Some(interaction) => interaction,
-                None => break
-            };
-            
-            let data = &interaction.data;
-            match &data.custom_id[..] {
+            let interaction = require!(collector.await, Ok(()));
+            match interaction.data.custom_id.as_str() {
                 "⏮️" => {
                     self.index = 0;
                     self.edit_message(&mut message, false).await?;
@@ -273,8 +260,7 @@ impl<'a> MenuPaginator<'a> {
                 },
                 "⏹️" => {
                     self.edit_message(&mut message, true).await?;
-                    interaction.defer(&ctx_discord.http).await?;
-                    break
+                    return interaction.defer(&ctx_discord.http).await
                 },
                 "▶️" => {
                     self.index += 1;
@@ -286,9 +272,8 @@ impl<'a> MenuPaginator<'a> {
                 },
                 _ => unreachable!()
             };
-            interaction.defer(&self.ctx.discord().http).await?;
+            interaction.defer(&ctx_discord.http).await?;
         }
-        Ok(())
     }
 }
 
@@ -1034,24 +1019,7 @@ pub async fn voices(
 
 
 pub async fn list_premium_voices(ctx: Context<'_>) -> Result<()> {
-    let http = &ctx.discord().http; 
-    if let poise::Context::Application(ctx) = ctx {
-        if let poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) = ctx.interaction {
-            interaction.create_interaction_response(http, |b| {b
-                .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
-                .interaction_response_data(|b| b.content("Loading!"))
-            }).await?;
-
-            interaction.delete_original_interaction_response(http).await?;
-        }
-    }
-
     let data = ctx.data();
-    let pages = data.premium_voices.iter().map(|(language, variants)| {
-        variants.iter().map(|(variant, gender)| {
-            format!("{language} {variant} ({gender})\n")
-        }).collect()
-    }).collect();
 
     let (lang_variant, mode) = parse_user_or_guild(data, ctx.author().id, ctx.guild_id()).await?;
     let (lang, variant) = match mode {
@@ -1059,7 +1027,17 @@ pub async fn list_premium_voices(ctx: Context<'_>) -> Result<()> {
         _ => ("en-US", "A")
     };
 
+    let pages = data.premium_voices.iter().map(|(language, variants)| {
+        variants.iter().map(|(variant, gender)| {
+            format!("{language} {variant} ({gender})\n")
+        }).collect()
+    }).collect();
+
     let variant = String::from(variant);
     let gender = data.premium_voices[lang][&variant];
-    MenuPaginator::new(ctx, pages, format!("{lang} {variant} ({gender})")).start().await
+    MenuPaginator::new(ctx, pages, format!("{lang} {variant} ({gender})"), random_footer(
+        &data.config.main_server_invite,
+        ctx.discord().cache.current_user_id().into(),
+        ctx.current_catalog(),
+    )).start().await.map_err(Into::into)
 }
