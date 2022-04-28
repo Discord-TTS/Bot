@@ -74,15 +74,21 @@ async fn get_webhooks(
     webhooks
 }
 
-#[tokio::main]
+fn main() -> Result<()> {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(_main())
+}
+
 #[allow(clippy::too_many_lines)]
-async fn main() {
+async fn _main() -> Result<()> {
     let start_time = std::time::SystemTime::now();
     std::env::set_var("RUST_LIB_BACKTRACE", "1");
 
     let (pool, mut main, webhooks) = {
-        let mut config_toml: toml::Value = std::fs::read_to_string("config.toml").unwrap().parse().unwrap();
-        let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone()).unwrap();
+        let mut config_toml: toml::Value = std::fs::read_to_string("config.toml")?.parse()?;
+        let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
 
         // Setup database pool
         let pool = sqlx::PgPool::connect_with(
@@ -91,11 +97,11 @@ async fn main() {
             .username(&postgres.user)
             .database(&postgres.database)
             .password(&postgres.password)
-        ).await.unwrap();
+        ).await?;
 
-        migration::run(&mut config_toml, &pool).await.unwrap();
+        migration::run(&mut config_toml, &pool).await?;
 
-        let Config{main, webhooks} = config_toml.try_into().unwrap();
+        let Config{main, webhooks} = config_toml.try_into()?;
         (pool, main, webhooks)
     };
 
@@ -117,7 +123,7 @@ async fn main() {
             INSERT INTO guilds(guild_id, {key}) VALUES ($1, $2)
             ON CONFLICT (guild_id) DO UPDATE SET {key} = $2
         "
-    ).await.unwrap();
+    ).await?;
     let userinfo_db = database::Handler::new(pool.clone(), 0,
         "SELECT * FROM userinfo WHERE user_id = $1",
         "DELETE FROM userinfo WHERE user_id = $1",
@@ -129,7 +135,7 @@ async fn main() {
             INSERT INTO userinfo(user_id, {key}) VALUES ($1, $2)
             ON CONFLICT (user_id) DO UPDATE SET {key} = $2
         "
-    ).await.unwrap();
+    ).await?;
     let nickname_db = database::Handler::new(pool.clone(), [0, 0],
         "SELECT * FROM nicknames WHERE guild_id = $1 AND user_id = $2",
         "DELETE FROM nicknames WHERE guild_id = $1 AND user_id = $2",
@@ -141,7 +147,7 @@ async fn main() {
             INSERT INTO nicknames(guild_id, user_id, {key}) VALUES ($1, $2, $3)
             ON CONFLICT (guild_id, user_id) DO UPDATE SET {key} = $3
         "
-    ).await.unwrap();
+    ).await?;
     let user_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::gTTS),
         "SELECT * FROM user_voice WHERE user_id = $1 AND mode = $2",
         "DELETE FROM user_voice WHERE user_id = $1 AND mode = $2",
@@ -153,7 +159,7 @@ async fn main() {
             INSERT INTO user_voice(user_id, mode, {key}) VALUES ($1, $2, $3)
             ON CONFLICT (user_id, mode) DO UPDATE SET {key} = $3
         "
-    ).await.unwrap();
+    ).await?;
     let guild_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::gTTS),
         "SELECT * FROM guild_voice WHERE guild_id = $1 AND mode = $2",
         "DELETE FROM guild_voice WHERE guild_id = $1 AND mode = $2",
@@ -165,7 +171,7 @@ async fn main() {
             INSERT INTO guild_voice(guild_id, mode, {key}) VALUES ($1, $2, $3)
             ON CONFLICT (guild_id, mode) DO UPDATE SET {key} = $3
         "
-    ).await.unwrap();
+    ).await?;
 
     let (startup_message, webhooks) = {
         let http = serenity::Http::new(main.token.as_deref().unwrap());
@@ -173,7 +179,7 @@ async fn main() {
         (
             webhooks["logs"].execute(&http, true, |b| b
                 .content("**TTS Bot is starting up**")
-            ).await.unwrap().unwrap().id, webhooks
+            ).await?.unwrap().id, webhooks
         )
     };
 
@@ -205,7 +211,7 @@ async fn main() {
             );
 
             tokio::spawn(async move {listener.listener().await;});
-            tracing::subscriber::set_global_default(subscriber).unwrap();
+            tracing::subscriber::set_global_default(subscriber)?;
 
             let filter_entry = |to_check| move |entry: &std::fs::DirEntry| entry
                 .metadata()
@@ -306,7 +312,7 @@ async fn main() {
                 }
             ],..poise::FrameworkOptions::default()
         })
-        .build().await.unwrap();
+        .build().await?;
 
     if framework_oc.set(Arc::downgrade(&framework)).is_err() {unreachable!()};
 
@@ -343,7 +349,7 @@ async fn main() {
         framework_copy.shard_manager().lock().await.shutdown_all().await;
     });
 
-    framework.start_autosharded().await.unwrap();
+    framework.start_autosharded().await.map_err(Into::into)
 }
 
 struct EventHandler {

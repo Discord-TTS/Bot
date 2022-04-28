@@ -46,7 +46,7 @@ default-features = false
 
 [dependencies.tokio]
 version = "1"
-features = ["macros", "rt-multi-thread", "signal", "parking_lot"]
+features = ["rt-multi-thread", "signal", "parking_lot"]
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"

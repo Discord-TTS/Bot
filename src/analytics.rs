@@ -65,13 +65,11 @@ impl Handler {
             }
 
             Ok(())
-        })).await?;
-        Ok(())
+        })).await
     }
 
-    pub fn log(&self, event: Cow<'static, str>) -> i32 {
+    pub fn log(&self, event: Cow<'static, str>) {
         let count = (*self.log_buffer.entry(event.clone()).or_insert(0)) + 1;
         self.log_buffer.insert(event, count);
-        count
     }
 }
