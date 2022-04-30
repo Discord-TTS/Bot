@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-26 15:44+0000\n"
-"PO-Revision-Date: 2022-04-26 22:15\n"
+"PO-Revision-Date: 2022-04-30 20:57\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -537,5 +537,5 @@ msgstr ""
 
 #: src/funcs.rs:177
 msgid "There are loads of customizable settings, check out `/help set`"
-msgstr ""
+msgstr "Hay muchos los ajustes personalizeables, mirar `/help set`"
 
