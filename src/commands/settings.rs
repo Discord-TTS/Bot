@@ -194,7 +194,7 @@ impl<'a> MenuPaginator<'a> {
         embed
             .title(self.ctx.discord().cache.current_user_field(|u| self.ctx
                 .gettext("{bot_user} Voices | Mode: `Premium`")
-                .replace("{bot_name}", &u.name))
+                .replace("{bot_user}", &u.name))
             )
             .author(|a| a
                 .name(author.name.clone())
