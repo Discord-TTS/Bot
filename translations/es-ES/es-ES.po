@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-01 13:08+0000\n"
-"PO-Revision-Date: 2022-05-01 15:36\n"
+"PO-Revision-Date: 2022-05-01 16:53\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -55,7 +55,7 @@ msgstr ""
 
 #: src/commands/main.rs:106
 msgid "Just type normally and TTS Bot will say your messages!"
-msgstr ""
+msgstr "¡Simplemente escribe normalmente y TTS Bot dirá tus mensajes!"
 
 #: src/commands/main.rs:142
 msgid "Error: You need to be in the same voice channel as me to make me leave!"
