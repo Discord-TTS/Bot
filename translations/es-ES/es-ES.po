@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-26 15:44+0000\n"
-"PO-Revision-Date: 2022-05-01 08:08\n"
+"PO-Revision-Date: 2022-05-01 09:05\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -334,7 +334,7 @@ msgstr ""
 
 #: src/commands/settings.rs:416
 msgid "Disabled"
-msgstr ""
+msgstr "Desactivado"
 
 #: src/commands/settings.rs:439
 msgid "Done!"
@@ -350,7 +350,7 @@ msgstr ""
 
 #: src/commands/settings.rs:500
 msgid "Ignoring bots is now: {}"
-msgstr ""
+msgstr "Estoy ignorando los bots: {}"
 
 #: src/commands/settings.rs:521
 msgid "Requiring users to be in voice channel for TTS is now: {}"
