@@ -14,57 +14,47 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Write, sync::{Arc, mpsc::{Receiver, Sender}}};
+use std::{collections::HashMap, fmt::Write, sync::Arc, borrow::Cow};
 
-use poise::serenity_prelude as serenity;
 use parking_lot::Mutex;
 
-use crate::structs::Error;
+use poise::serenity_prelude as serenity;
 
-// This is split up into two structs as listener needs to be run in the background
-// and the sender needs to be given to tracing as a subscriber, so mspc is used as
-// an easy way to send the log messages from sync to async land.
+use crate::structs::Result;
 
-// [target, message]
-type LogMessage = [String; 2];
 
-pub struct WebhookLogRecv {
+type LogMessage = (&'static str, String);
+
+pub struct WebhookLogger {
     http: Arc<serenity::Http>,
+    max_verbosity: tracing::Level,
     level_lookup: HashMap<tracing::Level, String>,
 
-    rx: Mutex<Receiver<(tracing::Level, LogMessage)>>,
+    pending_logs: Arc<Mutex<HashMap<tracing::Level, Vec<LogMessage>>>>,
 
     normal_logs: serenity::Webhook,
     error_logs: serenity::Webhook,
 }
 
-impl WebhookLogRecv {
+impl WebhookLogger {
     pub fn new(
-        rx: Receiver<(tracing::Level, LogMessage)>,
         http: Arc<serenity::Http>,
+        max_verbosity: tracing::Level,
         normal_logs: serenity::Webhook,
         error_logs: serenity::Webhook,
-    ) -> Self {
-        let level_lookup_raw = [
+    ) -> ArcWrapper<Self> {
+        let level_lookup = HashMap::from_iter([
             (tracing::Level::TRACE, 1),
             (tracing::Level::DEBUG, 1),
             (tracing::Level::INFO, 0),
             (tracing::Level::WARN, 3),
             (tracing::Level::ERROR, 4),
-        ];
+        ].map(|(level, value)| (level, format!("https://cdn.discordapp.com/embed/avatars/{value}.png"))));
 
-        let mut level_lookup = HashMap::new();
-        for (level_enum, value) in level_lookup_raw {
-            level_lookup.insert(
-                level_enum,
-                format!("https://cdn.discordapp.com/embed/avatars/{}.png", value),
-            );
-        }
-
-        Self {
-            http, level_lookup, error_logs,normal_logs,
-            rx: Mutex::new(rx),
-        }
+        ArcWrapper(Arc::new(Self {
+            http, max_verbosity, level_lookup, normal_logs, error_logs,
+            pending_logs: Arc::default(),
+        }))
     }
 
     pub async fn listener(&self) {
@@ -78,41 +68,31 @@ impl WebhookLogRecv {
         }
     }
 
-    async fn send_buffer(&self) -> Result<(), Error> {
-        let recv_buf: Vec<(tracing::Level, LogMessage)> = self.rx.lock().try_iter().collect();
-        let mut message_buf: HashMap<tracing::Level, Vec<[String; 2]>> =
-            HashMap::with_capacity(recv_buf.len());
+    async fn send_buffer(&self) -> Result<()> {
+        let pending_logs = self.pending_logs.lock().drain().collect::<HashMap<_, _>>();
 
-        for (level, [target, msg]) in recv_buf {
-            let messages = message_buf.get_mut(&level);
-            match messages {
-                Some(messages) => messages.push([target, msg]),
-                None => {message_buf.insert(level, vec![[target, msg]]);}
-            };
-        }
-
-        for (severity, messages) in message_buf {
-            let mut chunks: Vec<String> = Vec::with_capacity(messages.len());
-            messages
+        for (severity, messages) in pending_logs {
+            let mut chunks: Vec<Cow<'_, str>> = Vec::with_capacity(messages.len());
+            let pre_chunked: String = messages
                 .into_iter()
-                .map(|[target, log_message]| {
+                .map(|(target, log_message)| {
                     log_message.trim().split('\n').map(move |line| {
-                        format!("`[{}]`: {}\n", target.clone(), line)
+                        format!("`[{}]`: {}\n", target, line)
                     }).collect::<String>()
                 })
-                .collect::<String>()
-                .split_inclusive('\n')
-                .for_each(|line| {
-                    if let Some(chunk) = chunks.last_mut() {
-                        if chunk.len() + line.len() > 2000 {
-                            chunks.push(String::from(line));
-                        } else {
-                            chunk.push_str(line);
-                        }
+                .collect();
+
+            for line in pre_chunked.split_inclusive('\n') {
+                if let Some(chunk) = chunks.last_mut() {
+                    if chunk.len() + line.len() > 2000 {
+                        chunks.push(Cow::Borrowed(line));
                     } else {
-                        chunks.push(String::from(line));
+                        chunk.to_mut().push_str(line);
                     }
-                });
+                } else {
+                    chunks.push(Cow::Borrowed(line));
+                }
+            }
 
             let webhook = if tracing::Level::ERROR >= severity {
                 &self.error_logs
@@ -121,46 +101,20 @@ impl WebhookLogRecv {
             };
 
             for chunk in chunks {
-                webhook.execute(&self.http, false, |b| {b
-                    .content(&chunk)
-                    .username(&format!("TTS-Webhook [{}]", severity.as_str()))
-                    .avatar_url(&self.level_lookup.get(&severity).unwrap_or(&String::from(
+                webhook.execute(&self.http, false, |b| b
+                    .content(chunk)
+                    .username(format!("TTS-Webhook [{}]", severity.as_str()))
+                    .avatar_url(self.level_lookup.get(&severity).cloned().unwrap_or_else(|| String::from(
                         "https://cdn.discordapp.com/embed/avatars/5.png",
                     )))
-                }).await?;
+                ).await?;
             }
         }
         Ok(())
     }
 }
-pub struct StringVisitor<'a> {
-    string: &'a mut String,
-}
-pub struct WebhookLogSend {
-    sender: Mutex<Option<Sender<(tracing::Level, LogMessage)>>>,
-    max_verbosity: tracing::Level,
-}
 
-impl<'a> tracing::field::Visit for StringVisitor<'a> {
-    fn record_debug(&mut self, _field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-        write!(self.string, "{:?}", value).unwrap();
-    }
-
-    fn record_str(&mut self, _field: &tracing::field::Field, value: &str) {
-        self.string.push_str(value);
-    }
-}
-
-impl WebhookLogSend {
-    pub fn new(sender: Sender<(tracing::Level, LogMessage)>, max_verbosity: tracing::Level) -> Self {
-        Self {
-            sender: Mutex::new(Some(sender)),
-            max_verbosity,
-        }
-    }
-}
-
-impl tracing::Subscriber for WebhookLogSend {
+impl tracing::Subscriber for ArcWrapper<WebhookLogger> {
     // Hopefully this works
     fn new_span(&self, _span: &tracing::span::Attributes<'_>) -> tracing::span::Id {
         tracing::span::Id::from_u64(1)
@@ -172,22 +126,29 @@ impl tracing::Subscriber for WebhookLogSend {
     fn exit(&self, _span: &tracing::span::Id) {}
 
     fn event(&self, event: &tracing::Event<'_>) {
-        let mut message = String::new();
-        event.record(&mut StringVisitor {string: &mut message});
-        
-        let mut sender_lock = self.sender.lock();
-        match &*sender_lock {
-            Some(sender) => {
-                let metadata = event.metadata();
-                if sender.send((*metadata.level(), [String::from(metadata.target()), message])).is_err() {
-                    eprintln!("Logging channel hung up, assuming shutdown.");
-                    sender_lock.take();
-                }
+        pub struct StringVisitor<'a> {
+            string: &'a mut String,
+        }
+
+        impl<'a> tracing::field::Visit for StringVisitor<'a> {
+            fn record_debug(&mut self, _field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                write!(self.string, "{:?}", value).unwrap();
             }
-            None => {
-                eprintln!("{} log during shutdown: {}", event.metadata().level(), message);
+
+            fn record_str(&mut self, _field: &tracing::field::Field, value: &str) {
+                self.string.push_str(value);
             }
         }
+
+        let mut message = String::new();
+        event.record(&mut StringVisitor {string: &mut message});
+
+        let metadata = event.metadata();
+        self.pending_logs
+            .lock()
+            .entry(*metadata.level())
+            .or_insert_with(Vec::new)
+            .push((metadata.target(), message));
     }
 
     fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
@@ -197,5 +158,21 @@ impl tracing::Subscriber for WebhookLogSend {
         } else {
             tracing::Level::WARN >= *metadata.level()
         }
+    }
+}
+
+
+// So we can impl tracing::Subscriber for Arc<WebhookLogger>
+pub struct ArcWrapper<T>(pub Arc<T>);
+impl<T> Clone for ArcWrapper<T> {
+    fn clone(&self) -> Self {
+        ArcWrapper(Arc::clone(&self.0))
+    }
+}
+
+impl<T> std::ops::Deref for ArcWrapper<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

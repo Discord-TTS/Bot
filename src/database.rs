@@ -179,7 +179,7 @@ where
         let query_raw = *self.query_cache.entry(key).or_insert_with(|| {
             Box::leak(Box::new(strfmt::strfmt(
                 self.single_insert,
-                &HashMap::from_iter([(String::from("key"), String::from(key))])
+                &HashMap::from_iter([(String::from("key"), key)])
             ).unwrap()))
         });
 

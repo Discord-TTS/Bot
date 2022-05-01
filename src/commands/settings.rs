@@ -1058,8 +1058,7 @@ pub async fn list_premium_voices(ctx: Context<'_>) -> Result<()> {
         }).collect()
     }).collect();
 
-    let variant = String::from(variant);
-    let gender = data.premium_voices[lang][&variant];
+    let gender = data.premium_voices[lang][variant];
     MenuPaginator::new(ctx, pages, format!("{lang} {variant} ({gender})"), random_footer(
         &data.config.main_server_invite,
         ctx.discord().cache.current_user_id().into(),

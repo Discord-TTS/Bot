@@ -198,17 +198,15 @@ async fn _main() -> Result<()> {
             .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
         })
         .user_data_setup(move |ctx, _, _| {Box::pin(async move {
-            let (send, rx) = std::sync::mpsc::channel();
-            let subscriber = logging::WebhookLogSend::new(send, tracing::Level::from_str(&main.log_level)?);
-            let listener = logging::WebhookLogRecv::new(
-                rx,
+            let logger = logging::WebhookLogger::new(
                 ctx.http.clone(),
+                tracing::Level::from_str(&main.log_level)?,
                 webhooks["logs"].clone(),
                 webhooks["errors"].clone(),
             );
 
-            tokio::spawn(async move {listener.listener().await;});
-            tracing::subscriber::set_global_default(subscriber)?;
+            tracing::subscriber::set_global_default(logger.clone())?;
+            tokio::spawn(async move {logger.listener().await;});
 
             let filter_entry = |to_check| move |entry: &std::fs::DirEntry| entry
                 .metadata()
