@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-01 13:08+0000\n"
-"PO-Revision-Date: 2022-05-01 17:48\n"
+"PO-Revision-Date: 2022-05-01 20:36\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -83,7 +83,7 @@ msgstr ""
 
 #: src/commands/main.rs:238
 msgid "Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier"
-msgstr ""
+msgstr "¡Hola, tienes demasiados servidores enlazados! Por favor contacta a Gnome!#6669 si has comprado el nivel 5 Servidores"
 
 #: src/commands/main.rs:256
 msgid "Done! This server is now premium!"
