@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-01 13:08+0000\n"
-"PO-Revision-Date: 2022-05-01 20:36\n"
+"PO-Revision-Date: 2022-05-01 21:41\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -91,7 +91,7 @@ msgstr "¡completada! este servido es ahora premium"
 
 #: src/commands/help.rs:117
 msgid "No command called {} found!"
-msgstr ""
+msgstr "¡no peudo buscar un comando se llama {}!"
 
 #: src/commands/help.rs:125
 msgid "The group {group_name} does not have a subcommand called {subcommand_name}!"
