@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-04-26 15:44+0000\n"
-"PO-Revision-Date: 2022-04-30 20:57\n"
+"PO-Revision-Date: 2022-05-01 08:08\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -358,15 +358,15 @@ msgstr ""
 
 #: src/commands/settings.rs:594
 msgid "Translation is now: {}"
-msgstr ""
+msgstr "La traducción es ahora: {}"
 
 #: src/commands/settings.rs:625
 msgid "The target translation language is now: {}"
-msgstr ""
+msgstr "El idioma de traducción de destino es ahora: {}"
 
 #: src/commands/settings.rs:627
 msgid "You may want to enable translation with `/set translation on`"
-msgstr ""
+msgstr "Puedes activar la traducción con `/set translation on`"
 
 #: src/commands/settings.rs:634
 msgid "DeepL Translation - Supported languages"
@@ -394,7 +394,7 @@ msgstr ""
 
 #: src/commands/settings.rs:708
 msgid "Ignoring audience is now: {}"
-msgstr ""
+msgstr "Ignorar al público es ahora: {}"
 
 #: src/commands/settings.rs:728
 msgid "**Error**: Cannot set speaking rate for the {mode} mode"
