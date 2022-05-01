@@ -20,8 +20,8 @@ use itertools::Itertools;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult, PoiseContextExt};
-use crate::funcs::{get_gtts_voices, get_espeak_voices, random_footer, parse_user_or_guild};
+use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult, PoiseContextExt, ApplicationContext};
+use crate::funcs::{get_gtts_voices, random_footer, parse_user_or_guild};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::macros::{require_guild, require};
 use crate::database;
@@ -277,6 +277,35 @@ impl<'a> MenuPaginator<'a> {
     }
 }
 
+async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> Vec<poise::AutocompleteChoice<String>> {
+    let (_, mode) = match parse_user_or_guild(ctx.data, ctx.interaction.user().id, ctx.interaction.guild_id()).await {
+        Ok(v) => v,
+        Err(_) => return Vec::new()
+    };
+
+    let voices: Box<dyn Iterator<Item=poise::AutocompleteChoice<String>>> = match mode {
+        TTSMode::gTTS => Box::new(get_gtts_voices().into_iter().map(|(value, name)| poise::AutocompleteChoice {name, value})) as _,
+        TTSMode::eSpeak => Box::new(ctx.data.espeak_voices.clone().into_iter().map(poise::AutocompleteChoice::from)) as _,
+        TTSMode::Premium => Box::new(
+            ctx.data.premium_voices.iter().flat_map(|(language, variants)| {
+                variants.iter().map(move |(variant, gender)| {
+                    poise::AutocompleteChoice {
+                        name: format!("{language} {variant} ({gender})"),
+                        value: format!("{language} {variant}")
+                    }
+                })
+            })
+        ) as _
+    };
+
+    let mut filtered_voices: Vec<_> = voices
+        .filter(|choice| choice.name.starts_with(&searching))
+        .collect();
+
+    filtered_voices.sort_by_key(|choice| strsim::levenshtein(&choice.name, &searching));
+    filtered_voices
+}
+
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
     crate::funcs::bool_button(
         ctx,
@@ -351,7 +380,7 @@ where
 {
     let (_, mode) = parse_user_or_guild(ctx.data(), author_id, Some(guild_id)).await?;
     Ok(if let Some(voice) = voice {
-        if check_valid_voice(ctx.data(), &voice, mode).await? {
+        if check_valid_voice(ctx.data(), &voice, mode) {
             general_db.create_row(key).await?;
             voice_db.set_one((key, mode), "voice", &voice).await?;
             Cow::Owned(match target {
@@ -370,16 +399,16 @@ where
     })
 }
 
-async fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> Result<bool, Error> {
-    Ok(match mode {
+fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> bool {
+    match mode {
         TTSMode::gTTS => get_gtts_voices().contains_key(voice),
-        TTSMode::eSpeak => get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?.contains(voice),
+        TTSMode::eSpeak => data.espeak_voices.contains(voice),
         TTSMode::Premium => {
             voice.split_once(' ')
                 .and_then(|(language, variant)| data.premium_voices.get(language).map(|l| (l, variant)))
                 .map_or(false, |(ls, v)| ls.contains_key(v))
         }
-    })
+    }
 }
 
 async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Result<Vec<String>, Error> {
@@ -552,7 +581,7 @@ pub async fn server_mode(
 )]
 pub async fn server_voice(
     ctx: Context<'_>,
-    #[description="The default voice to read messages in"] #[rest] voice: String
+    #[description="The default voice to read messages in"] #[autocomplete="voice_autocomplete"] #[rest] voice: String
 ) -> CommandResult {
     let data = ctx.data();
     let guild_id = ctx.guild_id().unwrap();
@@ -966,7 +995,7 @@ pub async fn mode(
 )]
 pub async fn voice(
     ctx: Context<'_>,
-    #[description="The voice to read messages in, leave blank to reset"] #[rest] voice: Option<String>
+    #[description="The voice to read messages in, leave blank to reset"] #[autocomplete="voice_autocomplete"] #[rest] voice: Option<String>
 ) -> CommandResult {
     let data = ctx.data();
     let author_id = ctx.author().id;
@@ -1004,7 +1033,7 @@ pub async fn voices(
     let voices: String = {
         let mut supported_langs = match mode {
             TTSMode::gTTS => get_gtts_voices().into_iter().map(|(k, _)| k).collect(),
-            TTSMode::eSpeak => get_espeak_voices(&data.reqwest, data.config.tts_service.clone()).await?,
+            TTSMode::eSpeak => data.espeak_voices.clone(),
             TTSMode::Premium => return list_premium_voices(ctx).await
         };
 

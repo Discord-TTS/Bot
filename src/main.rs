@@ -45,7 +45,7 @@ mod funcs;
 
 use macros::{require, async_try};
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
-use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices, generate_status};
+use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, get_premium_voices, generate_status, get_espeak_voices};
 use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework, JoinVCToken};
 
 use crate::constants::PREMIUM_NEUTRAL_COLOUR;
@@ -230,15 +230,16 @@ async fn _main() -> Result<()> {
                     )
                     .collect::<Result<_, anyhow::Error>>()?;
 
+            let reqwest = reqwest::Client::new();
             Ok(Data {
-                config: main,
-                reqwest: reqwest::Client::new(),
                 premium_voices: get_premium_voices(),
                 join_vc_tokens: dashmap::DashMap::new(),
                 last_to_xsaid_tracker: dashmap::DashMap::new(),
                 system_info: parking_lot::Mutex::new(sysinfo::System::new()),
+                espeak_voices: get_espeak_voices(&reqwest, main.tts_service.clone()).await?,
                 premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
 
+                config: main, reqwest,
                 guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
                 analytics, webhooks, start_time, pool, startup_message, translations,
             })

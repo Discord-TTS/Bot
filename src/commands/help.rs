@@ -16,7 +16,7 @@
 
 use indexmap::IndexMap;
 
-use crate::{structs::{Context, Command, CommandResult, PoiseContextExt}, macros::require};
+use crate::{structs::{Context, Command, CommandResult, PoiseContextExt, ApplicationContext}, macros::require};
 
 enum HelpCommandMode<'a> {
     Root,
@@ -64,7 +64,7 @@ fn show_group_description(group: &IndexMap<&str, Vec<&Command>>) -> String {
 }
 
 #[allow(clippy::unused_async)]
-async fn help_autocomplete(ctx: Context<'_>, searching: String) -> Vec<String> {
+async fn help_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> Vec<String> {
     fn flatten_commands(commands: &[Command], searching: &str) -> Vec<String> {
         let mut result = Vec::new();
 
@@ -85,7 +85,7 @@ async fn help_autocomplete(ctx: Context<'_>, searching: String) -> Vec<String> {
         result
     }
 
-    let mut result: Vec<String> = flatten_commands(&ctx.framework().options().commands, &searching);
+    let mut result: Vec<String> = flatten_commands(&ctx.framework.options().commands, &searching);
     result.sort_by_key(|a| strsim::levenshtein(a, &searching));
     result
 }
