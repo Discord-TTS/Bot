@@ -671,7 +671,32 @@ pub async fn repeated_characters(ctx: Context<'_>, #[description="The max repeat
             Cow::Borrowed(ctx.gettext("**Error**: Cannot set the max repeated characters below 5"))
         } else {
             ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "repeated_chars", &(chars as i16)).await?;
-            Cow::Owned(ctx.gettext("Max repeated characters is now: {}").replace("{chars}", &chars.to_string()))
+            Cow::Owned(ctx.gettext("Max repeated characters is now: {}").replace("{}", &chars.to_string()))
+        }
+    };
+
+    ctx.say(to_send).await?;
+    Ok(())
+}
+
+/// Changes the max length of a TTS message in seconds
+#[poise::command(
+    guild_only,
+    category="Settings",
+    prefix_command, slash_command,
+    required_permissions="ADMINISTRATOR",
+    required_bot_permissions="SEND_MESSAGES",
+    aliases("max_length", "message_length")
+)]
+pub async fn msg_length(ctx: Context<'_>, #[description="Max length of TTS message in seconds"] seconds: u8) -> CommandResult {
+    let to_send = {
+        if seconds > 60 {
+            Cow::Borrowed(ctx.gettext("**Error**: Cannot set the max length of messages above 60 seconds"))
+        } else if seconds < 10 {
+            Cow::Borrowed(ctx.gettext("**Error**: Cannot set the max length of messages below 10 seconds"))
+        } else {
+            ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "msg_length", &(seconds as i16)).await?;
+            Cow::Owned(ctx.gettext("Max message length is now: {} seconds").replace("{}", &seconds.to_string()))
         }
     };
 

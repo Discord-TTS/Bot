@@ -190,10 +190,65 @@ pub enum Gender {
 
 impl std::fmt::Display for Gender {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
+        f.write_str(match self {
             Self::Male => "Male",
             Self::Female => "Female"
         })
+    }
+}
+
+
+fn deserialize_error_code<'de, D: serde::Deserializer<'de>>(to_deserialize: D) -> Result<TTSServiceErrorCode, D::Error> {
+    struct IntVisitor {}
+    impl<'de> serde::de::Visitor<'de> for IntVisitor {
+        type Value = u8;
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("a number between 0 and 255")
+        }
+
+        #[allow(clippy::cast_possible_truncation)]
+        fn visit_u64<E: serde::de::Error>(self, value: u64) -> Result<Self::Value, E> {
+            if value > 255 {
+                Err(E::custom(format!("{value} is too large")))
+            } else {
+                Ok(value as u8)
+            }
+        }
+    }
+
+    Ok(match to_deserialize.deserialize_u8(IntVisitor {})? {
+        1 => TTSServiceErrorCode::UnknownVoice,
+        2 => TTSServiceErrorCode::AudioTooLong,
+        3 => TTSServiceErrorCode::InvalidSpeakingRate,
+        _ => TTSServiceErrorCode::Unknown,
+    })
+}
+
+#[derive(Debug)]
+pub enum TTSServiceErrorCode {
+    Unknown,
+    UnknownVoice,
+    AudioTooLong,
+    InvalidSpeakingRate,
+}
+
+impl TTSServiceErrorCode {
+    pub fn should_ignore(self) -> bool {
+        matches!(self, Self::AudioTooLong)
+    }
+}
+
+#[must_use]
+#[derive(serde::Deserialize)]
+pub struct TTSServiceError {
+    pub display: String,
+    #[serde(deserialize_with = "deserialize_error_code")]
+    pub code: TTSServiceErrorCode,
+}
+
+impl std::fmt::Display for TTSServiceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.display)
     }
 }
 
@@ -283,6 +338,7 @@ impl PoiseContextExt for Context<'_> {
         let author = self.author();
         let ctx_discord = self.discord();
 
+        let m;
         let (name, avatar_url) = match self.channel_id().to_channel(ctx_discord).await? {
             serenity::Channel::Guild(channel) => {
                 let permissions = channel.permissions_for_user(ctx_discord, ctx_discord.cache.current_user_id())?;
@@ -299,7 +355,10 @@ impl PoiseContextExt for Context<'_> {
                 };
 
                 match channel.guild_id.member(ctx_discord, author.id).await {
-                    Ok(member) => (Cow::Owned(member.display_name().into_owned()), member.face()),
+                    Ok(member) => {
+                        m = member;
+                        (m.display_name(), m.face())
+                    },
                     Err(_) => (Cow::Borrowed(&author.name), author.face()),
                 }
             }

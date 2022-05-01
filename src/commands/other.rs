@@ -20,7 +20,7 @@ use poise::serenity_prelude::{self as serenity, Mentionable};
 use num_format::{Locale, ToFormattedString};
 
 use crate::constants::{OPTION_SEPERATORS};
-use crate::funcs::{bool_button, fetch_audio, parse_user_or_guild, refresh_kind};
+use crate::funcs::{bool_button, fetch_audio, parse_user_or_guild, refresh_kind, prepare_url};
 use crate::structs::{Context, TTSMode, OptionTryUnwrap, CommandResult, PoiseContextExt};
 use crate::require;
 
@@ -72,11 +72,14 @@ pub async fn tts(
                 |r| Cow::Owned(r.to_string())
             );
 
+        let url = prepare_url(
+            data.config.tts_service.clone(),
+            &message, &voice, mode,
+            &speaking_rate.to_string(), &u64::MAX.to_string()
+        );
+
         serenity::AttachmentType::Bytes {
-            data: std::borrow::Cow::Owned(fetch_audio(
-                &data.reqwest, &data.config.tts_service,
-                message, &voice, mode, &speaking_rate.to_string()
-            ).await?),
+            data: Cow::Owned(fetch_audio(&data.reqwest, url).await?.try_unwrap()?.bytes().await?.into_iter().collect()),
             filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
                 TTSMode::gTTS => "mp3",
                 TTSMode::eSpeak => "wav",

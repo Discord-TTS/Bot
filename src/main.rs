@@ -23,10 +23,7 @@
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless)]
 #![allow(clippy::unreadable_literal)]
 
-use std::{collections::HashMap, borrow::Cow};
-use std::path::Path;
-use std::str::FromStr;
-use std::sync::{Arc, Weak};
+use std::{borrow::Cow, collections::HashMap, path::Path, str::FromStr, sync::{Arc, Weak}};
 
 use sysinfo::SystemExt;
 use once_cell::sync::OnceCell;
@@ -291,7 +288,7 @@ async fn _main() -> Result<()> {
                         },
                         commands::settings::xsaid(), commands::settings::autojoin(), commands::settings::botignore(),
                         commands::settings::voice(), commands::settings::server_voice(), commands::settings::mode(),
-                        commands::settings::server_mode(), commands::settings::prefix(),
+                        commands::settings::server_mode(), commands::settings::msg_length(), commands::settings::prefix(),
                         commands::settings::translation(), commands::settings::translation_lang(), commands::settings::speaking_rate(),
                         commands::settings::nick(), commands::settings::repeated_characters(), commands::settings::audienceignore(),
                         commands::settings::require_voice(), commands::settings::block(),
@@ -622,12 +619,13 @@ async fn process_tts_msg(
 
     let guild_row = guilds_db.get(guild_id.into()).await?;
     let xsaid = guild_row.xsaid;
-    let channel: i64 = guild_row.channel;
+    let channel = guild_row.channel;
     let prefix = &guild_row.prefix;
     let autojoin = guild_row.auto_join;
+    let msg_length = guild_row.msg_length;
     let bot_ignore = guild_row.bot_ignore;
     let require_voice = guild_row.require_voice;
-    let repeated_limit: i16 = guild_row.repeated_chars;
+    let repeated_limit = guild_row.repeated_chars;
     let audience_ignore = guild_row.audience_ignore;
 
     let mode;
@@ -638,14 +636,14 @@ async fn process_tts_msg(
         channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
     ).await? {
         None => return Ok(()),
-        Some((guild, content)) => {
-            let member = guild.member(ctx, message.author.id.0).await?;
-            (voice, mode) = parse_user_or_guild(data, message.author.id, Some(guild.id)).await?;
+        Some(content) => {
+            let member = guild_id.member(ctx, message.author.id.0).await?;
+            (voice, mode) = parse_user_or_guild(data, message.author.id, Some(guild_id)).await?;
 
-            let nickname_row = nicknames.get([guild.id.into(), message.author.id.into()]).await?;
+            let nickname_row = nicknames.get([guild_id.into(), message.author.id.into()]).await?;
 
             clean_msg(
-                &content, &guild, &member, &message.attachments, &voice,
+                &content, &ctx.cache, &member, &message.attachments, &voice,
                 xsaid, repeated_limit as usize, nickname_row.name.as_deref(),
                 &data.last_to_xsaid_tracker
             )
@@ -666,26 +664,30 @@ async fn process_tts_msg(
         };
     }
 
-    let mut tracks = Vec::new();
-    for url in funcs::fetch_url(&data.config.tts_service, content, &voice, mode, &speaking_rate) {
-        tracks.push(songbird::ffmpeg(url.as_str()).await?);
+    let url = funcs::prepare_url(
+        data.config.tts_service.clone(),
+        &content, &voice, mode,
+        &speaking_rate, &msg_length.to_string()
+    );
+
+    // Pre-caches the audio and handles max_length errors
+    if funcs::fetch_audio(&data.reqwest, url.clone()).await?.is_none() {
+        return Ok(());
     }
 
-    let call_lock = match songbird::get(ctx).await.unwrap().get(guild_id) {
-        Some(call) => call,
-        None => {
-            // At this point, the bot is "in" the voice channel, but without a voice client,
-            // this is usually if the bot restarted but the bot is still in the vc from the last boot.
-            let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-            ctx.join_vc(join_vc_lock.lock().await, message.channel_id).await?
-        }
-    };
-
     {
+        let call_lock = match songbird::get(ctx).await.unwrap().get(guild_id) {
+            Some(call) => call,
+            None => {
+                // At this point, the bot is "in" the voice channel, but without a voice client,
+                // this is usually if the bot restarted but the bot is still in the vc from the last boot.
+                let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+                ctx.join_vc(join_vc_lock.lock().await, message.channel_id).await?
+            }
+        };
+
         let mut call = call_lock.lock().await;
-        for track in tracks {
-            call.enqueue_source(track);
-        }
+        call.enqueue_source(songbird::ffmpeg(url.as_str()).await?);
     }
 
     let mode: &'static str = mode.into();

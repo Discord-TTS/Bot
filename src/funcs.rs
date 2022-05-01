@@ -26,7 +26,7 @@ use rand::prelude::SliceRandom;
 use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
-use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, JoinVCToken};
+use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, JoinVCToken, TTSServiceError};
 use crate::macros::require;
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
@@ -89,41 +89,35 @@ pub async fn parse_user_or_guild(
 }
 
 
-pub async fn fetch_audio(
-    reqwest: &reqwest::Client,
-    tts_service: &reqwest::Url,
-    content: String,
-    lang: &str,
-    mode: TTSMode,
-    speaking_rate: &str
-) -> Result<Vec<u8>, Error> {
-    let mut data = Vec::new();
-    for url in fetch_url(tts_service, content, lang, mode, speaking_rate) {
-        data.push(reqwest.get(url).send().await?.error_for_status()?.bytes().await?);
+pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url) -> Result<Option<reqwest::Response>> {
+    let resp = reqwest.get(url).send().await?;
+    match resp.error_for_status_ref() {
+        Ok(_) => Ok(Some(resp)),
+        Err(backup_err) => {
+            match resp.json::<TTSServiceError>().await {
+                Ok(err) => {
+                    if err.code.should_ignore() {
+                        Ok(None)
+                    } else {
+                        Err(anyhow::anyhow!("Error fetching audio: {}", err.display))
+                    }
+                }
+                Err(_) => Err(backup_err.into())
+            }
+        }
     }
-    Ok(data.into_iter().flatten().collect())
 }
 
-pub fn fetch_url(tts_service: &reqwest::Url, content: String, lang: &str, mode: TTSMode, speaking_rate: &str) -> Vec<reqwest::Url> {
-    let fetch_url = |chunk: String| {
-        let mut url = tts_service.clone();
-        url.set_path("tts");
-        url.query_pairs_mut()
-            .append_pair("text", &chunk)
-            .append_pair("lang", lang)
-            .append_pair("mode", mode.into())
-            .append_pair("speaking_rate", speaking_rate)
-            .finish();
-        url
-    };
-
-    if mode == TTSMode::gTTS {
-        content.chars().chunks(200).into_iter().map(std::iter::Iterator::collect::<String>).map(|chunk| {
-            fetch_url(chunk)
-        }).collect()
-    } else{
-        vec![fetch_url(content)]
-    }
+pub fn prepare_url(mut tts_service: reqwest::Url, content: &str, lang: &str, mode: TTSMode, speaking_rate: &str, max_length: &str) -> reqwest::Url {
+    tts_service.set_path("tts");
+    tts_service.query_pairs_mut()
+        .append_pair("text", content)
+        .append_pair("lang", lang)
+        .append_pair("mode", mode.into())
+        .append_pair("max_length", max_length)
+        .append_pair("speaking_rate", speaking_rate)
+        .finish();
+    tts_service
 }
 
 
@@ -246,19 +240,13 @@ pub async fn run_checks(
     bot_ignore: bool,
     require_voice: bool,
     audience_ignore: bool,
-) -> Result<Option<(serenity::Guild, String)>> {
-    let cache = &ctx.cache;
+) -> Result<Option<String>> {
     let guild_id = require!(message.guild_id, Ok(None));
-
     if channel as u64 != message.channel_id.0 {
-        if message.author.bot {
-            return Ok(None)
-        }
-
         return Ok(None)
     }
 
-    let mut content = serenity::content_safe(cache, &message.content,
+    let mut content = serenity::content_safe(&ctx.cache, &message.content,
         &serenity::ContentSafeOptions::default()
             .clean_here(false)
             .clean_everyone(false)
@@ -282,16 +270,19 @@ pub async fn run_checks(
         return Ok(None)
     }
 
-    let guild = require!(cache.guild(guild_id), Ok(None));
-    let voice_state = guild.voice_states.get(&message.author.id);
+    let (guild_voice_states, guild_channels) = require!(
+        ctx.cache.guild_field(guild_id, |g| {(g.voice_states.clone(), g.channels.clone())}),
+        Ok(None)
+    );
 
+    let voice_state = guild_voice_states.get(&message.author.id);
     if message.author.bot {
         if bot_ignore || voice_state.is_none() {
             return Ok(None) // Is bot
         }
     } else {
         // If the bot is in vc
-        if let Some(vc) = guild.voice_states.get(&cache.current_user_id()) {
+        if let Some(vc) = guild_voice_states.get(&ctx.cache.current_user_id()) {
             // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
             if require_voice && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
                 return Ok(None); // Wrong vc
@@ -308,7 +299,7 @@ pub async fn run_checks(
 
         if require_voice {
             let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
-            if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).try_unwrap()? {
+            if let serenity::Channel::Guild(channel) = guild_channels.get(&voice_channel).try_unwrap()? {
                 if channel.kind == serenity::ChannelType::Stage && voice_state.map_or(false, |vs| vs.suppress) && audience_ignore {
                     return Ok(None); // Is audience
                 }
@@ -322,14 +313,14 @@ pub async fn run_checks(
         return Ok(None)
     }
 
-    Ok(Some((guild, content)))
+    Ok(Some(content))
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn clean_msg(
     content: &str,
 
-    guild: &serenity::Guild,
+    cache: &serenity::Cache,
     member: &serenity::Member,
     attachments: &[serenity::Attachment],
 
@@ -340,10 +331,8 @@ pub fn clean_msg(
 
     last_to_xsaid_tracker: &LastToXsaidTracker
 ) -> String {
-    let contained_url;
-    let mut content = if content == "?" {
-        contained_url = false;
-        String::from("what")
+    let (contained_url, mut content) = if content == "?" {
+        (false, String::from("what"))
     } else {
         // Regex
         lazy_static! {
@@ -385,27 +374,27 @@ pub fn clean_msg(
             .map(|span| span.as_str())
             .collect();
 
-        contained_url = content != filtered_content;
-        filtered_content
+        (content != filtered_content, filtered_content)
     };
 
     // If xsaid is enabled, and the author has not been announced last (in one minute if more than 2 users in vc)
-    let last_to_xsaid = last_to_xsaid_tracker.get(&guild.id);
-    let voice_channel_id = guild.voice_states.get(&member.user.id).and_then(|vs| vs.channel_id);
+    let guild_id = member.guild_id;
+    let last_to_xsaid = last_to_xsaid_tracker.get(&guild_id);
 
     if xsaid && match last_to_xsaid.map(|i| *i) {
-        Some((u_id, last_time)) => {
-            voice_channel_id.map_or(true, |voice_channel_id|
-                (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) && {
+        None => true,
+        Some((u_id, last_time)) => cache.guild_field(guild_id, |guild| {
+            guild.voice_states.get(&member.user.id).and_then(|vs| vs.channel_id).map_or(true, |voice_channel_id|
+                (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) &&
                     // If more than 2 users in vc
                     guild.voice_states.values()
                         .filter(|vs| vs.channel_id.map_or(false, |vc| vc == voice_channel_id))
                         .filter_map(|vs| guild.members.get(&vs.user_id))
                         .filter(|member| !member.user.bot)
                         .count() > 2
-                })
+                )
             )
-        }, None => true
+        }).unwrap()
     } {
         if contained_url {
             write!(content, " {}",
