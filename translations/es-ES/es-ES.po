@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-01 13:08+0000\n"
-"PO-Revision-Date: 2022-05-01 16:53\n"
+"PO-Revision-Date: 2022-05-01 17:48\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -59,7 +59,7 @@ msgstr "¡Simplemente escribe normalmente y TTS Bot dirá tus mensajes!"
 
 #: src/commands/main.rs:142
 msgid "Error: You need to be in the same voice channel as me to make me leave!"
-msgstr ""
+msgstr "Error: Tienes que estar en el mismo canal de voz que yo para hacerme salir!"
 
 #: src/commands/main.rs:151
 msgid "Left voice channel!"
@@ -75,7 +75,7 @@ msgstr "**Error**: ¡No estoy en un canal de voz!"
 
 #: src/commands/main.rs:206
 msgid "Hey, this server is already premium!"
-msgstr ""
+msgstr "¡Hola, este servidor ya es prémium!"
 
 #: src/commands/main.rs:223
 msgid "Hey, you are not in the [Support Server]({server_invite}) so I cannot validate your membership!"
@@ -330,7 +330,7 @@ msgstr ""
 
 #: src/commands/settings.rs:404
 msgid "Enabled"
-msgstr ""
+msgstr "Activado"
 
 #: src/commands/settings.rs:406
 msgid "Disabled"
@@ -350,7 +350,7 @@ msgstr ""
 
 #: src/commands/settings.rs:490
 msgid "Ignoring bots is now: {}"
-msgstr "Estoy ignorando los bots: {}"
+msgstr "Ignorar a los bots es ahora: {}"
 
 #: src/commands/settings.rs:511
 msgid "Requiring users to be in voice channel for TTS is now: {}"
