@@ -21,8 +21,8 @@ use itertools::Itertools;
 use poise::serenity_prelude as serenity;
 
 use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult, PoiseContextExt, ApplicationContext};
-use crate::funcs::{get_gtts_voices, random_footer, parse_user_or_guild};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
+use crate::funcs::{random_footer, parse_user_or_guild};
 use crate::macros::{require_guild, require};
 use crate::database;
 
@@ -284,7 +284,7 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
     };
 
     let voices: Box<dyn Iterator<Item=poise::AutocompleteChoice<String>>> = match mode {
-        TTSMode::gTTS => Box::new(get_gtts_voices().into_iter().map(|(value, name)| poise::AutocompleteChoice {name, value})) as _,
+        TTSMode::gTTS => Box::new(ctx.data.gtts_voices.clone().into_iter().map(|(value, name)| poise::AutocompleteChoice {name, value})) as _,
         TTSMode::eSpeak => Box::new(ctx.data.espeak_voices.clone().into_iter().map(poise::AutocompleteChoice::from)) as _,
         TTSMode::Premium => Box::new(
             ctx.data.premium_voices.iter().flat_map(|(language, variants)| {
@@ -401,7 +401,7 @@ where
 
 fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> bool {
     match mode {
-        TTSMode::gTTS => get_gtts_voices().contains_key(voice),
+        TTSMode::gTTS => data.gtts_voices.contains_key(voice),
         TTSMode::eSpeak => data.espeak_voices.contains(voice),
         TTSMode::Premium => {
             voice.split_once(' ')
@@ -1030,20 +1030,33 @@ pub async fn voices(
         None => parse_user_or_guild(data, author.id, ctx.guild_id()).await?.1
     };
 
-    let voices: String = {
-        let mut supported_langs = match mode {
-            TTSMode::gTTS => get_gtts_voices().into_iter().map(|(k, _)| k).collect(),
-            TTSMode::eSpeak => data.espeak_voices.clone(),
-            TTSMode::Premium => return list_premium_voices(ctx).await
-        };
+    let voices = {
+        fn format<'a>(mut iter: impl Iterator<Item=&'a String>) -> String {
+            let mut buf = String::with_capacity(iter.size_hint().0 * 2);
+            if let Some(first_elt) = iter.next() {
+                buf.push('`');
+                buf.push_str(first_elt);
+                buf.push('`');
+                for elt in iter {
+                    buf.push_str(", `");
+                    buf.push_str(elt);
+                    buf.push('`');
+                }
+            };
 
-        supported_langs.sort_unstable();
-        supported_langs.into_iter().map(|l| format!("`{l}`, ")).collect()
+            buf
+        }
+
+        match mode {
+            TTSMode::gTTS => format(data.gtts_voices.keys()),
+            TTSMode::eSpeak => format(data.espeak_voices.iter()),
+            TTSMode::Premium => return list_premium_voices(ctx).await
+        }
     };
 
     let cache = &ctx.discord().cache;
     let user_voice_row = data.user_voice_db.get((author.id.into(), mode)).await?;
-    ctx.send(|b| {b.embed(|e| {e
+    ctx.send(|b| b.embed(|e| e
         .title(cache.current_user_field(|u| ctx
             .gettext("{bot_user} Voices | Mode: `{mode}`")
             .replace("{bot_user}", &u.name)
@@ -1052,21 +1065,17 @@ pub async fn voices(
         .footer(|f| f.text(random_footer(
             &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
         )))
-        .author(|a| {a
+        .author(|a| a
             .name(author.name.clone())
             .icon_url(author.face())
-        })
-        .field(
-            ctx.gettext("Currently supported voices"),
-            voices.strip_suffix(", ").unwrap_or(&voices),
-            true
         )
+        .field(ctx.gettext("Currently supported voices"), voices, true)
         .field(
             ctx.gettext("Current voice used"),
             user_voice_row.voice.as_ref().map_or_else(|| ctx.gettext("None"), std::ops::Deref::deref),
             false
         )
-    })}).await?;
+    )).await?;
 
     Ok(())
 }

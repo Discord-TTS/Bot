@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::{sync::Arc, borrow::Cow};
 
 use strum_macros::IntoStaticStr;
@@ -68,8 +68,9 @@ pub struct Data {
     pub pool: sqlx::PgPool,
     pub config: MainConfig,
 
-    pub premium_voices: PremiumVoices,
+    pub gtts_voices: BTreeMap<String, String>,
     pub espeak_voices: Vec<String>,
+    pub premium_voices: BTreeMap<String, BTreeMap<String, Gender>>,
 }
 
 impl Data {
@@ -93,6 +94,17 @@ pub enum TTSMode {
 }
 
 impl TTSMode {
+    pub async fn fetch_voices(self, mut tts_service: reqwest::Url, reqwest: &reqwest::Client) -> Result<reqwest::Response> {
+        tts_service.set_path("voices");
+        tts_service.query_pairs_mut()
+            .append_pair("mode", self.into())
+            .finish();
+
+        reqwest
+            .get(tts_service).send().await?
+            .error_for_status().map_err(Into::into)
+    }
+
     pub const fn default_voice(self) -> &'static str {
         match self {
             Self::gTTS => "en",
@@ -261,7 +273,6 @@ pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Data, CommandErr
 
 pub type CommandError = Error;
 pub type CommandResult<E=Error> = Result<(), E>;
-pub type PremiumVoices = std::collections::BTreeMap<String, std::collections::BTreeMap<String, Gender>>;
 pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, (serenity::UserId, std::time::SystemTime)>;
 
 pub trait OptionTryUnwrap<T> {

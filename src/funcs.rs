@@ -24,9 +24,8 @@ use regex::{Captures, Regex};
 use rand::prelude::SliceRandom;
 
 use poise::serenity_prelude as serenity;
-use serenity::json::prelude as json;
 
-use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, PremiumVoices, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, JoinVCToken, TTSServiceError};
+use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, JoinVCToken, TTSServiceError};
 use crate::macros::require;
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
@@ -121,11 +120,9 @@ pub fn prepare_url(mut tts_service: reqwest::Url, content: &str, lang: &str, mod
 }
 
 
-pub fn get_premium_voices() -> PremiumVoices {
+pub fn prepare_premium_voices(raw_map: Vec<GoogleVoice<'_>>) -> BTreeMap<String, BTreeMap<String, Gender>> {
     // {lang_accent: {variant: gender}}
     let mut cleaned_map = BTreeMap::new();
-    let raw_map: Vec<GoogleVoice<'_>> = json::from_str(std::include_str!("data/langs-premium.json")).unwrap();    
-
     for gvoice in raw_map {
         let mode_variant: String = gvoice.name.split_inclusive('-').skip(2).collect();
         let (mode, variant) = mode_variant.split_once('-').unwrap();
@@ -143,24 +140,6 @@ pub fn get_premium_voices() -> PremiumVoices {
     }
 
     cleaned_map
-}
-
-pub async fn get_espeak_voices(reqwest: &reqwest::Client, mut tts_service: reqwest::Url) -> Result<Vec<String>, Error> {
-    tts_service.set_path("voices");
-    tts_service.query_pairs_mut()
-        .append_pair("mode", "eSpeak")
-        .finish();
-
-    Ok(
-        reqwest.get(tts_service)
-            .send().await?
-            .error_for_status()?
-            .json().await?
-        )
-}
-
-pub fn get_gtts_voices() -> BTreeMap<String, String> {
-    json::from_str(std::include_str!("data/langs-free.json")).unwrap()
 }
 
 pub fn random_footer<'a>(server_invite: &str, client_id: u64, catalog: &'a gettext::Catalog) -> Cow<'a, str> {
