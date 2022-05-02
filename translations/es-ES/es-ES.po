@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-01 13:08+0000\n"
-"PO-Revision-Date: 2022-05-01 21:41\n"
+"PO-Revision-Date: 2022-05-02 13:00\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -23,7 +23,7 @@ msgstr "has ejecutado este comando en el canal incorrecto"
 
 #: src/commands/main.rs:34
 msgid "do `/channel` get the channel that has been setup"
-msgstr ""
+msgstr "usar `/channel` ver el canal que se ha cónfigurado"
 
 #: src/commands/main.rs:57
 msgid "you need to be in a voice channel to make me join your voice channel"
