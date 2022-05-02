@@ -16,13 +16,14 @@
 use std::borrow::Cow;
 
 use sysinfo::{SystemExt, ProcessExt};
-use poise::serenity_prelude::{self as serenity, Mentionable};
 use num_format::{Locale, ToFormattedString};
 
-use crate::constants::{OPTION_SEPERATORS};
-use crate::funcs::{bool_button, fetch_audio, parse_user_or_guild, refresh_kind, prepare_url};
-use crate::structs::{Context, TTSMode, OptionTryUnwrap, CommandResult, PoiseContextExt};
+use poise::serenity_prelude::{self as serenity, Mentionable as _};
+
 use crate::require;
+use crate::constants::OPTION_SEPERATORS;
+use crate::funcs::{bool_button, fetch_audio, parse_user_or_guild, refresh_kind, prepare_url};
+use crate::structs::{ApplicationContext, Context, CommandResult, OptionTryUnwrap, PoiseContextExt, TTSMode};
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
@@ -32,25 +33,22 @@ pub async fn uptime(ctx: Context<'_>,) -> CommandResult {
         .gettext("{user_mention} has been up since: <t:{timestamp}:R>")
         .replace("{user_mention}", &ctx.author().mention().to_string())
         .replace("{timestamp}", &timestamp.to_string())
-    ).await.map(|_| ()).map_err(Into::into)
+    ).await.map(drop).map_err(Into::into)
 }
 
 /// Generates TTS and sends it in the current text channel!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | ATTACH_FILES")]
 pub async fn tts(
-    ctx: Context<'_>, 
+    ctx: Context<'_>,
     #[description="The text to TTS"] #[rest] message: String
 ) -> CommandResult {
-    let data = ctx.data();
-    let author = ctx.author();
-
     if let poise::Context::Prefix(_) = ctx {
         if let Some(guild) = ctx.guild() {
-            let author_voice_state = guild.voice_states.get(&author.id);
+            let author_voice_state = guild.voice_states.get(&ctx.author().id);
             let bot_voice_state = guild.voice_states.get(&ctx.discord().cache.current_user_id());
             if let (Some(bot_voice_state), Some(author_voice_state)) = (bot_voice_state, author_voice_state) {
                 if bot_voice_state.channel_id == author_voice_state.channel_id {
-                    let setup_channel = data.guilds_db.get(guild.id.into()).await?.channel;
+                    let setup_channel = ctx.data().guilds_db.get(guild.id.into()).await?.channel;
                     if setup_channel as u64 == ctx.channel_id().0 {
                         ctx.say(ctx.gettext("You don't need to include the `/tts` for messages to be said!")).await?;
                         return Ok(())
@@ -60,7 +58,12 @@ pub async fn tts(
         }
     }
 
+    _tts(ctx, ctx.author(), &message).await
+}
+
+async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> CommandResult {
     let attachment = {
+        let data = ctx.data();
         let (voice, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
 
         let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
@@ -74,7 +77,7 @@ pub async fn tts(
 
         let url = prepare_url(
             data.config.tts_service.clone(),
-            &message, &voice, mode,
+            message, &voice, mode,
             &speaking_rate.to_string(), &u64::MAX.to_string()
         );
 
@@ -89,13 +92,22 @@ pub async fn tts(
     };
 
     ctx.defer().await?;
-    ctx.send(|b| {b
+    ctx.send(|b| b
         .content(ctx.gettext("Generated some TTS!"))
         .attachment(attachment)
-    }).await?;
-
-    Ok(())
+    ).await.map(drop).map_err(Into::into)
 }
+
+#[poise::command(category="Extra Commands", hide_in_help, context_menu_command="Speak with their voice!")]
+pub async fn tts_speak_as(ctx: ApplicationContext<'_>, message: serenity::Message) -> CommandResult {
+    _tts(ctx.into(), &message.author, &message.content).await
+}
+
+#[poise::command(category="Extra Commands", hide_in_help, context_menu_command="Speak with your voice!")]
+pub async fn tts_speak(ctx: ApplicationContext<'_>, message: serenity::Message) -> CommandResult {
+    _tts(ctx.into(), ctx.interaction.user(), &message.content).await
+}
+
 
 /// Shows various different stats
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
@@ -158,7 +170,7 @@ and can be used by {total_members} people!")
             .replace("{total_members}", &total_members)
             .replace("{shard_count}", &shard_count.to_string())
             .replace("{ram_usage}", &format!("{ram_usage:.1}"))
-    )})}).await.map(|_| ()).map_err(Into::into)
+    )})}).await.map(drop).map_err(Into::into)
 }
 
 /// Shows the current setup channel!
@@ -183,7 +195,7 @@ pub async fn donate(ctx: Context<'_>,) -> CommandResult {
     ctx.say(ctx.gettext("
 To donate to support the development and hosting of TTS Bot and get access to TTS Bot Premium, a more stable version of this bot with more and better voices you can donate via Patreon!
 https://www.patreon.com/Gnome_the_Bot_Maker
-    ")).await.map(|_| ()).map_err(Into::into)
+    ")).await.map(drop).map_err(Into::into)
 }
 
 /// Gets current ping to discord!
@@ -258,5 +270,5 @@ pub async fn invite(ctx: Context<'_>,) -> CommandResult {
                 .replace("{server_invite}", &config.main_server_invite)
             ).try_unwrap()?
         }
-    ).await.map(|_| ()).map_err(Into::into)
+    ).await.map(drop).map_err(Into::into)
 }

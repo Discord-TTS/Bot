@@ -124,7 +124,7 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
                     ctx.say(ctx
                         .gettext("The group {group_name} does not have a subcommand called {subcommand_name}!")
                         .replace("{subcommand_name}", &remaining_args).replace("{group_name}", command_obj.name)
-                    ).await.map(|_| ()).map_err(Into::into)
+                    ).await.map(drop).map_err(Into::into)
                 });
             };
 

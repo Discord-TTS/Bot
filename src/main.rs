@@ -58,17 +58,17 @@ enum EntryCheck {
 async fn get_webhooks(
     http: &serenity::Http,
     webhooks_raw: toml::value::Table,
-) -> HashMap<String, serenity::Webhook> {
+) -> Result<HashMap<String, serenity::Webhook>> {
     let mut webhooks = HashMap::with_capacity(webhooks_raw.len());
 
     for (name, url) in webhooks_raw {
         let url = url.as_str().unwrap().parse().unwrap();
         let (webhook_id, token) = serenity::parse_webhook(&url).unwrap();
 
-        webhooks.insert(name, http.get_webhook_with_token(webhook_id, token).await.unwrap());
+        webhooks.insert(name, http.get_webhook_with_token(webhook_id, token).await?);
     }
 
-    webhooks
+    Ok(webhooks)
 }
 
 fn main() -> Result<()> {
@@ -172,7 +172,7 @@ async fn _main() -> Result<()> {
 
     let (startup_message, webhooks) = {
         let http = serenity::Http::new(main.token.as_deref().unwrap());
-        let webhooks = get_webhooks(&http, webhooks).await;
+        let webhooks = get_webhooks(&http, webhooks).await?;
         (
             webhooks["logs"].execute(&http, true, |b| b
                 .content("**TTS Bot is starting up**")
@@ -277,6 +277,7 @@ async fn _main() -> Result<()> {
 
                 commands::other::tts(), commands::other::uptime(), commands::other::botstats(), commands::other::channel(),
                 commands::other::donate(), commands::other::ping(), commands::other::suggest(), commands::other::invite(),
+                commands::other::tts_speak(), commands::other::tts_speak_as(),
 
                 commands::settings::settings(),
                 poise::Command {

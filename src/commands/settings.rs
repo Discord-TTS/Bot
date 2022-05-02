@@ -167,7 +167,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{speaking_rate}", &speaking_rate)
             .replace("{speaking_rate_kind}", speaking_rate_kind),
         false)
-    })}).await.map(|_| ()).map_err(Into::into)
+    })}).await.map(drop).map_err(Into::into)
 }
 
 

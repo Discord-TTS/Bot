@@ -130,7 +130,7 @@ Nickname Data: `{nick_row:?}`
 User Voice Data: `{user_voice_row:?}`
 Guild Voice Data: `{guild_voice_row:?}`
 "))
-    })}).await.map(|_| ()).map_err(Into::into)
+    })}).await.map(drop).map_err(Into::into)
 }
 
 

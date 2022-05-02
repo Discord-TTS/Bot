@@ -56,7 +56,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         ctx.send_error(
             ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
             Some(ctx.gettext("join a voice channel and try again")),
-        ).await.map(|_| ())
+        ).await.map(drop)
     });
 
     let ctx_discord = ctx.discord();
