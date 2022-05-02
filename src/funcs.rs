@@ -40,14 +40,16 @@ pub async fn generate_status(framework: &Framework) -> (String, bool) {
     let shard_manager = shard_manager_lock.lock().await;
     let shards = shard_manager.runners.lock().await;
 
-    let mut status: Vec<_> = shards
-        .iter()
-        .map(|(id, shard)| format!("Shard {id}: `{}`", shard.stage))
+    let mut status: Vec<_> = shards.iter()
+        .map(|(id, shard)| (id, format!("Shard {id}: `{}`", shard.stage)))
         .collect();
 
-    status.sort_unstable();
+    status.sort_unstable_by_key(|(id, _)| *id);
 
-    (status.join("\n"), shards.values().any(|shard| shard.stage.is_connecting()))
+    (
+        status.into_iter().map(|(_, status)| status).join("\n"),
+        shards.values().any(|shard| shard.stage.is_connecting())
+    )
 }
 
 
