@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-01 13:08+0000\n"
-"PO-Revision-Date: 2022-05-02 13:00\n"
+"PO-Revision-Date: 2022-05-03 19:42\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -51,7 +51,7 @@ msgstr "¡ya estoy en <#{channel_id}>!"
 
 #: src/commands/main.rs:105
 msgid "Joined your voice channel!"
-msgstr ""
+msgstr "¡he unido tu canal de voz!"
 
 #: src/commands/main.rs:106
 msgid "Just type normally and TTS Bot will say your messages!"
@@ -79,7 +79,7 @@ msgstr "¡Hola, este servidor ya es prémium!"
 
 #: src/commands/main.rs:223
 msgid "Hey, you are not in the [Support Server]({server_invite}) so I cannot validate your membership!"
-msgstr ""
+msgstr "¡Hola! No estás en el [support server] ({server_invite}) y no peudo validar tu afiliación"
 
 #: src/commands/main.rs:238
 msgid "Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier"
