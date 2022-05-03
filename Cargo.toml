@@ -14,7 +14,6 @@ rand = "0.8"
 toml = "0.5"
 anyhow = "1"
 sha2 = "0.10"
-poise = "0.1"
 strfmt = "0.1"
 indexmap = "1"
 once_cell = "1"
@@ -38,6 +37,7 @@ features = ["macros", "postgres", "runtime-tokio-rustls"]
 
 [dependencies.reqwest]
 version = "0.11"
+default-features = false
 features = ["rustls-tls"]
 
 [dependencies.dashmap]
@@ -48,10 +48,11 @@ default-features = false
 version = "1"
 features = ["rt-multi-thread", "signal", "parking_lot"]
 
+[dependencies.poise]
+git = "https://github.com/GnomedDev/poise"
+branch = "cutting-edge"
+
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "next"
-
-[patch."https://github.com/serenity-rs/serenity"]
-serenity = { version = "0.11.1" }

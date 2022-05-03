@@ -333,6 +333,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
                 ))
             ).await?;
         },
+        poise::FrameworkError::__NonExhaustive => panic!(),
     }
 
     Ok(())
