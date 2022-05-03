@@ -252,6 +252,7 @@ async fn _main() -> Result<()> {
             })
         })})
         .options(poise::FrameworkOptions {
+            command_check: Some(|ctx| Box::pin(async move {Ok(!ctx.author().bot)})),
             allowed_mentions: Some({
                 let mut allowed_mentions = serenity::CreateAllowedMentions::default();
                 allowed_mentions.parse(serenity::ParseValue::Users);
@@ -264,7 +265,10 @@ async fn _main() -> Result<()> {
                 analytics_handler.log(Cow::Owned(ctx.command().qualified_name.clone()));
                 analytics_handler.log(Cow::Borrowed(match ctx {
                     poise::Context::Prefix(_) => "on_command",
-                    poise::Context::Application(_) => "on_slash_command",
+                    poise::Context::Application(ctx) => match ctx.interaction {
+                        poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(_) => "on_slash_command",
+                        poise::ApplicationCommandOrAutocompleteInteraction::Autocomplete(_) => "on_autocomplete",
+                    },
                 }));
             }),
             on_error: |error| Box::pin(async move {error::handle(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err))}),
@@ -393,11 +397,9 @@ impl serenity::EventHandler for EventHandler {
                 && !new.member // user other than bot leaving
                     .as_ref()
                     .map_or(false, |m| m.user.id == bot_id)
-                && !ctx.cache // filter out bots from members
-                    .guild_channel(old.as_ref().unwrap().channel_id.unwrap())
-                    .try_unwrap()?
+                && require!(ctx.cache.guild_channel(old.as_ref().unwrap().channel_id.unwrap()), Ok(()))
                     .members(&ctx.cache).await?
-                    .iter().any(|m| !m.user.bot)
+                    .iter().all(|m| !m.user.bot)
             {
                 songbird.remove(guild_id).await?;
             };
