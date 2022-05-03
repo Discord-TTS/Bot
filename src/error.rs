@@ -326,7 +326,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
         poise::FrameworkError::NotAnOwner{ctx: _} => {},
         poise::FrameworkError::GuildOnly {ctx} => {
             ctx.send_error(
-                &ctx.gettext("{command_name} cannot be used in private messages").replace("{}", &ctx.command().qualified_name),
+                &ctx.gettext("{command_name} cannot be used in private messages").replace("{command_name}", &ctx.command().qualified_name),
                 Some(&ctx.discord().cache.current_user_field(|b| ctx
                     .gettext("try running it on a server with {bot_name} in")
                     .replace("{bot_name}", &b.name)

@@ -690,8 +690,19 @@ async fn process_tts_msg(
             None => {
                 // At this point, the bot is "in" the voice channel, but without a voice client,
                 // this is usually if the bot restarted but the bot is still in the vc from the last boot.
+                let voice_channel_id =
+                    ctx.cache.guild_field(
+                        guild_id,
+                        |g| g
+                            .voice_states
+                            .get(&message.author.id)
+                            .and_then(|vs| vs.channel_id)
+                    )
+                    .try_unwrap()?
+                    .try_unwrap()?;
+
                 let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-                ctx.join_vc(join_vc_lock.lock().await, message.channel_id).await?
+                ctx.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
             }
         };
 
