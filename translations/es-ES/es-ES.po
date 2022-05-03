@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-01 13:08+0000\n"
-"PO-Revision-Date: 2022-05-03 19:42\n"
+"PO-Revision-Date: 2022-05-03 21:13\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -95,11 +95,11 @@ msgstr "¡no peudo buscar un comando se llama {}!"
 
 #: src/commands/help.rs:125
 msgid "The group {group_name} does not have a subcommand called {subcommand_name}!"
-msgstr ""
+msgstr "El grupo {group_name} no tiene un subcomando se llama {subcommand_name}"
 
 #: src/commands/help.rs:132
 msgid "This command is only available to the bot owner!"
-msgstr ""
+msgstr "Este comando puede utilizarse al dueño del bot soló"
 
 #: src/commands/help.rs:146
 msgid "{command_name} Help!"
@@ -107,11 +107,11 @@ msgstr "{command_name} ¡Ayuda!"
 
 #: src/commands/help.rs:154
 msgid "Command description not found!"
-msgstr ""
+msgstr "No se ha encontrado la descripción del comando."
 
 #: src/commands/help.rs:159
 msgid "__**Parameter Descriptions**__\n"
-msgstr ""
+msgstr "__**Descripción de parámetros**__\n"
 
 #: src/commands/help.rs:161
 msgid "no description"
@@ -180,7 +180,7 @@ msgstr ""
 
 #: src/commands/other.rs:196
 msgid "Current Latency: {}ms"
-msgstr ""
+msgstr "Latencia actual: {}ms"
 
 #: src/commands/other.rs:216
 msgid "Are you sure you want to make a suggestion to {bot_name}?"
