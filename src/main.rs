@@ -88,7 +88,15 @@ async fn _main() -> Result<()> {
         let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
 
         // Setup database pool
-        let pool = sqlx::PgPool::connect_with(
+
+        let pool_config = sqlx::postgres::PgPoolOptions::new();
+        let pool_config = if let Some(max_connections) = postgres.max_connections {
+            pool_config.max_connections(max_connections)
+        } else {
+            pool_config
+        };
+
+        let pool = pool_config.connect_with(
             sqlx::postgres::PgConnectOptions::new()
             .host(&postgres.host)
             .username(&postgres.user)
@@ -223,12 +231,13 @@ async fn _main() -> Result<()> {
                         .map(Result::unwrap)
                         .filter(filter_entry(EntryCheck::IsFile))
                         .filter(|e| e.path().extension().map_or(false, |e| e == "mo"))
-                        .map(|entry| Ok((
+                        .map(|entry| Ok::<_, anyhow::Error>((
                             entry.file_name().to_str().unwrap().split('.').next().unwrap().to_string(),
                             gettext::Catalog::parse(std::fs::File::open(entry.path())?)?
                         )))
+                        .filter_map(Result::ok)
                     )
-                    .collect::<Result<_, anyhow::Error>>()?;
+                    .collect();
 
             let reqwest = reqwest::Client::new();
 

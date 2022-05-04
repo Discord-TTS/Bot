@@ -25,7 +25,7 @@ use rand::prelude::SliceRandom;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, JoinVCToken, TTSServiceError};
+use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, JoinVCToken, TTSServiceError, OptionGettext};
 use crate::macros::require;
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
@@ -144,7 +144,7 @@ pub fn prepare_premium_voices(raw_map: Vec<GoogleVoice<'_>>) -> BTreeMap<String,
     cleaned_map
 }
 
-pub fn random_footer<'a>(server_invite: &str, client_id: u64, catalog: &'a gettext::Catalog) -> Cow<'a, str> {
+pub fn random_footer<'a>(server_invite: &str, client_id: u64, catalog: Option<&'a gettext::Catalog>) -> Cow<'a, str> {
     [
         Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
         Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),

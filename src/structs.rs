@@ -37,6 +37,7 @@ pub struct PostgresConfig {
     pub user: String,
     pub database: String,
     pub password: String,
+    pub max_connections: Option<u32>
 }
 
 pub struct JoinVCToken (pub serenity::GuildId);
@@ -74,8 +75,8 @@ pub struct Data {
 }
 
 impl Data {
-    pub fn default_catalog(&self) -> &gettext::Catalog {
-        self.translations.get("en-US").unwrap()
+    pub fn default_catalog(&self) -> Option<&gettext::Catalog> {
+        self.translations.get("en-US")
     }
 }
 
@@ -98,6 +99,7 @@ impl TTSMode {
         tts_service.set_path("voices");
         tts_service.query_pairs_mut()
             .append_pair("mode", self.into())
+            .append_pair("raw", "true")
             .finish();
 
         reqwest
@@ -278,12 +280,15 @@ pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, (serenity::Use
 pub trait OptionTryUnwrap<T> {
     fn try_unwrap(self) -> Result<T>;
 }
+pub trait OptionGettext<'a> {
+    fn gettext(self, translate: &'a str) -> &'a str;
+}
 
 #[serenity::async_trait]
 pub trait PoiseContextExt {
     async fn neutral_colour(&self) -> u32;
-    fn current_catalog(&self) -> &gettext::Catalog;
     fn gettext<'a>(&'a self, translate: &'a str) -> &'a str;
+    fn current_catalog(&self) -> Option<&gettext::Catalog>;
     async fn author_permissions(&self) -> Result<serenity::Permissions>;
     async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>>;
 }
@@ -303,7 +308,7 @@ impl PoiseContextExt for Context<'_> {
         self.current_catalog().gettext(translate)
     }
 
-    fn current_catalog(&self) -> &gettext::Catalog {
+    fn current_catalog(&self) -> Option<&gettext::Catalog> {
         let catalog = if let poise::Context::Application(ctx) = self {
             ctx.data.translations.get(match ctx.interaction.unwrap().locale.as_str() {
                 "ko" => "ko-KR",
@@ -314,7 +319,7 @@ impl PoiseContextExt for Context<'_> {
             None
         };
 
-        catalog.unwrap_or_else(|| self.data().default_catalog())
+        catalog.or_else(|| self.data().default_catalog())
     }
 
     async fn neutral_colour(&self) -> u32 {
@@ -438,5 +443,11 @@ impl<T> OptionTryUnwrap<T> for Option<T> {
                 anyhow::anyhow!("Unexpected None value on line {} in {}", location.line(), location.file())
             })
         }
+    }
+}
+
+impl<'a> OptionGettext<'a> for Option<&'a gettext::Catalog> {
+    fn gettext(self, translate: &'a str) -> &'a str {
+        self.map_or(translate, |c| c.gettext(translate))
     }
 }

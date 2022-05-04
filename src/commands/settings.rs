@@ -20,7 +20,7 @@ use itertools::Itertools;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult, PoiseContextExt, ApplicationContext};
+use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult, PoiseContextExt, ApplicationContext, OptionGettext};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::funcs::{random_footer, parse_user_or_guild};
 use crate::macros::{require_guild, require};
@@ -428,7 +428,7 @@ async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Result
 
 
 
-fn to_enabled(catalog: &gettext::Catalog, value: bool) -> &str {
+fn to_enabled(catalog: Option<&gettext::Catalog>, value: bool) -> &str {
     if value {
         catalog.gettext("Enabled")
     } else {
