@@ -406,9 +406,11 @@ impl serenity::EventHandler for EventHandler {
                 && !new.member // user other than bot leaving
                     .as_ref()
                     .map_or(false, |m| m.user.id == bot_id)
-                && require!(ctx.cache.guild_channel(old.as_ref().unwrap().channel_id.unwrap()), Ok(()))
+                && !ctx.cache // filter out bots from members
+                    .guild_channel(old.as_ref().unwrap().channel_id.unwrap())
+                    .try_unwrap()?
                     .members(&ctx.cache).await?
-                    .iter().all(|m| !m.user.bot)
+                    .iter().any(|m| !m.user.bot)
             {
                 songbird.remove(guild_id).await?;
             };
