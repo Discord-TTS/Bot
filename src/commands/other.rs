@@ -31,7 +31,7 @@ pub async fn uptime(ctx: Context<'_>,) -> CommandResult {
     let timestamp = ctx.data().start_time.duration_since(std::time::UNIX_EPOCH)?.as_secs();
     ctx.say(ctx
         .gettext("{user_mention} has been up since: <t:{timestamp}:R>")
-        .replace("{user_mention}", &ctx.author().mention().to_string())
+        .replace("{user_mention}", &ctx.discord().cache.current_user_field(|u| u.mention().to_string()))
         .replace("{timestamp}", &timestamp.to_string())
     ).await.map(drop).map_err(Into::into)
 }
