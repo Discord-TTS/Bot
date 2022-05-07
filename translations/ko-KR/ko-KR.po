@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-01 13:08+0000\n"
-"PO-Revision-Date: 2022-05-01 15:36\n"
+"PO-Revision-Date: 2022-05-07 09:00\n"
 "Last-Translator: \n"
 "Language-Team: Korean\n"
 "Language: ko_KR\n"
@@ -19,7 +19,7 @@ msgstr ""
 
 #: src/commands/main.rs:33
 msgid "you ran this command in the wrong channel"
-msgstr ""
+msgstr "dsdzds"
 
 #: src/commands/main.rs:34
 msgid "do `/channel` get the channel that has been setup"
