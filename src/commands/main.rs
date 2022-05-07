@@ -251,7 +251,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
 
     data.userinfo_db.create_row(author_id).await?;
     data.guilds_db.set_one(guild.id.into(), "premium_user", &author_id).await?;
-    data.guilds_db.set_one(guild.id.into(), "voice_mode", &TTSMode::Premium).await?;
+    data.guilds_db.set_one(guild.id.into(), "voice_mode", &TTSMode::gCloud).await?;
 
     ctx.say(ctx.gettext("Done! This server is now premium!")).await?;
 

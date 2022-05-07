@@ -244,7 +244,7 @@ async fn _main() -> Result<()> {
             let gtts_voices = TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest).await?.json().await?;
             let espeak_voices = TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest).await?.json().await?;
 
-            let premium_voices_raw = TTSMode::Premium.fetch_voices(main.tts_service.clone(), &reqwest).await?.bytes().await?;
+            let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest).await?.bytes().await?;
             let premium_voices = prepare_premium_voices(serenity::json::prelude::from_slice(&premium_voices_raw)?);
 
             Ok(Data {

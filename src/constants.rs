@@ -41,7 +41,7 @@ pub const DB_SETUP_QUERY: &str = "
     CREATE type TTSMode AS ENUM (
         'gtts',
         'espeak',
-        'premium'
+        'gcloud',
     );
 
     CREATE TABLE userinfo (

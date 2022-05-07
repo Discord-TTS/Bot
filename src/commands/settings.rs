@@ -27,7 +27,7 @@ use crate::macros::{require_guild, require};
 use crate::database;
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
-    if mode == TTSMode::Premium {
+    if mode == TTSMode::gCloud {
         let (lang, variant) = voice.split_once(' ').unwrap();
         let gender = &data.premium_voices[lang][variant];
         Cow::Owned(format!("{lang} - {variant} ({gender})"))
@@ -286,7 +286,7 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
     let voices: Box<dyn Iterator<Item=poise::AutocompleteChoice<String>>> = match mode {
         TTSMode::gTTS => Box::new(ctx.data.gtts_voices.clone().into_iter().map(|(value, name)| poise::AutocompleteChoice {name, value})) as _,
         TTSMode::eSpeak => Box::new(ctx.data.espeak_voices.clone().into_iter().map(poise::AutocompleteChoice::from)) as _,
-        TTSMode::Premium => Box::new(
+        TTSMode::gCloud => Box::new(
             ctx.data.premium_voices.iter().flat_map(|(language, variants)| {
                 variants.iter().map(move |(variant, gender)| {
                     poise::AutocompleteChoice {
@@ -334,7 +334,7 @@ where
     RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
 {
     let data = ctx.data();
-    if mode == Some(TTSMode::Premium) && crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_some() {
+    if mode == Some(TTSMode::gCloud) && crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_some() {
         ctx.send(|b| b.embed(|e| {e
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
@@ -403,7 +403,7 @@ fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> bool {
     match mode {
         TTSMode::gTTS => data.gtts_voices.contains_key(voice),
         TTSMode::eSpeak => data.espeak_voices.contains(voice),
-        TTSMode::Premium => {
+        TTSMode::gCloud => {
             voice.split_once(' ')
                 .and_then(|(language, variant)| data.premium_voices.get(language).map(|l| (l, variant)))
                 .map_or(false, |(ls, v)| ls.contains_key(v))
@@ -1050,7 +1050,7 @@ pub async fn voices(
         match mode {
             TTSMode::gTTS => format(data.gtts_voices.keys()),
             TTSMode::eSpeak => format(data.espeak_voices.iter()),
-            TTSMode::Premium => return list_premium_voices(ctx).await
+            TTSMode::gCloud => return list_premium_voices(ctx).await
         }
     };
 
@@ -1086,7 +1086,7 @@ pub async fn list_premium_voices(ctx: Context<'_>) -> Result<()> {
 
     let (lang_variant, mode) = parse_user_or_guild(data, ctx.author().id, ctx.guild_id()).await?;
     let (lang, variant) = match mode {
-        TTSMode::Premium => lang_variant.split_once(' ').unwrap(),
+        TTSMode::gCloud => lang_variant.split_once(' ').unwrap(),
         _ => ("en-US", "A")
     };
 

@@ -65,7 +65,7 @@ async fn migrate_speaking_rate_to_mode(transaction: &mut Transaction<'_>) -> Res
 
             if (speaking_rate - 1.0).abs() > f32::EPSILON {
                 let user_id: i64 = row.get("user_id");
-                transaction.execute(sqlx::query(insert_query).bind(user_id).bind(TTSMode::Premium).bind(speaking_rate)).await?;
+                transaction.execute(sqlx::query(insert_query).bind(user_id).bind(TTSMode::gCloud).bind(speaking_rate)).await?;
             }
         } else {
             break
@@ -162,6 +162,8 @@ async fn _run(main_config: &mut toml::value::Table, transaction: &mut Transactio
 
         INSERT INTO user_voice  (user_id, mode)         VALUES(0, 'gtts')       ON CONFLICT (user_id, mode)  DO NOTHING;
         INSERT INTO guild_voice (guild_id, mode, voice) VALUES(0, 'gtts', 'en') ON CONFLICT (guild_id, mode) DO NOTHING;
+
+        ALTER TYPE TTSMode RENAME 'premium' to 'gcloud';
     ").await?;
 
     migrate_single_to_modes(transaction, "userinfo", "user_voice", "voice", "user_id").await?;

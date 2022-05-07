@@ -91,7 +91,7 @@ impl Data {
 pub enum TTSMode {
     gTTS,
     eSpeak,
-    Premium
+    gCloud,
 }
 
 impl TTSMode {
@@ -111,7 +111,7 @@ impl TTSMode {
         match self {
             Self::gTTS => "en",
             Self::eSpeak => "en1",
-            Self::Premium => "en-US A",
+            Self::gCloud => "en-US A",
         }
     }
 
@@ -119,7 +119,7 @@ impl TTSMode {
     pub const fn speaking_rate_info(self) -> Option<(f32, f32, f32, &'static str)> {
         match self {
             Self::gTTS => None,
-            Self::Premium => Some((0.25, 1.0, 4.0, "x")),
+            Self::gCloud => Some((0.25, 1.0, 4.0, "x")),
             Self::eSpeak => Some((100.0, 175.0, 400.0, " words per minute")),
         }
     }
@@ -143,7 +143,7 @@ pub enum TTSModeServerChoice {
     // Name to show in slash command invoke           Aliases for prefix
     #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       gTTS,
     #[name="eSpeak TTS (male)"]                       #[name="espeak"]     eSpeak,
-    #[name="Premium TTS (changable)"]                 #[name="premium"]    Premium,
+    #[name="gCloud TTS (changable)"]                  #[name="gcloud"]     gCloud,
 }
 
 #[derive(poise::ChoiceParameter)]
@@ -159,7 +159,7 @@ impl From<TTSModeServerChoice> for TTSMode {
         match mode {
             TTSModeServerChoice::gTTS => Self::gTTS,
             TTSModeServerChoice::eSpeak => Self::eSpeak,
-            TTSModeServerChoice::Premium => Self::Premium
+            TTSModeServerChoice::gCloud => Self::gCloud
         }
     }
 }
@@ -325,7 +325,7 @@ impl PoiseContextExt for Context<'_> {
     async fn neutral_colour(&self) -> u32 {
         if let Some(guild_id) = self.guild_id() {
             let row = self.data().guilds_db.get(guild_id.0 as i64).await;
-            if row.map(|row| row.voice_mode == TTSMode::Premium).unwrap_or(false) {
+            if row.map(|row| row.voice_mode == TTSMode::gCloud).unwrap_or(false) {
                 return PREMIUM_NEUTRAL_COLOUR
             }
         }

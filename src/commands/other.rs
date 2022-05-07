@@ -86,7 +86,7 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
                 TTSMode::gTTS => "mp3",
                 TTSMode::eSpeak => "wav",
-                TTSMode::Premium => "ogg"
+                TTSMode::gCloud => "ogg"
             })
         }
     };
