@@ -62,6 +62,7 @@ pub async fn tts(
 }
 
 async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> CommandResult {
+    let audio;
     let attachment = {
         let data = ctx.data();
         let (voice, mode) = parse_user_or_guild(data, ctx.discord(), author.id, ctx.guild_id()).await?;
@@ -81,8 +82,10 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             &speaking_rate.to_string(), &u64::MAX.to_string()
         );
 
+        audio = fetch_audio(&data.reqwest, url, data.config.tts_service_auth_key.as_deref()).await?.try_unwrap()?.bytes().await?;
+
         serenity::AttachmentType::Bytes {
-            data: Cow::Owned(fetch_audio(&data.reqwest, url).await?.try_unwrap()?.bytes().await?.into_iter().collect()),
+            data: Cow::Borrowed(&audio),
             filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
                 TTSMode::gTTS => "mp3",
                 TTSMode::eSpeak => "wav",

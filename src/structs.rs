@@ -20,6 +20,7 @@ pub struct Config {
 
 #[derive(serde::Deserialize)]
 pub struct MainConfig {
+    pub tts_service_auth_key: Option<String>,
     pub translation_token: Option<String>,
     pub patreon_role: serenity::RoleId,
     pub main_server: serenity::GuildId,
@@ -97,7 +98,7 @@ pub enum TTSMode {
 }
 
 impl TTSMode {
-    pub async fn fetch_voices(self, mut tts_service: reqwest::Url, reqwest: &reqwest::Client) -> Result<reqwest::Response> {
+    pub async fn fetch_voices(self, mut tts_service: reqwest::Url, reqwest: &reqwest::Client, auth_key: Option<&str>) -> Result<reqwest::Response> {
         tts_service.set_path("voices");
         tts_service.query_pairs_mut()
             .append_pair("mode", self.into())
@@ -105,8 +106,9 @@ impl TTSMode {
             .finish();
 
         reqwest
-            .get(tts_service).send().await?
-            .error_for_status().map_err(Into::into)
+            .get(tts_service)
+            .header("Authorization", auth_key.unwrap_or(""))
+            .send().await?.error_for_status().map_err(Into::into)
     }
 
     pub const fn is_premium(self) -> bool {

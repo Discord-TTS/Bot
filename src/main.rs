@@ -240,14 +240,15 @@ async fn _main() -> Result<()> {
                     .collect();
 
             let reqwest = reqwest::Client::new();
+            let auth_key = main.tts_service_auth_key.as_deref();
 
-            let gtts_voices = TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest).await?.json().await?;
-            let espeak_voices = TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest).await?.json().await?;
+            let gtts_voices = TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
+            let espeak_voices = TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
 
-            let polly_voices_raw: Vec<PollyVoice> = TTSMode::Polly.fetch_voices(main.tts_service.clone(), &reqwest).await?.json().await?;
+            let polly_voices_raw: Vec<PollyVoice> = TTSMode::Polly.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
             let polly_voices = polly_voices_raw.into_iter().map(|v| (v.id.clone(), v)).collect();
 
-            let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest).await?.bytes().await?;
+            let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?;
             let premium_voices = prepare_premium_voices(serenity::json::prelude::from_slice(&premium_voices_raw)?);
 
             Ok(Data {
@@ -694,7 +695,7 @@ async fn process_tts_msg(
     );
 
     // Pre-caches the audio and handles max_length errors
-    if funcs::fetch_audio(&data.reqwest, url.clone()).await?.is_none() {
+    if funcs::fetch_audio(&data.reqwest, url.clone(), data.config.tts_service_auth_key.as_deref()).await?.is_none() {
         return Ok(());
     }
 

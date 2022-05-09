@@ -99,8 +99,12 @@ pub async fn parse_user_or_guild(
 }
 
 
-pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url) -> Result<Option<reqwest::Response>> {
-    let resp = reqwest.get(url).send().await?;
+pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url, auth_key: Option<&str>) -> Result<Option<reqwest::Response>> {
+    let resp = reqwest
+        .get(url)
+        .header("Authorization", auth_key.unwrap_or(""))
+        .send().await?;
+
     match resp.error_for_status_ref() {
         Ok(_) => Ok(Some(resp)),
         Err(backup_err) => {
