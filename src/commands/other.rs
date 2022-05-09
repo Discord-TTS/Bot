@@ -94,7 +94,6 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
         }
     };
 
-    ctx.defer().await?;
     ctx.send(|b| b
         .content(ctx.gettext("Generated some TTS!"))
         .attachment(attachment)
@@ -115,8 +114,6 @@ pub async fn tts_speak(ctx: ApplicationContext<'_>, message: serenity::Message) 
 /// Shows various different stats
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
 pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
-    ctx.defer_or_broadcast().await?;
-
     let data = ctx.data();
     let ctx_discord = ctx.discord();
     let bot_user_id = ctx_discord.cache.current_user_id();
