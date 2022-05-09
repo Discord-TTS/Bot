@@ -256,7 +256,7 @@ pub enum TTSServiceErrorCode {
 }
 
 impl TTSServiceErrorCode {
-    pub fn should_ignore(self) -> bool {
+    pub const fn should_ignore(self) -> bool {
         matches!(self, Self::AudioTooLong)
     }
 }

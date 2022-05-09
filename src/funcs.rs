@@ -26,7 +26,7 @@ use rand::prelude::SliceRandom;
 use poise::serenity_prelude as serenity;
 
 use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, JoinVCToken, TTSServiceError, OptionGettext};
-use crate::macros::require;
+use crate::require;
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
     sysinfo::RefreshKind::new()

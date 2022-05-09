@@ -19,7 +19,7 @@ use poise::serenity_prelude as serenity;
 use sqlx::Row;
 
 use crate::structs::{Context, Result, CommandResult, PoiseContextExt, SerenityContextExt, TTSMode, JoinVCToken};
-use crate::macros::{require_guild, require};
+use crate::{require_guild, require};
 use crate::funcs::random_footer;
 
 async fn channel_check(ctx: &Context<'_>) -> Result<bool> {

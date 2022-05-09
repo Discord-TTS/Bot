@@ -24,7 +24,7 @@ use poise::serenity_prelude as serenity;
 use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, PoiseContextExt, ApplicationContext, OptionGettext, PollyVoice, TTSModeChoice};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::funcs::{random_footer, parse_user_or_guild};
-use crate::macros::{require_guild, require};
+use crate::{require_guild, require};
 use crate::database;
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {

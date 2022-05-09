@@ -166,7 +166,7 @@ impl tracing::Subscriber for ArcWrapper<WebhookLogger> {
 pub struct ArcWrapper<T>(pub Arc<T>);
 impl<T> Clone for ArcWrapper<T> {
     fn clone(&self) -> Self {
-        ArcWrapper(Arc::clone(&self.0))
+        Self(Arc::clone(&self.0))
     }
 }
 

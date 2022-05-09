@@ -43,12 +43,10 @@ mod macros;
 mod error;
 mod funcs;
 
-use macros::{require, async_try};
-use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
+use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, generate_status, prepare_premium_voices};
 use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework, JoinVCToken, PollyVoice};
 
-use crate::constants::PREMIUM_NEUTRAL_COLOUR;
 
 enum EntryCheck {
     IsFile,

@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#[macro_export]
 macro_rules! async_try {
     ($inner:block) => {async {$inner}.await};
 }
 
+#[macro_export]
 macro_rules! require {
     ($to_check:expr) => {
         require!($to_check, ())
@@ -31,13 +33,12 @@ macro_rules! require {
     };
 }
 
+#[macro_export]
 macro_rules! require_guild {
     ($ctx:expr) => {
-        crate::require!($ctx.guild(), {
+        $crate::require!($ctx.guild(), {
             ::tracing::warn!("Guild {} not cached in {} command!", $ctx.guild_id().unwrap(), $ctx.command().qualified_name);
             Ok(())
         })
     };
 }
-
-pub(crate) use {async_try, require, require_guild};

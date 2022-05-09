@@ -10,7 +10,7 @@ use serenity::json::prelude as json;
 use crate::{
     structs::{Context, Error, Data, Framework, PoiseContextExt, Result},
     constants::{RED, VIEW_TRACEBACK_CUSTOM_ID},
-    funcs::refresh_kind, macros::require
+    funcs::refresh_kind, require
 };
 
 #[allow(clippy::module_name_repetitions)]
@@ -163,7 +163,7 @@ pub async fn handle_unexpected_default(ctx: &serenity::Context, framework: &Fram
 
 
 // Listener Handlers
-pub async fn handle_message<T>(ctx: &serenity::Context, framework: &Framework, message: &serenity::Message, result: Result<T>) -> Result<()> {
+pub async fn handle_message<T: Send + Sync>(ctx: &serenity::Context, framework: &Framework, message: &serenity::Message, result: Result<T>) -> Result<()> {
     let error = require!(result.err(), Ok(()));
 
     let mut extra_fields = Vec::with_capacity(3);
