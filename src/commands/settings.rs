@@ -59,13 +59,12 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let userinfo_row = data.userinfo_db.get(author_id.into()).await?;
     let nickname_row = data.nickname_db.get([guild_id.into(), author_id.into()]).await?;
 
-    let default_channel_name = || Cow::Borrowed("has not been set up yet");
     let channel_name = if guild_row.channel == 0 {
+        Cow::Borrowed(none_str)
+    } else {
         ctx_discord.cache
             .guild_channel_field(guild_row.channel as u64, |c| c.name.clone())
-            .map_or_else(default_channel_name, Cow::Owned)
-    } else {
-        default_channel_name()
+            .map_or(Cow::Borrowed(none_str), Cow::Owned)
     };
 
     let prefix = &guild_row.prefix;
@@ -73,7 +72,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
     let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
 
-    let user_mode = if guild_mode.is_premium() {
+    let user_mode = if crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_none() {
         userinfo_row.premium_voice_mode
     } else {
         userinfo_row.voice_mode
