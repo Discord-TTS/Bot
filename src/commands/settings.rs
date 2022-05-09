@@ -15,12 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use itertools::Itertools;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Result, Error, TTSMode, Data, TTSModeServerChoice, CommandResult, PoiseContextExt, ApplicationContext, OptionGettext};
+use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, PoiseContextExt, ApplicationContext, OptionGettext, PollyVoice, TTSModeChoice};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::funcs::{random_footer, parse_user_or_guild};
 use crate::macros::{require_guild, require};
@@ -31,6 +32,9 @@ fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> 
         let (lang, variant) = voice.split_once(' ').unwrap();
         let gender = &data.premium_voices[lang][variant];
         Cow::Owned(format!("{lang} - {variant} ({gender})"))
+    } else if mode == TTSMode::Polly {
+        let voice = &data.polly_voices[voice];
+        Cow::Owned(format!("{} - {} ({})", voice.name, voice.language_name, voice.gender))
     } else {
         Cow::Borrowed(voice)
     }
@@ -66,9 +70,14 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 
     let prefix = &guild_row.prefix;
     let guild_mode = guild_row.voice_mode;
-    let user_mode = userinfo_row.voice_mode;
     let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
     let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
+
+    let user_mode = if guild_mode.is_premium() {
+        userinfo_row.premium_voice_mode
+    } else {
+        userinfo_row.voice_mode
+    };
 
     let guild_voice_row = data.guild_voice_db.get((guild_id.into(), guild_mode)).await?;
     let default_voice = {
@@ -173,16 +182,17 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 
 struct MenuPaginator<'a> {
     index: usize,
+    mode: TTSMode,
     ctx: Context<'a>,
     pages: Vec<String>,
     footer: Cow<'a, str>,
-    current_lang: String,
+    current_voice: String,
 }
 
 impl<'a> MenuPaginator<'a> {
-    pub fn new(ctx: Context<'a>, pages: Vec<String>, current_lang: String, footer: Cow<'a, str>) -> Self {
+    pub fn new(ctx: Context<'a>, pages: Vec<String>, current_voice: String, mode: TTSMode, footer: Cow<'a, str>) -> Self {
         Self {
-            ctx, pages, current_lang, footer,
+            ctx, pages, current_voice, mode, footer,
             index: 0,
         }
     }
@@ -193,17 +203,17 @@ impl<'a> MenuPaginator<'a> {
 
         embed
             .title(self.ctx.discord().cache.current_user_field(|u| self.ctx
-                .gettext("{bot_user} Voices | Mode: `Premium`")
-                .replace("{bot_user}", &u.name))
-            )
+                .gettext("{bot_user} Voices | Mode: `{mode}`")
+                .replace("{mode}", self.mode.into())
+                .replace("{bot_user}", &u.name)
+            ))
             .author(|a| a
                 .name(author.name.clone())
                 .icon_url(author.face())
             )
             .description(self.ctx.gettext("**Currently Supported Voice**\n{page}").replace("{page}", page))
-            .field(self.ctx.gettext("Current voice used"), &self.current_lang, false)
+            .field(self.ctx.gettext("Current voice used"), &self.current_voice, false)
             .footer(|f| f.text(self.footer.to_string()))
-
     }
 
     fn create_action_row<'b>(&self, builder: &'b mut serenity::CreateActionRow, disabled: bool) -> &'b mut serenity::CreateActionRow {
@@ -278,7 +288,7 @@ impl<'a> MenuPaginator<'a> {
 }
 
 async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> Vec<poise::AutocompleteChoice<String>> {
-    let (_, mode) = match parse_user_or_guild(ctx.data, ctx.interaction.user().id, ctx.interaction.guild_id()).await {
+    let (_, mode) = match parse_user_or_guild(ctx.data, ctx.discord, ctx.interaction.user().id, ctx.interaction.guild_id()).await {
         Ok(v) => v,
         Err(_) => return Vec::new()
     };
@@ -286,6 +296,12 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
     let voices: Box<dyn Iterator<Item=poise::AutocompleteChoice<String>>> = match mode {
         TTSMode::gTTS => Box::new(ctx.data.gtts_voices.clone().into_iter().map(|(value, name)| poise::AutocompleteChoice {name, value})) as _,
         TTSMode::eSpeak => Box::new(ctx.data.espeak_voices.clone().into_iter().map(poise::AutocompleteChoice::from)) as _,
+        TTSMode::Polly => Box::new(
+            ctx.data.polly_voices.iter().map(|(_, voice)| poise::AutocompleteChoice{
+                name: format!("{} - {} ({})", voice.id, voice.name, voice.gender),
+                value: voice.id.clone()
+            })
+        ),
         TTSMode::gCloud => Box::new(
             ctx.data.premium_voices.iter().flat_map(|(language, variants)| {
                 variants.iter().map(move |(variant, gender)| {
@@ -326,15 +342,15 @@ async fn change_mode<'a, CacheKey, RowT>(
     ctx: &'a Context<'_>,
     general_db: &database::Handler<CacheKey, RowT>,
     guild_id: serenity::GuildId,
-    key: CacheKey, mode: Option<TTSMode>,
-    target: Target
+    identifier: CacheKey, mode: Option<TTSMode>,
+    target: Target, guild_is_premium: bool
 ) -> Result<Option<Cow<'a, str>>, Error>
 where
     CacheKey: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
     RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
 {
     let data = ctx.data();
-    if mode == Some(TTSMode::gCloud) && crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_some() {
+    if mode.map_or(false, TTSMode::is_premium) && crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_some() {
         ctx.send(|b| b.embed(|e| {e
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
@@ -348,7 +364,13 @@ where
         })).await?;
         Ok(None)
     } else {
-        general_db.set_one(key, "voice_mode", &mode).await?;
+        let key = if guild_is_premium {
+            "premium_voice_mode"
+        } else {
+            "voice_mode"
+        };
+
+        general_db.set_one(identifier, key, &mode).await?;
         Ok(Some(match mode {
             Some(mode) => Cow::Owned(match target {
                 Target::Guild => ctx.gettext("Changed the server TTS Mode to: {mode}"),
@@ -378,7 +400,7 @@ where
     T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
     (T, TTSMode): database::CacheKeyTrait,
 {
-    let (_, mode) = parse_user_or_guild(ctx.data(), author_id, Some(guild_id)).await?;
+    let (_, mode) = parse_user_or_guild(ctx.data(), ctx.discord(), author_id, Some(guild_id)).await?;
     Ok(if let Some(voice) = voice {
         if check_valid_voice(ctx.data(), &voice, mode) {
             general_db.create_row(key).await?;
@@ -403,6 +425,7 @@ fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> bool {
     match mode {
         TTSMode::gTTS => data.gtts_voices.contains_key(voice),
         TTSMode::eSpeak => data.espeak_voices.contains(voice),
+        TTSMode::Polly => data.polly_voices.contains_key(voice),
         TTSMode::gCloud => {
             voice.split_once(' ')
                 .and_then(|(language, variant)| data.premium_voices.get(language).map(|l| (l, variant)))
@@ -553,7 +576,7 @@ pub async fn require_voice(
 )]
 pub async fn server_mode(
     ctx: Context<'_>,
-    #[description="The TTS Mode to change to"] mode: TTSModeServerChoice
+    #[description="The TTS Mode to change to"] mode: TTSModeChoice
 ) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
 
@@ -561,7 +584,8 @@ pub async fn server_mode(
     let to_send = change_mode(
         &ctx, &data.guilds_db,
         guild_id, guild_id.into(),
-        Some(TTSMode::from(mode)), Target::Guild
+        Some(TTSMode::from(mode)), Target::Guild,
+        false
     ).await?;
 
     if let Some(to_send) = to_send {
@@ -767,7 +791,7 @@ pub async fn speaking_rate(
     let data = ctx.data();
     let author = ctx.author();
 
-    let (_, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
+    let (_, mode) = parse_user_or_guild(data, ctx.discord(), author.id, ctx.guild_id()).await?;
     let (min, _, max, kind) = require!(mode.speaking_rate_info(), {
         ctx.say(ctx.gettext("**Error**: Cannot set speaking rate for the {mode} mode").replace("{mode}", mode.into())).await?;
         Ok(())
@@ -971,12 +995,19 @@ Just do `/join` and start talking!
 )]
 pub async fn mode(
     ctx: Context<'_>,
-    #[description="The TTS Mode to change to, leave blank for server default"] mode: Option<crate::structs::TTSModeChoice>
+    #[description="The TTS Mode to change to, leave blank for server default"] mode: Option<TTSModeChoice>
 ) -> CommandResult {
+    let data = ctx.data();
+    let author_id = ctx.author().id.into();
+    let guild_id = ctx.guild_id().unwrap();
+
+    let guild_is_premium = crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_none();
+
     let to_send = change_mode(
-        &ctx, &ctx.data().userinfo_db,
-        ctx.guild_id().unwrap(), ctx.author().id.into(),
-        mode.map(TTSMode::from), Target::User
+        &ctx, &data.userinfo_db,
+        guild_id, author_id,
+        mode.map(TTSMode::from),
+        Target::User, guild_is_premium
     ).await?;
 
     if let Some(to_send) = to_send {
@@ -1020,14 +1051,14 @@ pub async fn voice(
 )]
 pub async fn voices(
     ctx: Context<'_>,
-    #[description="The mode to see the voices for, leave blank for current"] mode: Option<TTSModeServerChoice>
+    #[description="The mode to see the voices for, leave blank for current"] mode: Option<TTSModeChoice>
 ) -> CommandResult {
     let author = ctx.author();
     let data = ctx.data();
 
     let mode = match mode {
         Some(mode) => TTSMode::from(mode),
-        None => parse_user_or_guild(data, author.id, ctx.guild_id()).await?.1
+        None => parse_user_or_guild(data, ctx.discord(), author.id, ctx.guild_id()).await?.1
     };
 
     let voices = {
@@ -1047,10 +1078,23 @@ pub async fn voices(
             buf
         }
 
+        let random_footer = || random_footer(
+            &data.config.main_server_invite,
+            ctx.discord().cache.current_user_id().into(),
+            ctx.current_catalog(),
+        );
+
         match mode {
             TTSMode::gTTS => format(data.gtts_voices.keys()),
             TTSMode::eSpeak => format(data.espeak_voices.iter()),
-            TTSMode::gCloud => return list_premium_voices(ctx).await
+            TTSMode::Polly => return {
+                let (current_voice, pages) = list_polly_voices(&ctx).await?;
+                MenuPaginator::new(ctx, pages, current_voice, mode, random_footer()).start().await.map_err(Into::into)
+            },
+            TTSMode::gCloud => return {
+                let (current_voice, pages) = list_gcloud_voices(&ctx).await?;
+                MenuPaginator::new(ctx, pages, current_voice, mode, random_footer()).start().await.map_err(Into::into)
+            }
         }
     };
 
@@ -1081,14 +1125,41 @@ pub async fn voices(
 }
 
 
-pub async fn list_premium_voices(ctx: Context<'_>) -> Result<()> {
+pub async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
     let data = ctx.data();
 
-    let (lang_variant, mode) = parse_user_or_guild(data, ctx.author().id, ctx.guild_id()).await?;
-    let (lang, variant) = match mode {
-        TTSMode::gCloud => lang_variant.split_once(' ').unwrap(),
-        _ => ("en-US", "A")
+    let (voice_id, mode) = parse_user_or_guild(data, ctx.discord(), ctx.author().id, ctx.guild_id()).await?;
+    let voice = match mode {
+        TTSMode::Polly => {
+            let voice_id: &str = &voice_id;
+            &data.polly_voices[voice_id]
+        },
+        _ => &data.polly_voices[TTSMode::Polly.default_voice()]
     };
+
+    let mut lang_to_voices: HashMap<&String, Vec<&PollyVoice>> = HashMap::new();
+    for voice in data.polly_voices.values() {
+        lang_to_voices.entry(&voice.language_name).or_insert_with(Vec::new).push(voice);
+    }
+
+    let format_voice = |voice: &PollyVoice| format!("{} - {} ({})\n", voice.id, voice.language_name, voice.gender);
+    let pages = lang_to_voices.into_iter().map(|(_, voices)| voices
+        .into_iter()
+        .map(format_voice)
+        .collect()
+    ).collect();
+
+    Ok((format_voice(voice).trim_end().to_string(), pages))
+}
+
+pub async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
+    let data = ctx.data();
+
+    let (lang_variant, mode) = parse_user_or_guild(data, ctx.discord(), ctx.author().id, ctx.guild_id()).await?;
+    let (lang, variant) = match mode {
+        TTSMode::gCloud => &lang_variant,
+        _ => TTSMode::gCloud.default_voice()
+    }.split_once(' ').unwrap();
 
     let pages = data.premium_voices.iter().map(|(language, variants)| {
         variants.iter().map(|(variant, gender)| {
@@ -1097,9 +1168,5 @@ pub async fn list_premium_voices(ctx: Context<'_>) -> Result<()> {
     }).collect();
 
     let gender = data.premium_voices[lang][variant];
-    MenuPaginator::new(ctx, pages, format!("{lang} {variant} ({gender})"), random_footer(
-        &data.config.main_server_invite,
-        ctx.discord().cache.current_user_id().into(),
-        ctx.current_catalog(),
-    )).start().await.map_err(Into::into)
+    Ok((format!("{lang} {variant} ({gender})"), pages))
 }

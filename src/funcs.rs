@@ -55,19 +55,28 @@ pub async fn generate_status(framework: &Framework) -> (String, bool) {
 
 pub async fn parse_user_or_guild(
     data: &Data,
+    ctx: &serenity::Context,
     author_id: serenity::UserId,
     guild_id: Option<serenity::GuildId>,
 ) -> Result<(Cow<'static, str>, TTSMode)> {
     let user_row = data.userinfo_db.get(author_id.into()).await?;
-    let mode =
-        if let Some(mode) = user_row.voice_mode {
+    let mode = {
+        let user_mode =
+            if crate::premium_check(ctx, data, guild_id).await?.is_none() {
+                user_row.premium_voice_mode
+            } else {
+                user_row.voice_mode
+            };
+
+        if let Some(mode) = user_mode {
             mode
         } else if let Some(guild_id) = guild_id {
             let settings = data.guilds_db.get(guild_id.into()).await?;
             settings.voice_mode
         } else {
             TTSMode::gTTS
-        };
+        }
+    };
 
     let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
     let voice =

@@ -111,8 +111,11 @@ async fn _run(main_config: &mut toml::value::Table, transaction: &mut Transactio
                 'espeak',
                 'premium'
             );
+
+            ALTER TYPE TTSMode RENAME VALUE 'premium' TO 'gcloud';
+            ALTER TYPE TTSMode ADD VALUE 'polly';
         EXCEPTION
-            WHEN duplicate_object THEN null;
+            WHEN OTHERS THEN null;
         END $$;
 
         CREATE TABLE IF NOT EXISTS guild_voice (
@@ -140,7 +143,8 @@ async fn _run(main_config: &mut toml::value::Table, transaction: &mut Transactio
         );
 
         ALTER TABLE userinfo
-            ADD COLUMN IF NOT EXISTS voice_mode     TTSMode;
+            ADD COLUMN IF NOT EXISTS voice_mode            TTSMode,
+            ADD COLUMN IF NOT EXISTS premium_voice_mode    TTSMode;
         ALTER TABLE guilds
             ADD COLUMN IF NOT EXISTS audience_ignore  bool       DEFAULT True,
             ADD COLUMN IF NOT EXISTS voice_mode       TTSMode    DEFAULT 'gtts',
@@ -162,8 +166,6 @@ async fn _run(main_config: &mut toml::value::Table, transaction: &mut Transactio
 
         INSERT INTO user_voice  (user_id, mode)         VALUES(0, 'gtts')       ON CONFLICT (user_id, mode)  DO NOTHING;
         INSERT INTO guild_voice (guild_id, mode, voice) VALUES(0, 'gtts', 'en') ON CONFLICT (guild_id, mode) DO NOTHING;
-
-        ALTER TYPE TTSMode RENAME 'premium' to 'gcloud';
     ").await?;
 
     migrate_single_to_modes(transaction, "userinfo", "user_voice", "voice", "user_id").await?;

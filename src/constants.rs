@@ -40,15 +40,17 @@ There are some basic rules if you want to get help though:
 pub const DB_SETUP_QUERY: &str = "
     CREATE type TTSMode AS ENUM (
         'gtts',
+        'polly,
         'espeak',
         'gcloud',
     );
 
     CREATE TABLE userinfo (
-        user_id       bigint     PRIMARY KEY,
-        dm_blocked    bool       DEFAULT False,
-        dm_welcomed   bool       DEFAULT false,
-        voice_mode    TTSMode
+        user_id             bigint     PRIMARY KEY,
+        dm_blocked          bool       DEFAULT False,
+        dm_welcomed         bool       DEFAULT false,
+        voice_mode          TTSMode
+        premium_voice_mode  TTSMode,
     );
 
     CREATE TABLE guilds (

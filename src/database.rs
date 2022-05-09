@@ -81,7 +81,8 @@ pub struct UserRow {
     pub user_id: i64,
     pub dm_blocked: bool,
     pub dm_welcomed: bool,
-    pub voice_mode: Option<TTSMode>
+    pub voice_mode: Option<TTSMode>,
+    pub premium_voice_mode: Option<TTSMode>,
 }
 
 #[derive(Debug, sqlx::FromRow)]

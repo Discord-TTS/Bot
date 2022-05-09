@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, CommandResult, Result, TTSModeServerChoice};
+use crate::structs::{Context, CommandResult, Result, TTSModeChoice};
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
@@ -84,14 +84,14 @@ pub async fn user(ctx: Context<'_>, user: i64) -> CommandResult {
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn guild_voice(ctx: Context<'_>, guild: i64, mode: TTSModeServerChoice) -> CommandResult {
+pub async fn guild_voice(ctx: Context<'_>, guild: i64, mode: TTSModeChoice) -> CommandResult {
     ctx.data().guild_voice_db.invalidate_cache(&(guild, mode.into()));
     ctx.say("Done!").await?;
     Ok(())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeServerChoice) -> CommandResult {
+pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeChoice) -> CommandResult {
     ctx.data().user_voice_db.invalidate_cache(&(user, mode.into()));
     ctx.say("Done!").await?;
     Ok(())

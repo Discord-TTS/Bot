@@ -46,7 +46,7 @@ mod funcs;
 use macros::{require, async_try};
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, generate_status, prepare_premium_voices};
-use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework, JoinVCToken};
+use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework, JoinVCToken, PollyVoice};
 
 use crate::constants::PREMIUM_NEUTRAL_COLOUR;
 
@@ -244,6 +244,9 @@ async fn _main() -> Result<()> {
             let gtts_voices = TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest).await?.json().await?;
             let espeak_voices = TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest).await?.json().await?;
 
+            let polly_voices_raw: Vec<PollyVoice> = TTSMode::Polly.fetch_voices(main.tts_service.clone(), &reqwest).await?.json().await?;
+            let polly_voices = polly_voices_raw.into_iter().map(|v| (v.id.clone(), v)).collect();
+
             let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest).await?.bytes().await?;
             let premium_voices = prepare_premium_voices(serenity::json::prelude::from_slice(&premium_voices_raw)?);
 
@@ -253,7 +256,7 @@ async fn _main() -> Result<()> {
                 system_info: parking_lot::Mutex::new(sysinfo::System::new()),
                 premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
 
-                gtts_voices, espeak_voices, premium_voices,
+                gtts_voices, espeak_voices, premium_voices, polly_voices,
 
                 config: main, reqwest,
                 guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
@@ -658,7 +661,7 @@ async fn process_tts_msg(
         None => return Ok(()),
         Some(content) => {
             let member = guild_id.member(ctx, message.author.id.0).await?;
-            (voice, mode) = parse_user_or_guild(data, message.author.id, Some(guild_id)).await?;
+            (voice, mode) = parse_user_or_guild(data, ctx, message.author.id, Some(guild_id)).await?;
 
             let nickname_row = nicknames.get([guild_id.into(), message.author.id.into()]).await?;
 

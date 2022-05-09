@@ -69,8 +69,9 @@ pub struct Data {
     pub pool: sqlx::PgPool,
     pub config: MainConfig,
 
-    pub gtts_voices: BTreeMap<String, String>,
     pub espeak_voices: Vec<String>,
+    pub gtts_voices: BTreeMap<String, String>,
+    pub polly_voices: BTreeMap<String, PollyVoice>,
     pub premium_voices: BTreeMap<String, BTreeMap<String, Gender>>,
 }
 
@@ -90,6 +91,7 @@ impl Data {
 #[sqlx(type_name="ttsmode")]
 pub enum TTSMode {
     gTTS,
+    Polly,
     eSpeak,
     gCloud,
 }
@@ -107,10 +109,18 @@ impl TTSMode {
             .error_for_status().map_err(Into::into)
     }
 
+    pub const fn is_premium(self) -> bool {
+        match self {
+            Self::gTTS | Self::eSpeak => false,
+            Self::Polly | Self::gCloud => true,
+        }
+    }
+
     pub const fn default_voice(self) -> &'static str {
         match self {
             Self::gTTS => "en",
             Self::eSpeak => "en1",
+            Self::Polly => "Brian",
             Self::gCloud => "en-US A",
         }
     }
@@ -120,6 +130,7 @@ impl TTSMode {
         match self {
             Self::gTTS => None,
             Self::gCloud => Some((0.25, 1.0, 4.0, "x")),
+            Self::Polly  => Some((10.0, 100.0, 500.0, "%")),
             Self::eSpeak => Some((100.0, 175.0, 400.0, " words per minute")),
         }
     }
@@ -139,36 +150,21 @@ impl Default for TTSMode {
 
 #[derive(poise::ChoiceParameter)]
 #[allow(non_camel_case_types)]
-pub enum TTSModeServerChoice {
-    // Name to show in slash command invoke           Aliases for prefix
-    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       gTTS,
-    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     eSpeak,
-    #[name="gCloud TTS (changable)"]                  #[name="gcloud"]     gCloud,
-}
-
-#[derive(poise::ChoiceParameter)]
-#[allow(non_camel_case_types)]
 pub enum TTSModeChoice {
     // Name to show in slash command invoke           Aliases for prefix
     #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       gTTS,
     #[name="eSpeak TTS (male)"]                       #[name="espeak"]     eSpeak,
-}
-
-impl From<TTSModeServerChoice> for TTSMode {
-    fn from(mode: TTSModeServerChoice) -> Self {
-        match mode {
-            TTSModeServerChoice::gTTS => Self::gTTS,
-            TTSModeServerChoice::eSpeak => Self::eSpeak,
-            TTSModeServerChoice::gCloud => Self::gCloud
-        }
-    }
+    #[name="gCloud TTS (changable)"]                  #[name="gcloud"]     gCloud,
+    #[name="Amazon Polly TTS (changable)"]            #[name="polly"]      Polly,
 }
 
 impl From<TTSModeChoice> for TTSMode {
     fn from(mode: TTSModeChoice) -> Self {
         match mode {
             TTSModeChoice::gTTS => Self::gTTS,
+            TTSModeChoice::Polly => Self::Polly,
             TTSModeChoice::eSpeak => Self::eSpeak,
+            TTSModeChoice::gCloud => Self::gCloud,
         }
     }
 }
@@ -197,7 +193,7 @@ pub struct GoogleVoice<'a> {
     pub languageCodes: [String; 1],
 }
 
-#[derive(serde::Serialize, Debug, Copy, Clone)]
+#[derive(serde::Deserialize, Debug, Copy, Clone)]
 pub enum Gender {
     Male,
     Female
@@ -210,6 +206,16 @@ impl std::fmt::Display for Gender {
             Self::Female => "Female"
         })
     }
+}
+
+#[derive(serde::Deserialize)]
+pub struct PollyVoice {
+    pub additional_language_codes: Option<Vec<String>>,
+    pub language_code: String,
+    pub language_name: String,
+    pub gender: Gender,
+    pub name: String,
+    pub id: String,
 }
 
 
@@ -325,7 +331,7 @@ impl PoiseContextExt for Context<'_> {
     async fn neutral_colour(&self) -> u32 {
         if let Some(guild_id) = self.guild_id() {
             let row = self.data().guilds_db.get(guild_id.0 as i64).await;
-            if row.map(|row| row.voice_mode == TTSMode::gCloud).unwrap_or(false) {
+            if row.map(|row| row.voice_mode).map_or(false, TTSMode::is_premium) {
                 return PREMIUM_NEUTRAL_COLOUR
             }
         }

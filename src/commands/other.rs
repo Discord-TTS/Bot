@@ -64,7 +64,7 @@ pub async fn tts(
 async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> CommandResult {
     let attachment = {
         let data = ctx.data();
-        let (voice, mode) = parse_user_or_guild(data, author.id, ctx.guild_id()).await?;
+        let (voice, mode) = parse_user_or_guild(data, ctx.discord(), author.id, ctx.guild_id()).await?;
 
         let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
         let speaking_rate = data.user_voice_db
@@ -86,7 +86,7 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
                 TTSMode::gTTS => "mp3",
                 TTSMode::eSpeak => "wav",
-                TTSMode::gCloud => "ogg"
+                TTSMode::gCloud | TTSMode::Polly => "ogg",
             })
         }
     };
