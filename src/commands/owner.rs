@@ -98,7 +98,7 @@ pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeServerChoice) 
 }
 
 
-#[poise::command(prefix_command, guild_only, hide_in_help)]
+#[poise::command(prefix_command, guild_only, hide_in_help, subcommands("leave"))]
 pub async fn debug(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let guild_id_db: i64 = guild_id.into();
@@ -131,6 +131,12 @@ User Voice Data: `{user_voice_row:?}`
 Guild Voice Data: `{guild_voice_row:?}`
 "))
     })}).await.map(drop).map_err(Into::into)
+}
+
+#[poise::command(prefix_command, guild_only, hide_in_help)]
+pub async fn leave(ctx: Context<'_>) -> CommandResult {
+    let guild_id = ctx.guild_id().unwrap();
+    songbird::get(ctx.discord()).await.unwrap().remove(guild_id).await.map_err(Into::into)
 }
 
 
