@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-09 16:12+0000\n"
-"PO-Revision-Date: 2022-05-09 16:43\n"
+"PO-Revision-Date: 2022-05-09 18:38\n"
 "Last-Translator: \n"
 "Language-Team: Japanese\n"
 "Language: ja_JP\n"
@@ -47,7 +47,7 @@ msgstr "TTS-Botはすでにこのボイスチャットに参加しています"
 
 #: src/commands/main.rs:89
 msgid "I am already in <#{channel_id}>!"
-msgstr "すでに#{channel_id}に参加しています！"
+msgstr "すでに<#{channel_id}> に参加しています！"
 
 #: src/commands/main.rs:105
 msgid "Joined your voice channel!"
