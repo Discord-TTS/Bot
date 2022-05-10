@@ -297,7 +297,7 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
         TTSMode::eSpeak => Box::new(ctx.data.espeak_voices.clone().into_iter().map(poise::AutocompleteChoice::from)) as _,
         TTSMode::Polly => Box::new(
             ctx.data.polly_voices.iter().map(|(_, voice)| poise::AutocompleteChoice{
-                name: format!("{} - {} ({})", voice.id, voice.name, voice.gender),
+                name: format!("{} - {} ({})", voice.name, voice.language_name, voice.gender),
                 value: voice.id.clone()
             })
         ),
