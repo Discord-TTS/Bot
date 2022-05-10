@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-09 16:12+0000\n"
-"PO-Revision-Date: 2022-05-09 16:43\n"
+"PO-Revision-Date: 2022-05-10 11:19\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -79,7 +79,7 @@ msgstr "¡Hola, este servidor ya es prémium!"
 
 #: src/commands/main.rs:223
 msgid "Hey, you are not in the [Support Server]({server_invite}) so I cannot validate your membership!"
-msgstr "¡Hola! No estás en el [support server] ({server_invite}) y no peudo validar tu afiliación"
+msgstr "¡Hola! ¡No estás en el [canal de apoyo] ({server_invite}) y no puedo validar tu afiliación!"
 
 #: src/commands/main.rs:238
 msgid "Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier"
@@ -87,19 +87,19 @@ msgstr "¡Hola, tienes demasiados servidores enlazados! Por favor contacta a Gno
 
 #: src/commands/main.rs:256
 msgid "Done! This server is now premium!"
-msgstr "¡completada! este servido es ahora premium"
+msgstr "¡Completada! ¡Este servido es ahora prémium!"
 
 #: src/commands/help.rs:117
 msgid "No command called {} found!"
-msgstr "¡no peudo buscar un comando se llama {}!"
+msgstr "¡No puedo buscar un comando se llama {}!"
 
 #: src/commands/help.rs:125
 msgid "The group {group_name} does not have a subcommand called {subcommand_name}!"
-msgstr "El grupo {group_name} no tiene un subcomando se llama {subcommand_name}"
+msgstr "¡El grupo {group_name} no tiene un subcomando se llama {subcommand_name}!"
 
 #: src/commands/help.rs:132
 msgid "This command is only available to the bot owner!"
-msgstr "Este comando puede utilizarse al dueño del bot soló"
+msgstr "¡Este comando puede utilizarse al dueño del bot soló!"
 
 #: src/commands/help.rs:146
 msgid "{command_name} Help!"
@@ -107,7 +107,7 @@ msgstr "{command_name} ¡Ayuda!"
 
 #: src/commands/help.rs:154
 msgid "Command description not found!"
-msgstr "No se ha encontrado la descripción del comando."
+msgstr "¡No se ha encontrado la descripción del comando!"
 
 #: src/commands/help.rs:159
 msgid "__**Parameter Descriptions**__\n"
@@ -213,7 +213,7 @@ msgstr ""
 
 #: src/commands/settings.rs:126
 msgid "**General Server Settings**"
-msgstr "**Configuraciónes del Servidor General**"
+msgstr "**Configuraciones del Servidor General**"
 
 #: src/commands/settings.rs:126
 msgid "\n"
@@ -342,7 +342,7 @@ msgstr "¡completada!"
 
 #: src/commands/settings.rs:500
 msgid "xsaid is now: {}"
-msgstr "xdijo es ahora: {}"
+msgstr "xsaid es ahora: {}"
 
 #: src/commands/settings.rs:521
 msgid "Auto Join is now: {}"
@@ -468,7 +468,7 @@ msgstr ""
 
 #: src/commands/settings.rs:1119
 msgid "None"
-msgstr "ninguno"
+msgstr "Ninguno"
 
 #: src/error.rs:201
 msgid "{command_name} is on cooldown"
@@ -545,5 +545,5 @@ msgstr ""
 
 #: src/funcs.rs:161
 msgid "There are loads of customizable settings, check out `/help set`"
-msgstr "Hay muchos los ajustes personalizeables, mirar `/help set`"
+msgstr "Hay muchos los ajustes personalizables, mirar `/help set`"
 
