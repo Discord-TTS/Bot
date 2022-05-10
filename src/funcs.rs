@@ -447,23 +447,24 @@ pub async fn bool_button(ctx: Context<'_>, prompt: &str, positive: &str, negativ
     if let Some(value) = value {
         Ok(Some(value))
     } else {
-        let message = ctx.send(|b| {b
+        let message = ctx.send(|b| b
             .content(prompt)
+            .ephemeral(true)
             .components(|c| {c
-                .create_action_row(|r| {r
-                    .create_button(|b| {b
+                .create_action_row(|r| r
+                    .create_button(|b| b
                         .style(serenity::ButtonStyle::Success)
                         .custom_id("True")
                         .label(positive)
-                    })
-                    .create_button(|b| {b
+                    )
+                    .create_button(|b| b
                         .style(serenity::ButtonStyle::Danger)
                         .custom_id("False")
                         .label(negative)
-                    })
-                })
+                    )
+                )
             })
-        }).await?.message().await?;
+        ).await?.message().await?;
 
         let ctx_discord = ctx.discord();
         let interaction = message
