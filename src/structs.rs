@@ -20,6 +20,7 @@ pub struct Config {
 
 #[derive(serde::Deserialize)]
 pub struct MainConfig {
+    pub announcements_channel: serenity::ChannelId,
     pub tts_service_auth_key: Option<String>,
     pub translation_token: Option<String>,
     pub patreon_role: serenity::RoleId,

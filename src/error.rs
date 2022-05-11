@@ -55,7 +55,9 @@ async fn handle_unexpected(
     let data = framework.user_data().await;
     let error_webhook = &data.webhooks["errors"];
 
-    let traceback = error.backtrace().to_string();
+    let mut traceback = format!("{:?}", error);
+    traceback.push_str(&error.backtrace().to_string());
+
     let traceback_hash = hash(traceback.as_bytes());
 
     let short_error = error.to_string();

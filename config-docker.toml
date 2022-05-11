@@ -3,6 +3,7 @@ log_level = 'info'
 tts_service = 'https://localhost:20310'
 #translation_token = token from https://deepl.com/
 #main_server_invite = 'https://discord.gg/example'
+#announcements_channel = id here
 #invite_channel = id here
 #patreon_role = id here
 #main_server = id here 

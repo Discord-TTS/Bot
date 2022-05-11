@@ -22,7 +22,7 @@ use poise::serenity_prelude::{self as serenity, Mentionable as _};
 
 use crate::require;
 use crate::constants::OPTION_SEPERATORS;
-use crate::funcs::{bool_button, fetch_audio, parse_user_or_guild, refresh_kind, prepare_url};
+use crate::funcs::{confirm_dialog, fetch_audio, parse_user_or_guild, refresh_kind, prepare_url};
 use crate::structs::{ApplicationContext, Context, CommandResult, OptionTryUnwrap, PoiseContextExt, TTSMode};
 
 /// Shows how long TTS Bot has been online
@@ -229,7 +229,7 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
         .replace("{bot_name}", &b.name)
     );
 
-    if !require!(bool_button(ctx, &confirm_message, "Yes", "Cancel", None).await?, Ok(())) {
+    if !require!(confirm_dialog(ctx, &confirm_message, "Yes", "Cancel").await?, Ok(())) {
         ctx.say(ctx.gettext("Suggestion cancelled")).await?;
         return Ok(());
     }

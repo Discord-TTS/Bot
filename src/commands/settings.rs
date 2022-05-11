@@ -23,7 +23,7 @@ use poise::serenity_prelude as serenity;
 
 use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, PoiseContextExt, ApplicationContext, OptionGettext, PollyVoice, TTSModeChoice};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
-use crate::funcs::{random_footer, parse_user_or_guild};
+use crate::funcs::{random_footer, parse_user_or_guild, confirm_dialog};
 use crate::{require_guild, require};
 use crate::database;
 
@@ -322,12 +322,15 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
 }
 
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
-    crate::funcs::bool_button(
-        ctx,
-        ctx.gettext("What would you like to set this to?"),
-        ctx.gettext("True"), ctx.gettext("False"),
-        value
-    ).await
+    if let Some(value) = value {
+        Ok(Some(value))
+    } else {
+        confirm_dialog(
+            ctx,
+            ctx.gettext("What would you like to set this to?"),
+            ctx.gettext("True"), ctx.gettext("False"),
+        ).await
+    }
 }
 
 
@@ -887,16 +890,16 @@ pub async fn setup(
 ) -> CommandResult {
     let guild = require_guild!(ctx);
 
+    let author = ctx.author();
     let ctx_discord = ctx.discord();
     let cache = &ctx_discord.cache;
 
-    let author = ctx.author();
     let (bot_user_id, bot_user_name, bot_user_face) =
         cache.current_user_field(|u| (u.id, u.name.clone(), u.face()));
 
-    let channel: u64 =
-        if let Some(channel) = channel {
-            channel.id.into()
+    let channel =
+        if let Some(channel) = channel.as_ref() {
+            channel
         } else {
             let author_member = guild.member(ctx_discord, author).await?;
             let bot_member = guild.member(ctx_discord, bot_user_id).await?;
@@ -914,11 +917,9 @@ pub async fn setup(
                 .collect();
 
             if text_channels.is_empty() {
-                ctx.say(ctx.gettext("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!")).await?;
-                return Ok(())
+                return ctx.say(ctx.gettext("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!")).await.map(drop).map_err(Into::into);
             } else if text_channels.len() >= (25 * 5) {
-                ctx.say(ctx.gettext("**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`")).await?;
-                return Ok(())
+                return ctx.say(ctx.gettext("**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`")).await.map(drop).map_err(Into::into);
             };
 
             text_channels.sort_by(|f, s| Ord::cmp(&f.position, &s.position));
@@ -955,7 +956,9 @@ pub async fn setup(
 
             if let Some(interaction) = interaction {
                 interaction.defer(&ctx_discord.http).await?;
-                interaction.data.values[0].parse().unwrap()
+
+                let selected_id = serenity::ChannelId(interaction.data.values[0].parse().unwrap());
+                text_channels.into_iter().find(|c| c.id == selected_id).unwrap()
             } else {
                 // The timeout was hit
                 return Ok(())
@@ -963,23 +966,37 @@ pub async fn setup(
         };
 
     let data = ctx.data();
-    data.guilds_db.set_one(guild.id.into(), "channel", &(channel as i64)).await?;
-    ctx.send(|b| b.embed(|e| {e
+    data.guilds_db.set_one(guild.id.into(), "channel", &(channel.id.0 as i64)).await?;
+    ctx.send(|b| b.embed(|e| e
         .title(ctx.gettext("{bot_name} has been setup!").replace("{bot_name}", &bot_user_name))
         .thumbnail(bot_user_face)
         .description(ctx.gettext("
 TTS Bot will now accept commands and read from <#{channel}>.
 Just do `/join` and start talking!
-").replace("{channel}", &channel.to_string()))
-
+").replace("{channel}", &channel.id.0.to_string()))
         .footer(|f| f.text(random_footer(
             &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
         )))
-        .author(|a| {
-            a.name(&author.name);
-            a.icon_url(author.face())
-        })
-    })).await?;
+        .author(|a| a
+            .name(&author.name)
+            .icon_url(author.face())
+        )
+    )).await?;
+
+    if let poise::Context::Application(_) = ctx &&
+        guild.user_permissions_in(
+            channel,
+            &guild.member(ctx_discord, ctx_discord.cache.current_user_id()).await?
+        )?.manage_webhooks() &&
+        confirm_dialog(ctx,
+            ctx.gettext("Would you like to set up TTS Bot update announcements for the setup channel?"),
+            ctx.gettext("Yes"),
+            ctx.gettext("No")
+        ).await?.unwrap_or(false)
+    {
+        data.config.announcements_channel.follow(ctx_discord, channel.id).await?;
+        tracing::info!("Set up announcements channel in {}", guild.id);
+    };
 
     Ok(())
 }
