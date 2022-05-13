@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-09 16:12+0000\n"
-"PO-Revision-Date: 2022-05-13 20:46\n"
+"PO-Revision-Date: 2022-05-13 21:45\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -139,7 +139,7 @@ msgstr "¡Generó algunos TTS!"
 
 #: src/commands/other.rs:147
 msgid "{bot_name}: Freshly rewritten in Rust!"
-msgstr ""
+msgstr "{bot_name}: ¡Recién reescrito en Rust!"
 
 #: src/commands/other.rs:151
 msgid "\n"
