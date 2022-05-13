@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-09 16:12+0000\n"
-"PO-Revision-Date: 2022-05-10 11:19\n"
+"PO-Revision-Date: 2022-05-13 20:46\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -119,11 +119,11 @@ msgstr "no hay descripción"
 
 #: src/commands/help.rs:180
 msgid "Use `/help {command_name} [command]` for more info on a command"
-msgstr ""
+msgstr "Usar `/help {command_name} [command]` para recibir más información sobre un comando"
 
 #: src/commands/help.rs:183
 msgid "Use `/help [command]` for more info on a command"
-msgstr ""
+msgstr "Usar `/help [command]` para recibir más información sobre un comando"
 
 #: src/commands/other.rs:33
 msgid "{user_mention} has been up since: <t:{timestamp}:R>"
