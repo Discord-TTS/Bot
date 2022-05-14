@@ -277,10 +277,9 @@ impl std::fmt::Display for TTSServiceError {
 }
 
 
-pub type Command = poise::Command<Data, CommandError>;
-pub type Framework = poise::Framework<Data, CommandError>;
-pub type Context<'a> = poise::Context<'a, Data, CommandError>;
-pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Data, CommandError>;
+pub type Command = poise::Command<Arc<Data>, CommandError>;
+pub type Context<'a> = poise::Context<'a, Arc<Data>, CommandError>;
+pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Arc<Data>, CommandError>;
 
 pub type CommandError = Error;
 pub type CommandResult<E=Error> = Result<(), E>;
@@ -404,7 +403,7 @@ impl PoiseContextExt for Context<'_> {
                     fix.unwrap_or("get in contact with us via the support server"),
                 ))
                 .author(|a| {a
-                    .name(name)
+                    .name(name.into_owned())
                     .icon_url(avatar_url)
                 })
                 .footer(|f| f.text(format!(

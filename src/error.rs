@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use sysinfo::SystemExt;
 use tracing::error;
@@ -8,13 +8,15 @@ use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
 use crate::{
-    structs::{Context, Error, Data, Framework, PoiseContextExt, Result},
+    structs::{Context, Error, Data, PoiseContextExt, Result},
     constants::{RED, VIEW_TRACEBACK_CUSTOM_ID},
     funcs::refresh_kind, require
 };
 
 #[allow(clippy::module_name_repetitions)]
 pub type CommandError = Error;
+type ShardManager = tokio::sync::Mutex<serenity::ShardManager>;
+
 
 #[derive(sqlx::FromRow)]
 struct ErrorRowWithOccurrences {
@@ -43,16 +45,17 @@ fn hash(data: &[u8]) -> Vec<u8> {
     Vec::from(&*hasher.finalize())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_unexpected(
     ctx: &serenity::Context,
-    framework: &Framework,
+    shard_manager: &tokio::sync::Mutex<serenity::ShardManager>,
+    data: &Data,
     event: &str,
     error: Error,
     extra_fields: Vec<(&str, Cow<'_, str>, bool)>,
     author_name: Option<String>,
     icon_url: Option<String>
 ) -> Result<()> {
-    let data = framework.user_data().await;
     let error_webhook = &data.webhooks["errors"];
 
     let mut traceback = format!("{:?}", error);
@@ -98,19 +101,19 @@ async fn handle_unexpected(
         let after_fields = [
             ("CPU Usage (5 minutes)", Cow::Owned(cpu_usage), true),
             ("System Memory Usage", Cow::Owned(mem_usage), true),
-            ("Shard Count", Cow::Owned(framework.shard_manager().lock().await.shards_instantiated().await.len().to_string()), true),
+            ("Shard Count", Cow::Owned(shard_manager.lock().await.shards_instantiated().await.len().to_string()), true),
         ];
 
         let embed = serenity::Embed::fake(|e| {
             before_fields.into_iter()
                 .chain(extra_fields)
                 .chain(after_fields)
-                .for_each(|(title, value, inline)| {
-                    e.field(
-                        title, 
-                        if value == "\u{200B}" {value.into_owned()} else {format!("`{value}`")},
-                        inline
-                    );
+                .for_each(|(title, mut value, inline)| {
+                    if value == "\u{200B}" {
+                        value = Cow::Owned(format!("`{value}`"));
+                    };
+
+                    e.field(title, &*value, inline);
                 });
 
             if let Some(author_name) = author_name {
@@ -153,19 +156,19 @@ async fn handle_unexpected(
     Ok(())
 }
 
-pub async fn handle_unexpected_default(ctx: &serenity::Context, framework: &Framework, name: &str, result: Result<()>) -> Result<()> {
+pub async fn handle_unexpected_default(ctx: &serenity::Context, shard_manager: &ShardManager, data: &Data, name: &str, result: Result<()>) -> Result<()> {
     let error = require!(result.err(), Ok(()));
 
     handle_unexpected(
-        ctx, framework, name,
-        error, Vec::new(),
+        ctx, shard_manager, data,
+        name, error, Vec::new(),
         None, None
     ).await
 }
 
 
 // Listener Handlers
-pub async fn handle_message<T: Send + Sync>(ctx: &serenity::Context, framework: &Framework, message: &serenity::Message, result: Result<T>) -> Result<()> {
+pub async fn handle_message<T: Send + Sync>(ctx: &serenity::Context, shard_manager: &ShardManager, data: &Data, message: &serenity::Message, result: Result<T>) -> Result<()> {
     let error = require!(result.err(), Ok(()));
 
     let mut extra_fields = Vec::with_capacity(3);
@@ -179,18 +182,18 @@ pub async fn handle_message<T: Send + Sync>(ctx: &serenity::Context, framework: 
 
     extra_fields.push(("Channel Type", Cow::Borrowed(channel_type(&message.channel_id.to_channel(&ctx).await?)), true));
     handle_unexpected(
-        ctx, framework, "MessageCreate",
-        error, extra_fields,
+        ctx, shard_manager, data,
+        "MessageCreate", error, extra_fields,
         Some(message.author.name.clone()), Some(message.author.face())
     ).await
 }
 
-pub async fn handle_guild(name: &str, ctx: &serenity::Context, framework: &Framework, guild: Option<&serenity::Guild>, result: Result<()>) -> Result<()> {
+pub async fn handle_guild(name: &str, ctx: &serenity::Context, shard_manager: &ShardManager, data: &Data, guild: Option<&serenity::Guild>, result: Result<()>) -> Result<()> {
     let error = require!(result.err(), Ok(()));
 
     handle_unexpected(
-        ctx, framework, name,
-        error, Vec::new(),
+        ctx, shard_manager, data,
+        name, error, Vec::new(),
         guild.as_ref().map(|g| g.name.clone()),
         guild.and_then(serenity::Guild::icon_url),
     ).await
@@ -266,7 +269,7 @@ const fn channel_type(channel: &serenity::Channel) -> &'static str {
     }
 }
 
-pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Result<(), Error> {
+pub async fn handle(error: poise::FrameworkError<'_, Arc<Data>, CommandError>) -> Result<(), Error> {
     match error {
         poise::FrameworkError::DynamicPrefix { error } => error!("Error in dynamic_prefix: {:?}", error),
         poise::FrameworkError::Command { error, ctx } => {
@@ -287,8 +290,10 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, CommandError>) -> Res
                 ]);
             }
 
+            let framework = ctx.framework();
+
             handle_unexpected(
-                ctx.discord(), ctx.framework(),
+                ctx.discord(), &framework.shard_manager(), framework.user_data().await,
                 "command", error, extra_fields,
                 Some(author.name.clone()), Some(author.face())
             ).await?;

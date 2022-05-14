@@ -122,7 +122,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             "Change these settings with `/set {property} {value}`!\nNone = setting has not been set yet!"
         )))
 
-        .field(ctx.gettext("**General Server Settings**"), ctx.gettext("
+        .field(ctx.gettext("**General Server Settings**"), &ctx.gettext("
 {sep1} Setup Channel: `#{channel_name}`
 {sep1} Command Prefix: `{prefix}`
 {sep1} Auto Join: `{autojoin}`
@@ -132,7 +132,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{autojoin}", &guild_row.auto_join.to_string())
             .replace("{channel_name}", &channel_name),
         false)
-        .field("**TTS Settings**", ctx.gettext("
+        .field("**TTS Settings**", &ctx.gettext("
 {sep2} <User> said: message: `{xsaid}`
 {sep2} Ignore bot's messages: `{bot_ignore}`
 {sep2} Ignore audience messages: `{audience_ignore}`
@@ -154,7 +154,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{msg_length}", &guild_row.msg_length.to_string())
             .replace("{repeated_chars}", &guild_row.repeated_chars.to_string()),
         false)
-        .field(ctx.gettext("**Translation Settings (Premium Only)**"), ctx.gettext("
+        .field(ctx.gettext("**Translation Settings (Premium Only)**"), &ctx.gettext("
 {sep4} Translation: `{to_translate}`
 {sep4} Translation Language: `{target_lang}`
         ")
@@ -162,7 +162,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{to_translate}", &guild_row.to_translate.to_string())
             .replace("{target_lang}", target_lang),
         false)
-        .field("**User Specific**", #[allow(clippy::redundant_closure_for_method_calls)] ctx.gettext("
+        .field("**User Specific**", #[allow(clippy::redundant_closure_for_method_calls)] &ctx.gettext("
 {sep3} Voice: `{user_voice}`
 {sep3} Voice Mode: `{voice_mode}`
 {sep3} Nickname: `{nickname}`
@@ -356,7 +356,7 @@ where
         ctx.send(|b| b.embed(|e| {e
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
-            .thumbnail(data.premium_avatar_url.clone())
+            .thumbnail(&data.premium_avatar_url)
             .url("https://www.patreon.com/Gnome_the_Bot_Maker")
             .footer(|f| f.text(ctx.gettext("If this is an error, please contact Gnome!#6669.")))
             .description(ctx.gettext("
@@ -935,7 +935,7 @@ pub async fn setup(
                                     for channel in chunked_channels {
                                         os.create_option(|o| {o
                                             .label(&channel.name)
-                                            .value(channel.id)
+                                            .value(channel.id.to_string())
                                         });
                                     };
                                     os
@@ -969,7 +969,7 @@ pub async fn setup(
     data.guilds_db.set_one(guild.id.into(), "channel", &(channel.id.0 as i64)).await?;
     ctx.send(|b| b.embed(|e| e
         .title(ctx.gettext("{bot_name} has been setup!").replace("{bot_name}", &bot_user_name))
-        .thumbnail(bot_user_face)
+        .thumbnail(&bot_user_face)
         .description(ctx.gettext("
 TTS Bot will now accept commands and read from <#{channel}>.
 Just do `/join` and start talking!
@@ -1129,7 +1129,7 @@ pub async fn voices(
             .name(author.name.clone())
             .icon_url(author.face())
         )
-        .field(ctx.gettext("Currently supported voices"), voices, true)
+        .field(ctx.gettext("Currently supported voices"), &voices, true)
         .field(
             ctx.gettext("Current voice used"),
             user_voice_row.voice.as_ref().map_or_else(|| ctx.gettext("None"), std::ops::Deref::deref),

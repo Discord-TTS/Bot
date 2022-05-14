@@ -45,7 +45,7 @@ mod funcs;
 
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, generate_status, prepare_premium_voices};
-use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, Framework, JoinVCToken, PollyVoice};
+use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, JoinVCToken, PollyVoice};
 
 
 enum EntryCheck {
@@ -186,8 +186,8 @@ async fn _main() -> Result<()> {
         )
     };
 
-    let framework_oc = Arc::new(once_cell::sync::OnceCell::new());
-    let framework_oc_clone = framework_oc.clone();
+    let framework_state_oc = Arc::new(once_cell::sync::OnceCell::new());
+    let framework_state_oc_clone = framework_state_oc.clone();
 
     let framework = poise::Framework::build()
         .token(main.token.take().unwrap())
@@ -199,11 +199,11 @@ async fn _main() -> Result<()> {
             | serenity::GatewayIntents::GUILD_MEMBERS
             | serenity::GatewayIntents::MESSAGE_CONTENT,
         )
-        .client_settings(move |f| {f
-            .event_handler(EventHandler {framework: framework_oc_clone})
+        .client_settings(move |f| f
+            .event_handler(EventHandler {state: framework_state_oc_clone})
             .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
-        })
-        .user_data_setup(move |ctx, _, _| {Box::pin(async move {
+        )
+        .user_data_setup(move |ctx, _, framework| {Box::pin(async move {
             let logger = logging::WebhookLogger::new(
                 ctx.http.clone(),
                 tracing::Level::from_str(&main.log_level)?,
@@ -249,7 +249,7 @@ async fn _main() -> Result<()> {
             let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?;
             let premium_voices = prepare_premium_voices(serenity::json::prelude::from_slice(&premium_voices_raw)?);
 
-            Ok(Data {
+            let data = Arc::new(Data {
                 join_vc_tokens: dashmap::DashMap::new(),
                 last_to_xsaid_tracker: dashmap::DashMap::new(),
                 system_info: parking_lot::Mutex::new(sysinfo::System::new()),
@@ -260,7 +260,15 @@ async fn _main() -> Result<()> {
                 config: main, reqwest,
                 guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
                 analytics, webhooks, start_time, pool, startup_message, translations,
-            })
+            });
+
+            let res = framework_state_oc.set(FrameworkState{
+                shard_manager: Arc::downgrade(&framework.shard_manager()),
+                user_data: Arc::downgrade(&data),
+            });
+            if res.is_err() {unreachable!()}
+
+            Ok(data)
         })})
         .options(poise::FrameworkOptions {
             command_check: Some(|ctx| Box::pin(async move {Ok(!ctx.author().bot)})),
@@ -333,8 +341,6 @@ async fn _main() -> Result<()> {
         })
         .build().await?;
 
-    if framework_oc.set(Arc::downgrade(&framework)).is_err() {unreachable!()};
-
     let framework_copy = framework.clone();
     tokio::spawn(async move {
         #[cfg(unix)] {
@@ -371,32 +377,43 @@ async fn _main() -> Result<()> {
     framework.start_autosharded().await.map_err(Into::into)
 }
 
+struct FrameworkState {
+    shard_manager: Weak<tokio::sync::Mutex<serenity::ShardManager>>,
+    user_data: Weak<Data>,
+}
+
 struct EventHandler {
-    framework: Arc<OnceCell<Weak<Framework>>>
+    state: Arc<OnceCell<FrameworkState>>
 }
 
 impl EventHandler {
-    fn framework(&self) -> Option<Arc<Framework>> {
-        self.framework.get().and_then(Weak::upgrade)
+    fn shard_manager(&self) -> Option<Arc<tokio::sync::Mutex<serenity::ShardManager>>> {
+        self.state.get().and_then(|s| s.shard_manager.upgrade())
+    }
+
+    fn data(&self) -> Option<Arc<Data>> {
+        self.state.get().and_then(|s| s.user_data.upgrade())
     }
 }
 
 #[poise::async_trait]
 impl serenity::EventHandler for EventHandler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
-        let framework = require!(self.framework());
-        let data = framework.user_data().await;
+        let shard_manager = require!(self.shard_manager());
+        let data = require!(self.data());
 
-        error::handle_message(&ctx, &framework, &new_message, tokio::try_join!(
-            process_tts_msg(&ctx, &new_message, data),
-            process_support_dm(&ctx, &new_message, data),
-            process_mention_msg(&ctx, &new_message, data),
+        error::handle_message(&ctx, &shard_manager, &data, &new_message, tokio::try_join!(
+            process_tts_msg(&ctx, &new_message, &data),
+            process_support_dm(&ctx, &new_message, &data),
+            process_mention_msg(&ctx, &new_message, &data),
         )).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
     async fn voice_state_update(&self, ctx: serenity::Context, old: Option<serenity::VoiceState>, new: serenity::VoiceState) {
-        let framework = require!(self.framework());
-        error::handle_unexpected_default(&ctx, &framework, "VoiceStateUpdate", async_try!({
+        let shard_manager = require!(self.shard_manager());
+        let data = require!(self.data());
+
+        error::handle_unexpected_default(&ctx, &shard_manager, &data, "VoiceStateUpdate", async_try!({
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user_id();
             let guild_id = new.guild_id.try_unwrap()?;
@@ -422,11 +439,12 @@ impl serenity::EventHandler for EventHandler {
     }
 
     async fn guild_create(&self, ctx: serenity::Context, guild: serenity::Guild, is_new: bool) {
-        let framework = require!(self.framework());
-        let data = framework.user_data().await;
         if !is_new {return};
 
-        error::handle_guild("GuildCreate", &ctx, &framework, Some(&guild), async_try!({
+        let shard_manager = require!(self.shard_manager());
+        let data = require!(self.data());
+
+        error::handle_guild("GuildCreate", &ctx, &shard_manager, &data, Some(&guild), async_try!({
             // Send to servers channel and DM owner the welcome message
 
             let (owner, _) = tokio::join!(
@@ -478,10 +496,10 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn guild_delete(&self, ctx: serenity::Context, incomplete: serenity::UnavailableGuild, full: Option<serenity::Guild>) {
-        let framework = require!(self.framework());
-        let data = framework.user_data().await;
+        let data = require!(self.data());
+        let shard_manager = require!(self.shard_manager());
 
-        error::handle_guild("GuildDelete", &ctx, &framework, full.as_ref(), async_try!({
+        error::handle_guild("GuildDelete", &ctx, &shard_manager, &data, full.as_ref(), async_try!({
             data.guilds_db.delete(incomplete.id.into()).await?;
             if let Some(guild) = &full {
                 data.webhooks["servers"].execute(&ctx.http, false, |b| {b.content(format!(
@@ -495,13 +513,13 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn interaction_create(&self, ctx: serenity::Context, interaction: serenity::Interaction) {
-        let framework = require!(self.framework());
-        let data = framework.user_data().await;
+        let data = require!(self.data());
+        let shard_manager = require!(self.shard_manager());
 
-        error::handle_unexpected_default(&ctx, &framework, "InteractionCreate", async_try!({
+        error::handle_unexpected_default(&ctx, &shard_manager, &data, "InteractionCreate", async_try!({
             if let serenity::Interaction::MessageComponent(interaction) = interaction {
                 if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
-                    error::handle_traceback_button(&ctx, data, interaction).await?;
+                    error::handle_traceback_button(&ctx, &data, interaction).await?;
                 }
             };
 
@@ -510,12 +528,12 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn ready(&self, ctx: serenity::Context, data_about_bot: serenity::Ready) {
-        let framework = require!(self.framework());
-        let data = framework.user_data().await;
+        let data = require!(self.data());
+        let shard_manager = require!(self.shard_manager());
 
-        error::handle_unexpected_default(&ctx, &framework, "Ready", async_try!({
+        error::handle_unexpected_default(&ctx, &shard_manager, &data, "Ready", async_try!({
             let user_name = &data_about_bot.user.name;
-            let (status, starting) = generate_status(&framework).await;
+            let (status, starting) = generate_status(&*shard_manager.lock().await).await;
             data.webhooks["logs"].edit_message(&ctx.http, data.startup_message, |m| {m
                 .content("")
                 .embeds(vec![serenity::Embed::fake(|e| {e
@@ -533,8 +551,8 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn resume(&self, _: serenity::Context, _: serenity::ResumedEvent) {
-        if let Some(framework) = self.framework() {
-            framework.user_data().await.analytics.log(Cow::Borrowed("on_resumed"));
+        if let Some(data) = self.data() {
+            data.analytics.log(Cow::Borrowed("on_resumed"));
         }
     }
 }
@@ -617,7 +635,7 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, error:
                     .title("TTS Bot Premium - Premium Only Command!")
                     .description(main_msg)
                     .colour(PREMIUM_NEUTRAL_COLOUR)
-                    .thumbnail(data.premium_avatar_url.clone())
+                    .thumbnail(&data.premium_avatar_url)
                     .footer(|f| f.text(FOOTER_MSG))
                 })
             } else {

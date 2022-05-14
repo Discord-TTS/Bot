@@ -145,7 +145,7 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
     ctx.send(|b| {b.embed(|e| { e
         .title(ctx_discord.cache.current_user_field(|u| ctx.gettext("{bot_name}: Freshly rewritten in Rust!").replace("{bot_name}",  &u.name)))
-        .thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
+        .thumbnail(&ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
         .url(data.config.main_server_invite.clone())
         .colour(neutral_colour)
         .footer(|f| f.text(ctx.gettext("

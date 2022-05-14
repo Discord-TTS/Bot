@@ -104,7 +104,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         m.embed(|e| {e
             .title(ctx.gettext("Joined your voice channel!"))
             .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
-            .thumbnail(ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
+            .thumbnail(&ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
             .author(|a| {a
                 .name(member.nick.unwrap_or_else(|| author.name.clone()))
                 .icon_url(author.face())
@@ -242,7 +242,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
         ctx.send(|b| b.embed(|e| {e
             .title("TTS Bot Premium")
             .description(error_msg)
-            .thumbnail(data.premium_avatar_url.clone())
+            .thumbnail(&data.premium_avatar_url)
             .colour(crate::constants::PREMIUM_NEUTRAL_COLOUR)
             .footer(|f| f.text("If this is an error, please contact Gnome!#6669."))
         })).await?;

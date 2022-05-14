@@ -25,7 +25,7 @@ use rand::prelude::SliceRandom;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, Gender, GoogleVoice, OptionTryUnwrap, Framework, Result, JoinVCToken, TTSServiceError, OptionGettext};
+use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, Gender, GoogleVoice, OptionTryUnwrap, Result, JoinVCToken, TTSServiceError, OptionGettext};
 use crate::require;
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
@@ -35,9 +35,7 @@ pub fn refresh_kind() -> sysinfo::RefreshKind {
         .with_cpu()
 }
 
-pub async fn generate_status(framework: &Framework) -> (String, bool) {
-    let shard_manager_lock = framework.shard_manager();
-    let shard_manager = shard_manager_lock.lock().await;
+pub async fn generate_status(shard_manager: &serenity::ShardManager) -> (String, bool) {
     let shards = shard_manager.runners.lock().await;
 
     let mut status: Vec<_> = shards.iter()
