@@ -176,21 +176,86 @@ async fn _main() -> Result<()> {
         "
     ).await?;
 
-    let (startup_message, webhooks) = {
+    let filter_entry = |to_check| move |entry: &std::fs::DirEntry| entry
+        .metadata()
+        .map(|m| match to_check {
+            EntryCheck::IsFile => m.is_file(),
+            EntryCheck::IsDir => m.is_dir(),
+        }).unwrap_or(false);
+
+    let translations =
+        std::fs::read_dir("translations")?
+            .map(Result::unwrap)
+            .filter(filter_entry(EntryCheck::IsDir))
+            .flat_map(|d| std::fs::read_dir(d.path()).unwrap()
+                .map(Result::unwrap)
+                .filter(filter_entry(EntryCheck::IsFile))
+                .filter(|e| e.path().extension().map_or(false, |e| e == "mo"))
+                .map(|entry| Ok::<_, anyhow::Error>((
+                    entry.file_name().to_str().unwrap().split('.').next().unwrap().to_string(),
+                    gettext::Catalog::parse(std::fs::File::open(entry.path())?)?
+                )))
+                .filter_map(Result::ok)
+            )
+            .collect();
+
+    let reqwest = reqwest::Client::new();
+    let auth_key = main.tts_service_auth_key.as_deref();
+
+    let gtts_voices = TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
+    let espeak_voices = TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
+
+    let polly_voices_raw: Vec<PollyVoice> = TTSMode::Polly.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
+    let polly_voices = polly_voices_raw.into_iter().map(|v| (v.id.clone(), v)).collect();
+
+    let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?;
+    let premium_voices = prepare_premium_voices(serenity::json::prelude::from_slice(&premium_voices_raw)?);
+
+    let (startup_message, premium_avatar_url, webhooks) = {
         let http = serenity::Http::new(main.token.as_deref().unwrap());
         let webhooks = get_webhooks(&http, webhooks).await?;
-        (
-            webhooks["logs"].execute(&http, true, |b| b
-                .content("**TTS Bot is starting up**")
-            ).await?.unwrap().id, webhooks
-        )
+
+        let premium_avatar_url = serenity::UserId(802632257658683442).to_user(&http).await?.face();
+
+        let startup_message = webhooks["logs"].execute(&http, true, |b| b
+            .content("**TTS Bot is starting up**")
+        ).await?.unwrap().id;
+
+        let logger = logging::WebhookLogger::new(
+            http,
+            tracing::Level::from_str(&main.log_level)?,
+            webhooks["logs"].clone(),
+            webhooks["errors"].clone(),
+        );
+
+        tracing::subscriber::set_global_default(logger.clone())?;
+        tokio::spawn(async move {logger.listener().await;});
+
+        (startup_message, premium_avatar_url, webhooks)
     };
+
+    let token = main.token.take().unwrap();
+
+    let data = Arc::new(Data {
+        join_vc_tokens: dashmap::DashMap::new(),
+        last_to_xsaid_tracker: dashmap::DashMap::new(),
+        system_info: parking_lot::Mutex::new(sysinfo::System::new()),
+
+        gtts_voices, espeak_voices, premium_voices, polly_voices,
+
+        config: main, reqwest, premium_avatar_url,
+        guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
+        analytics, webhooks, start_time, pool, startup_message, translations,
+    });
+
+    let data_clone = data.clone();
 
     let framework_state_oc = Arc::new(once_cell::sync::OnceCell::new());
     let framework_state_oc_clone = framework_state_oc.clone();
 
     let framework = poise::Framework::build()
-        .token(main.token.take().unwrap())
+        .token(token)
+        .user_data_setup(|_, _, _| {Box::pin(async {Ok(data_clone)})})
         .intents(
             serenity::GatewayIntents::GUILDS
             | serenity::GatewayIntents::GUILD_MESSAGES
@@ -203,73 +268,6 @@ async fn _main() -> Result<()> {
             .event_handler(EventHandler {state: framework_state_oc_clone})
             .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
         )
-        .user_data_setup(move |ctx, _, framework| {Box::pin(async move {
-            let logger = logging::WebhookLogger::new(
-                ctx.http.clone(),
-                tracing::Level::from_str(&main.log_level)?,
-                webhooks["logs"].clone(),
-                webhooks["errors"].clone(),
-            );
-
-            tracing::subscriber::set_global_default(logger.clone())?;
-            tokio::spawn(async move {logger.listener().await;});
-
-            let filter_entry = |to_check| move |entry: &std::fs::DirEntry| entry
-                .metadata()
-                .map(|m| match to_check {
-                    EntryCheck::IsFile => m.is_file(),
-                    EntryCheck::IsDir => m.is_dir(),
-                }).unwrap_or(false);
-
-            let translations =
-                std::fs::read_dir("translations")?
-                    .map(Result::unwrap)
-                    .filter(filter_entry(EntryCheck::IsDir))
-                    .flat_map(|d| std::fs::read_dir(d.path()).unwrap()
-                        .map(Result::unwrap)
-                        .filter(filter_entry(EntryCheck::IsFile))
-                        .filter(|e| e.path().extension().map_or(false, |e| e == "mo"))
-                        .map(|entry| Ok::<_, anyhow::Error>((
-                            entry.file_name().to_str().unwrap().split('.').next().unwrap().to_string(),
-                            gettext::Catalog::parse(std::fs::File::open(entry.path())?)?
-                        )))
-                        .filter_map(Result::ok)
-                    )
-                    .collect();
-
-            let reqwest = reqwest::Client::new();
-            let auth_key = main.tts_service_auth_key.as_deref();
-
-            let gtts_voices = TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
-            let espeak_voices = TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
-
-            let polly_voices_raw: Vec<PollyVoice> = TTSMode::Polly.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
-            let polly_voices = polly_voices_raw.into_iter().map(|v| (v.id.clone(), v)).collect();
-
-            let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?;
-            let premium_voices = prepare_premium_voices(serenity::json::prelude::from_slice(&premium_voices_raw)?);
-
-            let data = Arc::new(Data {
-                join_vc_tokens: dashmap::DashMap::new(),
-                last_to_xsaid_tracker: dashmap::DashMap::new(),
-                system_info: parking_lot::Mutex::new(sysinfo::System::new()),
-                premium_avatar_url: serenity::UserId(802632257658683442).to_user(ctx).await?.face(),
-
-                gtts_voices, espeak_voices, premium_voices, polly_voices,
-
-                config: main, reqwest,
-                guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
-                analytics, webhooks, start_time, pool, startup_message, translations,
-            });
-
-            let res = framework_state_oc.set(FrameworkState{
-                shard_manager: Arc::downgrade(&framework.shard_manager()),
-                user_data: Arc::downgrade(&data),
-            });
-            if res.is_err() {unreachable!()}
-
-            Ok(data)
-        })})
         .options(poise::FrameworkOptions {
             command_check: Some(|ctx| Box::pin(async move {Ok(!ctx.author().bot)})),
             allowed_mentions: Some({
@@ -340,6 +338,12 @@ async fn _main() -> Result<()> {
             ],..poise::FrameworkOptions::default()
         })
         .build().await?;
+
+    let res = framework_state_oc.set(FrameworkState{
+        shard_manager: Arc::downgrade(&framework.shard_manager()),
+        user_data: Arc::downgrade(&data),
+    });
+    if res.is_err() {unreachable!()}
 
     let framework_copy = framework.clone();
     tokio::spawn(async move {
