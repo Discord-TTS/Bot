@@ -260,7 +260,7 @@ pub async fn invite(ctx: Context<'_>,) -> CommandResult {
         if ctx.guild_id() == Some(config.main_server) {
             ctx
                 .gettext("Check out {channel_mention} to invite {bot_mention}!")
-                .replace("{invite_channel}", &serenity::ChannelId(invite_channel).mention().to_string())
+                .replace("{invite_channel}", &invite_channel.mention().to_string())
                 .replace("{bot_mention}", &bot_mention)
         } else {
             ctx_discord.cache.guild_channel_field(invite_channel, |c| ctx

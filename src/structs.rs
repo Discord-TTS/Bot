@@ -22,15 +22,15 @@ pub struct Config {
 pub struct MainConfig {
     pub announcements_channel: serenity::ChannelId,
     pub tts_service_auth_key: Option<String>,
+    pub invite_channel: serenity::ChannelId,
     pub translation_token: Option<String>,
     pub patreon_role: serenity::RoleId,
     pub main_server: serenity::GuildId,
+    pub ofs_role: serenity::RoleId,
     pub main_server_invite: String,
     pub tts_service: reqwest::Url,
     pub token: Option<String>,
-    pub invite_channel: u64,
     pub log_level: String,
-    pub ofs_role: u64,
 }
 
 #[derive(serde::Deserialize)]

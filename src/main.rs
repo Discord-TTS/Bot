@@ -29,7 +29,7 @@ use sysinfo::SystemExt;
 use once_cell::sync::OnceCell;
 use tracing::{error, info, warn};
 
-use poise::serenity_prelude as serenity; // re-exports a lot of serenity with shorter paths
+use poise::serenity_prelude::{self as serenity, Mentionable as _}; // re-exports a lot of serenity with shorter paths
 use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
 
 mod migration;
@@ -481,7 +481,7 @@ Ask questions by either responding here or asking on the support server!",
             match ctx.http.add_member_role(
                 data.config.main_server.into(),
                 owner.id.0,
-                data.config.ofs_role,
+                data.config.ofs_role.into(),
                 None
             ).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => {return Ok(())},
@@ -835,8 +835,8 @@ async fn process_support_dm(
 
                 if content.contains("discord.gg") {
                     channel.say(&ctx.http, format!(
-                        "Join {} and look in <#{}> to invite {}!",
-                        data.config.main_server_invite, data.config.invite_channel, ctx.cache.current_user_id()
+                        "Join {} and look in {} to invite {}!",
+                        data.config.main_server_invite, data.config.invite_channel.mention(), ctx.cache.current_user_id()
                     )).await?;
                 } else if content.as_str() == "help" {
                     channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
