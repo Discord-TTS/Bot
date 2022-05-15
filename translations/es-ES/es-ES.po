@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-09 16:12+0000\n"
-"PO-Revision-Date: 2022-05-13 21:45\n"
+"PO-Revision-Date: 2022-05-15 18:15\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -184,15 +184,15 @@ msgstr "Latencia actual: {}ms"
 
 #: src/commands/other.rs:228
 msgid "Are you sure you want to make a suggestion to {bot_name}?"
-msgstr ""
+msgstr "¿Quieres sugerir algo a {bot_name}?"
 
 #: src/commands/other.rs:233
 msgid "Suggestion cancelled"
-msgstr ""
+msgstr "?"
 
 #: src/commands/other.rs:247
 msgid "Suggestion noted"
-msgstr ""
+msgstr "?"
 
 #: src/commands/other.rs:262
 msgid "Check out {channel_mention} to invite {bot_mention}!"
