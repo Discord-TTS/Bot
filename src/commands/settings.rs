@@ -23,7 +23,7 @@ use poise::serenity_prelude as serenity;
 
 use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, PoiseContextExt, ApplicationContext, OptionGettext, PollyVoice, TTSModeChoice};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
-use crate::funcs::{random_footer, parse_user_or_guild, confirm_dialog};
+use crate::funcs::{random_footer, confirm_dialog};
 use crate::{require_guild, require};
 use crate::database;
 
@@ -72,7 +72,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
     let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
 
-    let user_mode = if crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_none() {
+    let user_mode = if data.premium_check(Some(guild_id)).await?.is_none() {
         userinfo_row.premium_voice_mode
     } else {
         userinfo_row.voice_mode
@@ -287,7 +287,7 @@ impl<'a> MenuPaginator<'a> {
 }
 
 async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> Vec<poise::AutocompleteChoice<String>> {
-    let (_, mode) = match parse_user_or_guild(ctx.data, ctx.discord, ctx.interaction.user().id, ctx.interaction.guild_id()).await {
+    let (_, mode) = match ctx.data.parse_user_or_guild(ctx.interaction.user().id, ctx.interaction.guild_id()).await {
         Ok(v) => v,
         Err(_) => return Vec::new()
     };
@@ -341,8 +341,8 @@ enum Target {
 
 #[allow(clippy::too_many_arguments)]
 async fn change_mode<'a, CacheKey, RowT>(
-    ctx: &'a Context<'_>,
-    general_db: &database::Handler<CacheKey, RowT>,
+    ctx: &'a Context<'a>,
+    general_db: &'a database::Handler<CacheKey, RowT>,
     guild_id: serenity::GuildId,
     identifier: CacheKey, mode: Option<TTSMode>,
     target: Target, guild_is_premium: bool
@@ -352,7 +352,7 @@ where
     RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
 {
     let data = ctx.data();
-    if mode.map_or(false, TTSMode::is_premium) && crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_some() {
+    if mode.map_or(false, TTSMode::is_premium) && data.premium_check(Some(guild_id)).await?.is_some() {
         ctx.send(|b| b.embed(|e| {e
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
@@ -389,8 +389,8 @@ where
 #[allow(clippy::too_many_arguments)]
 async fn change_voice<'a, T, RowT1, RowT2>(
     ctx: &'a Context<'a>,
-    general_db: &database::Handler<T, RowT1>,
-    voice_db: &database::Handler<(T, TTSMode), RowT2>,
+    general_db: &'a database::Handler<T, RowT1>,
+    voice_db: &'a database::Handler<(T, TTSMode), RowT2>,
     author_id: serenity::UserId, guild_id: serenity::GuildId,
     key: T, voice: Option<String>,
     target: Target,
@@ -402,9 +402,10 @@ where
     T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
     (T, TTSMode): database::CacheKeyTrait,
 {
-    let (_, mode) = parse_user_or_guild(ctx.data(), ctx.discord(), author_id, Some(guild_id)).await?;
+    let data = ctx.data();
+    let (_, mode) = data.parse_user_or_guild(author_id, Some(guild_id)).await?;
     Ok(if let Some(voice) = voice {
-        if check_valid_voice(ctx.data(), &voice, mode) {
+        if check_valid_voice(data, &voice, mode) {
             general_db.create_row(key).await?;
             voice_db.set_one((key, mode), "voice", &voice).await?;
             Cow::Owned(match target {
@@ -793,7 +794,7 @@ pub async fn speaking_rate(
     let data = ctx.data();
     let author = ctx.author();
 
-    let (_, mode) = parse_user_or_guild(data, ctx.discord(), author.id, ctx.guild_id()).await?;
+    let (_, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
     let (min, _, max, kind) = require!(mode.speaking_rate_info(), {
         ctx.say(ctx.gettext("**Error**: Cannot set speaking rate for the {mode} mode").replace("{mode}", mode.into())).await?;
         Ok(())
@@ -1017,7 +1018,7 @@ pub async fn mode(
     let author_id = ctx.author().id.into();
     let guild_id = ctx.guild_id().unwrap();
 
-    let guild_is_premium = crate::premium_check(ctx.discord(), data, Some(guild_id)).await?.is_none();
+    let guild_is_premium = data.premium_check(Some(guild_id)).await?.is_none();
 
     let to_send = change_mode(
         &ctx, &data.userinfo_db,
@@ -1074,7 +1075,7 @@ pub async fn voices(
 
     let mode = match mode {
         Some(mode) => TTSMode::from(mode),
-        None => parse_user_or_guild(data, ctx.discord(), author.id, ctx.guild_id()).await?.1
+        None => data.parse_user_or_guild(author.id, ctx.guild_id()).await?.1
     };
 
     let voices = {
@@ -1144,7 +1145,7 @@ pub async fn voices(
 pub async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
     let data = ctx.data();
 
-    let (voice_id, mode) = parse_user_or_guild(data, ctx.discord(), ctx.author().id, ctx.guild_id()).await?;
+    let (voice_id, mode) = data.parse_user_or_guild(ctx.author().id, ctx.guild_id()).await?;
     let voice = match mode {
         TTSMode::Polly => {
             let voice_id: &str = &voice_id;
@@ -1171,7 +1172,7 @@ pub async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>
 pub async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
     let data = ctx.data();
 
-    let (lang_variant, mode) = parse_user_or_guild(data, ctx.discord(), ctx.author().id, ctx.guild_id()).await?;
+    let (lang_variant, mode) = data.parse_user_or_guild(ctx.author().id, ctx.guild_id()).await?;
     let (lang, variant) = match mode {
         TTSMode::gCloud => &lang_variant,
         _ => TTSMode::gCloud.default_voice()

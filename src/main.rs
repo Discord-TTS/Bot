@@ -20,7 +20,7 @@
 #![warn(clippy::pedantic)]
 
 // clippy::pedantic complains about u64 -> i64 and back when db conversion, however it is fine
-#![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless)]
+#![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
 #![allow(clippy::unreadable_literal)]
 
 use std::{borrow::Cow, collections::HashMap, path::Path, str::FromStr, sync::{Arc, Weak}};
@@ -32,6 +32,7 @@ use tracing::{error, info, warn};
 use poise::serenity_prelude::{self as serenity, Mentionable as _}; // re-exports a lot of serenity with shorter paths
 use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
 
+mod patreon_check;
 mod migration;
 mod analytics;
 mod constants;
@@ -43,10 +44,11 @@ mod macros;
 mod error;
 mod funcs;
 
+use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_premium_voices};
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
-use funcs::{clean_msg, parse_user_or_guild, run_checks, random_footer, generate_status, prepare_premium_voices};
 use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, JoinVCToken, PollyVoice};
 
+use crate::structs::FailurePoint;
 
 enum EntryCheck {
     IsFile,
@@ -81,7 +83,7 @@ async fn _main() -> Result<()> {
     let start_time = std::time::SystemTime::now();
     std::env::set_var("RUST_LIB_BACKTRACE", "1");
 
-    let (pool, mut main, webhooks) = {
+    let (pool, mut main, patreon_config, webhooks) = {
         let mut config_toml: toml::Value = std::fs::read_to_string("config.toml")?.parse()?;
         let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
 
@@ -104,8 +106,8 @@ async fn _main() -> Result<()> {
 
         migration::run(&mut config_toml, &pool).await?;
 
-        let Config{main, webhooks} = config_toml.try_into()?;
-        (pool, main, webhooks)
+        let Config{main, patreon, webhooks} = config_toml.try_into()?;
+        (pool, main, patreon, webhooks)
     };
 
     // CLEANUP
@@ -234,8 +236,31 @@ async fn _main() -> Result<()> {
         (startup_message, premium_avatar_url, webhooks)
     };
 
-    let token = main.token.take().unwrap();
+    let patreon_checker = {
+        let bind_addr = patreon_config.webhook_bind_address.parse()?;
+        let patreon_checker = Arc::new(patreon_check::PatreonChecker::new(reqwest.clone(), patreon_config));
+        let patreon_checker_clone = patreon_checker.clone();
 
+        {
+            let router = axum::Router::new().route("/patreon", axum::routing::post(|headers, body| async move {
+                if let Err(err) = patreon_checker_clone.webhook_recv(headers, body).await {
+                    tracing::error!("Error in Patreon webhook: {}", err);
+                }
+            }));
+
+            tokio::spawn(async move {
+                axum::Server::bind(&bind_addr)
+                    .serve(router.into_make_service())
+                    .await.unwrap();
+            });
+        }
+
+        let patreon_checker_clone = patreon_checker.clone();
+        tokio::spawn(async move {patreon_checker_clone.background_task().await;});
+        patreon_checker
+    };
+
+    let token = main.token.take().unwrap();
     let data = Arc::new(Data {
         join_vc_tokens: dashmap::DashMap::new(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
@@ -243,7 +268,7 @@ async fn _main() -> Result<()> {
 
         gtts_voices, espeak_voices, premium_voices, polly_voices,
 
-        config: main, reqwest, premium_avatar_url,
+        config: main, reqwest, premium_avatar_url, patreon_checker,
         guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
         analytics, webhooks, start_time, pool, startup_message, translations,
     });
@@ -562,56 +587,19 @@ Ask questions by either responding here or asking on the support server!",
 }
 
 
-enum FailurePoint {
-    InSupportGuild(serenity::UserId),
-    PatreonRole(serenity::UserId),
-    PremiumUser,
-    Guild,
-}
-
-async fn premium_check(ctx: &serenity::Context, data: &Data, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>> {
-    let guild_id = match guild_id {
-        Some(guild) => guild,
-        None => return Ok(Some(FailurePoint::Guild))
-    };
-
-    let premium_user_id = data
-        .guilds_db.get(guild_id.0 as i64).await?
-        .premium_user
-        .map(|u| serenity::UserId(u as u64));
-
-    match premium_user_id {
-        Some(premium_user_id) => {
-            match data.config.main_server.member(ctx, premium_user_id).await {
-                Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => Ok(Some(FailurePoint::InSupportGuild(premium_user_id))),
-                Ok(premium_user) => Ok((!premium_user.roles.contains(&data.config.patreon_role)).then(|| FailurePoint::PatreonRole(premium_user_id))),
-                Err(err) => Err(anyhow::Error::from(err)),
-            }
-        }
-        None => Ok(Some(FailurePoint::PremiumUser))
-    }
-}
-
 async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, error::CommandError> {
+    let guild_id = ctx.guild_id();
     let ctx_discord = ctx.discord();
-    let guild = ctx.guild();
     let data = ctx.data();
 
     let main_msg =
-        match premium_check(ctx_discord, data, guild.as_ref().map(|g| g.id)).await? {
+        match data.premium_check(guild_id).await? {
             None => return Ok(true),
             Some(FailurePoint::Guild) => Cow::Borrowed("Hey, this is a premium command so it must be run in a server!"),
-            Some(FailurePoint::PremiumUser) => {Cow::Owned(
+            Some(FailurePoint::PremiumUser) => Cow::Owned(
                 format!("Hey, this server isn't premium, please purchase TTS Bot Premium via Patreon! (`{}donate`)", ctx.prefix())
-            )}
-            Some(FailurePoint::InSupportGuild(premium_user_id)) => {
-                let premium_user = premium_user_id.to_user(ctx_discord).await?;
-                Cow::Owned(format!(concat!(
-                    "Hey, this server has a premium user setup, however they are not longer in the support server! ",
-                    "Please ask {}#{} to rejoin with {}invite",
-                ), premium_user.name, premium_user.discriminator, ctx.prefix()))
-            },
-            Some(FailurePoint::PatreonRole(premium_user_id)) => {
+            ),
+            Some(FailurePoint::NotSubscribed(premium_user_id)) => {
                 let premium_user = premium_user_id.to_user(ctx_discord).await?;
                 Cow::Owned(format!(concat!(
                     "Hey, this server has a premium user setup, however they are not longer a patreon! ",
@@ -624,8 +612,8 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, error:
     warn!(
         "{}#{} | {} failed the premium check in {}",
         author.name, author.discriminator, author.id,
-        match guild {
-            Some(guild) => Cow::Owned(format!("{} | {}", guild.name, guild.id)),
+        match guild_id.and_then(|g_id| ctx_discord.cache.guild_field(g_id, |g| (g_id, g.name.clone()))) {
+            Some((guild_id, name)) => Cow::Owned(format!("{} | {}", name, guild_id)),
             None => Cow::Borrowed("DMs")
         }
     );
@@ -682,7 +670,7 @@ async fn process_tts_msg(
         None => return Ok(()),
         Some(content) => {
             let member = guild_id.member(ctx, message.author.id.0).await?;
-            (voice, mode) = parse_user_or_guild(data, ctx, message.author.id, Some(guild_id)).await?;
+            (voice, mode) = data.parse_user_or_guild(message.author.id, Some(guild_id)).await?;
 
             let nickname_row = nicknames.get([guild_id.into(), message.author.id.into()]).await?;
 
@@ -703,7 +691,7 @@ async fn process_tts_msg(
         );
 
     if let Some(target_lang) = guild_row.target_lang.as_deref() {
-        if guild_row.to_translate && premium_check(ctx, data, Some(guild_id)).await?.is_none() {
+        if guild_row.to_translate && data.premium_check(Some(guild_id)).await?.is_none() {
             content = funcs::translate(&content, target_lang, data).await?.unwrap_or(content);
         };
     }

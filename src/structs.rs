@@ -6,8 +6,9 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 use poise::serenity_prelude as serenity;
+use tracing::warn;
 
-use crate::{database, analytics};
+use crate::{database, analytics, patreon_check};
 use crate::constants::{RED, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 
 pub use anyhow::{Error, Result};
@@ -15,6 +16,7 @@ pub use anyhow::{Error, Result};
 #[derive(serde::Deserialize)]
 pub struct Config {
     #[serde(rename="Main")] pub main: MainConfig,
+    #[serde(rename="Patreon-Info")] pub patreon: PatreonConfig,
     #[serde(rename="Webhook-Info")] pub webhooks: toml::value::Table,
 }
 
@@ -24,13 +26,22 @@ pub struct MainConfig {
     pub tts_service_auth_key: Option<String>,
     pub invite_channel: serenity::ChannelId,
     pub translation_token: Option<String>,
-    pub patreon_role: serenity::RoleId,
     pub main_server: serenity::GuildId,
     pub ofs_role: serenity::RoleId,
     pub main_server_invite: String,
     pub tts_service: reqwest::Url,
     pub token: Option<String>,
     pub log_level: String,
+}
+
+#[derive(serde::Deserialize)]
+pub struct PatreonConfig {
+    pub campaign_id: String,
+    pub basic_tier_id: String,
+    pub extra_tier_id: String,
+    pub webhook_secret: String,
+    pub creator_access_token: String,
+    pub webhook_bind_address: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -51,8 +62,15 @@ impl JoinVCToken {
     }
 }
 
+pub enum FailurePoint {
+    NotSubscribed(serenity::UserId),
+    PremiumUser,
+    Guild,
+}
+
 pub struct Data {
     pub analytics: Arc<analytics::Handler>,
+    pub patreon_checker: Arc<patreon_check::PatreonChecker>,
     pub guilds_db: database::Handler<i64, database::GuildRow>,
     pub userinfo_db: database::Handler<i64, database::UserRow>,
     pub nickname_db: database::Handler<[i64; 2], database::NicknameRow>,
@@ -80,6 +98,81 @@ pub struct Data {
 impl Data {
     pub fn default_catalog(&self) -> Option<&gettext::Catalog> {
         self.translations.get("en-US")
+    }
+
+    pub async fn premium_check(&self, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>> {
+        let guild_id = match guild_id {
+            Some(guild) => guild,
+            None => return Ok(Some(FailurePoint::Guild))
+        };
+
+        let premium_user_id = self
+            .guilds_db.get(guild_id.0 as i64).await?
+            .premium_user
+            .map(|u| serenity::UserId(u as u64));
+
+        premium_user_id.map_or(
+            Ok(Some(FailurePoint::PremiumUser)),
+            |patreon_user_id| if self.patreon_checker.check(patreon_user_id).is_some() {
+                Ok(None)
+            } else {
+                Ok(Some(FailurePoint::NotSubscribed(patreon_user_id)))
+            }
+        )
+    }
+
+    pub async fn parse_user_or_guild(&self, author_id: serenity::UserId, guild_id: Option<serenity::GuildId>) -> Result<(Cow<'static, str>, TTSMode)> {
+        let user_row = self.userinfo_db.get(author_id.into()).await?;
+        let guild_is_premium = self.premium_check(guild_id).await?.is_none();
+
+        let mut mode = {
+            let user_mode =
+                if guild_is_premium {
+                    user_row.premium_voice_mode
+                } else {
+                    user_row.voice_mode
+                };
+
+            if let Some(mode) = user_mode {
+                mode
+            } else if let Some(guild_id) = guild_id {
+                let settings = self.guilds_db.get(guild_id.into()).await?;
+                settings.voice_mode
+            } else {
+                TTSMode::gTTS
+            }
+        };
+
+        let user_voice_row = self.user_voice_db.get((author_id.into(), mode)).await?;
+        let voice =
+            // Get user voice for user mode
+            if user_voice_row.user_id != 0 {
+                user_voice_row.voice.clone().map(Cow::Owned)
+            } else if let Some(guild_id) = guild_id {
+                // Get default server voice for user mode
+                let guild_voice_row = self.guild_voice_db.get((guild_id.into(), mode)).await?;
+                if guild_voice_row.guild_id == 0 {
+                    None
+                } else {
+                    Some(Cow::Owned(guild_voice_row.voice.clone()))
+                }
+            } else {
+                None
+            }.unwrap_or_else(|| Cow::Borrowed(mode.default_voice()));
+
+        if mode.is_premium() && !guild_is_premium {
+            if user_row.voice_mode.map_or(false, TTSMode::is_premium) {
+                let default_tts_mode = TTSMode::default();
+                mode = default_tts_mode;
+
+                warn!("User ID {author_id}'s normal voice mode is set to a premium mode! Resetting.");
+                self.userinfo_db.set_one(author_id.into(), "voice_mode", default_tts_mode).await?;
+            } else {
+                warn!("Guild {guild_id:?} - User {author_id} has a mode set to premium without being premium!");
+            }
+        }
+
+        Ok((voice, mode))
     }
 }
 

@@ -198,45 +198,36 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS | ADD_REACTIONS"
 )]
 pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
-    let ctx_discord = ctx.discord();
     let guild = require_guild!(ctx);
     let data = ctx.data();
 
-    if crate::premium_check(ctx_discord, data, Some(guild.id)).await?.is_none() {
-        ctx.say(ctx.gettext("Hey, this server is already premium!")).await?;
-        return Ok(())
+    if data.premium_check(Some(guild.id)).await?.is_none() {
+        return ctx.say(ctx.gettext("Hey, this server is already premium!")).await.map(drop).map_err(Into::into)
     }
 
     let author = ctx.author();
-    let author_id = author.id.into();
+    let author_id = ctx.author().id.0 as i64;
 
-    let mut error_msg: Option<Cow<'_, str>> = match data.config.main_server.member(ctx_discord, author.id).await {
-        Ok(m) if !m.roles.contains(&data.config.patreon_role) => Some(
-            Cow::Borrowed(ctx.gettext(concat!(
-                "Hey, you do not have the Patreon Role on the Support Server! Please link your ",
-                "[patreon account to your discord account](https://support.patreon.com/hc/en-gb/articles/212052266) ",
-                "or [purchase TTS Bot Premium via Patreon](https://patreon.com/Gnome_The_Bot_Maker)!"
-            )))
-        ),
-        Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => Some(
-            Cow::Owned(ctx
-                .gettext("Hey, you are not in the [Support Server]({server_invite}) so I cannot validate your membership!")
-                .replace("{server_invite}", &data.config.main_server_invite)
-            )
-        ),
-        _ => None
+    let linked_guilds: i64 = sqlx::query("SELECT count(*) FROM guilds WHERE premium_user = $1")
+        .bind(&author_id)
+        .fetch_one(&data.pool)
+        .await?.get("count");
+
+    let error_msg = match data.patreon_checker.check(author.id) {
+        Some(tier) => {
+            let entitled_servers = tier.entitled_servers();
+            if linked_guilds as u8 >= entitled_servers {
+                Some(Cow::Owned(ctx
+                    .gettext("Hey, you already have {server_count} servers linked, you are only subscribed to the {entitled_servers} tier!")
+                    .replace("{entitled_servers}", &entitled_servers.to_string())
+                    .replace("{server_count}", &linked_guilds.to_string())
+                ))
+            } else {
+                None
+            }
+        },
+        None => Some(Cow::Borrowed(ctx.gettext("Hey, you are not subscribed on Patreon!")))
     };
-
-    let linked_guilds: i64 = {
-        sqlx::query("SELECT count(*) FROM guilds WHERE premium_user = $1")
-            .bind(&(author_id as i64))
-            .fetch_one(&data.pool)
-            .await?.get("count")
-    };
-
-    if error_msg.is_none() && linked_guilds >= 2 {
-        error_msg = Some(Cow::Borrowed(ctx.gettext("Hey, you have too many servers linked! Please contact Gnome!#6669 if you have purchased the 5 Servers tier")));
-    }
 
     if let Some(error_msg) = error_msg {
         ctx.send(|b| b.embed(|e| {e

@@ -26,7 +26,7 @@ use crate::structs::Result;
 type LogMessage = (&'static str, String);
 
 pub struct WebhookLogger {
-    http: Arc<serenity::Http>,
+    http: serenity::Http,
     max_verbosity: tracing::Level,
     level_lookup: HashMap<tracing::Level, String>,
 
@@ -38,7 +38,7 @@ pub struct WebhookLogger {
 
 impl WebhookLogger {
     pub fn new(
-        http: Arc<serenity::Http>,
+        http: serenity::Http,
         max_verbosity: tracing::Level,
         normal_logs: serenity::Webhook,
         error_logs: serenity::Webhook,

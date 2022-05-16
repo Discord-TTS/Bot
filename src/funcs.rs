@@ -51,52 +51,6 @@ pub async fn generate_status(shard_manager: &serenity::ShardManager) -> (String,
 }
 
 
-pub async fn parse_user_or_guild(
-    data: &Data,
-    ctx: &serenity::Context,
-    author_id: serenity::UserId,
-    guild_id: Option<serenity::GuildId>,
-) -> Result<(Cow<'static, str>, TTSMode)> {
-    let user_row = data.userinfo_db.get(author_id.into()).await?;
-    let mode = {
-        let user_mode =
-            if crate::premium_check(ctx, data, guild_id).await?.is_none() {
-                user_row.premium_voice_mode
-            } else {
-                user_row.voice_mode
-            };
-
-        if let Some(mode) = user_mode {
-            mode
-        } else if let Some(guild_id) = guild_id {
-            let settings = data.guilds_db.get(guild_id.into()).await?;
-            settings.voice_mode
-        } else {
-            TTSMode::gTTS
-        }
-    };
-
-    let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
-    let voice =
-        // Get user voice for user mode
-        if user_voice_row.user_id != 0 {
-            user_voice_row.voice.clone().map(Cow::Owned)
-        } else if let Some(guild_id) = guild_id {
-            // Get default server voice for user mode
-            let guild_voice_row = data.guild_voice_db.get((guild_id.into(), mode)).await?;
-            if guild_voice_row.guild_id == 0 {
-                None
-            } else {
-                Some(Cow::Owned(guild_voice_row.voice.clone()))
-            }
-        } else {
-            None
-        }.unwrap_or_else(|| Cow::Borrowed(mode.default_voice()));
-
-    Ok((voice, mode))
-}
-
-
 pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url, auth_key: Option<&str>) -> Result<Option<reqwest::Response>> {
     let resp = reqwest
         .get(url)

@@ -22,7 +22,7 @@ use poise::serenity_prelude::{self as serenity, Mentionable as _};
 
 use crate::require;
 use crate::constants::OPTION_SEPERATORS;
-use crate::funcs::{confirm_dialog, fetch_audio, parse_user_or_guild, refresh_kind, prepare_url};
+use crate::funcs::{confirm_dialog, fetch_audio, refresh_kind, prepare_url};
 use crate::structs::{ApplicationContext, Context, CommandResult, OptionTryUnwrap, PoiseContextExt, TTSMode};
 
 /// Shows how long TTS Bot has been online
@@ -65,7 +65,7 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
     let audio;
     let attachment = {
         let data = ctx.data();
-        let (voice, mode) = parse_user_or_guild(data, ctx.discord(), author.id, ctx.guild_id()).await?;
+        let (voice, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
 
         let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
         let speaking_rate = data.user_voice_db
