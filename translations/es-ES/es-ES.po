@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-16 20:19+0000\n"
-"PO-Revision-Date: 2022-05-16 20:20\n"
+"PO-Revision-Date: 2022-05-16 21:20\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -468,11 +468,11 @@ msgstr ""
 
 #: src/commands/settings.rs:993
 msgid "Yes"
-msgstr ""
+msgstr "Sí"
 
 #: src/commands/settings.rs:994
 msgid "No"
-msgstr ""
+msgstr "No"
 
 #: src/commands/settings.rs:1132
 msgid "Currently supported voices"
