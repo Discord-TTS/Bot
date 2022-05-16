@@ -106,17 +106,16 @@ impl Data {
             None => return Ok(Some(FailurePoint::Guild))
         };
 
-        let premium_user_id = self
-            .guilds_db.get(guild_id.0 as i64).await?
-            .premium_user
-            .map(|u| serenity::UserId(u as u64));
-
-        premium_user_id.map_or(
+        let guild_row = self.guilds_db.get(guild_id.0 as i64).await?;
+        guild_row.premium_user.map_or(
             Ok(Some(FailurePoint::PremiumUser)),
-            |patreon_user_id| if self.patreon_checker.check(patreon_user_id).is_some() {
-                Ok(None)
-            } else {
-                Ok(Some(FailurePoint::NotSubscribed(patreon_user_id)))
+            |raw_user_id| {
+                let patreon_user_id = serenity::UserId(raw_user_id as u64);
+                if self.patreon_checker.check(patreon_user_id).is_some() {
+                    Ok(None)
+                } else {
+                    Ok(Some(FailurePoint::NotSubscribed(patreon_user_id)))
+                }
             }
         )
     }

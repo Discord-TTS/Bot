@@ -60,7 +60,6 @@ impl CacheKeyTrait for (i64, TTSMode) {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, sqlx::FromRow)]
 pub struct GuildRow {
-    pub guild_id: i64,
     pub channel: i64,
     pub premium_user: Option<i64>,
     pub xsaid: bool,
@@ -78,7 +77,6 @@ pub struct GuildRow {
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct UserRow {
-    pub user_id: i64,
     pub dm_blocked: bool,
     pub dm_welcomed: bool,
     pub voice_mode: Option<TTSMode>,
@@ -102,8 +100,6 @@ pub struct UserVoiceRow {
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct NicknameRow {
-    pub guild_id: i64,
-    pub user_id: i64,
     pub name: Option<String>,
 }
 

@@ -829,13 +829,12 @@ pub async fn nick(
     #[description="The user to set the nick for, defaults to you"] user: Option<serenity::User>,
     #[description="The nickname to set, leave blank to reset"] #[rest] nickname: Option<String>
 ) -> CommandResult {
-    let ctx_discord = ctx.discord();
-    let guild = require_guild!(ctx);
-
     let author = ctx.author();
+    let ctx_discord = ctx.discord();
+    let guild_id = ctx.guild_id().unwrap();
     let user = user.map_or(Cow::Borrowed(author), Cow::Owned);
 
-    if author.id != user.id && !guild.member(ctx_discord, author).await?.permissions(ctx_discord)?.administrator() {
+    if author.id != user.id && !guild_id.member(ctx_discord, author).await?.permissions(ctx_discord)?.administrator() {
         ctx.say(ctx.gettext("**Error**: You need admin to set other people's nicknames!")).await?;
         return Ok(())
     }
@@ -848,15 +847,15 @@ pub async fn nick(
                 Cow::Borrowed(ctx.gettext("**Error**: You can't have mentions/emotes in your nickname!"))
             } else {
                 tokio::try_join!(
-                    data.guilds_db.create_row(guild.id.into()),
+                    data.guilds_db.create_row(guild_id.into()),
                     data.userinfo_db.create_row(user.id.into())
                 )?;
 
-                data.nickname_db.set_one([guild.id.into(), user.id.into()], "name", &nick).await?;
+                data.nickname_db.set_one([guild_id.into(), user.id.into()], "name", &nick).await?;
                 Cow::Owned(ctx.gettext("Changed {user}'s nickname to {new_nick}").replace("{user}", &user.name).replace("{new_nick}", &nick))
             }
         } else {
-            data.nickname_db.delete([guild.id.into(), user.id.into()]).await?;
+            data.nickname_db.delete([guild_id.into(), user.id.into()]).await?;
             Cow::Owned(ctx.gettext("Reset {user}'s nickname").replace("{user}", &user.name))
         };
 

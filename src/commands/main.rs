@@ -198,10 +198,10 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS | ADD_REACTIONS"
 )]
 pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
-    let guild = require_guild!(ctx);
+    let guild_id = ctx.guild_id().unwrap();
     let data = ctx.data();
 
-    if data.premium_check(Some(guild.id)).await?.is_none() {
+    if data.premium_check(Some(guild_id)).await?.is_none() {
         return ctx.say(ctx.gettext("Hey, this server is already premium!")).await.map(drop).map_err(Into::into)
     }
 
@@ -241,14 +241,18 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     }
 
     data.userinfo_db.create_row(author_id).await?;
-    data.guilds_db.set_one(guild.id.into(), "premium_user", &author_id).await?;
-    data.guilds_db.set_one(guild.id.into(), "voice_mode", &TTSMode::gCloud).await?;
+    data.guilds_db.set_one(guild_id.into(), "premium_user", &author_id).await?;
+    data.guilds_db.set_one(guild_id.into(), "voice_mode", &TTSMode::gCloud).await?;
 
     ctx.say(ctx.gettext("Done! This server is now premium!")).await?;
 
+    let guild_name = ctx.discord().cache
+        .guild_field(guild_id, |g| g.name.clone())
+        .map_or(Cow::Borrowed("<Unknown>"), Cow::Owned);
+
     tracing::info!(
         "{}#{} | {} linked premium to {} | {}, they had {} linked servers",
-        author.name, author.discriminator, author.id, guild.name, guild.id, linked_guilds
+        author.name, author.discriminator, author.id, guild_name, guild_id, linked_guilds
     );
     Ok(())
 }
