@@ -369,12 +369,14 @@ impl std::fmt::Display for TTSServiceError {
 }
 
 
-pub type Command = poise::Command<Arc<Data>, CommandError>;
-pub type Context<'a> = poise::Context<'a, Arc<Data>, CommandError>;
-pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Arc<Data>, CommandError>;
+pub type Command = poise::Command<Data, CommandError>;
+pub type Context<'a> = poise::Context<'a, Data, CommandError>;
+pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Data, CommandError>;
 
 pub type CommandError = Error;
 pub type CommandResult<E=Error> = Result<(), E>;
+pub type Framework = poise::Framework<Data, CommandError>;
+pub type FrameworkContext<'a> = poise::FrameworkContext<'a, Data, CommandError>;
 pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, (serenity::UserId, std::time::SystemTime)>;
 
 pub trait OptionTryUnwrap<T> {

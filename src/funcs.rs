@@ -16,7 +16,7 @@
 
 use std::borrow::Cow;
 use std::fmt::Write;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -35,9 +35,7 @@ pub fn refresh_kind() -> sysinfo::RefreshKind {
         .with_cpu()
 }
 
-pub async fn generate_status(shard_manager: &serenity::ShardManager) -> (String, bool) {
-    let shards = shard_manager.runners.lock().await;
-
+pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> (String, bool) {
     let mut status: Vec<_> = shards.iter()
         .map(|(id, shard)| (id, format!("Shard {id}: `{}`", shard.stage)))
         .collect();

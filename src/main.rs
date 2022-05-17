@@ -23,7 +23,7 @@
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
 #![allow(clippy::unreadable_literal)]
 
-use std::{borrow::Cow, collections::HashMap, path::Path, str::FromStr, sync::{Arc, Weak}};
+use std::{borrow::Cow, collections::HashMap, path::Path, str::FromStr, sync::Arc};
 
 use sysinfo::SystemExt;
 use once_cell::sync::OnceCell;
@@ -46,7 +46,7 @@ mod funcs;
 
 use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_premium_voices};
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
-use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, JoinVCToken, PollyVoice};
+use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, JoinVCToken, PollyVoice, FrameworkContext, Framework};
 
 use crate::structs::FailurePoint;
 
@@ -261,7 +261,9 @@ async fn _main() -> Result<()> {
     };
 
     let token = main.token.take().unwrap();
-    let data = Arc::new(Data {
+    let bot_id = serenity::utils::parse_token(&token).unwrap().0;
+
+    let data = Data {
         join_vc_tokens: dashmap::DashMap::new(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
         system_info: parking_lot::Mutex::new(sysinfo::System::new()),
@@ -271,16 +273,14 @@ async fn _main() -> Result<()> {
         config: main, reqwest, premium_avatar_url, patreon_checker,
         guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
         analytics, webhooks, start_time, pool, startup_message, translations,
-    });
+    };
 
-    let data_clone = data.clone();
-
-    let framework_state_oc = Arc::new(once_cell::sync::OnceCell::new());
-    let framework_state_oc_clone = framework_state_oc.clone();
+    let framework_oc = Arc::new(once_cell::sync::OnceCell::new());
+    let framework_oc_clone = framework_oc.clone();
 
     let framework = poise::Framework::build()
         .token(token)
-        .user_data_setup(|_, _, _| {Box::pin(async {Ok(data_clone)})})
+        .user_data_setup(|_, _, _| {Box::pin(async {Ok(data)})})
         .intents(
             serenity::GatewayIntents::GUILDS
             | serenity::GatewayIntents::GUILD_MESSAGES
@@ -290,7 +290,7 @@ async fn _main() -> Result<()> {
             | serenity::GatewayIntents::MESSAGE_CONTENT,
         )
         .client_settings(move |f| f
-            .event_handler(EventHandler {state: framework_state_oc_clone})
+            .event_handler(EventHandler {bot_id, framework: framework_oc_clone})
             .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
         )
         .options(poise::FrameworkOptions {
@@ -364,11 +364,9 @@ async fn _main() -> Result<()> {
         })
         .build().await?;
 
-    let res = framework_state_oc.set(FrameworkState{
-        shard_manager: Arc::downgrade(&framework.shard_manager()),
-        user_data: Arc::downgrade(&data),
-    });
-    if res.is_err() {unreachable!()}
+    if framework_oc.set(framework.clone()).is_err() {
+        unreachable!()
+    };
 
     let framework_copy = framework.clone();
     tokio::spawn(async move {
@@ -406,43 +404,39 @@ async fn _main() -> Result<()> {
     framework.start_autosharded().await.map_err(Into::into)
 }
 
-struct FrameworkState {
-    shard_manager: Weak<tokio::sync::Mutex<serenity::ShardManager>>,
-    user_data: Weak<Data>,
-}
 
 struct EventHandler {
-    state: Arc<OnceCell<FrameworkState>>
+    bot_id: serenity::UserId,
+    framework: Arc<OnceCell<Arc<Framework>>>
 }
-
 impl EventHandler {
-    fn shard_manager(&self) -> Option<Arc<tokio::sync::Mutex<serenity::ShardManager>>> {
-        self.state.get().and_then(|s| s.shard_manager.upgrade())
-    }
-
-    fn data(&self) -> Option<Arc<Data>> {
-        self.state.get().and_then(|s| s.user_data.upgrade())
+    async fn framework(&self) -> Option<FrameworkContext<'_>> {
+        match self.framework.get() {
+            None => None,
+            Some(framework) => Some(poise::FrameworkContext {
+                bot_id: self.bot_id,
+                options: framework.options(),
+                user_data: framework.user_data().await,
+                shard_manager: framework.shard_manager()
+            }),
+        }
     }
 }
 
 #[poise::async_trait]
 impl serenity::EventHandler for EventHandler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
-        let shard_manager = require!(self.shard_manager());
-        let data = require!(self.data());
-
-        error::handle_message(&ctx, &shard_manager, &data, &new_message, tokio::try_join!(
-            process_tts_msg(&ctx, &new_message, &data),
-            process_support_dm(&ctx, &new_message, &data),
-            process_mention_msg(&ctx, &new_message, &data),
+        let framework = require!(self.framework().await);
+        error::handle_message(&ctx, framework, &new_message, tokio::try_join!(
+            process_tts_msg(&ctx, &new_message, framework.user_data),
+            process_support_dm(&ctx, &new_message, framework.user_data),
+            process_mention_msg(&ctx, &new_message, framework.user_data),
         )).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
     async fn voice_state_update(&self, ctx: serenity::Context, old: Option<serenity::VoiceState>, new: serenity::VoiceState) {
-        let shard_manager = require!(self.shard_manager());
-        let data = require!(self.data());
-
-        error::handle_unexpected_default(&ctx, &shard_manager, &data, "VoiceStateUpdate", async_try!({
+        let framework = require!(self.framework().await);
+        error::handle_unexpected_default(&ctx, framework, "VoiceStateUpdate", async_try!({
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user_id();
             let guild_id = new.guild_id.try_unwrap()?;
@@ -470,10 +464,10 @@ impl serenity::EventHandler for EventHandler {
     async fn guild_create(&self, ctx: serenity::Context, guild: serenity::Guild, is_new: bool) {
         if !is_new {return};
 
-        let shard_manager = require!(self.shard_manager());
-        let data = require!(self.data());
+        let framework = require!(self.framework().await);
+        let data = framework.user_data;
 
-        error::handle_guild("GuildCreate", &ctx, &shard_manager, &data, Some(&guild), async_try!({
+        error::handle_guild("GuildCreate", &ctx, framework, Some(&guild), async_try!({
             // Send to servers channel and DM owner the welcome message
 
             let (owner, _) = tokio::join!(
@@ -525,10 +519,10 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn guild_delete(&self, ctx: serenity::Context, incomplete: serenity::UnavailableGuild, full: Option<serenity::Guild>) {
-        let data = require!(self.data());
-        let shard_manager = require!(self.shard_manager());
+        let framework = require!(self.framework().await);
+        let data = framework.user_data;
 
-        error::handle_guild("GuildDelete", &ctx, &shard_manager, &data, full.as_ref(), async_try!({
+        error::handle_guild("GuildDelete", &ctx, framework, full.as_ref(), async_try!({
             data.guilds_db.delete(incomplete.id.into()).await?;
             if let Some(guild) = &full {
                 data.webhooks["servers"].execute(&ctx.http, false, |b| {b.content(format!(
@@ -542,13 +536,12 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn interaction_create(&self, ctx: serenity::Context, interaction: serenity::Interaction) {
-        let data = require!(self.data());
-        let shard_manager = require!(self.shard_manager());
+        let framework = require!(self.framework().await);
 
-        error::handle_unexpected_default(&ctx, &shard_manager, &data, "InteractionCreate", async_try!({
+        error::handle_unexpected_default(&ctx, framework, "InteractionCreate", async_try!({
             if let serenity::Interaction::MessageComponent(interaction) = interaction {
                 if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
-                    error::handle_traceback_button(&ctx, &data, interaction).await?;
+                    error::handle_traceback_button(&ctx, framework.user_data, interaction).await?;
                 }
             };
 
@@ -557,12 +550,13 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn ready(&self, ctx: serenity::Context, data_about_bot: serenity::Ready) {
-        let data = require!(self.data());
-        let shard_manager = require!(self.shard_manager());
+        let framework = require!(self.framework().await);
+        let data = framework.user_data;
 
-        error::handle_unexpected_default(&ctx, &shard_manager, &data, "Ready", async_try!({
+        error::handle_unexpected_default(&ctx, framework, "Ready", async_try!({
             let user_name = &data_about_bot.user.name;
-            let (status, starting) = generate_status(&*shard_manager.lock().await).await;
+            let (status, starting) = generate_status(&*framework.shard_manager.lock().await.runners.lock().await);
+
             data.webhooks["logs"].edit_message(&ctx.http, data.startup_message, |m| {m
                 .content("")
                 .embeds(vec![serenity::Embed::fake(|e| {e
@@ -580,8 +574,8 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn resume(&self, _: serenity::Context, _: serenity::ResumedEvent) {
-        if let Some(data) = self.data() {
-            data.analytics.log(Cow::Borrowed("on_resumed"));
+        if let Some(framework) = self.framework().await {
+            framework.user_data.analytics.log(Cow::Borrowed("on_resumed"));
         }
     }
 }
