@@ -107,7 +107,7 @@ async fn handle_unexpected(
                 .chain(extra_fields)
                 .chain(after_fields)
                 .for_each(|(title, mut value, inline)| {
-                    if value == "\u{200B}" {
+                    if value != "\u{200B}" {
                         value = Cow::Owned(format!("`{value}`"));
                     };
 

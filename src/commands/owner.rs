@@ -63,7 +63,7 @@ pub async fn add_premium(ctx: Context<'_>, guild: serenity::Guild, user: serenit
     Ok(())
 }
 
-#[poise::command(prefix_command, owners_only, hide_in_help)]
+#[poise::command(prefix_command, owners_only, hide_in_help, subcommands("guild", "user", "guild_voice", "user_voice"))]
 pub async fn remove_cache(ctx: Context<'_>) -> CommandResult {
     ctx.say("Please run a subcommand!").await?;
     Ok(())
@@ -97,9 +97,19 @@ pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeChoice) -> Com
     Ok(())
 }
 
-
-#[poise::command(prefix_command, guild_only, hide_in_help, subcommands("leave"))]
+/// Debug commands for the bot
+#[poise::command(prefix_command, slash_command, guild_only, subcommands("info", "leave"))]
 pub async fn debug(ctx: Context<'_>) -> CommandResult {
+    _info(ctx).await
+}
+
+/// Shows debug information including voice info and database info.
+#[poise::command(prefix_command, slash_command, guild_only)]
+pub async fn info(ctx: Context<'_>) -> CommandResult {
+    _info(ctx).await
+}
+
+pub async fn _info(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let guild_id_db: i64 = guild_id.into();
 
@@ -133,6 +143,7 @@ Guild Voice Data: `{guild_voice_row:?}`
     })}).await.map(drop).map_err(Into::into)
 }
 
+/// Force leaves the voice channel in the current server to bypass buggy states
 #[poise::command(prefix_command, guild_only, hide_in_help)]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
