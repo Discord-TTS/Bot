@@ -123,6 +123,7 @@ impl Data {
     pub async fn parse_user_or_guild(&self, author_id: serenity::UserId, guild_id: Option<serenity::GuildId>) -> Result<(Cow<'static, str>, TTSMode)> {
         let user_row = self.userinfo_db.get(author_id.into()).await?;
         let guild_is_premium = self.premium_check(guild_id).await?.is_none();
+        let mut guild_row = None;
 
         let mut mode = {
             let user_mode =
@@ -135,8 +136,8 @@ impl Data {
             if let Some(mode) = user_mode {
                 mode
             } else if let Some(guild_id) = guild_id {
-                let settings = self.guilds_db.get(guild_id.into()).await?;
-                settings.voice_mode
+                guild_row = Some(self.guilds_db.get(guild_id.into()).await?);
+                guild_row.as_ref().unwrap().voice_mode
             } else {
                 TTSMode::gTTS
             }
@@ -160,12 +161,14 @@ impl Data {
             }.unwrap_or_else(|| Cow::Borrowed(mode.default_voice()));
 
         if mode.is_premium() && !guild_is_premium {
-            if user_row.voice_mode.map_or(false, TTSMode::is_premium) {
-                let default_tts_mode = TTSMode::default();
-                mode = default_tts_mode;
+            mode = TTSMode::default();
 
+            if user_row.voice_mode.map_or(false, TTSMode::is_premium) {
                 warn!("User ID {author_id}'s normal voice mode is set to a premium mode! Resetting.");
-                self.userinfo_db.set_one(author_id.into(), "voice_mode", default_tts_mode).await?;
+                self.userinfo_db.set_one(author_id.into(), "voice_mode", mode).await?;
+            } else if let Some(guild_id) = guild_id && let Some(guild_row) = guild_row && guild_row.voice_mode.is_premium() {
+                warn!("Guild ID {guild_id}'s voice mode is set to a premium mode without being premium! Resetting.");
+                self.guilds_db.set_one(guild_id.into(), "voice_mode", mode).await?;
             } else {
                 warn!("Guild {guild_id:?} - User {author_id} has a mode set to premium without being premium!");
             }
