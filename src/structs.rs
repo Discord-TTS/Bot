@@ -16,8 +16,8 @@ pub use anyhow::{Error, Result};
 #[derive(serde::Deserialize)]
 pub struct Config {
     #[serde(rename="Main")] pub main: MainConfig,
-    #[serde(rename="Patreon-Info")] pub patreon: PatreonConfig,
     #[serde(rename="Webhook-Info")] pub webhooks: toml::value::Table,
+    #[serde(rename="Patreon-Info")] pub patreon: Option<PatreonConfig>,
 }
 
 #[derive(serde::Deserialize)]

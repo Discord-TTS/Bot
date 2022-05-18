@@ -40,17 +40,37 @@ fn check_md5(key: &[u8], untrusted_signature: &[u8], untrusted_data: &[u8]) -> R
 }
 
 pub struct PatreonChecker {
-    config: PatreonConfig,
     reqwest: reqwest::Client,
+    config: Option<PatreonConfig>,
     members: RwLock<HashMap<serenity::UserId, PatreonTier>>,
 }
 
 impl PatreonChecker {
-    pub fn new(reqwest: reqwest::Client, config: PatreonConfig) -> Self {
-        Self {
+    // Creates a new PatreonChecker, none on config means all checks fail
+    pub fn new(reqwest: reqwest::Client, config: Option<PatreonConfig>) -> Result<Arc<Self>> {
+        let self_ = Arc::new(Self {
             reqwest, config,
             members: RwLock::new(HashMap::new()),
+        });
+
+        if let Some(config) = self_.config.as_ref() {
+            let self_clone = self_.clone();
+            let bind_addr = config.webhook_bind_address.parse()?;
+
+            let router = axum::Router::new().route("/patreon", axum::routing::post(|headers, body| async move {
+                if let Err(err) = self_clone.webhook_recv(headers, body).await {
+                    tracing::error!("Error in Patreon webhook: {}", err);
+                }
+            }));
+
+            let server = axum::Server::bind(&bind_addr).serve(router.into_make_service());
+            tokio::spawn(self_.clone().background_task());
+            tokio::spawn(async {server.await.unwrap()});
+        } else {
+            tracing::warn!("Patreon Config not present: All premium checks will fail.");
         }
+
+        Ok(self_)
     }
 
 
@@ -58,7 +78,7 @@ impl PatreonChecker {
         self.members.read().get(&patreon_member).copied()
     }
 
-    pub async fn background_task(self: Arc<Self>) {
+    async fn background_task(self: Arc<Self>) {
         let mut timer = tokio::time::interval(std::time::Duration::from_secs(60*60));
 
         loop {
@@ -69,12 +89,12 @@ impl PatreonChecker {
         }
     }
 
-    pub async fn webhook_recv(&self, 
+    async fn webhook_recv(&self,
         headers: axum::http::HeaderMap,
         payload: String,
     ) -> Result<()> {
         if check_md5(
-            self.config.webhook_secret.as_bytes(),
+            self.config.as_ref().expect("Config should be set for webhook handling").webhook_secret.as_bytes(),
             require!(headers.get("X-Patreon-Signature"), Ok(())).as_bytes(),
             payload.as_bytes()
         )? {
@@ -91,15 +111,15 @@ impl PatreonChecker {
 
 
 
-    fn get_member_tier(&self, member: &RawPatreonMember, user: &RawPatreonUser) -> Option<(serenity::UserId, Option<PatreonTier>)> {
+    fn get_member_tier(config: &PatreonConfig, member: &RawPatreonMember, user: &RawPatreonUser) -> Option<(serenity::UserId, Option<PatreonTier>)> {
         user.attributes.social_connections.as_ref().and_then(|socials| socials.discord.as_ref()).map(|discord_info| {
             let check_tier = |tier_id| member.relationships.currently_entitled_tiers.data.iter().any(|tier| tier_id == &tier.id);
 
             (
                 serenity::UserId(discord_info.user_id.parse().unwrap()),
-                if check_tier(&self.config.extra_tier_id) {
+                if check_tier(&config.extra_tier_id) {
                     Some(PatreonTier::Extra)
-                } else if check_tier(&self.config.basic_tier_id) {
+                } else if check_tier(&config.basic_tier_id) {
                     Some(PatreonTier::Basic)
                 } else {
                     None
@@ -108,8 +128,10 @@ impl PatreonChecker {
         })
     }
 
-    pub async fn fill_members(&self) -> Result<()> {
-        let mut url = reqwest::Url::parse(&format!("{BASE_URL}/campaigns/{}/members", self.config.campaign_id))?;
+    async fn fill_members(&self) -> Result<()> {
+        let config = self.config.as_ref().expect("Members should only be filled if not a dummy instance!");
+
+        let mut url = reqwest::Url::parse(&format!("{BASE_URL}/campaigns/{}/members", config.campaign_id))?;
         url.query_pairs_mut()
             .append_pair("fields[user]", "social_connections")
             .append_pair("include", "user,currently_entitled_tiers")
@@ -117,7 +139,7 @@ impl PatreonChecker {
 
         let mut cursor = String::from("");
         let headers = reqwest::header::HeaderMap::from_iter([
-            (reqwest::header::AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {}", self.config.creator_access_token))?)
+            (reqwest::header::AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {}", config.creator_access_token))?)
         ]);
 
         let mut members = HashMap::with_capacity(self.members.read().len());
@@ -135,7 +157,7 @@ impl PatreonChecker {
                 let user_id = &member.relationships.user.data.id;
                 let user = resp.included.iter().find(|u| &u.id == user_id).unwrap();
     
-                self.get_member_tier(&member, user).and_then(|(discord_id, tier)| {
+                Self::get_member_tier(config, &member, user).and_then(|(discord_id, tier)| {
                     tier.map(|tier| (discord_id, tier))
                 })
             }));

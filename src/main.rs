@@ -236,30 +236,6 @@ async fn _main() -> Result<()> {
         (startup_message, premium_avatar_url, webhooks)
     };
 
-    let patreon_checker = {
-        let bind_addr = patreon_config.webhook_bind_address.parse()?;
-        let patreon_checker = Arc::new(patreon_check::PatreonChecker::new(reqwest.clone(), patreon_config));
-        let patreon_checker_clone = patreon_checker.clone();
-
-        {
-            let router = axum::Router::new().route("/patreon", axum::routing::post(|headers, body| async move {
-                if let Err(err) = patreon_checker_clone.webhook_recv(headers, body).await {
-                    tracing::error!("Error in Patreon webhook: {}", err);
-                }
-            }));
-
-            tokio::spawn(async move {
-                axum::Server::bind(&bind_addr)
-                    .serve(router.into_make_service())
-                    .await.unwrap();
-            });
-        }
-
-        let patreon_checker_clone = patreon_checker.clone();
-        tokio::spawn(async move {patreon_checker_clone.background_task().await;});
-        patreon_checker
-    };
-
     let token = main.token.take().unwrap();
     let bot_id = serenity::utils::parse_token(&token).unwrap().0;
 
@@ -267,10 +243,11 @@ async fn _main() -> Result<()> {
         join_vc_tokens: dashmap::DashMap::new(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
         system_info: parking_lot::Mutex::new(sysinfo::System::new()),
+        patreon_checker: patreon_check::PatreonChecker::new(reqwest.clone(), patreon_config)?,
 
         gtts_voices, espeak_voices, premium_voices, polly_voices,
 
-        config: main, reqwest, premium_avatar_url, patreon_checker,
+        config: main, reqwest, premium_avatar_url,
         guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
         analytics, webhooks, start_time, pool, startup_message, translations,
     };
@@ -599,10 +576,9 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, error:
     warn!(
         "{}#{} | {} failed the premium check in {}",
         author.name, author.discriminator, author.id,
-        match guild_id.and_then(|g_id| ctx_discord.cache.guild_field(g_id, |g| (g_id, g.name.clone()))) {
-            Some((guild_id, name)) => Cow::Owned(format!("{} | {}", name, guild_id)),
-            None => Cow::Borrowed("DMs")
-        }
+        guild_id.and_then(|g_id| ctx_discord.cache.guild_field(g_id, |g| (
+            Cow::Owned(format!("{} | {}", g.name, g_id))
+        ))).unwrap_or(Cow::Borrowed("DMs"))
     );
 
     let permissions = ctx.author_permissions().await?;
