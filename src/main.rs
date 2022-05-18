@@ -213,9 +213,15 @@ async fn _main() -> Result<()> {
     let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?;
     let premium_voices = prepare_premium_voices(serenity::json::prelude::from_slice(&premium_voices_raw)?);
 
-    let (startup_message, premium_avatar_url, webhooks) = {
+    let (owner_ids, startup_message, premium_avatar_url, webhooks) = {
         let http = serenity::Http::new(main.token.as_deref().unwrap());
         let webhooks = get_webhooks(&http, webhooks).await?;
+
+        let app_info = http.get_current_application_info().await?;
+        let owner_ids = app_info.team.map_or_else(
+            || vec![app_info.owner.id],
+            |t| t.members.into_iter().map(|o| o.user.id).collect()
+        );
 
         let premium_avatar_url = serenity::UserId(802632257658683442).to_user(&http).await?.face();
 
@@ -233,7 +239,7 @@ async fn _main() -> Result<()> {
         tracing::subscriber::set_global_default(logger.clone())?;
         tokio::spawn(async move {logger.listener().await;});
 
-        (startup_message, premium_avatar_url, webhooks)
+        (owner_ids, startup_message, premium_avatar_url, webhooks)
     };
 
     let token = main.token.take().unwrap();
@@ -243,7 +249,7 @@ async fn _main() -> Result<()> {
         join_vc_tokens: dashmap::DashMap::new(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
         system_info: parking_lot::Mutex::new(sysinfo::System::new()),
-        patreon_checker: patreon_check::PatreonChecker::new(reqwest.clone(), patreon_config)?,
+        patreon_checker: patreon_check::PatreonChecker::new(reqwest.clone(), owner_ids, patreon_config)?,
 
         gtts_voices, espeak_voices, premium_voices, polly_voices,
 

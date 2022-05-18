@@ -1,9 +1,9 @@
-use std::{sync::Arc, collections::HashMap};
+use std::{sync::Arc, collections::HashMap, borrow::Cow};
 
 use hmac::{Mac as _, digest::FixedOutput as _};
+use subtle::ConstantTimeEq as _;
 use reqwest::header::HeaderValue;
 use parking_lot::RwLock;
-use subtle::ConstantTimeEq as _;
 use tracing::error;
 
 use poise::serenity_prelude as serenity;
@@ -42,14 +42,15 @@ fn check_md5(key: &[u8], untrusted_signature: &[u8], untrusted_data: &[u8]) -> R
 pub struct PatreonChecker {
     reqwest: reqwest::Client,
     config: Option<PatreonConfig>,
+    owner_ids: Vec<serenity::UserId>,
     members: RwLock<HashMap<serenity::UserId, PatreonTier>>,
 }
 
 impl PatreonChecker {
     // Creates a new PatreonChecker, none on config means all checks fail
-    pub fn new(reqwest: reqwest::Client, config: Option<PatreonConfig>) -> Result<Arc<Self>> {
+    pub fn new(reqwest: reqwest::Client, owner_ids: Vec<serenity::UserId>, config: Option<PatreonConfig>) -> Result<Arc<Self>> {
         let self_ = Arc::new(Self {
-            reqwest, config,
+            reqwest, config, owner_ids,
             members: RwLock::new(HashMap::new()),
         });
 
@@ -75,7 +76,11 @@ impl PatreonChecker {
 
 
     pub fn check(&self, patreon_member: serenity::UserId) -> Option<PatreonTier> {
-        self.members.read().get(&patreon_member).copied()
+        if self.owner_ids.contains(&patreon_member) {
+            Some(PatreonTier::Extra)
+        } else {
+            self.members.read().get(&patreon_member).copied()
+        }
     }
 
     async fn background_task(self: Arc<Self>) {
@@ -137,7 +142,7 @@ impl PatreonChecker {
             .append_pair("include", "user,currently_entitled_tiers")
             .finish();
 
-        let mut cursor = String::from("");
+        let mut cursor = Cow::Borrowed("");
         let headers = reqwest::header::HeaderMap::from_iter([
             (reqwest::header::AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {}", config.creator_access_token))?)
         ]);
@@ -163,7 +168,7 @@ impl PatreonChecker {
             }));
 
             if let Some(cursors) = resp.meta.pagination.cursors {
-                cursor = cursors.next;
+                cursor = Cow::Owned(cursors.next);
             } else {
                 members.shrink_to_fit();
                 *self.members.write() = members;
