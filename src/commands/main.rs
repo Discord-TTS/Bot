@@ -63,19 +63,18 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let member = guild.member(ctx_discord, author.id).await?;
     let channel = channel_id.to_channel(ctx_discord).await?.guild().unwrap();
 
-    let permissions = channel.permissions_for_user(ctx_discord, ctx_discord.cache.current_user_id())?;
-    let required_permissions = serenity::Permissions::CONNECT | serenity::Permissions::SPEAK;
+    let missing_permissions =
+        (serenity::Permissions::VIEW_CHANNEL | serenity::Permissions::CONNECT | serenity::Permissions::SPEAK) -
+        channel.permissions_for_user(ctx_discord, ctx_discord.cache.current_user_id())?;
 
-    let missing_permissions = required_permissions - permissions;
     if !missing_permissions.is_empty() {
-        ctx.send_error(
+        return ctx.send_error(
             ctx.gettext("I do not have permissions to TTS in your voice channel!"),
-            Some(&ctx.gettext("please ask an administrator to give me: {missing_permissions}").replace(
-                "{missing_permissions}",
-                &missing_permissions.get_permission_names().join(", ")
-            ))
-        ).await?;
-        return Ok(());
+            Some(&ctx
+                .gettext("please ask an administrator to give me: {missing_permissions}")
+                .replace("{missing_permissions}", &missing_permissions.get_permission_names().join(", "))
+            )
+        ).await.map(drop).map_err(Into::into)
     }
 
     if let Some(bot_vc) = songbird::get(ctx_discord).await.unwrap().get(guild.id) {
@@ -86,7 +85,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 return Ok(());
             };
 
-            ctx.say(&ctx.gettext("I am already in <#{channel_id}>!").replace("{channel_id}", &bot_channel_id.0.to_string())).await?;
+            ctx.say(ctx.gettext("I am already in <#{channel_id}>!").replace("{channel_id}", &bot_channel_id.0.to_string())).await?;
             return Ok(());
         }
     };
@@ -100,20 +99,20 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         ctx_discord.join_vc(join_vc_lock.lock().await, channel_id).await?;
     }
 
-    ctx.send(|m| {
-        m.embed(|e| {e
+    ctx.send(|m|
+        m.embed(|e| e
             .title(ctx.gettext("Joined your voice channel!"))
             .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
             .thumbnail(&ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
             .author(|a| {a
-                .name(member.nick.unwrap_or_else(|| author.name.clone()))
+                .name(member.display_name().into_owned())
                 .icon_url(author.face())
             })
             .footer(|f| f.text(random_footer(
                 &data.config.main_server_invite, ctx_discord.cache.current_user_id().0, ctx.current_catalog()
             )))
-        })
-    })
+        )
+    )
     .await?;
     Ok(())
 }
