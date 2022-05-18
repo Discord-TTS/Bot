@@ -292,16 +292,17 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
         Err(_) => return Vec::new()
     };
 
-    let voices: Box<dyn Iterator<Item=poise::AutocompleteChoice<String>>> = match mode {
-        TTSMode::gTTS => Box::new(ctx.data.gtts_voices.clone().into_iter().map(|(value, name)| poise::AutocompleteChoice {name, value})) as _,
-        TTSMode::eSpeak => Box::new(ctx.data.espeak_voices.clone().into_iter().map(poise::AutocompleteChoice::from)) as _,
-        TTSMode::Polly => Box::new(
+    let (mut i1, mut i2, mut i3, mut i4);
+    let voices: &mut dyn Iterator<Item=_> = match mode {
+        TTSMode::gTTS => {i1 = ctx.data.gtts_voices.clone().into_iter().map(|(value, name)| poise::AutocompleteChoice {name, value}); &mut i1},
+        TTSMode::eSpeak => {i2 = ctx.data.espeak_voices.clone().into_iter().map(poise::AutocompleteChoice::from); &mut i2},
+        TTSMode::Polly => {i3 =
             ctx.data.polly_voices.iter().map(|(_, voice)| poise::AutocompleteChoice{
                 name: format!("{} - {} ({})", voice.name, voice.language_name, voice.gender),
                 value: voice.id.clone()
-            })
-        ),
-        TTSMode::gCloud => Box::new(
+            });
+        &mut i3}
+        TTSMode::gCloud => {i4 =
             ctx.data.premium_voices.iter().flat_map(|(language, variants)| {
                 variants.iter().map(move |(variant, gender)| {
                     poise::AutocompleteChoice {
@@ -309,8 +310,8 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
                         value: format!("{language} {variant}")
                     }
                 })
-            })
-        ) as _
+            });
+        &mut i4}
     };
 
     let mut filtered_voices: Vec<_> = voices
