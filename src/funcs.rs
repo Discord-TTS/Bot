@@ -85,22 +85,22 @@ pub fn prepare_url(mut tts_service: reqwest::Url, content: &str, lang: &str, mod
 }
 
 
-pub fn prepare_premium_voices(raw_map: Vec<GoogleVoice<'_>>) -> BTreeMap<String, BTreeMap<String, Gender>> {
+pub fn prepare_premium_voices(raw_map: Vec<GoogleVoice>) -> BTreeMap<String, BTreeMap<String, Gender>> {
     // {lang_accent: {variant: gender}}
     let mut cleaned_map = BTreeMap::new();
     for gvoice in raw_map {
-        let mode_variant: String = gvoice.name.split_inclusive('-').skip(2).collect();
-        let (mode, variant) = mode_variant.split_once('-').unwrap();
+        let variant = gvoice.name
+            .splitn(3, '-').nth(2)
+            .and_then(|mode_variant| {mode_variant.split_once('-')})
+            .filter(|(mode, _)| *mode == "Standard")
+            .map(|(_, variant)| variant);
 
-        if mode == "Standard" {
+        if let Some(variant) = variant {
             let [language] = gvoice.languageCodes;
-
-            let inner_map = cleaned_map.entry(language).or_insert_with(BTreeMap::new);
-            inner_map.insert(String::from(variant), match gvoice.ssmlGender {
-                "MALE" => Gender::Male,
-                "FEMALE" => Gender::Female,
-                _ => unreachable!()
-            });
+            cleaned_map
+                .entry(language)
+                .or_insert_with(BTreeMap::new)
+                .insert(String::from(variant), gvoice.ssmlGender);
         }
     }
 

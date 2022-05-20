@@ -285,16 +285,16 @@ pub struct DeeplVoice {
 
 #[allow(non_snake_case)]
 #[derive(serde::Deserialize, Debug)]
-pub struct GoogleVoice<'a> {
+pub struct GoogleVoice {
     pub name: String,
-    pub ssmlGender: &'a str,
+    pub ssmlGender: Gender,
     pub languageCodes: [String; 1],
 }
 
 #[derive(serde::Deserialize, Debug, Copy, Clone)]
 pub enum Gender {
-    Male,
-    Female
+    #[serde(rename="MALE")] Male,
+    #[serde(rename="FEMALE")] Female
 }
 
 impl std::fmt::Display for Gender {
@@ -414,8 +414,11 @@ impl PoiseContextExt for Context<'_> {
     }
 
     fn current_catalog(&self) -> Option<&gettext::Catalog> {
-        let catalog = if let poise::Context::Application(ctx) = self {
-            ctx.data.translations.get(match ctx.interaction.unwrap().locale.as_str() {
+        let catalog = if
+            let poise::Context::Application(ctx) = self &&
+            let poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) = ctx.interaction
+        {
+            ctx.data.translations.get(match interaction.locale.as_str() {
                 "ko" => "ko-KR",
                 "pt-BR" => "pt",
                 l => l
