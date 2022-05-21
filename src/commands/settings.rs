@@ -31,7 +31,7 @@ use crate::database;
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
     if mode == TTSMode::gCloud {
         let (lang, variant) = voice.split_once(' ').unwrap();
-        let gender = &data.premium_voices[lang][variant];
+        let gender = &data.gcloud_voices[lang][variant];
         Cow::Owned(format!("{lang} - {variant} ({gender})"))
     } else if mode == TTSMode::Polly {
         let voice = &data.polly_voices[voice];
@@ -304,7 +304,7 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
             });
         &mut i3}
         TTSMode::gCloud => {i4 =
-            ctx.data.premium_voices.iter().flat_map(|(language, variants)| {
+            ctx.data.gcloud_voices.iter().flat_map(|(language, variants)| {
                 variants.iter().map(move |(variant, gender)| {
                     poise::AutocompleteChoice {
                         name: format!("{language} {variant} ({gender})"),
@@ -433,7 +433,7 @@ fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> bool {
         TTSMode::Polly => data.polly_voices.contains_key(voice),
         TTSMode::gCloud => {
             voice.split_once(' ')
-                .and_then(|(language, variant)| data.premium_voices.get(language).map(|l| (l, variant)))
+                .and_then(|(language, variant)| data.gcloud_voices.get(language).map(|l| (l, variant)))
                 .map_or(false, |(ls, v)| ls.contains_key(v))
         }
     }
@@ -1179,12 +1179,12 @@ pub async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String
         _ => TTSMode::gCloud.default_voice()
     }.split_once(' ').unwrap();
 
-    let pages = data.premium_voices.iter().map(|(language, variants)| {
+    let pages = data.gcloud_voices.iter().map(|(language, variants)| {
         variants.iter().map(|(variant, gender)| {
             format!("{language} {variant} ({gender})\n")
         }).collect()
     }).collect();
 
-    let gender = data.premium_voices[lang][variant];
+    let gender = data.gcloud_voices[lang][variant];
     Ok((format!("{lang} {variant} ({gender})"), pages))
 }

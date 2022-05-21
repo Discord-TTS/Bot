@@ -89,7 +89,7 @@ pub struct Data {
     pub espeak_voices: Vec<String>,
     pub gtts_voices: BTreeMap<String, String>,
     pub polly_voices: BTreeMap<String, PollyVoice>,
-    pub premium_voices: BTreeMap<String, BTreeMap<String, GoogleGender>>,
+    pub gcloud_voices: BTreeMap<String, BTreeMap<String, GoogleGender>>,
 }
 
 impl Data {

@@ -23,8 +23,9 @@
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
 #![allow(clippy::unreadable_literal)]
 
-use std::{borrow::Cow, collections::HashMap, path::Path, str::FromStr, sync::Arc};
+use std::{borrow::Cow, collections::{HashMap, BTreeMap}, path::Path, str::FromStr, sync::Arc};
 
+use anyhow::Ok;
 use sysinfo::SystemExt;
 use once_cell::sync::OnceCell;
 use tracing::{error, info, warn};
@@ -45,7 +46,7 @@ mod macros;
 mod error;
 mod funcs;
 
-use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_premium_voices};
+use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices};
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use structs::{TTSMode, Config, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework};
 use traits::{SerenityContextExt, PoiseContextExt, OptionTryUnwrap, Looper};
@@ -190,7 +191,7 @@ async fn _main() -> Result<()> {
                 .map(Result::unwrap)
                 .filter(filter_entry(EntryCheck::IsFile))
                 .filter(|e| e.path().extension().map_or(false, |e| e == "mo"))
-                .map(|entry| Ok::<_, anyhow::Error>((
+                .map(|entry| Ok((
                     entry.file_name().to_str().unwrap().split('.').next().unwrap().to_string(),
                     gettext::Catalog::parse(std::fs::File::open(entry.path())?)?
                 )))
@@ -200,47 +201,47 @@ async fn _main() -> Result<()> {
 
     let reqwest = reqwest::Client::new();
     let auth_key = main.tts_service_auth_key.as_deref();
+    let http = serenity::Http::new(main.token.as_deref().unwrap());
 
-    let gtts_voices = TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
-    let espeak_voices = TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
-
-    let polly_voices_raw: Vec<PollyVoice> = TTSMode::Polly.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
-    let polly_voices = polly_voices_raw.into_iter().map(|v| (v.id.clone(), v)).collect();
-
-    let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?;
-    let premium_voices = prepare_premium_voices(serenity::json::prelude::from_slice(&premium_voices_raw)?);
+    let (webhooks, premium_avatar_url, gtts_voices, espeak_voices, polly_voices, gcloud_voices, owner_ids) = tokio::try_join!(
+        get_webhooks(&http, webhooks),
+        async {serenity::UserId(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
+        async {Ok(TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
+        async {Ok(TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
+        async {
+            let polly_voices_raw: Vec<PollyVoice> = TTSMode::Polly.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
+            Ok(polly_voices_raw.into_iter().map(|v| (v.id.clone(), v)).collect::<BTreeMap<String, PollyVoice>>())
+        },
+        async {
+            let gcloud_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?;
+            Ok(prepare_gcloud_voices(serenity::json::prelude::from_slice(&gcloud_voices_raw)?))
+        },
+        async {
+            http.get_current_application_info().await.map_err(Into::into).map(|app_info| {
+                app_info.team.map_or_else(
+                    || vec![app_info.owner.id],
+                    |t| t.members.into_iter().map(|o| o.user.id).collect()
+                )
+            })
+        }
+    )?;
 
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));
     tokio::spawn(analytics.clone().start());
 
-    let (owner_ids, startup_message, premium_avatar_url, webhooks) = {
-        let http = serenity::Http::new(main.token.as_deref().unwrap());
-        let webhooks = get_webhooks(&http, webhooks).await?;
+    let startup_message = webhooks["logs"].execute(&http, true, |b| b
+        .content("**TTS Bot is starting up**")
+    ).await?.unwrap().id;
 
-        let app_info = http.get_current_application_info().await?;
-        let owner_ids = app_info.team.map_or_else(
-            || vec![app_info.owner.id],
-            |t| t.members.into_iter().map(|o| o.user.id).collect()
-        );
+    let logger = logging::WebhookLogger::new(
+        http,
+        tracing::Level::from_str(&main.log_level)?,
+        webhooks["logs"].clone(),
+        webhooks["errors"].clone(),
+    );
 
-        let premium_avatar_url = serenity::UserId(802632257658683442).to_user(&http).await?.face();
-
-        let startup_message = webhooks["logs"].execute(&http, true, |b| b
-            .content("**TTS Bot is starting up**")
-        ).await?.unwrap().id;
-
-        let logger = logging::WebhookLogger::new(
-            http,
-            tracing::Level::from_str(&main.log_level)?,
-            webhooks["logs"].clone(),
-            webhooks["errors"].clone(),
-        );
-
-        tracing::subscriber::set_global_default(logger.clone())?;
-        tokio::spawn(logger.0.start());
-
-        (owner_ids, startup_message, premium_avatar_url, webhooks)
-    };
+    tracing::subscriber::set_global_default(logger.clone())?;
+    tokio::spawn(logger.0.start());
 
     let token = main.token.take().unwrap();
     let bot_id = serenity::utils::parse_token(&token).unwrap().0;
@@ -251,7 +252,7 @@ async fn _main() -> Result<()> {
         system_info: parking_lot::Mutex::new(sysinfo::System::new()),
         patreon_checker: patreon_check::PatreonChecker::new(reqwest.clone(), owner_ids, patreon_config)?,
 
-        gtts_voices, espeak_voices, premium_voices, polly_voices,
+        gtts_voices, espeak_voices, gcloud_voices, polly_voices,
 
         config: main, reqwest, premium_avatar_url,
         guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
@@ -485,7 +486,7 @@ Ask questions by either responding here or asking on the support server!",
             ).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => {return Ok(())},
                 Err(err) => return Err(anyhow::Error::from(err)),
-                Ok(_) => (),
+                Result::Ok(_) => (),
             }
 
             info!("Added OFS role to {}#{}", owner.name, owner.discriminator);
