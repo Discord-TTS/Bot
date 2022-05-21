@@ -42,3 +42,14 @@ macro_rules! require_guild {
         })
     };
 }
+
+#[macro_export]
+macro_rules! into_static_display {
+    ($struct:ident) => {
+        impl std::fmt::Display for $struct {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.into())
+            }
+        }
+    };
+}

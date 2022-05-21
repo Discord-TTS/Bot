@@ -25,7 +25,7 @@ use rand::prelude::SliceRandom;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, Gender, GoogleVoice, OptionTryUnwrap, Result, JoinVCToken, TTSServiceError, OptionGettext};
+use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, OptionTryUnwrap, Result, JoinVCToken, TTSServiceError, OptionGettext};
 use crate::require;
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
@@ -85,7 +85,7 @@ pub fn prepare_url(mut tts_service: reqwest::Url, content: &str, lang: &str, mod
 }
 
 
-pub fn prepare_premium_voices(raw_map: Vec<GoogleVoice>) -> BTreeMap<String, BTreeMap<String, Gender>> {
+pub fn prepare_premium_voices(raw_map: Vec<GoogleVoice>) -> BTreeMap<String, BTreeMap<String, GoogleGender>> {
     // {lang_accent: {variant: gender}}
     let mut cleaned_map = BTreeMap::new();
     for gvoice in raw_map {

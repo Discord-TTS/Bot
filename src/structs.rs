@@ -8,7 +8,7 @@ use regex::Regex;
 use poise::serenity_prelude as serenity;
 use tracing::warn;
 
-use crate::{database, analytics, patreon_check};
+use crate::{database, analytics, patreon_check, into_static_display};
 use crate::constants::{RED, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 
 pub use anyhow::{Error, Result};
@@ -92,7 +92,7 @@ pub struct Data {
     pub espeak_voices: Vec<String>,
     pub gtts_voices: BTreeMap<String, String>,
     pub polly_voices: BTreeMap<String, PollyVoice>,
-    pub premium_voices: BTreeMap<String, BTreeMap<String, Gender>>,
+    pub premium_voices: BTreeMap<String, BTreeMap<String, GoogleGender>>,
 }
 
 impl Data {
@@ -234,11 +234,7 @@ impl TTSMode {
     }
 }
 
-impl std::fmt::Display for TTSMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.into())
-    }
-}
+into_static_display!(TTSMode);
 
 impl Default for TTSMode {
     fn default() -> Self {
@@ -267,43 +263,28 @@ impl From<TTSModeChoice> for TTSMode {
     }
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize)]
 pub struct DeeplTranslateResponse {
     pub translations: Vec<DeeplTranslation>
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize)]
 pub struct DeeplTranslation {
     pub text: String,
     pub detected_source_language: String
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize)]
 pub struct DeeplVoice {
     pub language: String,
 }
 
 #[allow(non_snake_case)]
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize)]
 pub struct GoogleVoice {
     pub name: String,
-    pub ssmlGender: Gender,
+    pub ssmlGender: GoogleGender,
     pub languageCodes: [String; 1],
-}
-
-#[derive(serde::Deserialize, Debug, Copy, Clone)]
-pub enum Gender {
-    #[serde(rename="MALE")] Male,
-    #[serde(rename="FEMALE")] Female
-}
-
-impl std::fmt::Display for Gender {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Male => "Male",
-            Self::Female => "Female"
-        })
-    }
 }
 
 #[derive(serde::Deserialize)]
@@ -311,10 +292,25 @@ pub struct PollyVoice {
     pub additional_language_codes: Option<Vec<String>>,
     pub language_code: String,
     pub language_name: String,
-    pub gender: Gender,
+    pub gender: PollyGender,
     pub name: String,
     pub id: String,
 }
+
+#[derive(serde::Deserialize, IntoStaticStr, Copy, Clone)]
+pub enum GoogleGender {
+    #[serde(rename="MALE")] Male,
+    #[serde(rename="FEMALE")] Female
+}
+
+#[derive(serde::Deserialize, IntoStaticStr, Copy, Clone)]
+pub enum PollyGender {
+    Male,
+    Female
+}
+
+into_static_display!(GoogleGender);
+into_static_display!(PollyGender);
 
 
 fn deserialize_error_code<'de, D: serde::Deserializer<'de>>(to_deserialize: D) -> Result<TTSServiceErrorCode, D::Error> {
