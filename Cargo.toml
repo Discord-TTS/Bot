@@ -31,6 +31,7 @@ lazy_static = "1"
 itertools = "0.10"
 num-format = "0.4"
 parking_lot = "0.12"
+const_format = "0.2"
 strum_macros = "0.24"
 generic-array = "0.14"
 

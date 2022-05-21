@@ -121,12 +121,11 @@ pub struct Handler<
 
 impl<CacheKey, RowT> Handler<CacheKey, RowT>
 where
-    CacheKey: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + Sync + Send + Copy,
+    CacheKey: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + Sync + Send + Copy + Default,
     RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Sync + Send + Unpin,
 {
     pub async fn new(
         pool: sqlx::PgPool,
-        default_id: CacheKey,
         select: &'static str,
         delete: &'static str,
         create_row: &'static str,
@@ -135,7 +134,7 @@ where
         Ok(Self {
             cache: DashMap::new(),
             query_cache: DashMap::new(),
-            default_row: Self::_get(&pool, default_id, select).await?.expect("Default row not in table!"),
+            default_row: Self::_get(&pool, CacheKey::default(), select).await?.expect("Default row not in table!"),
             pool, select, delete, create_row, single_insert,
         })
     }
@@ -201,4 +200,36 @@ where
     pub fn invalidate_cache(&self, identifier: &CacheKey) {
         self.cache.remove(identifier);
     }
+}
+
+#[macro_export]
+macro_rules! create_db_handler {
+    ($pool:expr, $table_name:literal, $id_name:literal) => {
+        database::Handler::new($pool,
+            const_format::formatcp!("SELECT * FROM {} WHERE {} = $1", $table_name, $id_name),
+            const_format::formatcp!("DELETE FROM {} WHERE {} = $1", $table_name, $id_name),
+            const_format::formatcp!("
+                INSERT INTO {}({id_name}) VALUES ($1)
+                ON CONFLICT ({id_name}) DO NOTHING
+            ", $table_name, id_name=$id_name),
+            const_format::formatcp!("
+                INSERT INTO {}({id_name}, {{key}}) VALUES ($1, $2)
+                ON CONFLICT ({id_name}) DO UPDATE SET {{key}} = $2
+            ", $table_name, id_name=$id_name)
+        )
+    };
+    ($pool:expr, $table_name:literal, $id_name1:literal, $id_name2:literal) => {
+        database::Handler::new($pool,
+            const_format::formatcp!("SELECT * FROM {} WHERE {} = $1 AND {} = $2", $table_name, $id_name1, $id_name2),
+            const_format::formatcp!("DELETE FROM {} WHERE {} = $1 AND {} = $2", $table_name, $id_name1, $id_name2),
+            const_format::formatcp!("
+                INSERT INTO {}({id_name1}, {id_name2}) VALUES ($1, $2)
+                ON CONFLICT ({id_name1}, {id_name2}) DO NOTHING
+            ", $table_name, id_name1=$id_name1, id_name2=$id_name2),
+            const_format::formatcp!("
+                INSERT INTO {}({id_name1}, {id_name2}, {{key}}) VALUES ($1, $2, $3)
+                ON CONFLICT ({id_name1}, {id_name2}) DO UPDATE SET {{key}} = $3
+            ", $table_name, id_name1=$id_name1, id_name2=$id_name2)
+        )
+    };
 }

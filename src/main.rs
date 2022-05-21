@@ -91,8 +91,6 @@ async fn _main() -> Result<()> {
         let mut config_toml: toml::Value = std::fs::read_to_string("config.toml")?.parse()?;
         let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
 
-        // Setup database pool
-
         let pool_config = sqlx::postgres::PgPoolOptions::new();
         let pool_config = if let Some(max_connections) = postgres.max_connections {
             pool_config.max_connections(max_connections)
@@ -113,68 +111,6 @@ async fn _main() -> Result<()> {
         let Config{main, patreon, webhooks} = config_toml.try_into()?;
         (pool, main, patreon, webhooks)
     };
-
-    // CLEANUP
-    let guilds_db = database::Handler::new(pool.clone(), 0,
-        "SELECT * FROM guilds WHERE guild_id = $1",
-        "DELETE FROM guilds WHERE guild_id = $1",
-        "
-            INSERT INTO guilds(guild_id) VALUES ($1)
-            ON CONFLICT (guild_id) DO NOTHING
-        ",
-        "
-            INSERT INTO guilds(guild_id, {key}) VALUES ($1, $2)
-            ON CONFLICT (guild_id) DO UPDATE SET {key} = $2
-        "
-    ).await?;
-    let userinfo_db = database::Handler::new(pool.clone(), 0,
-        "SELECT * FROM userinfo WHERE user_id = $1",
-        "DELETE FROM userinfo WHERE user_id = $1",
-        "
-            INSERT INTO userinfo(user_id) VALUES ($1)
-            ON CONFLICT (user_id) DO NOTHING
-        ",
-        "
-            INSERT INTO userinfo(user_id, {key}) VALUES ($1, $2)
-            ON CONFLICT (user_id) DO UPDATE SET {key} = $2
-        "
-    ).await?;
-    let nickname_db = database::Handler::new(pool.clone(), [0, 0],
-        "SELECT * FROM nicknames WHERE guild_id = $1 AND user_id = $2",
-        "DELETE FROM nicknames WHERE guild_id = $1 AND user_id = $2",
-        "
-            INSERT INTO nicknames(guild_id, user_id) VALUES ($1, $2)
-            ON CONFLICT (guild_id, user_id) DO NOTHING
-        ",
-        "
-            INSERT INTO nicknames(guild_id, user_id, {key}) VALUES ($1, $2, $3)
-            ON CONFLICT (guild_id, user_id) DO UPDATE SET {key} = $3
-        "
-    ).await?;
-    let user_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::gTTS),
-        "SELECT * FROM user_voice WHERE user_id = $1 AND mode = $2",
-        "DELETE FROM user_voice WHERE user_id = $1 AND mode = $2",
-        "
-            INSERT INTO user_voice(user_id, mode) VALUES ($1, $2)
-            ON CONFLICT (user_id, mode) DO NOTHING
-        ",
-        "
-            INSERT INTO user_voice(user_id, mode, {key}) VALUES ($1, $2, $3)
-            ON CONFLICT (user_id, mode) DO UPDATE SET {key} = $3
-        "
-    ).await?;
-    let guild_voice_db = database::Handler::new(pool.clone(), (0, TTSMode::gTTS),
-        "SELECT * FROM guild_voice WHERE guild_id = $1 AND mode = $2",
-        "DELETE FROM guild_voice WHERE guild_id = $1 AND mode = $2",
-        "
-            INSERT INTO guild_voice(guild_id, mode) VALUES ($1, $2)
-            ON CONFLICT (guild_id, mode) DO NOTHING
-        ",
-        "
-            INSERT INTO guild_voice(guild_id, mode, {key}) VALUES ($1, $2, $3)
-            ON CONFLICT (guild_id, mode) DO UPDATE SET {key} = $3
-        "
-    ).await?;
 
     let filter_entry = |to_check| move |entry: &std::fs::DirEntry| entry
         .metadata()
@@ -203,19 +139,18 @@ async fn _main() -> Result<()> {
     let auth_key = main.tts_service_auth_key.as_deref();
     let http = serenity::Http::new(main.token.as_deref().unwrap());
 
-    let (webhooks, premium_avatar_url, gtts_voices, espeak_voices, polly_voices, gcloud_voices, owner_ids) = tokio::try_join!(
+    let (
+        guilds_db, userinfo_db, user_voice_db, guild_voice_db, nickname_db,
+        webhooks, premium_avatar_url, owner_ids,
+        gtts_voices, espeak_voices, gcloud_voices, polly_voices
+    ) = tokio::try_join!(
+        create_db_handler!(pool.clone(), "guilds", "guild_id"),
+        create_db_handler!(pool.clone(), "userinfo", "user_id"),
+        create_db_handler!(pool.clone(), "user_voice", "user_id", "mode"),
+        create_db_handler!(pool.clone(), "guild_voice", "guild_id", "mode"),
+        create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
         get_webhooks(&http, webhooks),
         async {serenity::UserId(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
-        async {Ok(TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
-        async {Ok(TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
-        async {
-            let polly_voices_raw: Vec<PollyVoice> = TTSMode::Polly.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json().await?;
-            Ok(polly_voices_raw.into_iter().map(|v| (v.id.clone(), v)).collect::<BTreeMap<String, PollyVoice>>())
-        },
-        async {
-            let gcloud_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?;
-            Ok(prepare_gcloud_voices(serenity::json::prelude::from_slice(&gcloud_voices_raw)?))
-        },
         async {
             http.get_current_application_info().await.map_err(Into::into).map(|app_info| {
                 app_info.team.map_or_else(
@@ -223,7 +158,16 @@ async fn _main() -> Result<()> {
                     |t| t.members.into_iter().map(|o| o.user.id).collect()
                 )
             })
-        }
+        },
+        async {Ok(TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
+        async {Ok(TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
+        async {Ok(prepare_gcloud_voices(serenity::json::prelude::from_slice(&TTSMode::gCloud
+            .fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?
+        )?))},
+        async {Ok(TTSMode::Polly
+            .fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<PollyVoice>>().await?
+            .into_iter().map(|v| (v.id.clone(), v)).collect::<BTreeMap<String, PollyVoice>>())
+        },
     )?;
 
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));

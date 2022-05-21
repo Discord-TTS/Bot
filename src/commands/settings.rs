@@ -350,7 +350,7 @@ async fn change_mode<'a, CacheKey, RowT>(
     target: Target, guild_is_premium: bool
 ) -> Result<Option<Cow<'a, str>>, Error>
 where
-    CacheKey: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
+    CacheKey: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Default + Send + Sync + Copy,
     RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
 {
     let data = ctx.data();
@@ -401,7 +401,7 @@ where
     RowT1: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
     RowT2: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
 
-    T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Send + Sync + Copy,
+    T: database::CacheKeyTrait + std::hash::Hash + std::cmp::Eq + Default + Send + Sync + Copy,
     (T, TTSMode): database::CacheKeyTrait,
 {
     let data = ctx.data();
