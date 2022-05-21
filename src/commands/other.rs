@@ -22,8 +22,9 @@ use poise::serenity_prelude::{self as serenity, Mentionable as _};
 
 use crate::require;
 use crate::constants::OPTION_SEPERATORS;
+use crate::traits::{OptionTryUnwrap, PoiseContextExt};
 use crate::funcs::{confirm_dialog, fetch_audio, refresh_kind, prepare_url};
-use crate::structs::{ApplicationContext, Context, CommandResult, OptionTryUnwrap, PoiseContextExt, TTSMode};
+use crate::structs::{ApplicationContext, Context, CommandResult, TTSMode};
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]

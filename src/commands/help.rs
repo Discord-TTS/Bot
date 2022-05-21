@@ -16,7 +16,9 @@
 
 use indexmap::IndexMap;
 
-use crate::{structs::{Context, Command, CommandResult, PoiseContextExt, ApplicationContext}, require};
+use crate::require;
+use crate::structs::{Context, Command, CommandResult, ApplicationContext};
+use crate::traits::PoiseContextExt;
 
 enum HelpCommandMode<'a> {
     Root,

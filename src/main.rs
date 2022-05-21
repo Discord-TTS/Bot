@@ -40,13 +40,16 @@ mod database;
 mod commands;
 mod logging;
 mod structs;
+mod traits;
 mod macros;
 mod error;
 mod funcs;
 
-use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_premium_voices};
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
-use structs::{TTSMode, Config, Data, Result, PoiseContextExt, SerenityContextExt, PostgresConfig, OptionTryUnwrap, JoinVCToken, PollyVoice, FrameworkContext, Framework};
+use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_premium_voices};
+use structs::{TTSMode, Config, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework};
+use traits::{SerenityContextExt, PoiseContextExt, OptionTryUnwrap};
+
 
 use crate::structs::FailurePoint;
 

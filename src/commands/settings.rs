@@ -21,8 +21,9 @@ use itertools::Itertools;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, PoiseContextExt, ApplicationContext, OptionGettext, PollyVoice, TTSModeChoice};
+use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
+use crate::traits::{PoiseContextExt, OptionGettext};
 use crate::funcs::{random_footer, confirm_dialog};
 use crate::{require_guild, require};
 use crate::database;

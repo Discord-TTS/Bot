@@ -25,8 +25,10 @@ use lazy_static::lazy_static;
 
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Data, SerenityContextExt, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, OptionTryUnwrap, Result, JoinVCToken, TTSServiceError, OptionGettext};
 use crate::require;
+use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, JoinVCToken, TTSServiceError};
+use crate::traits::{SerenityContextExt, OptionTryUnwrap, OptionGettext};
+
 
 pub fn refresh_kind() -> sysinfo::RefreshKind {
     sysinfo::RefreshKind::new()

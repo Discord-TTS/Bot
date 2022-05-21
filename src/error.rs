@@ -8,9 +8,11 @@ use poise::serenity_prelude as serenity;
 use serenity::json::prelude as json;
 
 use crate::{
-    structs::{Context, Data, Error, FrameworkContext, PoiseContextExt, Result},
     constants::{RED, VIEW_TRACEBACK_CUSTOM_ID},
-    funcs::refresh_kind, require
+    funcs::refresh_kind,
+    require,
+    structs::{Context, Data, Error, FrameworkContext, Result},
+    traits::PoiseContextExt,
 };
 
 #[allow(clippy::module_name_repetitions)]

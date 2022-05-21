@@ -18,7 +18,8 @@ use std::borrow::Cow;
 use poise::serenity_prelude as serenity;
 use sqlx::Row;
 
-use crate::structs::{Context, Result, CommandResult, PoiseContextExt, SerenityContextExt, TTSMode, JoinVCToken};
+use crate::structs::{Context, Result, CommandResult, TTSMode, JoinVCToken};
+use crate::traits::{PoiseContextExt, SerenityContextExt};
 use crate::{require_guild, require};
 use crate::funcs::random_footer;
 
