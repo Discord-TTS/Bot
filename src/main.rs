@@ -455,7 +455,7 @@ impl serenity::EventHandler for EventHandler {
 
             let owner = owner?;
             match owner.direct_message(&ctx, |b| {b.embed(|e| {e
-                .title(format!("Welcome to {}!", ctx.cache.current_user_field(|b| b.name.clone())))
+                .title(ctx.cache.current_user_field(|b| format!("Welcome to {}!", b.name)))
                 .description(format!("
 Hello! Someone invited me to your server `{}`!
 TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
@@ -818,10 +818,9 @@ async fn process_support_dm(
                 }
             } else {
                 let welcome_msg = channel.send_message(&ctx.http, |b| {b.embed(|e| {e
-                    .title(format!(
-                        "Welcome to {} Support DMs!",
-                        ctx.cache.current_user_field(|b| b.name.clone())
-                    ))
+                    .title(ctx.cache.current_user_field(|b| format!(
+                        "Welcome to {} Support DMs!", b.name
+                    )))
                     .description(DM_WELCOME_MESSAGE)
                     .footer(|f| f.text(random_footer(
                         &data.config.main_server_invite,

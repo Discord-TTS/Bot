@@ -18,10 +18,10 @@ use std::borrow::Cow;
 use std::fmt::Write;
 use std::collections::{BTreeMap, HashMap};
 
-use itertools::Itertools;
-use lazy_static::lazy_static;
+use itertools::Itertools as _;
+use rand::Rng as _;
 use regex::{Captures, Regex};
-use rand::prelude::SliceRandom;
+use lazy_static::lazy_static;
 
 use poise::serenity_prelude as serenity;
 
@@ -108,12 +108,13 @@ pub fn prepare_premium_voices(raw_map: Vec<GoogleVoice>) -> BTreeMap<String, BTr
 }
 
 pub fn random_footer<'a>(server_invite: &str, client_id: u64, catalog: Option<&'a gettext::Catalog>) -> Cow<'a, str> {
-    [
-        Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
-        Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
-        Cow::Borrowed(catalog.gettext("If you want to support the development and hosting of TTS Bot, check out `/donate`!")),
-        Cow::Borrowed(catalog.gettext("There are loads of customizable settings, check out `/help set`")),
-    ].choose(&mut rand::thread_rng()).unwrap().clone()
+    match rand::thread_rng().gen_range(0..4) {
+        0 => Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
+        1 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
+        2 => Cow::Borrowed(catalog.gettext("If you want to support the development and hosting of TTS Bot, check out `/donate`!")),
+        3 => Cow::Borrowed(catalog.gettext("There are loads of customizable settings, check out `/help set`")),
+        _ => unreachable!()
+    }
 }
 
 fn parse_acronyms(original: &str) -> String {

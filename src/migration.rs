@@ -84,10 +84,10 @@ pub async fn run(config: &mut toml::Value, pool: &sqlx::PgPool) -> Result<()> {
     let starting_conf = config.clone();    
     let mut config_clone = config.clone();
 
-    *config = pool.acquire().await?.transaction::<_, _, anyhow::Error>(move |transaction| Box::pin(async move {
+    *config = pool.acquire().await?.transaction(move |transaction| Box::pin(async move {
         let main_config = config_clone["Main"].as_table_mut().try_unwrap()?;
         _run(main_config, transaction).await?;
-        Ok(config_clone)
+        Ok::<_, anyhow::Error>(config_clone)
     })).await?;
 
     if &starting_conf != config {
