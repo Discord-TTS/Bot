@@ -4,12 +4,12 @@ use hmac::{Mac as _, digest::FixedOutput as _};
 use subtle::ConstantTimeEq as _;
 use reqwest::header::HeaderValue;
 use parking_lot::RwLock;
-use tracing::error;
 
 use poise::serenity_prelude as serenity;
 
-use crate::{structs::{Result, PatreonConfig}, require};
-
+use crate::require;
+use crate::structs::{Result, PatreonConfig};
+use crate::traits::Looper;
 
 type Md5Hmac = hmac::Hmac<md5::Md5>;
 const BASE_URL: &str = "https://www.patreon.com/api/oauth2/v2";
@@ -65,7 +65,7 @@ impl PatreonChecker {
             }));
 
             let server = axum::Server::bind(&bind_addr).serve(router.into_make_service());
-            tokio::spawn(self_.clone().background_task());
+            tokio::spawn(self_.clone().start());
             tokio::spawn(async {server.await.unwrap()});
         } else {
             tracing::warn!("Patreon Config not present: All premium checks will fail.");
@@ -80,17 +80,6 @@ impl PatreonChecker {
             Some(PatreonTier::Extra)
         } else {
             self.members.read().get(&patreon_member).copied()
-        }
-    }
-
-    async fn background_task(self: Arc<Self>) {
-        let mut timer = tokio::time::interval(std::time::Duration::from_secs(60*60));
-
-        loop {
-            timer.tick().await;
-            if let Err(error) = self.fill_members().await {
-                error!("Patreon checker: {error:?}");
-            }
         }
     }
 
@@ -175,6 +164,16 @@ impl PatreonChecker {
                 break Ok(())
             }
         }
+    }
+}
+
+#[serenity::async_trait]
+impl Looper for PatreonChecker {
+    const NAME: &'static str = "Patreon Checker";
+    const MILLIS: u64 = 60 * 60;
+
+    async fn loop_func(&self) -> Result<()> {
+        self.fill_members().await
     }
 }
 

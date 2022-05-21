@@ -56,19 +56,14 @@ impl WebhookLogger {
             pending_logs: Arc::default(),
         }))
     }
+}
 
-    pub async fn listener(&self) {
-        let mut periodic = tokio::time::interval(std::time::Duration::from_millis(1100));
+#[serenity::async_trait]
+impl crate::traits::Looper for WebhookLogger {
+    const NAME: &'static str = "Logging";
+    const MILLIS: u64 = 1100;
 
-        loop {
-            periodic.tick().await;
-            if let Err(error) = self.send_buffer().await {
-                eprintln!("Logging Error: {:?}", error);
-            }
-        }
-    }
-
-    async fn send_buffer(&self) -> Result<()> {
+    async fn loop_func(&self) -> Result<()> {
         let pending_logs = self.pending_logs.lock().drain().collect::<HashMap<_, _>>();
 
         for (severity, messages) in pending_logs {

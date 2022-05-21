@@ -16,9 +16,9 @@
 
 use std::borrow::Cow;
 
+use poise::async_trait;
 use dashmap::DashMap;
 use sqlx::Connection;
-use tracing::error;
 
 use crate::structs::Result;
 
@@ -34,24 +34,19 @@ impl Handler {
             log_buffer: DashMap::new()
         }
     }
+}
 
-    pub async fn loop_task(&self) {
-        let mut periodic = tokio::time::interval(std::time::Duration::from_millis(5000));
+#[async_trait]
+impl crate::traits::Looper for Handler {
+    const NAME: &'static str = "Analytics";
+    const MILLIS: u64 = 5000;
 
-        loop {
-            periodic.tick().await;
-            if let Err(error) = self.send_info_to_db().await {
-                error!("Analytics Handler: {:?}", error);
-            }
-        }
-    }
-
-    async fn send_info_to_db(&self) -> Result<()> {
+    async fn loop_func(&self) -> Result<()> {
         let log_buffer = self.log_buffer.clone();
         self.log_buffer.clear();
 
         let mut conn = self.pool.acquire().await?;
-        conn.transaction::<'_, _, _, anyhow::Error>(move |transaction| Box::pin(async {
+        conn.transaction::<_, _, anyhow::Error>(move |transaction| Box::pin(async {
             for (raw_event, count) in log_buffer {
                 let query = sqlx::query("
                     INSERT INTO analytics(event, is_command, count)
@@ -67,7 +62,9 @@ impl Handler {
             Ok(())
         })).await
     }
+}
 
+impl Handler {
     pub fn log(&self, event: Cow<'static, str>) {
         let count = (*self.log_buffer.entry(event.clone()).or_insert(0)) + 1;
         self.log_buffer.insert(event, count);

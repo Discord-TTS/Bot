@@ -45,10 +45,10 @@ mod macros;
 mod error;
 mod funcs;
 
-use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_premium_voices};
+use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use structs::{TTSMode, Config, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework};
-use traits::{SerenityContextExt, PoiseContextExt, OptionTryUnwrap};
+use traits::{SerenityContextExt, PoiseContextExt, OptionTryUnwrap, Looper};
 
 
 use crate::structs::FailurePoint;
@@ -114,12 +114,6 @@ async fn _main() -> Result<()> {
     };
 
     // CLEANUP
-    let analytics = Arc::new(analytics::Handler::new(pool.clone()));
-    {
-        let analytics_sender = analytics.clone();
-        tokio::spawn(async move {analytics_sender.loop_task().await});
-    }
-
     let guilds_db = database::Handler::new(pool.clone(), 0,
         "SELECT * FROM guilds WHERE guild_id = $1",
         "DELETE FROM guilds WHERE guild_id = $1",
@@ -216,6 +210,9 @@ async fn _main() -> Result<()> {
     let premium_voices_raw = TTSMode::gCloud.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?;
     let premium_voices = prepare_premium_voices(serenity::json::prelude::from_slice(&premium_voices_raw)?);
 
+    let analytics = Arc::new(analytics::Handler::new(pool.clone()));
+    tokio::spawn(analytics.clone().start());
+
     let (owner_ids, startup_message, premium_avatar_url, webhooks) = {
         let http = serenity::Http::new(main.token.as_deref().unwrap());
         let webhooks = get_webhooks(&http, webhooks).await?;
@@ -240,7 +237,7 @@ async fn _main() -> Result<()> {
         );
 
         tracing::subscriber::set_global_default(logger.clone())?;
-        tokio::spawn(async move {logger.listener().await;});
+        tokio::spawn(logger.0.start());
 
         (owner_ids, startup_message, premium_avatar_url, webhooks)
     };
