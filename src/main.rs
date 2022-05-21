@@ -23,7 +23,7 @@
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
 #![allow(clippy::unreadable_literal)]
 
-use std::{borrow::Cow, collections::{HashMap, BTreeMap}, path::Path, str::FromStr, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, path::Path, str::FromStr, sync::Arc};
 
 use anyhow::Ok;
 use sysinfo::SystemExt;
@@ -48,7 +48,7 @@ mod funcs;
 
 use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices};
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
-use structs::{TTSMode, Config, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework};
+use structs::{TTSMode, Config, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig};
 use traits::{SerenityContextExt, PoiseContextExt, OptionTryUnwrap, Looper};
 
 
@@ -61,18 +61,22 @@ enum EntryCheck {
 
 async fn get_webhooks(
     http: &serenity::Http,
-    webhooks_raw: toml::value::Table,
-) -> Result<HashMap<String, serenity::Webhook>> {
-    let mut webhooks = HashMap::with_capacity(webhooks_raw.len());
+    webhooks_raw: WebhookConfigRaw,
+) -> Result<WebhookConfig> {
+    let get_webhook = |url: reqwest::Url| async move {
+        let (webhook_id, token) = serenity::parse_webhook(&url).try_unwrap()?;
+        Ok(http.get_webhook_with_token(webhook_id, token).await?)
+    };
 
-    for (name, url) in webhooks_raw {
-        let url = url.as_str().unwrap().parse().unwrap();
-        let (webhook_id, token) = serenity::parse_webhook(&url).unwrap();
+    let (logs, errors, servers, dm_logs, suggestions) = tokio::try_join!(
+        get_webhook(webhooks_raw.logs),
+        get_webhook(webhooks_raw.errors),
+        get_webhook(webhooks_raw.servers),
+        get_webhook(webhooks_raw.dm_logs),
+        get_webhook(webhooks_raw.suggestions),
+    )?;
 
-        webhooks.insert(name, http.get_webhook_with_token(webhook_id, token).await?);
-    }
-
-    Ok(webhooks)
+    Ok(WebhookConfig{logs, errors, servers, dm_logs, suggestions})
 }
 
 fn main() -> Result<()> {
@@ -173,15 +177,15 @@ async fn _main() -> Result<()> {
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));
     tokio::spawn(analytics.clone().start());
 
-    let startup_message = webhooks["logs"].execute(&http, true, |b| b
+    let startup_message = webhooks.logs.execute(&http, true, |b| b
         .content("**TTS Bot is starting up**")
     ).await?.unwrap().id;
 
     let logger = logging::WebhookLogger::new(
         http,
         tracing::Level::from_str(&main.log_level)?,
-        webhooks["logs"].clone(),
-        webhooks["errors"].clone(),
+        webhooks.logs.clone(),
+        webhooks.errors.clone(),
     );
 
     tracing::subscriber::set_global_default(logger.clone())?;
@@ -393,7 +397,7 @@ impl serenity::EventHandler for EventHandler {
 
             let (owner, _) = tokio::join!(
                 guild.owner_id.to_user(&ctx),
-                data.webhooks["servers"].execute(&ctx.http, false, |b| {
+                data.webhooks.servers.execute(&ctx.http, false, |b| {
                     b.content(format!("Just joined {}!", &guild.name))
                 }),
             );
@@ -446,7 +450,7 @@ Ask questions by either responding here or asking on the support server!",
         error::handle_guild("GuildDelete", &ctx, framework, full.as_ref(), async_try!({
             data.guilds_db.delete(incomplete.id.into()).await?;
             if let Some(guild) = &full {
-                data.webhooks["servers"].execute(&ctx.http, false, |b| {b.content(format!(
+                data.webhooks.servers.execute(&ctx.http, false, |b| {b.content(format!(
                     "Just got kicked from {}. I'm now in {} servers",
                     guild.name, ctx.cache.guilds().len()
                 ))}).await?;
@@ -478,7 +482,7 @@ Ask questions by either responding here or asking on the support server!",
             let user_name = &data_about_bot.user.name;
             let (status, starting) = generate_status(&*framework.shard_manager.lock().await.runners.lock().await);
 
-            data.webhooks["logs"].edit_message(&ctx.http, data.startup_message, |m| {m
+            data.webhooks.logs.edit_message(&ctx.http, data.startup_message, |m| {m
                 .content("")
                 .embeds(vec![serenity::Embed::fake(|e| {e
                     .description(status)
@@ -647,8 +651,13 @@ async fn process_tts_msg(
         call.enqueue_source(songbird::ffmpeg(url.as_str()).await?);
     }
 
-    let mode: &'static str = mode.into();
-    data.analytics.log(Cow::Owned(format!("on_{mode}_tts")));
+    data.analytics.log(Cow::Borrowed(match mode {
+        TTSMode::gTTS => "on_gTTS_tts",
+        TTSMode::eSpeak => "on_eSpeak_tts",
+        TTSMode::gCloud => "on_gCloud_tts",
+        TTSMode::Polly => "on_Polly_tts",
+    }));
+
     Ok(())
 }
 
@@ -699,8 +708,8 @@ async fn process_support_dm(
         serenity::Channel::Guild(channel) => {
             // Check support server trusted member replies to a DM, if so, pass it through
             if let Some(reference) = &message.message_reference {
-                if ![data.webhooks["dm_logs"].channel_id.try_unwrap()?,
-                     data.webhooks["suggestions"].channel_id.try_unwrap()?]
+                if ![data.webhooks.dm_logs.channel_id.try_unwrap()?,
+                     data.webhooks.suggestions.channel_id.try_unwrap()?]
                     .contains(&channel.id)
                 {
                     return Ok(());
@@ -753,7 +762,7 @@ async fn process_support_dm(
                         .map(|a| serenity::AttachmentType::Path(Path::new(&a.url)))
                         .collect();
 
-                    data.webhooks["dm_logs"].execute(&ctx.http, false, |b| {b
+                    data.webhooks.dm_logs.execute(&ctx.http, false, |b| {b
                         .files(paths)
                         .content(&message.content)
                         .username(webhook_username)

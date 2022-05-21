@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Write as _;
+
 use indexmap::IndexMap;
 
 use crate::require;
@@ -159,9 +161,9 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
 
                 if !command_obj.parameters.is_empty() {
                     msg.push_str(ctx.gettext("__**Parameter Descriptions**__\n"));
-                    msg.push_str(&command_obj.parameters.iter().map(|p|
-                        format!("`{}`: {}\n", p.name, p.description.unwrap_or_else(|| ctx.gettext("no description")))
-                    ).collect::<String>());
+                    command_obj.parameters.iter().for_each(|p|
+                        writeln!(msg, "`{}`: {}", p.name, p.description.unwrap_or_else(|| ctx.gettext("no description"))).unwrap()
+                    );
                 };
 
                 msg

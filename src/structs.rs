@@ -13,7 +13,7 @@ pub use anyhow::{Error, Result};
 #[derive(serde::Deserialize)]
 pub struct Config {
     #[serde(rename="Main")] pub main: MainConfig,
-    #[serde(rename="Webhook-Info")] pub webhooks: toml::value::Table,
+    #[serde(rename="Webhook-Info")] pub webhooks: WebhookConfigRaw,
     #[serde(rename="Patreon-Info")] pub patreon: Option<PatreonConfig>,
 }
 
@@ -50,6 +50,24 @@ pub struct PostgresConfig {
     pub max_connections: Option<u32>
 }
 
+#[derive(serde::Deserialize)]
+pub struct WebhookConfigRaw {
+    pub logs: reqwest::Url,
+    pub errors: reqwest::Url,
+    pub servers: reqwest::Url,
+    pub dm_logs: reqwest::Url,
+    pub suggestions: reqwest::Url,
+}
+
+pub struct WebhookConfig {
+    pub logs: serenity::Webhook,
+    pub errors: serenity::Webhook,
+    pub servers: serenity::Webhook,
+    pub dm_logs: serenity::Webhook,
+    pub suggestions: serenity::Webhook,
+}
+
+
 pub struct JoinVCToken (pub serenity::GuildId);
 impl JoinVCToken {
     pub fn acquire(data: &Data, guild_id: serenity::GuildId) -> Arc<tokio::sync::Mutex<Self>> {
@@ -77,12 +95,12 @@ pub struct Data {
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
     pub system_info: parking_lot::Mutex<sysinfo::System>,
     pub translations: HashMap<String, gettext::Catalog>,
-    pub webhooks: HashMap<String, serenity::Webhook>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub start_time: std::time::SystemTime,
     pub premium_avatar_url: String,
     pub reqwest: reqwest::Client,
+    pub webhooks: WebhookConfig,
     pub pool: sqlx::PgPool,
     pub config: MainConfig,
 

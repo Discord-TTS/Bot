@@ -55,7 +55,7 @@ async fn handle_unexpected(
     icon_url: Option<String>
 ) -> Result<()> {
     let data = poise_context.user_data;
-    let error_webhook = &data.webhooks["errors"];
+    let error_webhook = &data.webhooks.errors;
 
     let mut traceback = format!("{:?}", error);
     traceback.push_str(&error.backtrace().to_string());

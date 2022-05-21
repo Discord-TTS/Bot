@@ -238,7 +238,7 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
     let data = ctx.data();
     let author = ctx.author();
     if !data.userinfo_db.get(author.id.into()).await?.dm_blocked {
-        data.webhooks["suggestions"].execute(&ctx.discord().http, false, |b| {b
+        data.webhooks.suggestions.execute(&ctx.discord().http, false, |b| {b
             .content(suggestion)
             .avatar_url(author.face())
             .username(format!("{}#{:04} ({})", author.name, author.discriminator, author.id))

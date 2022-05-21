@@ -46,7 +46,7 @@ impl crate::traits::Looper for Handler {
         self.log_buffer.clear();
 
         let mut conn = self.pool.acquire().await?;
-        conn.transaction::<_, _, anyhow::Error>(move |transaction| Box::pin(async {
+        conn.transaction(move |transaction| Box::pin(async {
             for (raw_event, count) in log_buffer {
                 let query = sqlx::query("
                     INSERT INTO analytics(event, is_command, count)
