@@ -27,3 +27,11 @@ services:
           -  GOOGLE_APPLICATION_CREDENTIALS=/gcp.json
         network_mode: "host"
         expose: [20310]
+    patreon-service:
+        image: gnomeddev/patreon-service
+        expose: [20036]
+
+        volumes:
+          - type: bind
+            source: ../patreon-config.toml
+            target: /config.toml

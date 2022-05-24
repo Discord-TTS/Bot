@@ -213,13 +213,12 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
         .fetch_one(&data.pool)
         .await?.get("count");
 
-    let error_msg = match data.patreon_checker.check(author.id) {
+    let error_msg = match data.fetch_patreon_info(author.id).await? {
         Some(tier) => {
-            let entitled_servers = tier.entitled_servers();
-            if linked_guilds as u8 >= entitled_servers {
+            if linked_guilds as u8 >= tier.entitled_servers {
                 Some(Cow::Owned(ctx
                     .gettext("Hey, you already have {server_count} servers linked, you are only subscribed to the {entitled_servers} tier!")
-                    .replace("{entitled_servers}", &entitled_servers.to_string())
+                    .replace("{entitled_servers}", &tier.entitled_servers.to_string())
                     .replace("{server_count}", &linked_guilds.to_string())
                 ))
             } else {

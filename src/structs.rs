@@ -6,7 +6,7 @@ use strum_macros::IntoStaticStr;
 use poise::serenity_prelude as serenity;
 use tracing::warn;
 
-use crate::{database, analytics, patreon_check, into_static_display};
+use crate::{database, analytics, into_static_display};
 
 pub use anyhow::{Error, Result};
 
@@ -14,7 +14,6 @@ pub use anyhow::{Error, Result};
 pub struct Config {
     #[serde(rename="Main")] pub main: MainConfig,
     #[serde(rename="Webhook-Info")] pub webhooks: WebhookConfigRaw,
-    #[serde(rename="Patreon-Info")] pub patreon: Option<PatreonConfig>,
 }
 
 #[derive(serde::Deserialize)]
@@ -24,21 +23,12 @@ pub struct MainConfig {
     pub invite_channel: serenity::ChannelId,
     pub translation_token: Option<String>,
     pub main_server: serenity::GuildId,
+    pub patreon_service: reqwest::Url,
     pub ofs_role: serenity::RoleId,
     pub main_server_invite: String,
     pub tts_service: reqwest::Url,
     pub token: Option<String>,
     pub log_level: String,
-}
-
-#[derive(serde::Deserialize)]
-pub struct PatreonConfig {
-    pub campaign_id: String,
-    pub basic_tier_id: String,
-    pub extra_tier_id: String,
-    pub webhook_secret: String,
-    pub creator_access_token: String,
-    pub webhook_bind_address: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -83,9 +73,15 @@ pub enum FailurePoint {
     Guild,
 }
 
+#[derive(serde::Deserialize, Clone, Copy)]
+pub struct PatreonInfo {
+    pub tier: u8,
+    pub entitled_servers: u8,
+}
+
+
 pub struct Data {
     pub analytics: Arc<analytics::Handler>,
-    pub patreon_checker: Arc<patreon_check::PatreonChecker>,
     pub guilds_db: database::Handler<i64, database::GuildRow>,
     pub userinfo_db: database::Handler<i64, database::UserRow>,
     pub nickname_db: database::Handler<[i64; 2], database::NicknameRow>,
@@ -115,6 +111,17 @@ impl Data {
         self.translations.get("en-US")
     }
 
+    pub async fn fetch_patreon_info(&self, user_id: serenity::UserId) -> Result<Option<PatreonInfo>> {
+        let mut url = self.config.patreon_service.clone();
+        url.set_path(&format!("/members/{user_id}"));
+
+        self.reqwest.get(url)
+            .send().await?
+            .error_for_status()?
+            .json().await
+            .map_err(Into::into)
+    }
+
     pub async fn premium_check(&self, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>> {
         let guild_id = match guild_id {
             Some(guild) => guild,
@@ -122,17 +129,16 @@ impl Data {
         };
 
         let guild_row = self.guilds_db.get(guild_id.0 as i64).await?;
-        guild_row.premium_user.map_or(
-            Ok(Some(FailurePoint::PremiumUser)),
-            |raw_user_id| {
-                let patreon_user_id = serenity::UserId(raw_user_id as u64);
-                if self.patreon_checker.check(patreon_user_id).is_some() {
-                    Ok(None)
-                } else {
-                    Ok(Some(FailurePoint::NotSubscribed(patreon_user_id)))
-                }
+        if let Some(raw_user_id) = guild_row.premium_user {
+            let patreon_user_id = serenity::UserId(raw_user_id as u64);
+            if self.fetch_patreon_info(patreon_user_id).await?.is_some() {
+                Ok(None)
+            } else {
+                Ok(Some(FailurePoint::NotSubscribed(patreon_user_id)))
             }
-        )
+        } else {
+            Ok(Some(FailurePoint::PremiumUser))
+        }
     }
 
     pub async fn parse_user_or_guild(&self, author_id: serenity::UserId, guild_id: Option<serenity::GuildId>) -> Result<(Cow<'static, str>, TTSMode)> {

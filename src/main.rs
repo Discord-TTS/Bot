@@ -33,7 +33,6 @@ use tracing::{error, info, warn};
 use poise::serenity_prelude::{self as serenity, Mentionable as _}; // re-exports a lot of serenity with shorter paths
 use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
 
-mod patreon_check;
 mod migration;
 mod analytics;
 mod constants;
@@ -91,7 +90,7 @@ async fn _main() -> Result<()> {
     let start_time = std::time::SystemTime::now();
     std::env::set_var("RUST_LIB_BACKTRACE", "1");
 
-    let (pool, mut main, patreon_config, webhooks) = {
+    let (pool, mut main, webhooks) = {
         let mut config_toml: toml::Value = std::fs::read_to_string("config.toml")?.parse()?;
         let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
 
@@ -112,8 +111,8 @@ async fn _main() -> Result<()> {
 
         migration::run(&mut config_toml, &pool).await?;
 
-        let Config{main, patreon, webhooks} = config_toml.try_into()?;
-        (pool, main, patreon, webhooks)
+        let Config{main, webhooks} = config_toml.try_into()?;
+        (pool, main, webhooks)
     };
 
     let filter_entry = |to_check| move |entry: &std::fs::DirEntry| entry
@@ -145,7 +144,7 @@ async fn _main() -> Result<()> {
 
     let (
         guilds_db, userinfo_db, user_voice_db, guild_voice_db, nickname_db,
-        webhooks, premium_avatar_url, owner_ids,
+        webhooks, premium_avatar_url,
         gtts_voices, espeak_voices, gcloud_voices, polly_voices
     ) = tokio::try_join!(
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
@@ -155,14 +154,6 @@ async fn _main() -> Result<()> {
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
         get_webhooks(&http, webhooks),
         async {serenity::UserId(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
-        async {
-            http.get_current_application_info().await.map_err(Into::into).map(|app_info| {
-                app_info.team.map_or_else(
-                    || vec![app_info.owner.id],
-                    |t| t.members.into_iter().map(|o| o.user.id).collect()
-                )
-            })
-        },
         async {Ok(TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
         async {Ok(TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
         async {Ok(prepare_gcloud_voices(serenity::json::prelude::from_slice(&TTSMode::gCloud
@@ -198,7 +189,6 @@ async fn _main() -> Result<()> {
         join_vc_tokens: dashmap::DashMap::new(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
         system_info: parking_lot::Mutex::new(sysinfo::System::new()),
-        patreon_checker: patreon_check::PatreonChecker::new(reqwest.clone(), owner_ids, patreon_config)?,
 
         gtts_voices, espeak_voices, gcloud_voices, polly_voices,
 
