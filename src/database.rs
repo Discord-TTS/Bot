@@ -204,32 +204,39 @@ where
 
 #[macro_export]
 macro_rules! create_db_handler {
-    ($pool:expr, $table_name:literal, $id_name:literal) => {
+    ($pool:expr, $table_name:literal, $id_name:literal) => {{
+        const TABLE_NAME: &str = $table_name;
+        const ID_NAME: &str = $id_name;
+
         database::Handler::new($pool,
-            const_format::formatcp!("SELECT * FROM {} WHERE {} = $1", $table_name, $id_name),
-            const_format::formatcp!("DELETE FROM {} WHERE {} = $1", $table_name, $id_name),
+            const_format::formatcp!("SELECT * FROM {TABLE_NAME} WHERE {ID_NAME} = $1"),
+            const_format::formatcp!("DELETE FROM {TABLE_NAME} WHERE {ID_NAME} = $1"),
             const_format::formatcp!("
-                INSERT INTO {}({id_name}) VALUES ($1)
-                ON CONFLICT ({id_name}) DO NOTHING
-            ", $table_name, id_name=$id_name),
+                INSERT INTO {TABLE_NAME}({ID_NAME}) VALUES ($1)
+                ON CONFLICT ({ID_NAME}) DO NOTHING
+            "),
             const_format::formatcp!("
-                INSERT INTO {}({id_name}, {{key}}) VALUES ($1, $2)
-                ON CONFLICT ({id_name}) DO UPDATE SET {{key}} = $2
-            ", $table_name, id_name=$id_name)
+                INSERT INTO {TABLE_NAME}({ID_NAME}, {{key}}) VALUES ($1, $2)
+                ON CONFLICT ({ID_NAME}) DO UPDATE SET {{key}} = $2
+            ")
         )
-    };
-    ($pool:expr, $table_name:literal, $id_name1:literal, $id_name2:literal) => {
+    }};
+    ($pool:expr, $table_name:literal, $id_name1:literal, $id_name2:literal) => {{
+        const TABLE_NAME: &str = $table_name;
+        const ID_NAME1: &str = $id_name1;
+        const ID_NAME2: &str = $id_name2;
+
         database::Handler::new($pool,
-            const_format::formatcp!("SELECT * FROM {} WHERE {} = $1 AND {} = $2", $table_name, $id_name1, $id_name2),
-            const_format::formatcp!("DELETE FROM {} WHERE {} = $1 AND {} = $2", $table_name, $id_name1, $id_name2),
+            const_format::formatcp!("SELECT * FROM {TABLE_NAME} WHERE {ID_NAME1} = $1 AND {ID_NAME2} = $2"),
+            const_format::formatcp!("DELETE FROM {TABLE_NAME} WHERE {ID_NAME1} = $1 AND {ID_NAME2} = $2"),
             const_format::formatcp!("
-                INSERT INTO {}({id_name1}, {id_name2}) VALUES ($1, $2)
-                ON CONFLICT ({id_name1}, {id_name2}) DO NOTHING
-            ", $table_name, id_name1=$id_name1, id_name2=$id_name2),
+                INSERT INTO {TABLE_NAME}({ID_NAME1}, {ID_NAME2}) VALUES ($1, $2)
+                ON CONFLICT ({ID_NAME1}, {ID_NAME2}) DO NOTHING
+            "),
             const_format::formatcp!("
-                INSERT INTO {}({id_name1}, {id_name2}, {{key}}) VALUES ($1, $2, $3)
-                ON CONFLICT ({id_name1}, {id_name2}) DO UPDATE SET {{key}} = $3
-            ", $table_name, id_name1=$id_name1, id_name2=$id_name2)
+                INSERT INTO {TABLE_NAME}({ID_NAME1}, {ID_NAME2}, {{key}}) VALUES ($1, $2, $3)
+                ON CONFLICT ({ID_NAME1}, {ID_NAME2}) DO UPDATE SET {{key}} = $3
+            ")
         )
-    };
+    }};
 }
