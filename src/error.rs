@@ -57,8 +57,7 @@ async fn handle_unexpected(
     let data = poise_context.user_data;
     let error_webhook = &data.webhooks.errors;
 
-    let mut traceback = format!("{:?}", error);
-    traceback.push_str(&error.backtrace().to_string());
+    let traceback = format!("{:?}", error);
 
     let traceback_hash = hash(traceback.as_bytes());
 
@@ -185,6 +184,21 @@ pub async fn handle_message(ctx: &serenity::Context, poise_context: FrameworkCon
         ctx, poise_context,
         "MessageCreate", error, extra_fields,
         Some(message.author.name.clone()), Some(message.author.face())
+    ).await
+}
+
+pub async fn handle_member(ctx: &serenity::Context, poise_context: FrameworkContext<'_>, member: &serenity::Member, result: Result<(), impl Into<Error>>) -> Result<()> {
+    let error = require!(result.err(), Ok(())).into();
+
+    let mut extra_fields = Vec::with_capacity(3);
+    extra_fields.push(("Guild", Cow::Owned(member.guild_id.to_string()), true));
+    extra_fields.push(("Guild ID", Cow::Owned(member.guild_id.to_string()), true));
+    extra_fields.push(("User ID", Cow::Owned(member.user.id.0.to_string()), true));
+
+    handle_unexpected(
+        ctx, poise_context,
+        "GuildMemberAdd", error, extra_fields,
+        None, None
     ).await
 }
 

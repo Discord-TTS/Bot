@@ -97,6 +97,48 @@ pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeChoice) -> Com
     Ok(())
 }
 
+#[poise::command(prefix_command, owners_only, hide_in_help)]
+pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
+    let data = ctx.data();
+    let ctx_discord = ctx.discord();
+    let http = &ctx_discord.http;
+    let cache = &ctx_discord.cache;
+
+    let support_guild_id = data.config.main_server;
+    let support_guild_members = support_guild_id.members(http, None, None).await?;
+
+    let all_guild_owners = cache.guilds().iter()
+        .filter_map(|id| cache.guild_field(id, |g| g.owner_id))
+        .collect::<Vec<_>>();
+
+    let current_ofs_members = support_guild_members.iter()
+        .filter(|m| m.roles.contains(&data.config.ofs_role))
+        .map(|m| m.user.id)
+        .collect::<Vec<_>>();
+
+    let should_not_be_ofs_members = current_ofs_members.iter().filter(|ofs_member| !all_guild_owners.contains(ofs_member));
+    let should_be_ofs_members = all_guild_owners.iter().filter(|owner|
+        (!current_ofs_members.contains(owner)) &&
+        support_guild_members.iter().any(|m| m.user.id == **owner)
+    );
+
+    let mut added_role = 0;
+    for member in should_be_ofs_members {
+        added_role += 1;
+        http.add_member_role(support_guild_id.0, member.0, data.config.ofs_role.0, None).await?;
+    }
+
+    let mut removed_role = 0;
+    for member in should_not_be_ofs_members {
+        removed_role += 1;
+        http.remove_member_role(support_guild_id.0, member.0, data.config.ofs_role.0, None).await?;
+    }
+
+    ctx.say(format!("Done! Removed {removed_role} members and added {added_role} members!")).await?;
+    Ok(())
+}
+
+
 /// Debug commands for the bot
 #[poise::command(prefix_command, slash_command, guild_only, subcommands("info", "leave"))]
 pub async fn debug(ctx: Context<'_>) -> CommandResult {

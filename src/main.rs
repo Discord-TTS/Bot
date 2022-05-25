@@ -274,7 +274,7 @@ async fn _main() -> Result<()> {
 
                 commands::help::help(),
                 commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
-                commands::owner::add_premium(), commands::owner::remove_cache(),
+                commands::owner::add_premium(), commands::owner::remove_cache(), commands::owner::refresh_ofs(),
             ],..poise::FrameworkOptions::default()
         })
         .build().await?;
@@ -440,10 +440,22 @@ Ask questions by either responding here or asking on the support server!",
         error::handle_guild("GuildDelete", &ctx, framework, full.as_ref(), async_try!({
             data.guilds_db.delete(incomplete.id.into()).await?;
             if let Some(guild) = &full {
-                data.webhooks.servers.execute(&ctx.http, false, |b| {b.content(format!(
+                if data.config.main_server.members(&ctx.http, None, None).await?.into_iter()
+                    .filter(|m| m.roles.contains(&data.config.ofs_role))
+                    .any(|m| m.user.id == guild.owner_id)
+                {
+                    ctx.http.remove_member_role(
+                        data.config.main_server.0,
+                        guild.owner_id.0,
+                        data.config.ofs_role.0,
+                        None
+                    ).await?;
+                }
+
+                data.webhooks.servers.execute(&ctx.http, false, |b| b.content(format!(
                     "Just got kicked from {}. I'm now in {} servers",
                     guild.name, ctx.cache.guilds().len()
-                ))}).await?;
+                ))).await?;
             };
 
             Ok(())
@@ -451,17 +463,15 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn interaction_create(&self, ctx: serenity::Context, interaction: serenity::Interaction) {
-        let framework = require!(self.framework().await);
+        if let serenity::Interaction::MessageComponent(interaction) = interaction {
+            if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
+                let framework = require!(self.framework().await);
 
-        error::handle_unexpected_default(&ctx, framework, "InteractionCreate", async_try!({
-            if let serenity::Interaction::MessageComponent(interaction) = interaction {
-                if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
-                    error::handle_traceback_button(&ctx, framework.user_data, interaction).await?;
-                }
+                error::handle_unexpected_default(&ctx, framework, "InteractionCreate",
+                    error::handle_traceback_button(&ctx, framework.user_data, interaction).await
+                ).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
             };
-
-            Ok(())
-        })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+        }
     }
 
     async fn ready(&self, ctx: serenity::Context, data_about_bot: serenity::Ready) {
@@ -486,6 +496,38 @@ Ask questions by either responding here or asking on the support server!",
 
             Ok(())
         })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+    }
+
+    async fn guild_member_addition(&self, ctx: serenity::Context, member: serenity::Member) {
+        let framework = require!(self.framework().await);
+        let data = framework.user_data;
+
+        if
+            member.guild_id != data.config.main_server &&
+            ctx.cache.guilds().into_iter().find_map(|id| ctx.cache.guild_field(id, |g| g.owner_id == member.user.id)).unwrap_or(false)
+        {
+            error::handle_member(&ctx, framework, &member,
+                match ctx.http.add_member_role(
+                    data.config.main_server.0,
+                    member.user.id.0,
+                    data.config.ofs_role.0,
+                    None
+                ).await {
+                    Err(err) => {
+                        if let serenity::Error::Http(err) = &err {
+                            if let serenity::HttpError::UnsuccessfulRequest(err) = &**err {
+                                if err.error.code == 10007 { // Unknown member
+                                    return
+                                }
+                            }
+                        }
+
+                        Err(err)
+                    },
+                    r => r
+                }
+            ).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
+        };
     }
 
     async fn resume(&self, _: serenity::Context, _: serenity::ResumedEvent) {
