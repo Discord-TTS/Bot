@@ -425,6 +425,7 @@ dependencies = [
  "dashmap",
  "generic-array",
  "gettext",
+ "gnomeutils",
  "hmac",
  "hyper",
  "indexmap",
@@ -748,6 +749,23 @@ checksum = "9ebb594e753d5997e4be036e5a8cf048ab9414352870fb45c779557bbc9ba971"
 dependencies = [
  "byteorder",
  "encoding",
+]
+
+[[package]]
+name = "gnomeutils"
+version = "0.1.0"
+source = "git+https://github.com/GnomedDev/GnomeUtills?branch=master#98383d8ea7f20bdaa1092ce4c903cac7444e34d7"
+dependencies = [
+ "anyhow",
+ "dashmap",
+ "gettext",
+ "parking_lot 0.12.0",
+ "poise",
+ "sha2",
+ "sqlx",
+ "sysinfo",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -1755,7 +1773,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#63b39a7c1b57cc841ff3e975c9f9f82b92b2904e"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#eb8a25c7c8865dfb16d605089c327c842bf65683"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -1829,7 +1847,7 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.2"
-source = "git+https://github.com/serenity-rs/songbird?branch=next#dabf73ba09934d3b1934aad0536b3213cf8fd0ef"
+source = "git+https://github.com/serenity-rs/songbird?branch=next#49c33461029f5c3a22e12e3d251319237d73b4a4"
 dependencies = [
  "async-trait",
  "async-tungstenite",

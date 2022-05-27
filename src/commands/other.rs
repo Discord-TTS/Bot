@@ -19,11 +19,11 @@ use sysinfo::{SystemExt, ProcessExt};
 use num_format::{Locale, ToFormattedString};
 
 use poise::serenity_prelude::{self as serenity, Mentionable as _};
+use gnomeutils::{require, PoiseContextExt as _, OptionTryUnwrap as _};
 
-use crate::require;
 use crate::constants::OPTION_SEPERATORS;
-use crate::traits::{OptionTryUnwrap, PoiseContextExt};
-use crate::funcs::{confirm_dialog, fetch_audio, refresh_kind, prepare_url};
+use crate::traits::PoiseContextExt as _;
+use crate::funcs::{confirm_dialog, fetch_audio, prepare_url};
 use crate::structs::{ApplicationContext, Context, CommandResult, TTSMode};
 
 /// Shows how long TTS Bot has been online
@@ -133,8 +133,12 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
 
     let shard_count = ctx_discord.cache.shard_count();
     let ram_usage = {
-        let mut system_info = data.system_info.lock();
-        system_info.refresh_specifics(refresh_kind());
+        let mut system_info = data.inner.system_info.lock();
+        system_info.refresh_specifics(sysinfo::RefreshKind::new()
+            .with_processes(sysinfo::ProcessRefreshKind::new())
+            .with_memory()
+            .with_cpu()
+        );
 
         let pid = sysinfo::get_current_pid().unwrap();
         system_info.process(pid).unwrap().memory() / 1024

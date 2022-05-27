@@ -18,9 +18,10 @@ use std::io::Write;
 
 use sqlx::{Row, Executor, Connection as _};
 
+use gnomeutils::OptionTryUnwrap;
+
 use crate::constants::DB_SETUP_QUERY;
 use crate::structs::{Result, TTSMode};
-use crate::traits::OptionTryUnwrap;
 
 type Transaction<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
 

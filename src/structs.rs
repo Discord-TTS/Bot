@@ -1,5 +1,4 @@
-use std::collections::{HashMap, BTreeMap};
-use std::{sync::Arc, borrow::Cow};
+use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 
 use strum_macros::IntoStaticStr;
 
@@ -51,10 +50,10 @@ pub struct WebhookConfigRaw {
 
 pub struct WebhookConfig {
     pub logs: serenity::Webhook,
-    pub errors: serenity::Webhook,
     pub servers: serenity::Webhook,
     pub dm_logs: serenity::Webhook,
     pub suggestions: serenity::Webhook,
+    pub errors: Option<serenity::Webhook>,
 }
 
 
@@ -89,16 +88,15 @@ pub struct Data {
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRow>,
 
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
-    pub system_info: parking_lot::Mutex<sysinfo::System>,
-    pub translations: HashMap<String, gettext::Catalog>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub start_time: std::time::SystemTime,
     pub premium_avatar_url: String,
     pub reqwest: reqwest::Client,
     pub webhooks: WebhookConfig,
-    pub pool: sqlx::PgPool,
     pub config: MainConfig,
+
+    pub inner: gnomeutils::GnomeData,
 
     pub espeak_voices: Vec<String>,
     pub gtts_voices: BTreeMap<String, String>,
@@ -106,9 +104,15 @@ pub struct Data {
     pub gcloud_voices: BTreeMap<String, BTreeMap<String, GoogleGender>>,
 }
 
+impl AsRef<gnomeutils::GnomeData> for Data {
+    fn as_ref(&self) -> &gnomeutils::GnomeData {
+        &self.inner
+    }
+}
+
 impl Data {
     pub fn default_catalog(&self) -> Option<&gettext::Catalog> {
-        self.translations.get("en-US")
+        self.inner.translations.get("en-US")
     }
 
     pub async fn fetch_patreon_info(&self, user_id: serenity::UserId) -> Result<Option<PatreonInfo>> {

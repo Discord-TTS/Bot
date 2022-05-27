@@ -24,18 +24,11 @@ use regex::{Captures, Regex};
 use lazy_static::lazy_static;
 
 use poise::serenity_prelude as serenity;
+use gnomeutils::{OptionGettext, OptionTryUnwrap};
 
-use crate::require;
 use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, JoinVCToken, TTSServiceError};
-use crate::traits::{SerenityContextExt, OptionTryUnwrap, OptionGettext};
-
-
-pub fn refresh_kind() -> sysinfo::RefreshKind {
-    sysinfo::RefreshKind::new()
-        .with_processes(sysinfo::ProcessRefreshKind::new())
-        .with_memory()
-        .with_cpu()
-}
+use crate::traits::SerenityContextExt;
+use crate::require;
 
 pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> (String, bool) {
     let mut status: Vec<_> = shards.iter()

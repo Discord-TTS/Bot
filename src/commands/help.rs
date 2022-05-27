@@ -18,6 +18,8 @@ use std::fmt::Write as _;
 
 use indexmap::IndexMap;
 
+use gnomeutils::PoiseContextExt as _;
+
 use crate::require;
 use crate::structs::{Context, Command, CommandResult, ApplicationContext};
 use crate::traits::PoiseContextExt;

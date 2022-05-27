@@ -15,12 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::borrow::Cow;
 
-use poise::serenity_prelude as serenity;
 use sqlx::Row;
 
+use poise::serenity_prelude as serenity;
+use gnomeutils::{PoiseContextExt as _, require, require_guild};
+
 use crate::structs::{Context, Result, CommandResult, TTSMode, JoinVCToken};
-use crate::traits::{PoiseContextExt, SerenityContextExt};
-use crate::{require_guild, require};
+use crate::traits::SerenityContextExt;
 use crate::funcs::random_footer;
 
 async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
@@ -210,7 +211,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
 
     let linked_guilds: i64 = sqlx::query("SELECT count(*) FROM guilds WHERE premium_user = $1")
         .bind(&author_id)
-        .fetch_one(&data.pool)
+        .fetch_one(&data.inner.pool)
         .await?.get("count");
 
     let error_msg = match data.fetch_patreon_info(author.id).await? {

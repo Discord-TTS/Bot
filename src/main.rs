@@ -30,25 +30,23 @@ use sysinfo::SystemExt;
 use once_cell::sync::OnceCell;
 use tracing::{error, info, warn};
 
+use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt};
 use poise::serenity_prelude::{self as serenity, Mentionable as _}; // re-exports a lot of serenity with shorter paths
 use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
 
 mod migration;
-mod analytics;
 mod constants;
 mod database;
 mod commands;
-mod logging;
 mod structs;
 mod traits;
 mod macros;
-mod error;
 mod funcs;
 
+use traits::SerenityContextExt;
+use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices};
-use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR, VIEW_TRACEBACK_CUSTOM_ID};
 use structs::{TTSMode, Config, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig};
-use traits::{SerenityContextExt, PoiseContextExt, OptionTryUnwrap, Looper};
 
 
 use crate::structs::FailurePoint;
@@ -75,7 +73,7 @@ async fn get_webhooks(
         get_webhook(webhooks_raw.suggestions),
     )?;
 
-    Ok(WebhookConfig{logs, errors, servers, dm_logs, suggestions})
+    Ok(WebhookConfig{logs, servers, dm_logs, suggestions, errors: Some(errors)})
 }
 
 fn main() -> Result<()> {
@@ -144,7 +142,7 @@ async fn _main() -> Result<()> {
 
     let (
         guilds_db, userinfo_db, user_voice_db, guild_voice_db, nickname_db,
-        webhooks, premium_avatar_url,
+        mut webhooks, premium_avatar_url,
         gtts_voices, espeak_voices, gcloud_voices, polly_voices
     ) = tokio::try_join!(
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
@@ -174,9 +172,11 @@ async fn _main() -> Result<()> {
 
     let logger = logging::WebhookLogger::new(
         http,
+        "TTS-Webhook",
+        "discord_tts_bot",
         tracing::Level::from_str(&main.log_level)?,
         webhooks.logs.clone(),
-        webhooks.errors.clone(),
+        webhooks.errors.as_ref().unwrap().clone(),
     );
 
     tracing::subscriber::set_global_default(logger.clone())?;
@@ -186,15 +186,21 @@ async fn _main() -> Result<()> {
     let bot_id = serenity::utils::parse_token(&token).unwrap().0;
 
     let data = Data {
+        inner: gnomeutils::GnomeData {
+            pool, translations,
+            error_webhook: webhooks.errors.take().unwrap(),
+            main_server_invite: main.main_server_invite.clone(),
+            system_info: parking_lot::Mutex::new(sysinfo::System::new()),
+        },
+
         join_vc_tokens: dashmap::DashMap::new(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
-        system_info: parking_lot::Mutex::new(sysinfo::System::new()),
 
         gtts_voices, espeak_voices, gcloud_voices, polly_voices,
 
         config: main, reqwest, premium_avatar_url,
+        analytics, webhooks, start_time, startup_message,
         guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
-        analytics, webhooks, start_time, pool, startup_message, translations,
     };
 
     let framework_oc = Arc::new(once_cell::sync::OnceCell::new());
@@ -226,16 +232,16 @@ async fn _main() -> Result<()> {
             pre_command: |ctx| Box::pin(async move {
                 let analytics_handler: &analytics::Handler = &ctx.data().analytics;
 
-                analytics_handler.log(Cow::Owned(ctx.command().qualified_name.clone()));
+                analytics_handler.log(Cow::Owned(ctx.command().qualified_name.clone()), true);
                 analytics_handler.log(Cow::Borrowed(match ctx {
-                    poise::Context::Prefix(_) => "on_command",
+                    poise::Context::Prefix(_) => "command",
                     poise::Context::Application(ctx) => match ctx.interaction {
-                        poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(_) => "on_slash_command",
-                        poise::ApplicationCommandOrAutocompleteInteraction::Autocomplete(_) => "on_autocomplete",
+                        poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(_) => "slash_command",
+                        poise::ApplicationCommandOrAutocompleteInteraction::Autocomplete(_) => "autocomplete",
                     },
-                }));
+                }), false);
             }),
-            on_error: |error| Box::pin(async move {error::handle(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err))}),
+            on_error: |error| Box::pin(async move {gnomeutils::errors::handle(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err))}),
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: None,
                 dynamic_prefix: Some(|ctx| {Box::pin(async move {Ok(Some(
@@ -342,7 +348,7 @@ impl EventHandler {
 impl serenity::EventHandler for EventHandler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
         let framework = require!(self.framework().await);
-        error::handle_message(&ctx, framework, &new_message, tokio::try_join!(
+        errors::handle_message(&ctx, framework, &new_message, tokio::try_join!(
             process_tts_msg(&ctx, &new_message, framework.user_data),
             process_support_dm(&ctx, &new_message, framework.user_data),
             process_mention_msg(&ctx, &new_message, framework.user_data),
@@ -351,7 +357,7 @@ impl serenity::EventHandler for EventHandler {
 
     async fn voice_state_update(&self, ctx: serenity::Context, old: Option<serenity::VoiceState>, new: serenity::VoiceState) {
         let framework = require!(self.framework().await);
-        error::handle_unexpected_default(&ctx, framework, "VoiceStateUpdate", async_try!({
+        errors::handle_unexpected_default(&ctx, framework, "VoiceStateUpdate", async_try!({
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user_id();
             let guild_id = new.guild_id.try_unwrap()?;
@@ -382,7 +388,7 @@ impl serenity::EventHandler for EventHandler {
         let framework = require!(self.framework().await);
         let data = framework.user_data;
 
-        error::handle_guild("GuildCreate", &ctx, framework, Some(&guild), async_try!({
+        errors::handle_guild("GuildCreate", &ctx, framework, Some(&guild), async_try!({
             // Send to servers channel and DM owner the welcome message
 
             let (owner, _) = tokio::join!(
@@ -437,7 +443,7 @@ Ask questions by either responding here or asking on the support server!",
         let framework = require!(self.framework().await);
         let data = framework.user_data;
 
-        error::handle_guild("GuildDelete", &ctx, framework, full.as_ref(), async_try!({
+        errors::handle_guild("GuildDelete", &ctx, framework, full.as_ref(), async_try!({
             data.guilds_db.delete(incomplete.id.into()).await?;
             if let Some(guild) = &full {
                 if data.config.main_server.members(&ctx.http, None, None).await?.into_iter()
@@ -463,22 +469,15 @@ Ask questions by either responding here or asking on the support server!",
     }
 
     async fn interaction_create(&self, ctx: serenity::Context, interaction: serenity::Interaction) {
-        if let serenity::Interaction::MessageComponent(interaction) = interaction {
-            if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
-                let framework = require!(self.framework().await);
-
-                error::handle_unexpected_default(&ctx, framework, "InteractionCreate",
-                    error::handle_traceback_button(&ctx, framework.user_data, interaction).await
-                ).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
-            };
-        }
+        let framework = require!(self.framework().await);
+        gnomeutils::errors::interaction_create(ctx, interaction, framework).await;
     }
 
     async fn ready(&self, ctx: serenity::Context, data_about_bot: serenity::Ready) {
         let framework = require!(self.framework().await);
         let data = framework.user_data;
 
-        error::handle_unexpected_default(&ctx, framework, "Ready", async_try!({
+        errors::handle_unexpected_default(&ctx, framework, "Ready", async_try!({
             let user_name = &data_about_bot.user.name;
             let (status, starting) = generate_status(&*framework.shard_manager.lock().await.runners.lock().await);
 
@@ -506,7 +505,7 @@ Ask questions by either responding here or asking on the support server!",
             member.guild_id != data.config.main_server &&
             ctx.cache.guilds().into_iter().find_map(|id| ctx.cache.guild_field(id, |g| g.owner_id == member.user.id)).unwrap_or(false)
         {
-            error::handle_member(&ctx, framework, &member,
+            errors::handle_member(&ctx, framework, &member,
                 match ctx.http.add_member_role(
                     data.config.main_server.0,
                     member.user.id.0,
@@ -532,13 +531,13 @@ Ask questions by either responding here or asking on the support server!",
 
     async fn resume(&self, _: serenity::Context, _: serenity::ResumedEvent) {
         if let Some(framework) = self.framework().await {
-            framework.user_data.analytics.log(Cow::Borrowed("on_resumed"));
+            framework.user_data.analytics.log(Cow::Borrowed("resumed"), false);
         }
     }
 }
 
 
-async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool, error::CommandError> {
+async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool> {
     let guild_id = ctx.guild_id();
     let ctx_discord = ctx.discord();
     let data = ctx.data();
@@ -684,11 +683,11 @@ async fn process_tts_msg(
     }
 
     data.analytics.log(Cow::Borrowed(match mode {
-        TTSMode::gTTS => "on_gTTS_tts",
-        TTSMode::eSpeak => "on_eSpeak_tts",
-        TTSMode::gCloud => "on_gCloud_tts",
-        TTSMode::Polly => "on_Polly_tts",
-    }));
+        TTSMode::gTTS => "gTTS_tts",
+        TTSMode::eSpeak => "eSpeak_tts",
+        TTSMode::gCloud => "gCloud_tts",
+        TTSMode::Polly => "Polly_tts",
+    }), false);
 
     Ok(())
 }
@@ -774,7 +773,7 @@ async fn process_support_dm(
                 return Ok(());
             }
 
-            data.analytics.log(Cow::Borrowed("on_dm"));
+            data.analytics.log(Cow::Borrowed("dm"), false);
 
             let userinfo = data.userinfo_db.get(message.author.id.into()).await?;
             if userinfo.dm_welcomed {

@@ -20,12 +20,12 @@ use std::collections::HashMap;
 use itertools::Itertools;
 
 use poise::serenity_prelude as serenity;
+use gnomeutils::{require, require_guild, OptionGettext as _, PoiseContextExt as _};
 
 use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
-use crate::traits::{PoiseContextExt, OptionGettext};
+use crate::traits::{PoiseContextExt};
 use crate::funcs::{random_footer, confirm_dialog};
-use crate::{require_guild, require};
 use crate::database;
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {

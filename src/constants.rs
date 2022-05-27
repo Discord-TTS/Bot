@@ -14,12 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub const RED: u32 = 0xff0000;
 pub const FREE_NEUTRAL_COLOUR: u32 = 0x3498db;
 pub const PREMIUM_NEUTRAL_COLOUR: u32 = 0xcaa652;
 
 pub const TRANSLATION_URL: &str = "https://api-free.deepl.com/v2";
-pub const VIEW_TRACEBACK_CUSTOM_ID: &str = "error::traceback::view";
 
 pub const OPTION_SEPERATORS: [&str; 4] = [
     ":small_orange_diamond:",

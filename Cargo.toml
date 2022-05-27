@@ -17,6 +17,7 @@ subtle = "2"
 md-5 = "0.10"
 sha2 = "0.10"
 hmac = "0.12"
+poise = "0.2"
 strfmt = "0.1"
 hyper = "0.14"
 indexmap = "1"
@@ -52,14 +53,21 @@ features = ["rt-multi-thread", "signal", "parking_lot"]
 version = "5"
 default-features = false
 
-[dependencies.poise]
-git = "https://github.com/GnomedDev/poise"
-branch = "cutting-edge"
+[dependencies.gnomeutils]
+git = "https://github.com/GnomedDev/GnomeUtills"
+branch = "master"
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "next"
+
+[patch.crates-io]
+serenity = {git = "https://github.com/GnomedDev/serenity", branch = "personal"}
+
+[patch.crates-io.poise]
+git = "https://github.com/GnomedDev/poise"
+branch = "cutting-edge"
 
 [patch."https://github.com/serenity-rs/serenity"]
 serenity = {git = "https://github.com/GnomedDev/serenity", branch = "personal"}
