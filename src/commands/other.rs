@@ -80,7 +80,7 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
         let url = prepare_url(
             data.config.tts_service.clone(),
             message, &voice, mode,
-            &speaking_rate.to_string(), &u64::MAX.to_string()
+            &speaking_rate, &u64::MAX.to_string()
         );
 
         audio = fetch_audio(&data.reqwest, url, data.config.tts_service_auth_key.as_deref()).await?.try_unwrap()?.bytes().await?;
