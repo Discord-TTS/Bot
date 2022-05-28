@@ -281,6 +281,7 @@ async fn _main() -> Result<()> {
                 commands::help::help(),
                 commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
                 commands::owner::add_premium(), commands::owner::remove_cache(), commands::owner::refresh_ofs(),
+                commands::owner::purge_guilds(),
             ],..poise::FrameworkOptions::default()
         })
         .build().await?;

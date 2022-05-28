@@ -13,7 +13,7 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use poise::serenity_prelude as serenity;
+use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
 
 use crate::structs::{Context, CommandResult, Result, TTSModeChoice};
 
@@ -95,6 +95,37 @@ pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeChoice) -> Com
     ctx.data().user_voice_db.invalidate_cache(&(user, mode.into()));
     ctx.say("Done!").await?;
     Ok(())
+}
+
+#[poise::command(prefix_command, owners_only, hide_in_help)]
+pub async fn purge_guilds(ctx: Context<'_>, #[flag] run: bool) -> CommandResult {
+    #[derive(sqlx::FromRow)]
+    struct HasGuildId {
+        guild_id: i64
+    }
+
+    let data = ctx.data();
+    let ctx_discord = ctx.discord();
+    let mut setup_guilds = std::collections::HashSet::new();
+
+    let mut stream = sqlx::query_as::<_, HasGuildId>("SELECT * from guilds WHERE channel_id != 0").fetch(&data.inner.pool);
+    while let Some(item) = stream.try_next().await? {
+        setup_guilds.insert(item.guild_id as u64);
+    }
+
+    let to_leave: Vec<_> = ctx_discord.cache.guilds().into_iter().filter(|g| !setup_guilds.contains(&g.0)).collect();
+    let to_leave_count = to_leave.len();
+
+    if run {
+        let msg = ctx.say(format!("Leaving {to_leave_count} guilds!")).await?;
+        for guild in to_leave {
+            guild.leave(ctx_discord).await?;
+        }
+
+        msg.edit(ctx, |b| b.content("Done! Left {to_leave_count} guilds!")).await.map(drop)
+    } else {
+        ctx.say(format!("Would purge {to_leave_count} guilds!")).await.map(drop)
+    }.map_err(Into::into)
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
