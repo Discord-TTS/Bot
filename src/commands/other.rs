@@ -195,10 +195,10 @@ pub async fn channel(ctx: Context<'_>,) -> CommandResult {
 }
 
 /// Shows how you can help support TTS Bot's development and hosting!
-#[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES", aliases("purchase", "premium"))]
-pub async fn donate(ctx: Context<'_>,) -> CommandResult {
+#[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES", aliases("purchase", "donate"))]
+pub async fn premium(ctx: Context<'_>,) -> CommandResult {
     ctx.say(ctx.gettext("
-To donate to support the development and hosting of TTS Bot and get access to TTS Bot Premium, a more stable version of this bot with more and better voices you can donate via Patreon!
+To support the development and hosting of TTS Bot and get access to TTS Bot Premium, including more modes (`/set mode`), many more voices (`/set voice`), and extra options such as TTS translation, see:
 https://www.patreon.com/Gnome_the_Bot_Maker
     ")).await.map(drop).map_err(Into::into)
 }

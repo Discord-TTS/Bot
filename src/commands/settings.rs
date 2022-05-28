@@ -362,7 +362,7 @@ where
             .url("https://www.patreon.com/Gnome_the_Bot_Maker")
             .footer(|f| f.text(ctx.gettext("If this is an error, please contact Gnome!#6669.")))
             .description(ctx.gettext("
-                The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/donate` command!
+                The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
                 If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!
             "))
         })).await?;

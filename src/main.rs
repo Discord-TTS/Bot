@@ -257,7 +257,7 @@ async fn _main() -> Result<()> {
                 commands::main::join(), commands::main::clear(), commands::main::leave(), commands::main::premium_activate(),
 
                 commands::other::tts(), commands::other::uptime(), commands::other::botstats(), commands::other::channel(),
-                commands::other::donate(), commands::other::ping(), commands::other::suggest(), commands::other::invite(),
+                commands::other::premium(), commands::other::ping(), commands::other::suggest(), commands::other::invite(),
                 commands::other::tts_speak(), commands::other::tts_speak_as(),
 
                 commands::settings::settings(),
