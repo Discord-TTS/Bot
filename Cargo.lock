@@ -220,9 +220,9 @@ dependencies = [
 
 [[package]]
 name = "const_format"
-version = "0.2.23"
+version = "0.2.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0936ffe6d0c8d6a51b3b0a73b2acbe925d786f346cf45bfddc8341d79fb7dc8a"
+checksum = "e6a1316fa6a23fea1ee41cb80321590385e5f3e575e99f77c4d918ce5d44379d"
 dependencies = [
  "const_format_proc_macros",
 ]
@@ -364,13 +364,14 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "5.3.3"
+version = "5.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "391b56fbd302e585b7a9494fb70e40949567b1cf9003a8e4a6041a1687c26573"
+checksum = "3495912c9c1ccf2e18976439f4443f3fee0fd61f424ff99fde6a66b15ecb448f"
 dependencies = [
  "cfg-if",
  "hashbrown 0.12.1",
  "lock_api",
+ "parking_lot_core 0.9.3",
  "serde",
 ]
 
@@ -754,7 +755,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtills?branch=master#98383d8ea7f20bdaa1092ce4c903cac7444e34d7"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#91ce234a9964441baa3658bc9032b7f5a2a2be10"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -889,9 +890,9 @@ checksum = "c4a1e36c821dbe04574f602848a19f742f4fb3c98d40449f11bcad18d6b17421"
 
 [[package]]
 name = "hyper"
-version = "0.14.18"
+version = "0.14.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b26ae0a80afebe130861d90abf98e3814a4f28a4c6ffeb5ab8ebb2be311e0ef2"
+checksum = "42dc3c131584288d375f2d07f822b0cb012d8c6fb899a5b9fdb3cb7eb9b6004f"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -943,9 +944,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.8.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f647032dfaa1f8b6dc29bd3edb7bbef4861b8b8007ebb118d6db284fd59f6ee"
+checksum = "e6012d540c5baa3589337a98ce73408de9b5a25ec9fc2c6fd6be8f0d39e0ca5a"
 dependencies = [
  "autocfg",
  "hashbrown 0.11.2",
@@ -1373,7 +1374,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=cutting-edge#0378aabe1c0bf783d515840872e4ba97c098890f"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#cd26855e509138e9c0748a05b93a38b8a80372d0"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1390,7 +1391,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=cutting-edge#0378aabe1c0bf783d515840872e4ba97c098890f"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#cd26855e509138e9c0748a05b93a38b8a80372d0"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1743,7 +1744,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.2"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#ab6fe76139d8614da1474a55818dd6c23f0bfc8f"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#7c1c0fe86c79f55568ad2abd07518f2e14442940"
 dependencies = [
  "async-trait",
  "async-tungstenite",

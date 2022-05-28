@@ -26,8 +26,7 @@ use lazy_static::lazy_static;
 use poise::serenity_prelude as serenity;
 use gnomeutils::{OptionGettext, OptionTryUnwrap};
 
-use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, JoinVCToken, TTSServiceError};
-use crate::traits::SerenityContextExt;
+use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError};
 use crate::require;
 
 pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> (String, bool) {
@@ -106,7 +105,7 @@ pub fn random_footer<'a>(server_invite: &str, client_id: u64, catalog: Option<&'
     match rand::thread_rng().gen_range(0..4) {
         0 => Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
         1 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
-        2 => Cow::Borrowed(catalog.gettext("If you want to support the development and hosting of TTS Bot, check out `/donate`!")),
+        2 => Cow::Borrowed(catalog.gettext("If you want to support the development and hosting of TTS Bot, check out `/premium`!")),
         3 => Cow::Borrowed(catalog.gettext("There are loads of customizable settings, check out `/help set`")),
         _ => unreachable!()
     }
@@ -171,10 +170,9 @@ fn remove_repeated_chars(content: &str, limit: usize) -> String {
 }
 
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
-pub async fn run_checks(
+pub fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
-    data: &Data,
 
     channel: u64,
     prefix: &str,
@@ -182,7 +180,7 @@ pub async fn run_checks(
     bot_ignore: bool,
     require_voice: bool,
     audience_ignore: bool,
-) -> Result<Option<String>> {
+) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
     let guild_id = require!(message.guild_id, Ok(None));
     if channel as u64 != message.channel_id.0 {
         return Ok(None)
@@ -212,36 +210,31 @@ pub async fn run_checks(
         return Ok(None)
     }
 
-    let (guild_voice_states, guild_channels) = require!(
-        ctx.cache.guild_field(guild_id, |g| {(g.voice_states.clone(), g.channels.clone())}),
-        Ok(None)
-    );
+    let guild = require!(message.guild(&ctx.cache), Ok(None));
+    let voice_state = guild.voice_states.get(&message.author.id);
 
-    let voice_state = guild_voice_states.get(&message.author.id);
+    let mut to_autojoin = None;
     if message.author.bot {
         if bot_ignore || voice_state.is_none() {
             return Ok(None) // Is bot
         }
     } else {
         // If the bot is in vc
-        if let Some(vc) = guild_voice_states.get(&ctx.cache.current_user_id()) {
+        if let Some(vc) = guild.voice_states.get(&ctx.cache.current_user_id()) {
             // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
             if require_voice && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
                 return Ok(None); // Wrong vc
             }
         // Else if the user is in the vc and autojoin is on
         } else if let Some(voice_state) = voice_state && autojoin {
-            let voice_channel = voice_state.channel_id.try_unwrap()?;
-            let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-
-            ctx.join_vc(join_vc_lock.lock().await, voice_channel).await?;
+            to_autojoin = Some(voice_state.channel_id.try_unwrap()?);
         } else {
             return Ok(None); // Bot not in vc
         };
 
         if require_voice {
             let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
-            if let serenity::Channel::Guild(channel) = guild_channels.get(&voice_channel).try_unwrap()? {
+            if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).try_unwrap()? {
                 if channel.kind == serenity::ChannelType::Stage && voice_state.map_or(false, |vs| vs.suppress) && audience_ignore {
                     return Ok(None); // Is audience
                 }
@@ -255,7 +248,7 @@ pub async fn run_checks(
         return Ok(None)
     }
 
-    Ok(Some(content))
+    Ok(Some((content, to_autojoin)))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -325,7 +318,7 @@ pub fn clean_msg(
 
     if xsaid && match last_to_xsaid.map(|i| *i) {
         None => true,
-        Some((u_id, last_time)) => cache.guild_field(guild_id, |guild| {
+        Some((u_id, last_time)) => cache.guild(guild_id).map(|guild|
             guild.voice_states.get(&member.user.id).and_then(|vs| vs.channel_id).map_or(true, |voice_channel_id|
                 (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) &&
                     // If more than 2 users in vc
@@ -336,7 +329,7 @@ pub fn clean_msg(
                         .count() > 2
                 )
             )
-        }).unwrap()
+        ).unwrap()
     } {
         if contained_url {
             write!(content, " {}",

@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::borrow::Cow;
 
+use anyhow::Error;
 use sysinfo::{SystemExt, ProcessExt};
 use num_format::{Locale, ToFormattedString};
 
@@ -43,23 +44,36 @@ pub async fn tts(
     ctx: Context<'_>,
     #[description="The text to TTS"] #[rest] message: String
 ) -> CommandResult {
-    if let poise::Context::Prefix(_) = ctx {
-        if let Some(guild) = ctx.guild() {
-            let author_voice_state = guild.voice_states.get(&ctx.author().id);
-            let bot_voice_state = guild.voice_states.get(&ctx.discord().cache.current_user_id());
-            if let (Some(bot_voice_state), Some(author_voice_state)) = (bot_voice_state, author_voice_state) {
-                if bot_voice_state.channel_id == author_voice_state.channel_id {
-                    let setup_channel = ctx.data().guilds_db.get(guild.id.into()).await?.channel;
-                    if setup_channel as u64 == ctx.channel_id().0 {
-                        ctx.say(ctx.gettext("You don't need to include the `/tts` for messages to be said!")).await?;
-                        return Ok(())
-                    }
-                }
+    let is_unnecessary_command_invoke = async {
+        if !matches!(ctx, poise::Context::Prefix(_)) {
+            return Ok(false);
+        }
+
+        let (guild_id, author_voice_cid, bot_voice_cid) = {
+            if let Some(guild) = ctx.guild() {(
+                guild.id,
+                guild.voice_states.get(&ctx.author().id).and_then(|vc| vc.channel_id),
+                guild.voice_states.get(&ctx.discord().cache.current_user_id()).and_then(|vc| vc.channel_id)
+            )} else {
+                return Ok(false)
+            }
+        };
+
+        if author_voice_cid.is_some() && author_voice_cid == bot_voice_cid {
+            let setup_channel = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
+            if setup_channel as u64 == ctx.channel_id().0 {
+                return Ok(true);
             }
         }
-    }
 
-    _tts(ctx, ctx.author(), &message).await
+        Ok::<_, Error>(false)
+    };
+
+    if is_unnecessary_command_invoke.await? {
+        ctx.say(ctx.gettext("You don't need to include the `/tts` for messages to be said!")).await.map(drop).map_err(Into::into)
+    } else {
+        _tts(ctx, ctx.author(), &message).await
+    }
 }
 
 async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> CommandResult {
@@ -121,15 +135,17 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
 
     let start_time = std::time::SystemTime::now();
 
-    let guilds_info: Vec<(u64, bool)> = ctx_discord.cache.guilds().iter()
-        .filter_map(|id| ctx_discord.cache.guild_field(id, |guild| {
-            (guild.member_count, guild.voice_states.get(&bot_user_id).is_some())
-        }))
-        .collect();
+    let (total_guild_count, total_voice_clients, total_members) = {
+        let guilds: Vec<_> = ctx_discord.cache.guilds().iter()
+            .filter_map(|id| ctx_discord.cache.guild(id))
+            .collect();
 
-    let total_guild_count = guilds_info.len();
-    let total_members = guilds_info.iter().map(|(mcount, _)| mcount).sum::<u64>().to_formatted_string(&Locale::en);
-    let total_voice_clients = guilds_info.into_iter().filter(|(_, has_vs)| *has_vs).count();
+        (
+            guilds.len(),
+            guilds.iter().filter(|g| g.voice_states.get(&bot_user_id).is_some()).count(),
+            guilds.into_iter().map(|g| g.member_count).sum::<u64>().to_formatted_string(&Locale::en),
+        )
+    };
 
     let shard_count = ctx_discord.cache.shard_count();
     let ram_usage = {
@@ -268,7 +284,7 @@ pub async fn invite(ctx: Context<'_>,) -> CommandResult {
                 .replace("{invite_channel}", &invite_channel.mention().to_string())
                 .replace("{bot_mention}", &bot_mention)
         } else {
-            ctx_discord.cache.guild_channel_field(invite_channel, |c| ctx
+            ctx_discord.cache.guild_channel(invite_channel).map(|c| ctx
                 .gettext("Join {server_invite} and look in #{channel_name} to invite <@{bot_mention}>")
                 .replace("{channel_name}", &c.name)
                 .replace("{bot_mention}", &bot_mention)

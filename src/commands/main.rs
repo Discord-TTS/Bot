@@ -47,22 +47,25 @@ async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
-    let guild = require_guild!(ctx);
+    let guild_id = ctx.guild_id().unwrap();
     if !channel_check(&ctx).await? {
         return Ok(())
     }
 
     let author = ctx.author();
+    let channel_id_opt = {
+        require_guild!(ctx).voice_states
+            .get(&author.id)
+            .and_then(|vc| vc.channel_id)
+    };
 
-    let channel_id = require!(guild.voice_states.get(&author.id).and_then(|vc| vc.channel_id), {
-        ctx.send_error(
-            ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
-            Some(ctx.gettext("join a voice channel and try again")),
-        ).await.map(drop)
-    });
+    let channel_id = require!(channel_id_opt, ctx.send_error(
+        ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
+        Some(ctx.gettext("join a voice channel and try again")),
+    ).await.map(drop));
 
     let ctx_discord = ctx.discord();
-    let member = guild.member(ctx_discord, author.id).await?;
+    let member = guild_id.member(ctx_discord, author.id).await?;
     let channel = channel_id.to_channel(ctx_discord).await?.guild().unwrap();
 
     let missing_permissions =
@@ -79,7 +82,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         ).await.map(drop).map_err(Into::into)
     }
 
-    if let Some(bot_vc) = songbird::get(ctx_discord).await.unwrap().get(guild.id) {
+    if let Some(bot_vc) = songbird::get(ctx_discord).await.unwrap().get(guild_id) {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
             if bot_channel_id.0 == channel_id.0 {
@@ -97,7 +100,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     {
         let _typing = ctx.defer_or_broadcast().await?;
 
-        let join_vc_lock = JoinVCToken::acquire(data, guild.id);
+        let join_vc_lock = JoinVCToken::acquire(data, guild_id);
         ctx_discord.join_vc(join_vc_lock.lock().await, channel_id).await?;
     }
 
@@ -126,19 +129,23 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
-    let guild = require_guild!(ctx);
     if !channel_check(&ctx).await? {
         return Ok(())
     }
 
-    let author_channel_id = guild
-        .voice_states
-        .get(&ctx.author().id)
-        .and_then(|vs| vs.channel_id)
-        .map(|vc| vc.0);
+    let (guild_id, author_channel_id) = {
+        let guild = require_guild!(ctx);
+        let channel_id = guild
+            .voice_states
+            .get(&ctx.author().id)
+            .and_then(|vs| vs.channel_id)
+            .map(|vc| vc.0);
+
+        (guild.id, channel_id)
+    };
 
     let manager = songbird::get(ctx.discord()).await.unwrap();
-    if let Some(handler) = manager.get(guild.id) {
+    if let Some(handler) = manager.get(guild_id) {
         if handler.lock().await.current_channel().map(|c| c.0) != author_channel_id {
             ctx.say(ctx.gettext("Error: You need to be in the same voice channel as me to make me leave!")).await?;
             return Ok(());
@@ -146,8 +153,8 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
 
         let data = ctx.data();
 
-        manager.remove(guild.id).await?;
-        data.last_to_xsaid_tracker.remove(&guild.id);
+        manager.remove(guild_id).await?;
+        data.last_to_xsaid_tracker.remove(&guild_id);
 
         ctx.say(ctx.gettext("Left voice channel!")).await?;
     } else {
@@ -246,9 +253,8 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
 
     ctx.say(ctx.gettext("Done! This server is now premium!")).await?;
 
-    let guild_name = ctx.discord().cache
-        .guild_field(guild_id, |g| g.name.clone())
-        .map_or(Cow::Borrowed("<Unknown>"), Cow::Owned);
+    let guild = ctx.discord().cache.guild(guild_id);
+    let guild_name = guild.as_ref().map_or("<Unknown>", |g| g.name.as_str());
 
     tracing::info!(
         "{}#{} | {} linked premium to {} | {}, they had {} linked servers",

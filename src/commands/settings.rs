@@ -64,8 +64,8 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         Cow::Borrowed(none_str)
     } else {
         ctx_discord.cache
-            .guild_channel_field(guild_row.channel as u64, |c| c.name.clone())
-            .map_or(Cow::Borrowed(none_str), Cow::Owned)
+            .guild_channel(guild_row.channel as u64)
+            .map_or(Cow::Borrowed(none_str), |c| Cow::Owned(c.name.clone()))
     };
 
     let prefix = &guild_row.prefix;
@@ -885,38 +885,44 @@ fn can_send(guild: &serenity::Guild, channel: &serenity::GuildChannel, member: &
     required_permissions="ADMINISTRATOR",
     required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
 )]
+#[allow(clippy::too_many_lines)]
 pub async fn setup(
     ctx: Context<'_>,
     #[description="The channel for the bot to read messages from"] #[channel_types("Text")]
     channel: Option<serenity::GuildChannel>
 ) -> CommandResult {
-    let guild = require_guild!(ctx);
-
+    let data = ctx.data();
     let author = ctx.author();
     let ctx_discord = ctx.discord();
     let cache = &ctx_discord.cache;
+    let guild_id = ctx.guild_id().unwrap();
 
     let (bot_user_id, bot_user_name, bot_user_face) =
         cache.current_user_field(|u| (u.id, u.name.clone(), u.face()));
 
-    let channel =
-        if let Some(channel) = channel.as_ref() {
+    let (bot_member, channel) = {
+        let bot_member = guild_id.member(ctx_discord, bot_user_id).await?;
+        let channel = if let Some(channel) = channel {
             channel
         } else {
-            let author_member = guild.member(ctx_discord, author).await?;
-            let bot_member = guild.member(ctx_discord, bot_user_id).await?;
+            let author_member = guild_id.member(ctx_discord, author).await?;
 
-            let mut text_channels: Vec<&serenity::GuildChannel> = guild.channels.values()
-                .filter_map(|c| {match c {
-                    serenity::Channel::Guild(channel) => Some(channel),
-                    _ => None
-                }})
-                .filter(|c| {
-                    c.kind == serenity::ChannelType::Text &&
-                    can_send(&guild, c, &author_member) &&
-                    can_send(&guild, c, &bot_member)
-                })
-                .collect();
+            let mut text_channels: Vec<_> = {
+                let guild = require_guild!(ctx);
+                guild.channels.iter()
+                    .map(|(_, v)| v)
+                    .filter_map(|c| match c {
+                        serenity::Channel::Guild(channel) => Some(channel),
+                        _ => None
+                    })
+                    .filter(|c| {
+                        c.kind == serenity::ChannelType::Text &&
+                        can_send(&guild, c, &author_member) &&
+                        can_send(&guild, c, &bot_member)
+                    })
+                    .cloned()
+                    .collect()
+            };
 
             if text_channels.is_empty() {
                 return ctx.say(ctx.gettext("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!")).await.map(drop).map_err(Into::into);
@@ -967,8 +973,10 @@ pub async fn setup(
             }
         };
 
-    let data = ctx.data();
-    data.guilds_db.set_one(guild.id.into(), "channel", &(channel.id.0 as i64)).await?;
+        (bot_member, channel)
+    };
+
+    data.guilds_db.set_one(guild_id.into(), "channel", &(channel.id.0 as i64)).await?;
     ctx.send(|b| b.embed(|e| e
         .title(ctx.gettext("{bot_name} has been setup!").replace("{bot_name}", &bot_user_name))
         .thumbnail(&bot_user_face)
@@ -986,10 +994,7 @@ Just do `/join` and start talking!
     )).await?;
 
     if let poise::Context::Application(_) = ctx &&
-        guild.user_permissions_in(
-            channel,
-            &guild.member(ctx_discord, ctx_discord.cache.current_user_id()).await?
-        )?.manage_webhooks() &&
+        require_guild!(ctx).user_permissions_in(&channel, &bot_member)?.manage_webhooks() &&
         confirm_dialog(ctx,
             ctx.gettext("Would you like to set up TTS Bot update announcements for the setup channel?"),
             ctx.gettext("Yes"),
@@ -997,7 +1002,7 @@ Just do `/join` and start talking!
         ).await?.unwrap_or(false)
     {
         data.config.announcements_channel.follow(ctx_discord, channel.id).await?;
-        tracing::info!("Set up announcements channel in {}", guild.id);
+        tracing::info!("Set up announcements channel in {}", guild_id);
     };
 
     Ok(())

@@ -364,17 +364,14 @@ impl serenity::EventHandler for EventHandler {
             let guild_id = new.guild_id.try_unwrap()?;
             let songbird = songbird::get(&ctx).await.unwrap();
 
-            let bot_voice_client = songbird.get(guild_id);
-            if bot_voice_client.is_some()
-                && old.is_some() && new.channel_id.is_none() // user left vc
-                && !new.member // user other than bot leaving
-                    .as_ref()
-                    .map_or(false, |m| m.user.id == bot_id)
+            if songbird.get(guild_id).is_some()
+                && let Some(old) = old && new.channel_id.is_none() // user left vc
+                && !new.member.map_or(false, |m| m.user.id == bot_id) // user other than bot leaving
                 && !ctx.cache // filter out bots from members
-                    .guild_channel(old.as_ref().unwrap().channel_id.unwrap())
+                    .guild_channel(old.channel_id.try_unwrap()?)
                     .try_unwrap()?
-                    .members(&ctx.cache).await?
-                    .iter().any(|m| !m.user.bot)
+                    .members(&ctx.cache)?
+                    .into_iter().any(|m| !m.user.bot)
             {
                 songbird.remove(guild_id).await?;
             };
@@ -504,7 +501,7 @@ Ask questions by either responding here or asking on the support server!",
 
         if
             member.guild_id != data.config.main_server &&
-            ctx.cache.guilds().into_iter().find_map(|id| ctx.cache.guild_field(id, |g| g.owner_id == member.user.id)).unwrap_or(false)
+            ctx.cache.guilds().into_iter().find_map(|id| ctx.cache.guild(id).map(|g| g.owner_id == member.user.id)).unwrap_or(false)
         {
             errors::handle_member(&ctx, framework, &member,
                 match ctx.http.add_member_role(
@@ -563,7 +560,7 @@ async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool> {
     warn!(
         "{}#{} | {} failed the premium check in {}",
         author.name, author.discriminator, author.id,
-        guild_id.and_then(|g_id| ctx_discord.cache.guild_field(g_id, |g| (
+        guild_id.and_then(|g_id| ctx_discord.cache.guild(g_id).map(|g| (
             Cow::Owned(format!("{} | {}", g.name, g_id))
         ))).unwrap_or(Cow::Borrowed("DMs"))
     );
@@ -614,11 +611,16 @@ async fn process_tts_msg(
     let voice;
 
     let mut content = match run_checks(
-        ctx, message, data,
+        ctx, message,
         channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
-    ).await? {
+    )? {
         None => return Ok(()),
-        Some(content) => {
+        Some((content, to_autojoin)) => {
+            if let Some(channel_id) = to_autojoin {
+                let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+                ctx.join_vc(join_vc_lock.lock().await, channel_id).await?;
+            }
+
             let member = guild_id.member(ctx, message.author.id.0).await?;
             (voice, mode) = data.parse_user_or_guild(message.author.id, Some(guild_id)).await?;
 
@@ -663,16 +665,10 @@ async fn process_tts_msg(
             None => {
                 // At this point, the bot is "in" the voice channel, but without a voice client,
                 // this is usually if the bot restarted but the bot is still in the vc from the last boot.
-                let voice_channel_id =
-                    ctx.cache.guild_field(
-                        guild_id,
-                        |g| g
-                            .voice_states
-                            .get(&message.author.id)
-                            .and_then(|vs| vs.channel_id)
-                    )
-                    .try_unwrap()?
-                    .try_unwrap()?;
+                let voice_channel_id = {
+                    let guild = ctx.cache.guild(guild_id).try_unwrap()?;
+                    guild.voice_states.get(&message.author.id).and_then(|vs| vs.channel_id).try_unwrap()?
+                };
 
                 let join_vc_lock = JoinVCToken::acquire(data, guild_id);
                 ctx.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
@@ -713,15 +709,14 @@ async fn process_mention_msg(
     if permissions.send_messages() {
         channel.say(ctx, format!("Current prefix for this server is: {}", prefix)).await?;
     } else {
-        let guild_name= ctx.cache
-            .guild_field(guild_id, |g| g.name.clone())
-            .map_or(Cow::Borrowed("Unknown Server"), Cow::Owned);
+        let msg = {
+            let guild = ctx.cache.guild(guild_id);
+            let guild_name = guild.as_ref().map_or("Unknown Server", |g| g.name.as_str());
 
-        let result = message.author.direct_message(ctx, |b| b.content(format!(
-            "My prefix for `{guild_name}` is {prefix} however I do not have permission to send messages so I cannot respond to your commands!",
-        ))).await;
+            format!("My prefix for `{guild_name}` is {prefix} however I do not have permission to send messages so I cannot respond to your commands!")
+        };
 
-        match result {
+        match message.author.direct_message(ctx, |b| b.content(msg)).await {
             Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
             Err(error) => return Err(anyhow::Error::from(error)),
             _ => {}
