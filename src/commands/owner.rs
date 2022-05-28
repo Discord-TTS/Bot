@@ -106,9 +106,9 @@ pub async fn purge_guilds(ctx: Context<'_>, #[flag] run: bool) -> CommandResult 
 
     let data = ctx.data();
     let ctx_discord = ctx.discord();
-    let mut setup_guilds = std::collections::HashSet::new();
+    let mut setup_guilds = std::collections::HashSet::with_capacity(ctx_discord.cache.guild_count());
 
-    let mut stream = sqlx::query_as::<_, HasGuildId>("SELECT * from guilds WHERE channel_id != 0").fetch(&data.inner.pool);
+    let mut stream = sqlx::query_as::<_, HasGuildId>("SELECT guild_id from guilds WHERE channel != 0").fetch(&data.inner.pool);
     while let Some(item) = stream.try_next().await? {
         setup_guilds.insert(item.guild_id as u64);
     }
