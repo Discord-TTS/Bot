@@ -11,6 +11,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
 
+use std::sync::atomic::Ordering::SeqCst;
+
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
@@ -99,14 +101,26 @@ pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeChoice) -> Com
     Ok(())
 }
 
+#[derive(poise::ChoiceParameter, PartialEq, Eq)]
+pub enum PurgeGuildsMode {
+    Run,
+    Check,
+    Abort,
+}
+
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn purge_guilds(ctx: Context<'_>, #[flag] run: bool) -> CommandResult {
+pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandResult {
     #[derive(sqlx::FromRow)]
     struct HasGuildId {
         guild_id: i64
     }
 
     let data = ctx.data();
+    if mode == PurgeGuildsMode::Abort {
+        data.currently_purging.store(false, SeqCst);
+        return ctx.say("Done!").await.map(drop).map_err(Into::into)
+    }
+
     let ctx_discord = ctx.discord();
     let mut setup_guilds = std::collections::HashSet::with_capacity(ctx_discord.cache.guild_count());
 
@@ -118,10 +132,16 @@ pub async fn purge_guilds(ctx: Context<'_>, #[flag] run: bool) -> CommandResult 
     let to_leave: Vec<_> = ctx_discord.cache.guilds().into_iter().filter(|g| !setup_guilds.contains(&g.0)).collect();
     let to_leave_count = to_leave.len();
 
-    if run {
+    if mode == PurgeGuildsMode::Run {
         let msg = ctx.say(format!("Leaving {to_leave_count} guilds!")).await?;
+
+        data.currently_purging.store(true, SeqCst);
         for guild in to_leave {
             guild.leave(ctx_discord).await?;
+
+            if !data.currently_purging.load(SeqCst) {
+                return msg.edit(ctx, |b| b.content("Aborted!")).await.map(drop).map_err(Into::into)
+            }
         }
 
         msg.edit(ctx, |b| b.content("Done! Left {to_leave_count} guilds!")).await.map(drop)

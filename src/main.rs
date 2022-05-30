@@ -195,6 +195,7 @@ async fn _main() -> Result<()> {
 
         join_vc_tokens: dashmap::DashMap::new(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
+        currently_purging: std::sync::atomic::AtomicBool::new(false),
 
         gtts_voices, espeak_voices, gcloud_voices, polly_voices,
 
@@ -444,6 +445,10 @@ Ask questions by either responding here or asking on the support server!",
         errors::handle_guild("GuildDelete", &ctx, framework, full.as_ref(), async_try!({
             data.guilds_db.delete(incomplete.id.into()).await?;
             if let Some(guild) = &full {
+                if data.currently_purging.load(std::sync::atomic::Ordering::SeqCst) {
+                    return Ok(());
+                }
+
                 if data.config.main_server.members(&ctx.http, None, None).await?.into_iter()
                     .filter(|m| m.roles.contains(&data.config.ofs_role))
                     .any(|m| m.user.id == guild.owner_id)

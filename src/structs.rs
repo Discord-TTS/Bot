@@ -88,6 +88,7 @@ pub struct Data {
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRow>,
 
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
+    pub currently_purging: std::sync::atomic::AtomicBool,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub start_time: std::time::SystemTime,
