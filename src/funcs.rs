@@ -101,7 +101,7 @@ pub fn prepare_gcloud_voices(raw_map: Vec<GoogleVoice>) -> BTreeMap<String, BTre
     cleaned_map
 }
 
-pub fn random_footer<'a>(server_invite: &str, client_id: u64, catalog: Option<&'a gettext::Catalog>) -> Cow<'a, str> {
+pub fn random_footer<'a>(server_invite: &str, client_id: serenity::UserId, catalog: Option<&'a gettext::Catalog>) -> Cow<'a, str> {
     match rand::thread_rng().gen_range(0..4) {
         0 => Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
         1 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
@@ -182,7 +182,7 @@ pub fn run_checks(
     audience_ignore: bool,
 ) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
     let guild_id = require!(message.guild_id, Ok(None));
-    if channel as u64 != message.channel_id.0 {
+    if channel as u64 != message.channel_id.get() {
         return Ok(None)
     }
 

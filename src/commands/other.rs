@@ -61,7 +61,7 @@ pub async fn tts(
 
         if author_voice_cid.is_some() && author_voice_cid == bot_voice_cid {
             let setup_channel = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
-            if setup_channel as u64 == ctx.channel_id().0 {
+            if setup_channel as u64 == ctx.channel_id().get() {
                 return Ok(true);
             }
         }
@@ -199,7 +199,7 @@ and can be used by {total_members} people!")
 pub async fn channel(ctx: Context<'_>,) -> CommandResult {
     let channel = ctx.data().guilds_db.get(ctx.guild_id().unwrap().into()).await?.channel;
 
-    if channel as u64 == ctx.channel_id().0 {
+    if channel as u64 == ctx.channel_id().get() {
         ctx.say(ctx.gettext("You are in the setup channel already!")).await?;
     } else if channel == 0 {
         ctx.say(ctx.gettext("The channel hasn't been setup, do `/setup #textchannel`")).await?;

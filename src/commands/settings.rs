@@ -808,8 +808,8 @@ pub async fn speaking_rate(
         } else if speaking_rate < min {
             ctx.gettext("**Error**: Cannot set the speaking rate multiplier below {min}{kind}").replace("{min}", &min.to_string())
         } else {
-            data.userinfo_db.create_row(author.id.0 as i64).await?;
-            data.user_voice_db.set_one((author.id.0 as i64, mode), "speaking_rate", &speaking_rate).await?;
+            data.userinfo_db.create_row(author.id.get() as i64).await?;
+            data.user_voice_db.set_one((author.id.get() as i64, mode), "speaking_rate", &speaking_rate).await?;
             ctx.gettext("Your speaking rate is now: {speaking_rate}{kind}").replace("{speaking_rate}", &speaking_rate.to_string())
         }
     }.replace("{kind}", kind);
@@ -976,7 +976,7 @@ pub async fn setup(
         (bot_member, channel)
     };
 
-    data.guilds_db.set_one(guild_id.into(), "channel", &(channel.id.0 as i64)).await?;
+    data.guilds_db.set_one(guild_id.into(), "channel", &(channel.id.get() as i64)).await?;
     ctx.send(|b| b.embed(|e| e
         .title(ctx.gettext("{bot_name} has been setup!").replace("{bot_name}", &bot_user_name))
         .thumbnail(&bot_user_face)
@@ -985,7 +985,7 @@ TTS Bot will now accept commands and read from <#{channel}>.
 Just do `/join` and start talking!
 ").replace("{channel}", &channel.id.0.to_string()))
         .footer(|f| f.text(random_footer(
-            &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
+            &data.config.main_server_invite, cache.current_user_id(), ctx.current_catalog()
         )))
         .author(|a| a
             .name(&author.name)
@@ -1103,7 +1103,7 @@ pub async fn voices(
 
         let random_footer = || random_footer(
             &data.config.main_server_invite,
-            ctx.discord().cache.current_user_id().into(),
+            ctx.discord().cache.current_user_id(),
             ctx.current_catalog(),
         );
 
@@ -1130,7 +1130,7 @@ pub async fn voices(
             .replace("{mode}", mode.into())
         ))
         .footer(|f| f.text(random_footer(
-            &data.config.main_server_invite, cache.current_user_id().0, ctx.current_catalog()
+            &data.config.main_server_invite, cache.current_user_id(), ctx.current_catalog()
         )))
         .author(|a| a
             .name(author.name.clone())

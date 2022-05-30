@@ -31,7 +31,7 @@ use once_cell::sync::OnceCell;
 use tracing::{error, info, warn};
 
 use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt};
-use poise::serenity_prelude::{self as serenity, Mentionable as _}; // re-exports a lot of serenity with shorter paths
+use poise::serenity_prelude::{self as serenity, Mentionable as _, json::prelude as json};
 use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
 
 mod migration;
@@ -151,10 +151,10 @@ async fn _main() -> Result<()> {
         create_db_handler!(pool.clone(), "guild_voice", "guild_id", "mode"),
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
         get_webhooks(&http, webhooks),
-        async {serenity::UserId(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
+        async {serenity::UserId::new(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
         async {Ok(TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
         async {Ok(TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
-        async {Ok(prepare_gcloud_voices(serenity::json::prelude::from_slice(&TTSMode::gCloud
+        async {Ok(prepare_gcloud_voices(json::from_slice(&TTSMode::gCloud
             .fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?
         )?))},
         async {Ok(TTSMode::Polly
@@ -172,8 +172,8 @@ async fn _main() -> Result<()> {
 
     let logger = logging::WebhookLogger::new(
         http,
-        "TTS-Webhook",
         "discord_tts_bot",
+        "TTS-Webhook",
         tracing::Level::from_str(&main.log_level)?,
         webhooks.logs.clone(),
         webhooks.errors.as_ref().unwrap().clone(),
@@ -422,7 +422,7 @@ Ask questions by either responding here or asking on the support server!",
 
             match ctx.http.add_member_role(
                 data.config.main_server.into(),
-                owner.id.0,
+                owner.id.get(),
                 data.config.ofs_role.into(),
                 None
             ).await {
@@ -449,9 +449,9 @@ Ask questions by either responding here or asking on the support server!",
                     .any(|m| m.user.id == guild.owner_id)
                 {
                     ctx.http.remove_member_role(
-                        data.config.main_server.0,
-                        guild.owner_id.0,
-                        data.config.ofs_role.0,
+                        data.config.main_server.get(),
+                        guild.owner_id.get(),
+                        data.config.ofs_role.get(),
                         None
                     ).await?;
                 }
@@ -505,9 +505,9 @@ Ask questions by either responding here or asking on the support server!",
         {
             errors::handle_member(&ctx, framework, &member,
                 match ctx.http.add_member_role(
-                    data.config.main_server.0,
-                    member.user.id.0,
-                    data.config.ofs_role.0,
+                    data.config.main_server.get(),
+                    member.user.id.get(),
+                    data.config.ofs_role.get(),
                     None
                 ).await {
                     Err(err) => {
@@ -794,21 +794,21 @@ async fn process_support_dm(
                         .content(&message.content)
                         .username(webhook_username)
                         .avatar_url(message.author.face())
-                        .embeds(message.embeds.iter().map(|e| serenity::json::prelude::to_value(e).unwrap()).collect())
+                        .embeds(message.embeds.iter().map(|e| json::to_value(e).unwrap()).collect())
                     }).await?;
                 }
             } else {
-                let welcome_msg = channel.send_message(&ctx.http, |b| {b.embed(|e| {e
+                let welcome_msg = channel.send_message(&ctx.http, |b| b.embed(|e| e
                     .title(ctx.cache.current_user_field(|b| format!(
                         "Welcome to {} Support DMs!", b.name
                     )))
                     .description(DM_WELCOME_MESSAGE)
                     .footer(|f| f.text(random_footer(
                         &data.config.main_server_invite,
-                        ctx.cache.current_user_id().0,
+                        ctx.cache.current_user_id(),
                         data.default_catalog(),
                     )))
-                })}).await?;
+                )).await?;
 
                 data.userinfo_db.set_one(message.author.id.into(), "dm_welcomed", &true).await?;
                 if channel.pins(&ctx.http).await?.len() < 50 {

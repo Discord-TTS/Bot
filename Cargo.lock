@@ -567,13 +567,11 @@ checksum = "77f3309417938f28bf8228fcff79a4a37103981e3e186d2ccd19c74b38f4eb71"
 
 [[package]]
 name = "flate2"
-version = "1.0.23"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b39522e96686d38f4bc984b9198e3a0613264abaebaff2c5c918bfa6b6da09af"
+checksum = "f82b0f4c27ad9f8bfd1f3208d882da2b09c301bc1c828fd3a00d0216d2fbbff6"
 dependencies = [
- "cfg-if",
  "crc32fast",
- "libc",
  "miniz_oxide",
 ]
 
@@ -755,7 +753,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#91ce234a9964441baa3658bc9032b7f5a2a2be10"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#9425e1a4d63a7aa68a3d835bfd5a301283e15e98"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -1374,7 +1372,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#cd26855e509138e9c0748a05b93a38b8a80372d0"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#a0e2161ccc73f028686ff886a5f4655c92caec00"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1391,7 +1389,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#cd26855e509138e9c0748a05b93a38b8a80372d0"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#a0e2161ccc73f028686ff886a5f4655c92caec00"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1744,7 +1742,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.2"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#7c1c0fe86c79f55568ad2abd07518f2e14442940"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#c32c35ed69278871bdf9f291748aa41d883a2fa5"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1774,7 +1772,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#eb8a25c7c8865dfb16d605089c327c842bf65683"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#c32c35ed69278871bdf9f291748aa41d883a2fa5"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -1848,7 +1846,7 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.2"
-source = "git+https://github.com/serenity-rs/songbird?branch=next#49c33461029f5c3a22e12e3d251319237d73b4a4"
+source = "git+https://github.com/GnomedDev/songbird?branch=personal#14d0d42605d472d71243daa9b6823623d9e531c5"
 dependencies = [
  "async-trait",
  "async-tungstenite",

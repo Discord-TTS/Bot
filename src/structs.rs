@@ -132,9 +132,9 @@ impl Data {
             None => return Ok(Some(FailurePoint::Guild))
         };
 
-        let guild_row = self.guilds_db.get(guild_id.0 as i64).await?;
+        let guild_row = self.guilds_db.get(guild_id.get() as i64).await?;
         if let Some(raw_user_id) = guild_row.premium_user {
-            let patreon_user_id = serenity::UserId(raw_user_id as u64);
+            let patreon_user_id = serenity::UserId::new(raw_user_id as u64);
             if self.fetch_patreon_info(patreon_user_id).await?.is_some() {
                 Ok(None)
             } else {

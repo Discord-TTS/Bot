@@ -18,7 +18,7 @@ pub trait PoiseContextExt {
 impl PoiseContextExt for Context<'_> {
     async fn neutral_colour(&self) -> u32 {
         if let Some(guild_id) = self.guild_id() {
-            let row = self.data().guilds_db.get(guild_id.0 as i64).await;
+            let row = self.data().guilds_db.get(guild_id.get() as i64).await;
             if row.map(|row| row.voice_mode).map_or(false, TTSMode::is_premium) {
                 return PREMIUM_NEUTRAL_COLOUR
             }

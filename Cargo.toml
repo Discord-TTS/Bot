@@ -62,9 +62,9 @@ features = ["cache"]
 branch = "personal"
 
 [dependencies.songbird]
-git = "https://github.com/serenity-rs/songbird"
+git = "https://github.com/GnomedDev/songbird"
 features = ["builtin-queue"]
-branch = "next"
+branch = "personal"
 
 [patch."https://github.com/serenity-rs/serenity"]
 serenity = {git = "https://github.com/GnomedDev/serenity", branch = "personal"}

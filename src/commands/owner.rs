@@ -15,6 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
 
+use gnomeutils::OptionTryUnwrap;
+
 use crate::structs::{Context, CommandResult, Result, TTSModeChoice};
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
@@ -110,7 +112,7 @@ pub async fn purge_guilds(ctx: Context<'_>, #[flag] run: bool) -> CommandResult 
 
     let mut stream = sqlx::query_as::<_, HasGuildId>("SELECT guild_id from guilds WHERE channel != 0").fetch(&data.inner.pool);
     while let Some(item) = stream.try_next().await? {
-        setup_guilds.insert(item.guild_id as u64);
+        setup_guilds.insert(std::num::NonZeroU64::new(item.guild_id as u64).try_unwrap()?);
     }
 
     let to_leave: Vec<_> = ctx_discord.cache.guilds().into_iter().filter(|g| !setup_guilds.contains(&g.0)).collect();
@@ -156,13 +158,23 @@ pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
     let mut added_role = 0;
     for member in should_be_ofs_members {
         added_role += 1;
-        http.add_member_role(support_guild_id.0, member.0, data.config.ofs_role.0, None).await?;
+        http.add_member_role(
+            support_guild_id.get(),
+            member.get(),
+            data.config.ofs_role.get(),
+            None
+        ).await?;
     }
 
     let mut removed_role = 0;
     for member in should_not_be_ofs_members {
         removed_role += 1;
-        http.remove_member_role(support_guild_id.0, member.0, data.config.ofs_role.0, None).await?;
+        http.remove_member_role(
+            support_guild_id.get(),
+            member.get(),
+            data.config.ofs_role.get(),
+            None
+        ).await?;
     }
 
     ctx.say(format!("Done! Removed {removed_role} members and added {added_role} members!")).await?;

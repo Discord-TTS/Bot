@@ -28,7 +28,7 @@ async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
     let guild_id = ctx.guild_id().unwrap();
     let channel_id = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
 
-    if channel_id == ctx.channel_id().0 as i64 {
+    if channel_id == ctx.channel_id().get() as i64 {
         Ok(true)
     } else {
         ctx.send_error(
@@ -114,7 +114,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 .icon_url(author.face())
             })
             .footer(|f| f.text(random_footer(
-                &data.config.main_server_invite, ctx_discord.cache.current_user_id().0, ctx.current_catalog()
+                &data.config.main_server_invite, ctx_discord.cache.current_user_id(), ctx.current_catalog()
             )))
         )
     )
@@ -214,7 +214,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     }
 
     let author = ctx.author();
-    let author_id = ctx.author().id.0 as i64;
+    let author_id = ctx.author().id.get() as i64;
 
     let linked_guilds: i64 = sqlx::query("SELECT count(*) FROM guilds WHERE premium_user = $1")
         .bind(&author_id)
