@@ -436,7 +436,7 @@ dependencies = [
  "md-5",
  "num-format",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "poise",
  "rand",
  "regex",
@@ -753,13 +753,15 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#9425e1a4d63a7aa68a3d835bfd5a301283e15e98"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#becd3f31e74b5c4b559277d65c774ab06ac174d5"
 dependencies = [
  "anyhow",
  "dashmap",
  "gettext",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "poise",
+ "reqwest",
+ "serde",
  "sha2",
  "sqlx",
  "sysinfo",
@@ -1113,9 +1115,9 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniz_oxide"
-version = "0.5.1"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2b29bd4bc3f33391105ebee3589c19197c4271e3e5a9ec9bfe8127eeff8f082"
+checksum = "6f5c75688da582b8ffc1f1799e9db273f32133c49e048f614d22ec3256773ccc"
 dependencies = [
  "adler",
 ]
@@ -1257,9 +1259,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87f5ec2493a61ac0506c0f4199f99070cbe83857b0337006a30f3e6719b8ef58"
+checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
 dependencies = [
  "lock_api",
  "parking_lot_core 0.9.3",
@@ -1742,7 +1744,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.2"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#c32c35ed69278871bdf9f291748aa41d883a2fa5"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#8d905bf93733bc5204c72f3460cd53a83766708b"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1756,7 +1758,7 @@ dependencies = [
  "futures",
  "mime",
  "mime_guess",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "percent-encoding",
  "reqwest",
  "serde",
@@ -1772,7 +1774,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#c32c35ed69278871bdf9f291748aa41d883a2fa5"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#8d905bf93733bc5204c72f3460cd53a83766708b"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -1857,7 +1859,7 @@ dependencies = [
  "discortp",
  "flume",
  "futures",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "pin-project",
  "rand",
  "serde",
@@ -2150,7 +2152,7 @@ dependencies = [
  "mio",
  "num_cpus",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",

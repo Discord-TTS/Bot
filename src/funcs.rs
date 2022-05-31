@@ -29,17 +29,13 @@ use gnomeutils::{OptionGettext, OptionTryUnwrap};
 use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError};
 use crate::require;
 
-pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> (String, bool) {
+pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
     let mut status: Vec<_> = shards.iter()
         .map(|(id, shard)| (id, format!("Shard {id}: `{}`", shard.stage)))
         .collect();
 
     status.sort_unstable_by_key(|(id, _)| *id);
-
-    (
-        status.into_iter().map(|(_, status)| status).join("\n"),
-        shards.values().any(|shard| shard.stage.is_connecting())
-    )
+    status.into_iter().map(|(_, status)| status).join("\n")
 }
 
 

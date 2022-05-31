@@ -13,6 +13,7 @@ pub use anyhow::{Error, Result};
 pub struct Config {
     #[serde(rename="Main")] pub main: MainConfig,
     #[serde(rename="Webhook-Info")] pub webhooks: WebhookConfigRaw,
+    #[serde(rename="Bot-List-Tokens")] #[serde(default)] pub bot_list_tokens: gnomeutils::BotListTokens,
 }
 
 #[derive(serde::Deserialize)]
@@ -98,6 +99,7 @@ pub struct Data {
     pub config: MainConfig,
 
     pub inner: gnomeutils::GnomeData,
+    pub bot_list_tokens: gnomeutils::BotListTokens,
 
     pub espeak_voices: Vec<String>,
     pub gtts_voices: BTreeMap<String, String>,
@@ -268,7 +270,7 @@ impl Default for TTSMode {
     }
 }
 
-#[derive(poise::ChoiceParameter)]
+#[derive(poise::ChoiceParameter, Clone, Copy)]
 #[allow(non_camel_case_types)]
 pub enum TTSModeChoice {
     // Name to show in slash command invoke           Aliases for prefix

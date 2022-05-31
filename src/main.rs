@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#![feature(let_chains)]
+#![feature(let_chains, must_not_suspend)]
 
-#![warn(rust_2018_idioms)]
+#![warn(rust_2018_idioms, missing_copy_implementations, must_not_suspend, noop_method_call, unused)]
 #![warn(clippy::pedantic)]
 
 // clippy::pedantic complains about u64 -> i64 and back when db conversion, however it is fine
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
 #![allow(clippy::unreadable_literal)]
 
-use std::{borrow::Cow, collections::BTreeMap, path::Path, str::FromStr, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, path::Path, str::FromStr, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 
 use anyhow::Ok;
 use sysinfo::SystemExt;
@@ -88,7 +88,7 @@ async fn _main() -> Result<()> {
     let start_time = std::time::SystemTime::now();
     std::env::set_var("RUST_LIB_BACKTRACE", "1");
 
-    let (pool, mut main, webhooks) = {
+    let (pool, mut config) = {
         let mut config_toml: toml::Value = std::fs::read_to_string("config.toml")?.parse()?;
         let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
 
@@ -109,8 +109,8 @@ async fn _main() -> Result<()> {
 
         migration::run(&mut config_toml, &pool).await?;
 
-        let Config{main, webhooks} = config_toml.try_into()?;
-        (pool, main, webhooks)
+        let config: Config = config_toml.try_into()?;
+        (pool, config)
     };
 
     let filter_entry = |to_check| move |entry: &std::fs::DirEntry| entry
@@ -137,8 +137,8 @@ async fn _main() -> Result<()> {
             .collect();
 
     let reqwest = reqwest::Client::new();
-    let auth_key = main.tts_service_auth_key.as_deref();
-    let http = serenity::Http::new(main.token.as_deref().unwrap());
+    let auth_key = config.main.tts_service_auth_key.as_deref();
+    let http = serenity::Http::new(config.main.token.as_deref().unwrap());
 
     let (
         guilds_db, userinfo_db, user_voice_db, guild_voice_db, nickname_db,
@@ -150,15 +150,15 @@ async fn _main() -> Result<()> {
         create_db_handler!(pool.clone(), "user_voice", "user_id", "mode"),
         create_db_handler!(pool.clone(), "guild_voice", "guild_id", "mode"),
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
-        get_webhooks(&http, webhooks),
+        get_webhooks(&http, config.webhooks),
         async {serenity::UserId::new(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
-        async {Ok(TTSMode::gTTS.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
-        async {Ok(TTSMode::eSpeak.fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
+        async {Ok(TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
+        async {Ok(TTSMode::eSpeak.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
         async {Ok(prepare_gcloud_voices(json::from_slice(&TTSMode::gCloud
-            .fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?
+            .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?
         )?))},
         async {Ok(TTSMode::Polly
-            .fetch_voices(main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<PollyVoice>>().await?
+            .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<PollyVoice>>().await?
             .into_iter().map(|v| (v.id.clone(), v)).collect::<BTreeMap<String, PollyVoice>>())
         },
     )?;
@@ -174,7 +174,7 @@ async fn _main() -> Result<()> {
         http,
         "discord_tts_bot",
         "TTS-Webhook",
-        tracing::Level::from_str(&main.log_level)?,
+        tracing::Level::from_str(&config.main.log_level)?,
         webhooks.logs.clone(),
         webhooks.errors.as_ref().unwrap().clone(),
     );
@@ -182,24 +182,25 @@ async fn _main() -> Result<()> {
     tracing::subscriber::set_global_default(logger.clone())?;
     tokio::spawn(logger.0.start());
 
-    let token = main.token.take().unwrap();
+    let token = config.main.token.take().unwrap();
     let bot_id = serenity::utils::parse_token(&token).unwrap().0;
 
     let data = Data {
+        bot_list_tokens: config.bot_list_tokens,
         inner: gnomeutils::GnomeData {
             pool, translations,
             error_webhook: webhooks.errors.take().unwrap(),
-            main_server_invite: main.main_server_invite.clone(),
+            main_server_invite: config.main.main_server_invite.clone(),
             system_info: parking_lot::Mutex::new(sysinfo::System::new()),
         },
 
         join_vc_tokens: dashmap::DashMap::new(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
-        currently_purging: std::sync::atomic::AtomicBool::new(false),
+        currently_purging: AtomicBool::new(false),
 
         gtts_voices, espeak_voices, gcloud_voices, polly_voices,
 
-        config: main, reqwest, premium_avatar_url,
+        config: config.main, reqwest, premium_avatar_url,
         analytics, webhooks, start_time, startup_message,
         guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
     };
@@ -219,7 +220,7 @@ async fn _main() -> Result<()> {
             | serenity::GatewayIntents::MESSAGE_CONTENT,
         )
         .client_settings(move |f| f
-            .event_handler(EventHandler {bot_id, framework: framework_oc_clone})
+            .event_handler(EventHandler {bot_id, framework: framework_oc_clone, fully_started: AtomicBool::new(false)})
             .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
         )
         .options(poise::FrameworkOptions {
@@ -330,6 +331,7 @@ async fn _main() -> Result<()> {
 
 struct EventHandler {
     bot_id: serenity::UserId,
+    fully_started: AtomicBool,
     framework: Arc<OnceCell<Arc<Framework>>>
 }
 impl EventHandler {
@@ -398,7 +400,7 @@ impl serenity::EventHandler for EventHandler {
             );
 
             let owner = owner?;
-            match owner.direct_message(&ctx, |b| {b.embed(|e| {e
+            match owner.direct_message(&ctx, |b| b.embed(|e| e
                 .title(ctx.cache.current_user_field(|b| format!("Welcome to {}!", b.name)))
                 .description(format!("
 Hello! Someone invited me to your server `{}`!
@@ -413,9 +415,9 @@ Then, you can just type normal messages and I will say them, like magic!
 You can view all the commands with `-help`
 Ask questions by either responding here or asking on the support server!",
                 guild.name))
-                .footer(|f| {f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite))})
-                .author(|a| {a.name(format!("{}#{}", &owner.name, &owner.id)); a.icon_url(owner.face())})
-            })}).await {
+                .footer(|f| f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
+                .author(|a| a.name(format!("{}#{}", &owner.name, &owner.id)).icon_url(owner.face()))
+            )).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
                 Err(error) => return Err(anyhow::Error::from(error)),
                 _ => {}
@@ -427,7 +429,7 @@ Ask questions by either responding here or asking on the support server!",
                 data.config.ofs_role.into(),
                 None
             ).await {
-                Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => {return Ok(())},
+                Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => return Ok(()),
                 Err(err) => return Err(anyhow::Error::from(err)),
                 Result::Ok(_) => (),
             }
@@ -445,7 +447,7 @@ Ask questions by either responding here or asking on the support server!",
         errors::handle_guild("GuildDelete", &ctx, framework, full.as_ref(), async_try!({
             data.guilds_db.delete(incomplete.id.into()).await?;
             if let Some(guild) = &full {
-                if data.currently_purging.load(std::sync::atomic::Ordering::SeqCst) {
+                if data.currently_purging.load(Ordering::SeqCst) {
                     return Ok(());
                 }
 
@@ -480,21 +482,32 @@ Ask questions by either responding here or asking on the support server!",
         let framework = require!(self.framework().await);
         let data = framework.user_data;
 
+        let last_shard = (ctx.shard_id + 1) == ctx.cache.shard_count();
         errors::handle_unexpected_default(&ctx, framework, "Ready", async_try!({
             let user_name = &data_about_bot.user.name;
-            let (status, starting) = generate_status(&*framework.shard_manager.lock().await.runners.lock().await);
+            let status = generate_status(&*framework.shard_manager.lock().await.runners.lock().await);
 
             data.webhooks.logs.edit_message(&ctx.http, data.startup_message, |m| {m
                 .content("")
                 .embeds(vec![serenity::Embed::fake(|e| {e
                     .description(status)
                     .colour(FREE_NEUTRAL_COLOUR)
-                    .title(
-                        if starting {format!("{user_name} is starting up!")}
-                        else {format!("{user_name} started in {} seconds", data.start_time.elapsed().unwrap().as_secs())
+                    .title(if last_shard {
+                        format!("{user_name} started in {} seconds", data.start_time.elapsed().unwrap().as_secs())
+                    } else {
+                        format!("{user_name} is starting up!")
                     })
                 })])
             }).await?;
+
+            if last_shard && !self.fully_started.load(Ordering::SeqCst) {
+                self.fully_started.store(true, Ordering::SeqCst);
+                let stats_updater = Arc::new(gnomeutils::BotListUpdater::new(
+                    data.reqwest.clone(), ctx.cache.clone(), data.bot_list_tokens.clone()
+                ));
+
+                tokio::spawn(stats_updater.start());
+            }
 
             Ok(())
         })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
