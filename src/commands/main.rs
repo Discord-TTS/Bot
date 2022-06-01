@@ -109,10 +109,10 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
             .title(ctx.gettext("Joined your voice channel!"))
             .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
             .thumbnail(&ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
-            .author(|a| {a
+            .author(|a| a
                 .name(member.display_name().into_owned())
                 .icon_url(author.face())
-            })
+            )
             .footer(|f| f.text(random_footer(
                 &data.config.main_server_invite, ctx_discord.cache.current_user_id(), ctx.current_catalog()
             )))

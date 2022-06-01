@@ -46,8 +46,8 @@ impl SerenityContextExt for serenity::Context {
         }
 
         let re_match = ID_IN_BRACKETS_REGEX.captures(dm_name)?;
-        let user_id: u64 = re_match.get(1)?.as_str().parse().ok()?;
-        self.http.get_user(user_id).await.ok()
+        let user_id: serenity::UserId = re_match.get(1)?.as_str().parse().ok()?;
+        user_id.to_user(self).await.ok()
     }
 
     async fn join_vc(

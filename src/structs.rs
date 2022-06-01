@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 
 use strum_macros::IntoStaticStr;
+use serde::Deserialize as _;
 
 use poise::serenity_prelude as serenity;
 use tracing::warn;
@@ -341,25 +342,8 @@ into_static_display!(GoogleGender);
 into_static_display!(PollyGender);
 
 
-fn deserialize_error_code<'de, D: serde::Deserializer<'de>>(to_deserialize: D) -> Result<TTSServiceErrorCode, D::Error> {
-    struct IntVisitor {}
-    impl<'de> serde::de::Visitor<'de> for IntVisitor {
-        type Value = u8;
-        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            formatter.write_str("a number between 0 and 255")
-        }
-
-        #[allow(clippy::cast_possible_truncation)]
-        fn visit_u64<E: serde::de::Error>(self, value: u64) -> Result<Self::Value, E> {
-            if value > 255 {
-                Err(E::custom(format!("{value} is too large")))
-            } else {
-                Ok(value as u8)
-            }
-        }
-    }
-
-    Ok(match to_deserialize.deserialize_u8(IntVisitor {})? {
+fn deserialize_error_code<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<TTSServiceErrorCode, D::Error> {
+    u8::deserialize(deserializer).map(|code| match code {
         1 => TTSServiceErrorCode::UnknownVoice,
         2 => TTSServiceErrorCode::AudioTooLong,
         3 => TTSServiceErrorCode::InvalidSpeakingRate,

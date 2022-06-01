@@ -1374,7 +1374,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#a0e2161ccc73f028686ff886a5f4655c92caec00"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#238001f807dcefcee0132491f4fa7f8a32a24e73"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1391,7 +1391,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#a0e2161ccc73f028686ff886a5f4655c92caec00"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#238001f807dcefcee0132491f4fa7f8a32a24e73"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1744,7 +1744,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.2"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#0760a4f32ae185c8c2d783bc1b830a8ebb355846"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#d8678c65fe719853dea50a02cae4f2edbf2b8ae6"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1774,7 +1774,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#0760a4f32ae185c8c2d783bc1b830a8ebb355846"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#d8678c65fe719853dea50a02cae4f2edbf2b8ae6"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -1848,7 +1848,7 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.2"
-source = "git+https://github.com/GnomedDev/songbird?branch=personal#2b8c14da7ce7fe3b11c5bf80687d298cf631b02c"
+source = "git+https://github.com/GnomedDev/songbird?branch=personal#148daa2be4c4433fac276c4adb62ae0d6c325705"
 dependencies = [
  "async-trait",
  "async-tungstenite",

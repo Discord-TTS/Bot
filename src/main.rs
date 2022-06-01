@@ -528,17 +528,8 @@ Ask questions by either responding here or asking on the support server!",
                     data.config.ofs_role.get(),
                     None
                 ).await {
-                    Err(err) => {
-                        if let serenity::Error::Http(err) = &err {
-                            if let serenity::HttpError::UnsuccessfulRequest(err) = &**err {
-                                if err.error.code == 10007 { // Unknown member
-                                    return
-                                }
-                            }
-                        }
-
-                        Err(err)
-                    },
+                    // Unknown member
+                    Err(serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(err))) if err.error.code == 10007 => return,
                     r => r
                 }
             ).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
