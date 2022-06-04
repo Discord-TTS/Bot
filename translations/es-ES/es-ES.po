@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-05-16 20:19+0000\n"
-"PO-Revision-Date: 2022-05-16 21:20\n"
+"PO-Revision-Date: 2022-06-04 11:31\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -79,11 +79,11 @@ msgstr "¡Hola, este servidor ya es prémium!"
 
 #: src/commands/main.rs:221
 msgid "Hey, you already have {server_count} servers linked, you are only subscribed to the {entitled_servers} tier!"
-msgstr ""
+msgstr "¡Hola, ya tienes {server_count} servidores enlazados, solo estás suscrito al nivel {entitled_servers}!"
 
 #: src/commands/main.rs:229
 msgid "Hey, you are not subscribed on Patreon!"
-msgstr ""
+msgstr "¡Oye, no estás suscrito a Patreon!"
 
 #: src/commands/main.rs:247
 msgid "Done! This server is now premium!"
@@ -161,7 +161,7 @@ msgstr ""
 
 #: src/commands/other.rs:182
 msgid "You are in the setup channel already!"
-msgstr ""
+msgstr "¡Ya estás en el canal de configuración!"
 
 #: src/commands/other.rs:184
 msgid "The channel hasn't been setup, do `/setup #textchannel`"
