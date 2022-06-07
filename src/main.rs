@@ -171,7 +171,7 @@ async fn _main() -> Result<()> {
     ).await?.unwrap().id;
 
     let logger = logging::WebhookLogger::new(
-        http,
+        Arc::new(http),
         "discord_tts_bot",
         "TTS-Webhook",
         tracing::Level::from_str(&config.main.log_level)?,
@@ -334,6 +334,7 @@ struct EventHandler {
     fully_started: AtomicBool,
     framework: Arc<OnceCell<Arc<Framework>>>
 }
+
 impl EventHandler {
     async fn framework(&self) -> Option<FrameworkContext<'_>> {
         match self.framework.get() {
