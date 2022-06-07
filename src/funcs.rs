@@ -179,7 +179,14 @@ pub fn run_checks(
 ) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
     let guild_id = require!(message.guild_id, Ok(None));
     if channel as u64 != message.channel_id.get() {
-        return Ok(None)
+        // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
+        // checking if the message's channel_id is the author's voice channel_id
+        let guild = require!(message.guild(&ctx.cache), Ok(None));
+        let author_vc = guild.voice_states.get(&message.author.id).and_then(|c| c.channel_id);
+
+        if author_vc.map_or(true, |author_vc| author_vc != message.channel_id) {
+            return Ok(None)
+        }
     }
 
     let mut content = serenity::content_safe(&ctx.cache, &message.content,

@@ -21,14 +21,15 @@ use poise::serenity_prelude as serenity;
 use gnomeutils::{PoiseContextExt as _, require, require_guild};
 
 use crate::structs::{Context, Result, CommandResult, TTSMode, JoinVCToken};
-use crate::traits::SerenityContextExt;
+use crate::traits::{SerenityContextExt, PoiseContextExt};
 use crate::funcs::random_footer;
 
-async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
+async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>) -> Result<bool> {
     let guild_id = ctx.guild_id().unwrap();
-    let channel_id = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
+    let setup_id = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
 
-    if channel_id == ctx.channel_id().get() as i64 {
+    let channel_id = ctx.channel_id();
+    if setup_id == channel_id.get() as i64 || author_vc == Some(channel_id) {
         Ok(true)
     } else {
         ctx.send_error(
@@ -47,26 +48,21 @@ async fn channel_check(ctx: &Context<'_>) -> Result<bool> {
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
-    let guild_id = ctx.guild_id().unwrap();
-    if !channel_check(&ctx).await? {
-        return Ok(())
-    }
-
-    let author = ctx.author();
-    let channel_id_opt = {
-        require_guild!(ctx).voice_states
-            .get(&author.id)
-            .and_then(|vc| vc.channel_id)
-    };
-
-    let channel_id = require!(channel_id_opt, ctx.send_error(
+    let author_vc = require!(ctx.author_vc(), ctx.send_error(
         ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
         Some(ctx.gettext("join a voice channel and try again")),
     ).await.map(drop));
 
+    if !channel_check(&ctx, Some(author_vc)).await? {
+        return Ok(())
+    }
+
+    let author = ctx.author();
     let ctx_discord = ctx.discord();
+    let guild_id = ctx.guild_id().unwrap();
+
     let member = guild_id.member(ctx_discord, author.id).await?;
-    let channel = channel_id.to_channel(ctx_discord).await?.guild().unwrap();
+    let channel = author_vc.to_channel(ctx_discord).await?.guild().unwrap();
 
     let missing_permissions =
         (serenity::Permissions::VIEW_CHANNEL | serenity::Permissions::CONNECT | serenity::Permissions::SPEAK) -
@@ -85,7 +81,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     if let Some(bot_vc) = songbird::get(ctx_discord).await.unwrap().get(guild_id) {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
-            if bot_channel_id.0 == channel_id.0 {
+            if bot_channel_id.0 == author_vc.0 {
                 ctx.say(ctx.gettext("I am already in your voice channel!")).await?;
                 return Ok(());
             };
@@ -101,7 +97,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         let _typing = ctx.defer_or_broadcast().await?;
 
         let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-        ctx_discord.join_vc(join_vc_lock.lock().await, channel_id).await?;
+        ctx_discord.join_vc(join_vc_lock.lock().await, author_vc).await?;
     }
 
     ctx.send(|m|
@@ -117,9 +113,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 &data.config.main_server_invite, ctx_discord.cache.current_user_id(), ctx.current_catalog()
             )))
         )
-    )
-    .await?;
-    Ok(())
+    ).await.map(drop).map_err(Into::into)
 }
 
 /// Leaves voice channel TTS Bot is in!
@@ -129,34 +123,36 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
-    if !channel_check(&ctx).await? {
-        return Ok(())
-    }
-
-    let (guild_id, author_channel_id) = {
+    let (guild_id, author_vc) = {
         let guild = require_guild!(ctx);
         let channel_id = guild
             .voice_states
             .get(&ctx.author().id)
-            .and_then(|vs| vs.channel_id)
-            .map(|vc| vc.0);
+            .and_then(|vs| vs.channel_id);
 
         (guild.id, channel_id)
     };
 
     let manager = songbird::get(ctx.discord()).await.unwrap();
-    if let Some(handler) = manager.get(guild_id) {
-        if handler.lock().await.current_channel().map(|c| c.0) != author_channel_id {
-            ctx.say(ctx.gettext("Error: You need to be in the same voice channel as me to make me leave!")).await?;
-            return Ok(());
+    let bot_vc = {
+        if let Some(handler) = manager.get(guild_id) {
+            handler.lock().await.current_channel()
+        } else {
+            None
         }
+    };
 
-        let data = ctx.data();
+    if let Some(bot_vc) = bot_vc {
+        if !channel_check(&ctx, author_vc).await? {
 
-        manager.remove(guild_id).await?;
-        data.last_to_xsaid_tracker.remove(&guild_id);
+        } else if author_vc.map_or(true, |author_vc| bot_vc.0 != author_vc.0) {
+            ctx.say(ctx.gettext("Error: You need to be in the same voice channel as me to make me leave!")).await?;
+        } else {
+            manager.remove(guild_id).await?;
+            ctx.data().last_to_xsaid_tracker.remove(&guild_id);
 
-        ctx.say(ctx.gettext("Left voice channel!")).await?;
+            ctx.say(ctx.gettext("Left voice channel!")).await?;
+        }
     } else {
         ctx.say(ctx.gettext("Error: How do I leave a voice channel if I am not in one?")).await?;
     }
@@ -172,7 +168,7 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES | ADD_REACTIONS"
 )]
 pub async fn clear(ctx: Context<'_>) -> CommandResult {
-    if !channel_check(&ctx).await? {
+    if !channel_check(&ctx, ctx.author_vc()).await? {
         return Ok(())
     }
 
