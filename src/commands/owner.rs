@@ -11,21 +11,19 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
 
-use std::sync::atomic::Ordering::SeqCst;
-
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
 
+use std::sync::atomic::Ordering::SeqCst;
+
+use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
 use gnomeutils::OptionTryUnwrap;
 
 use crate::structs::{Context, CommandResult, Result, TTSModeChoice};
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
-    poise::samples::register_application_commands(ctx, global).await?;
-
-    Ok(())
+    poise::samples::register_application_commands(ctx, global).await.map_err(Into::into)
 }
 
 #[poise::command(prefix_command, hide_in_help, owners_only)]
