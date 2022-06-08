@@ -55,6 +55,7 @@ pub const DB_SETUP_QUERY: &str = "
         guild_id        bigint      PRIMARY KEY,
         channel         bigint      DEFAULT 0,
         premium_user    bigint,
+        required_role   bigint,
         xsaid           bool        DEFAULT True,
         bot_ignore      bool        DEFAULT True,
         auto_join       bool        DEFAULT False,

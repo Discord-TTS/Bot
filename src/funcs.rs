@@ -166,7 +166,7 @@ fn remove_repeated_chars(content: &str, limit: usize) -> String {
 }
 
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
-pub fn run_checks(
+pub async fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
 
@@ -176,6 +176,7 @@ pub fn run_checks(
     bot_ignore: bool,
     require_voice: bool,
     audience_ignore: bool,
+    required_role: Option<i64>,
 ) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
     let guild_id = require!(message.guild_id, Ok(None));
     if channel as u64 != message.channel_id.get() {
@@ -186,6 +187,18 @@ pub fn run_checks(
 
         if author_vc.map_or(true, |author_vc| author_vc != message.channel_id) {
             return Ok(None)
+        }
+    }
+
+    if let Some(required_role) = required_role {
+        if !message.member.as_ref().try_unwrap()?.roles.contains(&serenity::RoleId::new(required_role as u64)) {
+            let member = guild_id.member(ctx, message.author.id).await?;
+            let channel = require!(message.channel_id.to_channel(ctx).await?.guild(), Ok(None));
+
+            let author_permissions = require!(message.guild(&ctx.cache), Ok(None)).user_permissions_in(&channel, &member)?;
+            if !author_permissions.administrator() {
+                return Ok(None)
+            }
         }
     }
 
@@ -215,15 +228,16 @@ pub fn run_checks(
 
     let guild = require!(message.guild(&ctx.cache), Ok(None));
     let voice_state = guild.voice_states.get(&message.author.id);
+    let bot_voice_state = guild.voice_states.get(&ctx.cache.current_user_id());
 
     let mut to_autojoin = None;
     if message.author.bot {
-        if bot_ignore || voice_state.is_none() {
+        if bot_ignore || bot_voice_state.is_none() {
             return Ok(None) // Is bot
         }
     } else {
         // If the bot is in vc
-        if let Some(vc) = guild.voice_states.get(&ctx.cache.current_user_id()) {
+        if let Some(vc) = bot_voice_state {
             // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
             if require_voice && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
                 return Ok(None); // Wrong vc
@@ -258,8 +272,10 @@ pub fn run_checks(
 pub fn clean_msg(
     content: &str,
 
+    user: &serenity::User,
     cache: &serenity::Cache,
-    member: &serenity::Member,
+    guild_id: serenity::GuildId,
+    member: &serenity::PartialMember,
     attachments: &[serenity::Attachment],
 
     voice: &str,
@@ -316,14 +332,13 @@ pub fn clean_msg(
     };
 
     // If xsaid is enabled, and the author has not been announced last (in one minute if more than 2 users in vc)
-    let guild_id = member.guild_id;
     let last_to_xsaid = last_to_xsaid_tracker.get(&guild_id);
 
     if xsaid && match last_to_xsaid.map(|i| *i) {
         None => true,
         Some((u_id, last_time)) => cache.guild(guild_id).map(|guild|
-            guild.voice_states.get(&member.user.id).and_then(|vs| vs.channel_id).map_or(true, |voice_channel_id|
-                (member.user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) &&
+            guild.voice_states.get(&user.id).and_then(|vs| vs.channel_id).map_or(true, |voice_channel_id|
+                (user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) &&
                     // If more than 2 users in vc
                     guild.voice_states.values()
                         .filter(|vs| vs.channel_id.map_or(false, |vc| vc == voice_channel_id))
@@ -341,7 +356,7 @@ pub fn clean_msg(
             ).unwrap();
         }
 
-        let said_name = nickname.unwrap_or_else(|| member.nick.as_ref().unwrap_or(&member.user.name));
+        let said_name = nickname.unwrap_or_else(|| member.nick.as_ref().unwrap_or(&user.name));
         content = match attachments_to_format(attachments) {
             Some(file_format) if content.is_empty() => format!("{} sent {}", said_name, file_format),
             Some(file_format) => format!("{} sent {} and said {}", said_name, file_format, content),
@@ -355,7 +370,7 @@ pub fn clean_msg(
     }
 
     if xsaid {
-        last_to_xsaid_tracker.insert(member.guild_id, (member.user.id, std::time::SystemTime::now()));
+        last_to_xsaid_tracker.insert(guild_id, (user.id, std::time::SystemTime::now()));
     }
 
     if repeated_limit != 0 {

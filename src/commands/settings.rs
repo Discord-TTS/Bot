@@ -21,6 +21,7 @@ use itertools::Itertools;
 
 use poise::serenity_prelude as serenity;
 use gnomeutils::{require, require_guild, OptionGettext as _, PoiseContextExt as _};
+use serenity::Mentionable;
 
 use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
@@ -53,25 +54,23 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let author_id = ctx.author().id;
 
     let data = ctx.data();
-    let ctx_discord = ctx.discord();
     let none_str = ctx.gettext("none");
 
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
     let userinfo_row = data.userinfo_db.get(author_id.into()).await?;
     let nickname_row = data.nickname_db.get([guild_id.into(), author_id.into()]).await?;
 
-    let channel_name = if guild_row.channel == 0 {
+    let channel_mention = if guild_row.channel == 0 {
         Cow::Borrowed(none_str)
     } else {
-        ctx_discord.cache
-            .guild_channel(guild_row.channel as u64)
-            .map_or(Cow::Borrowed(none_str), |c| Cow::Owned(c.name.clone()))
+        Cow::Owned(serenity::ChannelId::new(guild_row.channel as u64).mention().to_string())
     };
 
     let prefix = &guild_row.prefix;
     let guild_mode = guild_row.voice_mode;
     let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
     let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
+    let required_role = guild_row.required_role.map(|r| serenity::RoleId::new(r as u64).mention().to_string());
 
     let user_mode = if data.premium_check(Some(guild_id)).await?.is_none() {
         userinfo_row.premium_voice_mode
@@ -124,14 +123,16 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         )))
 
         .field(ctx.gettext("**General Server Settings**"), &ctx.gettext("
-{sep1} Setup Channel: `#{channel_name}`
+{sep1} Setup Channel: {channel_mention}
+{sep1} Required Role: {role_mention}
 {sep1} Command Prefix: `{prefix}`
 {sep1} Auto Join: `{autojoin}`
         ")
             .replace("{sep1}", sep1)
             .replace("{prefix}", prefix)
+            .replace("{channel_mention}", &channel_mention)
             .replace("{autojoin}", &guild_row.auto_join.to_string())
-            .replace("{channel_name}", &channel_name),
+            .replace("{role_mention}", required_role.as_deref().unwrap_or(none_str)),
         false)
         .field("**TTS Settings**", &ctx.gettext("
 {sep2} <User> said: message: `{xsaid}`
@@ -568,6 +569,61 @@ pub async fn require_voice(
     ctx.say(ctx.gettext("Requiring users to be in voice channel for TTS is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
 
     Ok(())
+}
+
+/// Changes the required role to use the bot.
+#[poise::command(
+    guild_only,
+    category="Settings",
+    prefix_command, slash_command,
+    required_permissions="ADMINISTRATOR",
+    required_bot_permissions="SEND_MESSAGES",
+    aliases("required_role", "require_role")
+)]
+pub async fn required_role(
+    ctx: Context<'_>,
+    #[description="The required role for all bot usage"] required_role: Option<serenity::Role>,
+) -> CommandResult {
+    let ctx_discord = ctx.discord();
+    let guild_id = ctx.guild_id().unwrap();
+    let data = ctx.data();
+
+    let currently_required_role = data.guilds_db
+        .get(guild_id.into()).await?.required_role
+        .map(|r| serenity::RoleId::new(r as u64))
+        .and_then(|r| ctx.guild()
+            .and_then(|g| g.roles.get(&r)
+            .map(|r| r.name.clone()))
+        );
+
+    let bot_name = ctx_discord.cache.current_user_field(|u| u.name.clone());
+    let (question, neg) = {
+        if required_role.is_some() {
+            if let Some(currently_required_role) = currently_required_role {(
+                ctx.gettext("Are you sure you want to change the required role?"),
+                ctx.gettext("No, keep {role_name} as the required role.").replace("{role_name}", &currently_required_role)
+            )} else {(
+                ctx.gettext("Are you sure you want to set the required role?"),
+                ctx.gettext("No, keep {bot_name} usable by everyone.").replace("{bot_name}", &bot_name)
+            )}
+        } else if let Some(currently_required_role) = currently_required_role {(
+            ctx.gettext("Are you sure you want to remove the required role?"),
+            ctx.gettext("No, keep {bot_name} restricted to {role_name}.").replace("{bot_name}", &bot_name).replace("{role_name}", &currently_required_role)
+        )} else {
+            return ctx.say("**Error:** Cannot reset the required role if there isn't one set!").await.map(drop).map_err(Into::into)
+        }
+    };
+
+    if require!(confirm_dialog(ctx, question, ctx.gettext("Yes, I'm sure."), &neg).await?, Ok(())) {
+        ctx.data().guilds_db.set_one(guild_id.into(), "required_role", &required_role.as_ref().map(|r| r.id.get() as i64)).await?;
+        ctx.say(if let Some(required_role) = required_role {
+            ctx.gettext("{bot_name} now requires {required_role} to use.").replace("{required_role}", &required_role.mention().to_string()).replace("{bot_name}", &bot_name)
+        } else {
+            ctx.gettext("{bot_name} is now usable by everyone!").replace("{bot_name}", &bot_name)
+        }).await
+    } else {
+        ctx.say(ctx.gettext("Cancelled!")).await
+    }.map(drop).map_err(Into::into)
 }
 
 /// Changes the default mode for TTS that messages are read in

@@ -30,7 +30,7 @@ use sysinfo::SystemExt;
 use once_cell::sync::OnceCell;
 use tracing::{error, info, warn};
 
-use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt};
+use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt, require_guild};
 use poise::serenity_prelude::{self as serenity, Mentionable as _, json::prelude as json};
 use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
 
@@ -224,7 +224,6 @@ async fn _main() -> Result<()> {
             .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
         )
         .options(poise::FrameworkOptions {
-            command_check: Some(|ctx| Box::pin(async move {Ok(!ctx.author().bot)})),
             allowed_mentions: Some({
                 let mut allowed_mentions = serenity::CreateAllowedMentions::default();
                 allowed_mentions.parse(serenity::ParseValue::Users);
@@ -254,6 +253,36 @@ async fn _main() -> Result<()> {
                 ))})}),
                 ..poise::PrefixFrameworkOptions::default()
             },
+            command_check: Some(|ctx| Box::pin(async move {
+                if ctx.author().bot {
+                    Ok(false)
+                } else if let Some(guild_id) = ctx.guild_id() && let Some(required_role) = ctx.data().guilds_db.get(guild_id.into()).await?.required_role {
+                    let required_role = serenity::RoleId::new(required_role as u64);
+                    let member = ctx.author_member().await.try_unwrap()?;
+
+                    let is_admin = || {
+                        let guild = require_guild!(ctx, Ok(false));
+                        let channel = guild.channels.get(&ctx.channel_id()).and_then(|c| match c {
+                            serenity::Channel::Guild(c) => Some(c),
+                            _ => None,
+                        }).try_unwrap()?;
+
+                        let permissions = guild.user_permissions_in(channel, &member)?;
+                        Ok(permissions.administrator())
+                    };
+
+                    if member.roles.contains(&required_role) || is_admin()? {
+                        Ok(true)
+                    } else {
+                        ctx.send_error(
+                            "you do not have the required role to use this command",
+                            Some(&format!("ask a server admin for {}", required_role.mention()))
+                        ).await.map(|_| false).map_err(Into::into)
+                    }
+                } else {
+                    Ok(true)
+                }
+            })),
             // Add all the commands, this ordering is important as it is shown on the help command
             commands: vec![
                 commands::main::join(), commands::main::clear(), commands::main::leave(), commands::main::premium_activate(),
@@ -269,9 +298,9 @@ async fn _main() -> Result<()> {
                             name: "channel",
                             ..commands::settings::setup()
                         },
-                        commands::settings::xsaid(), commands::settings::autojoin(), commands::settings::botignore(),
+                        commands::settings::xsaid(), commands::settings::autojoin(), commands::settings::required_role(),
                         commands::settings::voice(), commands::settings::server_voice(), commands::settings::mode(),
-                        commands::settings::server_mode(), commands::settings::msg_length(), commands::settings::prefix(),
+                        commands::settings::server_mode(), commands::settings::msg_length(),  commands::settings::botignore(), commands::settings::prefix(),
                         commands::settings::translation(), commands::settings::translation_lang(), commands::settings::speaking_rate(),
                         commands::settings::nick(), commands::settings::repeated_characters(), commands::settings::audienceignore(),
                         commands::settings::require_voice(), commands::settings::block(),
@@ -616,14 +645,15 @@ async fn process_tts_msg(
     let require_voice = guild_row.require_voice;
     let repeated_limit = guild_row.repeated_chars;
     let audience_ignore = guild_row.audience_ignore;
+    let required_role = guild_row.required_role;
 
     let mode;
     let voice;
 
     let mut content = match run_checks(
         ctx, message,
-        channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore,
-    )? {
+        channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore, required_role,
+    ).await? {
         None => return Ok(()),
         Some((content, to_autojoin)) => {
             if let Some(channel_id) = to_autojoin {
@@ -631,13 +661,13 @@ async fn process_tts_msg(
                 ctx.join_vc(join_vc_lock.lock().await, channel_id).await?;
             }
 
-            let member = guild_id.member(ctx, message.author.id.0).await?;
             (voice, mode) = data.parse_user_or_guild(message.author.id, Some(guild_id)).await?;
 
             let nickname_row = nicknames.get([guild_id.into(), message.author.id.into()]).await?;
 
+            let member = message.member.as_ref().try_unwrap()?;
             clean_msg(
-                &content, &ctx.cache, &member, &message.attachments, &voice,
+                &content, &message.author, &ctx.cache, guild_id, member, &message.attachments, &voice,
                 xsaid, repeated_limit as usize, nickname_row.name.as_deref(),
                 &data.last_to_xsaid_tracker
             )

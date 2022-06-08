@@ -62,6 +62,7 @@ impl CacheKeyTrait for (i64, TTSMode) {
 pub struct GuildRow {
     pub channel: i64,
     pub premium_user: Option<i64>,
+    pub required_role: Option<i64>,
     pub xsaid: bool,
     pub auto_join: bool,
     pub bot_ignore: bool,

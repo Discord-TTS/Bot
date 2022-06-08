@@ -153,7 +153,8 @@ async fn _run(main_config: &mut toml::value::Table, transaction: &mut Transactio
             ADD COLUMN IF NOT EXISTS to_translate     bool       DEFAULT False,
             ADD COLUMN IF NOT EXISTS target_lang      varchar(5),
             ADD COLUMN IF NOT EXISTS premium_user     bigint,
-            ADD COLUMN IF NOT EXISTS require_voice    bool       DEFAULT True;
+            ADD COLUMN IF NOT EXISTS require_voice    bool       DEFAULT True,
+            ADD COLUMN IF NOT EXISTS required_role    bigint;
         ALTER TABLE user_voice
             ADD COLUMN IF NOT EXISTS speaking_rate real;
 
