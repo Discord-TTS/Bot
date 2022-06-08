@@ -702,10 +702,12 @@ async fn process_tts_msg(
         &speaking_rate, &msg_length.to_string()
     );
 
-    // Pre-caches the audio and handles max_length errors
-    if funcs::fetch_audio(&data.reqwest, url.clone(), data.config.tts_service_auth_key.as_deref()).await?.is_none() {
-        return Ok(());
-    }
+    // Pre-fetch the audio to handle max_length errors
+    let audio = require!(funcs::fetch_audio(
+        &data.reqwest,
+        url.clone(),
+        data.config.tts_service_auth_key.as_deref()
+    ).await?, Ok(()));
 
     {
         let call_lock = match songbird::get(ctx).await.unwrap().get(guild_id) {
@@ -723,8 +725,17 @@ async fn process_tts_msg(
             }
         };
 
+        let hint = audio.headers().get(reqwest::header::CONTENT_TYPE).map(|ct| {
+            let mut hint = songbird::input::core::probe::Hint::new();
+            hint.mime_type(ct.to_str()?);
+            Ok(hint)
+        }).transpose()?;
+
+        let input = Box::new(std::io::Cursor::new(audio.bytes().await?));
+        let wrapped_audio = songbird::input::LiveInput::Raw(songbird::input::AudioStream{input, hint});
+
         let mut call = call_lock.lock().await;
-        call.enqueue_source(songbird::ffmpeg(url.as_str()).await?);
+        call.enqueue_input(songbird::input::Input::Live(wrapped_audio, None)).await;
     }
 
     data.analytics.log(Cow::Borrowed(match mode {

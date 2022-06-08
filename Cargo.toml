@@ -34,6 +34,11 @@ const_format = "0.2"
 strum_macros = "0.24"
 generic-array = "0.14"
 
+[dependencies.symphonia]
+version = "0.5"
+default-features = false
+features = ["mp3", "ogg", "wav", "pcm"]
+
 [dependencies.sqlx]
 version = "0.5"
 default-features = false
@@ -54,6 +59,7 @@ default-features = false
 
 [dependencies.gnomeutils]
 git = "https://github.com/GnomedDev/GnomeUtils"
+features = ["error_handling", "analytics", "i18n", "bot_list", "logging"]
 branch = "personal"
 
 [dependencies.poise]
@@ -64,7 +70,11 @@ branch = "personal"
 [dependencies.songbird]
 git = "https://github.com/GnomedDev/songbird"
 features = ["builtin-queue"]
-branch = "personal"
+branch = "symphonia-personal"
 
 [patch."https://github.com/serenity-rs/serenity"]
 serenity = {git = "https://github.com/GnomedDev/serenity", branch = "personal"}
+
+[patch.crates-io."serenity"]
+git = "https://github.com/GnomedDev/serenity"
+branch = "personal"

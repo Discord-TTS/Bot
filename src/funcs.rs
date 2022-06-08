@@ -42,7 +42,7 @@ pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunner
 pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url, auth_key: Option<&str>) -> Result<Option<reqwest::Response>> {
     let resp = reqwest
         .get(url)
-        .header("Authorization", auth_key.unwrap_or(""))
+        .header(reqwest::header::AUTHORIZATION, auth_key.unwrap_or(""))
         .send().await?;
 
     match resp.error_for_status_ref() {
@@ -69,6 +69,7 @@ pub fn prepare_url(mut tts_service: reqwest::Url, content: &str, lang: &str, mod
         .append_pair("lang", lang)
         .append_pair("mode", mode.into())
         .append_pair("max_length", max_length)
+        .append_pair("preferred_format", "mp3")
         .append_pair("speaking_rate", speaking_rate)
         .finish();
     tts_service
