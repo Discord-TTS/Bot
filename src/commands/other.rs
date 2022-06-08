@@ -281,11 +281,11 @@ pub async fn invite(ctx: Context<'_>,) -> CommandResult {
         if ctx.guild_id() == Some(config.main_server) {
             ctx
                 .gettext("Check out {channel_mention} to invite {bot_mention}!")
-                .replace("{invite_channel}", &invite_channel.mention().to_string())
+                .replace("{channel_mention}", &invite_channel.mention().to_string())
                 .replace("{bot_mention}", &bot_mention)
         } else {
             ctx_discord.cache.guild_channel(invite_channel).map(|c| ctx
-                .gettext("Join {server_invite} and look in #{channel_name} to invite <@{bot_mention}>")
+                .gettext("Join {server_invite} and look in #{channel_name} to invite {bot_mention}")
                 .replace("{channel_name}", &c.name)
                 .replace("{bot_mention}", &bot_mention)
                 .replace("{server_invite}", &config.main_server_invite)
