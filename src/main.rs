@@ -665,9 +665,17 @@ async fn process_tts_msg(
 
             let nickname_row = nicknames.get([guild_id.into(), message.author.id.into()]).await?;
 
-            let member = message.member.as_ref().try_unwrap()?;
+            let m;
+            let member_nick = match &message.member {
+                Some(member) => member.nick.as_deref(),
+                None => {
+                    m = guild_id.member(ctx, message.author.id).await?;
+                    m.nick.as_deref()
+                },
+            };
+
             clean_msg(
-                &content, &message.author, &ctx.cache, guild_id, member, &message.attachments, &voice,
+                &content, &message.author, &ctx.cache, guild_id, member_nick, &message.attachments, &voice,
                 xsaid, repeated_limit as usize, nickname_row.name.as_deref(),
                 &data.last_to_xsaid_tracker
             )

@@ -275,7 +275,7 @@ pub fn clean_msg(
     user: &serenity::User,
     cache: &serenity::Cache,
     guild_id: serenity::GuildId,
-    member: &serenity::PartialMember,
+    member_nick: Option<&str>,
     attachments: &[serenity::Attachment],
 
     voice: &str,
@@ -356,7 +356,7 @@ pub fn clean_msg(
             ).unwrap();
         }
 
-        let said_name = nickname.unwrap_or_else(|| member.nick.as_ref().unwrap_or(&user.name));
+        let said_name = nickname.unwrap_or_else(|| member_nick.unwrap_or(&user.name));
         content = match attachments_to_format(attachments) {
             Some(file_format) if content.is_empty() => format!("{} sent {}", said_name, file_format),
             Some(file_format) => format!("{} sent {} and said {}", said_name, file_format, content),
