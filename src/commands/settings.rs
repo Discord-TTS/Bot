@@ -727,8 +727,8 @@ pub async fn translation_lang(
             data.guilds_db.set_one(guild_id, "target_lang", &lang).await?;
 
             let mut to_say = ctx.gettext("The target translation language is now: {}").replace("{}", &lang);
-            if data.guilds_db.get(guild_id).await?.to_translate {
-                to_say.push_str(ctx.gettext("You may want to enable translation with `/set translation on`"));
+            if !data.guilds_db.get(guild_id).await?.to_translate {
+                to_say.push_str(ctx.gettext("\nYou may want to enable translation with `/set translation on`"));
             };
 
             ctx.say(to_say).await?;

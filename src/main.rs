@@ -666,12 +666,15 @@ async fn process_tts_msg(
             let nickname_row = nicknames.get([guild_id.into(), message.author.id.into()]).await?;
 
             let m;
+            let is_ephemeral = message.flags.map_or(false, |f| f.contains(serenity::model::channel::MessageFlags::EPHEMERAL));
+
             let member_nick = match &message.member {
                 Some(member) => member.nick.as_deref(),
-                None => {
+                None if message.webhook_id.is_none() && !is_ephemeral => {
                     m = guild_id.member(ctx, message.author.id).await?;
                     m.nick.as_deref()
                 },
+                None => None
             };
 
             clean_msg(

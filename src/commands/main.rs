@@ -199,7 +199,7 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     category="Main Commands",
     guild_only, prefix_command, slash_command,
     aliases("activate"),
-    required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS | ADD_REACTIONS"
+    required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
@@ -233,14 +233,13 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     };
 
     if let Some(error_msg) = error_msg {
-        ctx.send(|b| b.embed(|e| {e
+        return ctx.send(|b| b.embed(|e| {e
             .title("TTS Bot Premium")
             .description(error_msg)
             .thumbnail(&data.premium_avatar_url)
             .colour(crate::constants::PREMIUM_NEUTRAL_COLOUR)
             .footer(|f| f.text("If this is an error, please contact Gnome!#6669."))
-        })).await?;
-        return Ok(())
+        })).await.map(drop).map_err(Into::into)
     }
 
     data.userinfo_db.create_row(author_id).await?;

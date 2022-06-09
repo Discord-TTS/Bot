@@ -235,7 +235,7 @@ pub async fn ping(ctx: Context<'_>,) -> CommandResult {
             msg.edit(ctx.discord(), |b| b.content(content)).await?;
         },
         poise::ReplyHandle::Unknown { http, interaction } => {
-            interaction.edit_original_interaction_response(http, |b| {b.content(content)}).await?;  
+            interaction.edit_original_interaction_response(http, |b| b.content(content)).await?;
         },
     }
 
