@@ -739,7 +739,7 @@ pub async fn translation_lang(
             String::from(ctx.gettext("Reset the target translation language"))
         }
     } else {
-        String::from(ctx.gettext("Invalid voice, do `/translation_languages`"))
+        String::from(ctx.gettext("Invalid translation language, do `/translation_languages`"))
     };
 
     ctx.say(to_say).await.map(drop).map_err(Into::into)
