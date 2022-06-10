@@ -22,11 +22,11 @@ pub struct MainConfig {
     pub announcements_channel: serenity::ChannelId,
     pub tts_service_auth_key: Option<String>,
     pub invite_channel: serenity::ChannelId,
-    pub translation_token: Option<String>,
     pub main_server: serenity::GuildId,
     pub patreon_service: reqwest::Url,
     pub ofs_role: serenity::RoleId,
     pub main_server_invite: String,
+    pub translation_token: String,
     pub tts_service: reqwest::Url,
     pub token: Option<String>,
     pub log_level: String,
@@ -106,6 +106,8 @@ pub struct Data {
     pub gtts_voices: BTreeMap<String, String>,
     pub polly_voices: BTreeMap<String, PollyVoice>,
     pub gcloud_voices: BTreeMap<String, BTreeMap<String, GoogleGender>>,
+
+    pub translation_languages: BTreeMap<String, String>,
 }
 
 impl AsRef<gnomeutils::GnomeData> for Data {
@@ -290,22 +292,6 @@ impl From<TTSModeChoice> for TTSMode {
             TTSModeChoice::gCloud => Self::gCloud,
         }
     }
-}
-
-#[derive(serde::Deserialize)]
-pub struct DeeplTranslateResponse {
-    pub translations: Vec<DeeplTranslation>
-}
-
-#[derive(serde::Deserialize)]
-pub struct DeeplTranslation {
-    pub text: String,
-    pub detected_source_language: String
-}
-
-#[derive(serde::Deserialize)]
-pub struct DeeplVoice {
-    pub language: String,
 }
 
 #[allow(non_snake_case)]

@@ -25,8 +25,10 @@ use lazy_static::lazy_static;
 
 use poise::serenity_prelude as serenity;
 use gnomeutils::{OptionGettext, OptionTryUnwrap};
+use serenity::json::prelude as json;
 
 use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError};
+use crate::constants::TRANSLATION_URL;
 use crate::require;
 
 pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
@@ -75,6 +77,27 @@ pub fn prepare_url(mut tts_service: reqwest::Url, content: &str, lang: &str, mod
     tts_service
 }
 
+pub async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Result<BTreeMap<String, String>> {
+    #[derive(serde::Deserialize)]
+    pub struct DeeplVoice<'a> {
+        pub name: String,
+        pub language: &'a str,
+    }
+
+    let resp = reqwest
+        .get(format!("{TRANSLATION_URL}/languages"))
+        .query(&json::json!({
+            "type": "target",
+            "auth_key": token
+        }))
+        .send().await?
+        .error_for_status()?;
+
+    let resp_raw = resp.bytes().await?;
+    let languages: Vec<DeeplVoice<'_>> = json::from_slice(&resp_raw)?;
+
+    Ok(languages.into_iter().map(|v| (v.language.to_lowercase(), v.name)).collect())
+}
 
 pub fn prepare_gcloud_voices(raw_map: Vec<GoogleVoice>) -> BTreeMap<String, BTreeMap<String, GoogleGender>> {
     // {lang_accent: {variant: gender}}
@@ -383,16 +406,29 @@ pub fn clean_msg(
 
 
 pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<Option<String>> {
-    let url = format!("{}/translate", crate::constants::TRANSLATION_URL);
-    let response: crate::structs::DeeplTranslateResponse = data.reqwest.get(url)
-        .query(&serenity::json::prelude::json!({
+    #[derive(serde::Deserialize)]
+    pub struct DeeplTranslateResponse<'a> {
+        #[serde(borrow)] pub translations: Vec<DeeplTranslation<'a>>
+    }
+
+    #[derive(serde::Deserialize)]
+    pub struct DeeplTranslation<'a> {
+        pub text: String,
+        pub detected_source_language: &'a str
+    }
+
+    let resp = data.reqwest
+        .get(format!("{TRANSLATION_URL}/translate"))
+        .query(&json::json!({
             "text": content,
             "target_lang": target_lang,
             "preserve_formatting": 1u8,
-            "auth_key": &data.config.translation_token.as_ref().expect("Tried to do translation without token set in config!")
+            "auth_key": data.config.translation_token
         }))
-        .send().await?.error_for_status()?
-        .json().await?;
+        .send().await?.error_for_status()?;
+
+    let resp_raw = resp.bytes().await?;
+    let response: DeeplTranslateResponse<'_> = json::from_slice(&resp_raw)?;
 
     if let Some(translation) = response.translations.into_iter().next() {
         if translation.detected_source_language != target_lang {

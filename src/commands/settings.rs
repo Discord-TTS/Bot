@@ -17,8 +17,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use itertools::Itertools;
-
 use poise::serenity_prelude as serenity;
 use gnomeutils::{require, require_guild, OptionGettext as _, PoiseContextExt as _};
 use serenity::Mentionable;
@@ -324,6 +322,18 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
     filtered_voices
 }
 
+#[allow(clippy::unused_async)]
+async fn translation_languages_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> Vec<poise::AutocompleteChoice<String>> {
+    let mut filtered_languages = ctx.data.translation_languages.iter()
+        .filter(|(_, name)| name.starts_with(&searching))
+        .map(|(value, name)| (value.clone(), name.clone()))
+        .map(|(value, name)| poise::AutocompleteChoice {name, value})
+        .collect::<Vec<_>>();
+
+    filtered_languages.sort_by_key(|choice| strsim::levenshtein(&choice.name, &searching));
+    filtered_languages
+}
+
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
     if let Some(value) = value {
         Ok(Some(value))
@@ -427,6 +437,22 @@ where
     })
 }
 
+fn format_languages<'a>(mut iter: impl Iterator<Item=&'a String>) -> String {
+    let mut buf = String::with_capacity(iter.size_hint().0 * 2);
+    if let Some(first_elt) = iter.next() {
+        buf.push('`');
+        buf.push_str(first_elt);
+        buf.push('`');
+        for elt in iter {
+            buf.push_str(", `");
+            buf.push_str(elt);
+            buf.push('`');
+        }
+    };
+
+    buf
+}
+
 fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> bool {
     match mode {
         TTSMode::gTTS => data.gtts_voices.contains_key(voice),
@@ -439,23 +465,6 @@ fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> bool {
         }
     }
 }
-
-async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Result<Vec<String>, Error> {
-    Ok(
-        reqwest
-            .get(format!("{}/languages", crate::constants::TRANSLATION_URL))
-            .query(&serenity::json::prelude::json!({
-                "type": "target",
-                "auth_key": token
-            }))
-            .send().await?
-            .error_for_status()?
-            .json::<Vec<crate::structs::DeeplVoice>>().await?
-            .iter().map(|v| v.language.to_lowercase()).collect()
-    )
-}
-
-
 
 fn to_enabled(catalog: Option<&gettext::Catalog>, value: bool) -> &str {
     if value {
@@ -712,36 +721,28 @@ pub async fn translation(ctx: Context<'_>, #[description="Whether to translate a
 )]
 pub async fn translation_lang(
     ctx: Context<'_>,
-    #[description="The language to translate all TTS messages to"] lang: Option<String>
+    #[description="The language to translate all TTS messages to"] #[autocomplete="translation_languages_autocomplete"] target_lang: Option<String>
 ) -> CommandResult {
     let data = ctx.data();
     let guild_id = ctx.guild_id().unwrap().into();
 
-    let translation_langs = get_translation_langs(
-        &data.reqwest,
-        data.config.translation_token.as_ref().expect("Tried to do translation without token set in config!")
-    ).await?;
-
-    match lang {
-        Some(lang) if translation_langs.contains(&lang) => {
-            data.guilds_db.set_one(guild_id, "target_lang", &lang).await?;
-
-            let mut to_say = ctx.gettext("The target translation language is now: {}").replace("{}", &lang);
+    let to_say = if target_lang.as_ref().map_or(true, |target_lang| data.translation_languages.contains_key(target_lang)) {
+        data.guilds_db.set_one(guild_id, "target_lang", &target_lang).await?;
+        if let Some(target_lang) = target_lang {
+            let mut to_say = ctx.gettext("The target translation language is now: `{}`").replace("{}", &target_lang);
             if !data.guilds_db.get(guild_id).await?.to_translate {
                 to_say.push_str(ctx.gettext("\nYou may want to enable translation with `/set translation on`"));
             };
 
-            ctx.say(to_say).await?;
-        },
-        _ => {
-            ctx.send(|b| b.embed(|e| {e
-                .title(ctx.gettext("DeepL Translation - Supported languages"))
-                .description(format!("```{}```", translation_langs.iter().join(", ")))
-            })).await?;
+            to_say
+        } else {
+            String::from(ctx.gettext("Reset the target translation language"))
         }
-    }
+    } else {
+        String::from(ctx.gettext("Invalid voice, do `/translation_languages`"))
+    };
 
-    Ok(())
+    ctx.say(to_say).await.map(drop).map_err(Into::into)
 }
 
 
@@ -1121,6 +1122,30 @@ pub async fn voice(
     Ok(())
 }
 
+/// Lists all the languages that TTS bot accepts for DeepL translation
+#[poise::command(
+    category="Settings",
+    prefix_command, slash_command,
+    aliases("trans_langs", "translation_langs"),
+    required_bot_permissions="SEND_MESSAGES | EMBED_LINKS",
+)]
+pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
+    let data = ctx.data();
+    let author = ctx.author();
+    let cache = &ctx.discord().cache;
+    let neutral_colour = ctx.neutral_colour().await;
+
+    ctx.send(|b| b.embed(|e| e
+        .colour(neutral_colour)
+        .author(|a| a.name(author.name.clone()).icon_url(author.face()))
+        .title(cache.current_user_field(|u| ctx.gettext("{} Translation Languages").replace("{}", &u.name)))
+        .field("Currently Supported Languages", format_languages(data.translation_languages.keys()), false)
+        .footer(|f| f.text(random_footer(
+            &data.config.main_server_invite, cache.current_user_id(), ctx.current_catalog()
+        )))
+    )).await.map(drop).map_err(Into::into)
+}
+
 /// Lists all the voices that TTS bot accepts for the current mode
 #[poise::command(
     category="Settings",
@@ -1141,22 +1166,6 @@ pub async fn voices(
     };
 
     let voices = {
-        fn format<'a>(mut iter: impl Iterator<Item=&'a String>) -> String {
-            let mut buf = String::with_capacity(iter.size_hint().0 * 2);
-            if let Some(first_elt) = iter.next() {
-                buf.push('`');
-                buf.push_str(first_elt);
-                buf.push('`');
-                for elt in iter {
-                    buf.push_str(", `");
-                    buf.push_str(elt);
-                    buf.push('`');
-                }
-            };
-
-            buf
-        }
-
         let random_footer = || random_footer(
             &data.config.main_server_invite,
             ctx.discord().cache.current_user_id(),
@@ -1164,8 +1173,8 @@ pub async fn voices(
         );
 
         match mode {
-            TTSMode::gTTS => format(data.gtts_voices.keys()),
-            TTSMode::eSpeak => format(data.espeak_voices.iter()),
+            TTSMode::gTTS => format_languages(data.gtts_voices.keys()),
+            TTSMode::eSpeak => format_languages(data.espeak_voices.iter()),
             TTSMode::Polly => return {
                 let (current_voice, pages) = list_polly_voices(&ctx).await?;
                 MenuPaginator::new(ctx, pages, current_voice, mode, random_footer()).start().await.map_err(Into::into)

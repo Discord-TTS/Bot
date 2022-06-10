@@ -45,7 +45,7 @@ mod funcs;
 
 use traits::SerenityContextExt;
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
-use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices};
+use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices, get_translation_langs};
 use structs::{TTSMode, Config, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig};
 
 
@@ -142,7 +142,7 @@ async fn _main() -> Result<()> {
 
     let (
         guilds_db, userinfo_db, user_voice_db, guild_voice_db, nickname_db,
-        mut webhooks, premium_avatar_url,
+        mut webhooks, translation_languages, premium_avatar_url,
         gtts_voices, espeak_voices, gcloud_voices, polly_voices
     ) = tokio::try_join!(
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
@@ -151,12 +151,11 @@ async fn _main() -> Result<()> {
         create_db_handler!(pool.clone(), "guild_voice", "guild_id", "mode"),
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
         get_webhooks(&http, config.webhooks),
+        get_translation_langs(&reqwest, &config.main.translation_token),
         async {serenity::UserId::new(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
         async {Ok(TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
         async {Ok(TTSMode::eSpeak.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
-        async {Ok(prepare_gcloud_voices(json::from_slice(&TTSMode::gCloud
-            .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.bytes().await?
-        )?))},
+        async {Ok(prepare_gcloud_voices(TTSMode::gCloud.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json().await?))},
         async {Ok(TTSMode::Polly
             .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<PollyVoice>>().await?
             .into_iter().map(|v| (v.id.clone(), v)).collect::<BTreeMap<String, PollyVoice>>())
@@ -199,6 +198,7 @@ async fn _main() -> Result<()> {
         currently_purging: AtomicBool::new(false),
 
         gtts_voices, espeak_voices, gcloud_voices, polly_voices,
+        translation_languages,
 
         config: config.main, reqwest, premium_avatar_url,
         analytics, webhooks, start_time, startup_message,
@@ -307,7 +307,7 @@ async fn _main() -> Result<()> {
                     ],
                     ..commands::settings::set()
                 },
-                commands::settings::setup(), commands::settings::voices(),
+                commands::settings::setup(), commands::settings::voices(), commands::settings::translation_languages(),
 
                 commands::help::help(),
                 commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
