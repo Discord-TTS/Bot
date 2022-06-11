@@ -712,31 +712,31 @@ async fn process_tts_msg(
         data.config.tts_service_auth_key.as_deref()
     ).await?, Ok(()));
 
+    let call_lock = match songbird::get(ctx).await.unwrap().get(guild_id) {
+        Some(call) => call,
+        None => {
+            // At this point, the bot is "in" the voice channel, but without a voice client,
+            // this is usually if the bot restarted but the bot is still in the vc from the last boot.
+            let voice_channel_id = {
+                let guild = ctx.cache.guild(guild_id).try_unwrap()?;
+                guild.voice_states.get(&message.author.id).and_then(|vs| vs.channel_id).try_unwrap()?
+            };
+
+            let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+            ctx.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
+        }
+    };
+
+    let hint = audio.headers().get(reqwest::header::CONTENT_TYPE).map(|ct| {
+        let mut hint = songbird::input::core::probe::Hint::new();
+        hint.mime_type(ct.to_str()?);
+        Ok(hint)
+    }).transpose()?;
+
+    let input = Box::new(std::io::Cursor::new(audio.bytes().await?));
+    let wrapped_audio = songbird::input::LiveInput::Raw(songbird::input::AudioStream{input, hint});
+
     {
-        let call_lock = match songbird::get(ctx).await.unwrap().get(guild_id) {
-            Some(call) => call,
-            None => {
-                // At this point, the bot is "in" the voice channel, but without a voice client,
-                // this is usually if the bot restarted but the bot is still in the vc from the last boot.
-                let voice_channel_id = {
-                    let guild = ctx.cache.guild(guild_id).try_unwrap()?;
-                    guild.voice_states.get(&message.author.id).and_then(|vs| vs.channel_id).try_unwrap()?
-                };
-
-                let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-                ctx.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
-            }
-        };
-
-        let hint = audio.headers().get(reqwest::header::CONTENT_TYPE).map(|ct| {
-            let mut hint = songbird::input::core::probe::Hint::new();
-            hint.mime_type(ct.to_str()?);
-            Ok(hint)
-        }).transpose()?;
-
-        let input = Box::new(std::io::Cursor::new(audio.bytes().await?));
-        let wrapped_audio = songbird::input::LiveInput::Raw(songbird::input::AudioStream{input, hint});
-
         let mut call = call_lock.lock().await;
         call.enqueue_input(songbird::input::Input::Live(wrapped_audio, None)).await;
     }
