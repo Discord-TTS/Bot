@@ -812,10 +812,7 @@ async fn process_support_dm(
 
                     let todm = require!(ctx.user_from_dm(&resolved.author.name).await, Ok(()));
 
-                    let content: String;
-                    let embed: serenity::Embed;
-
-                    if channel.id == data.webhooks.suggestions.channel_id.try_unwrap()? {
+                    let (content, embed) = if channel.id == data.webhooks.suggestions.channel_id.try_unwrap()? {
                         let sent = todm.direct_message(ctx, |b| {b.embed(|e| {e
                             .title("Message from the developers:")
                             .description(&message.content)
@@ -826,17 +823,19 @@ async fn process_support_dm(
                             .field("In response to your suggestion:", &resolved.content, false)
                         })}).await?;
 
-                        content = format!("Sent message to {}#{:04}:", todm.name, todm.discriminator);
-                        embed = sent.embeds.into_iter().next().unwrap();
+                        (
+                            format!("Sent message to {}#{:04}:", todm.name, todm.discriminator),
+                            sent.embeds.into_iter().next().unwrap()
+                        )
                     }
                     else {
-                        (content, embed) = commands::owner::dm_generic(
+                        commands::owner::dm_generic(
                             ctx,
                             &message.author,
                             &todm,
                             &message.content
-                        ).await?;
-                    }
+                        ).await?
+                    };
 
                     channel.send_message(ctx, |b| {b
                         .content(content)
