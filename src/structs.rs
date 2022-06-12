@@ -279,8 +279,8 @@ pub enum TTSModeChoice {
     // Name to show in slash command invoke           Aliases for prefix
     #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       gTTS,
     #[name="eSpeak TTS (male)"]                       #[name="espeak"]     eSpeak,
-    #[name="gCloud TTS (changable)"]                  #[name="gcloud"]     gCloud,
-    #[name="Amazon Polly TTS (changable)"]            #[name="polly"]      Polly,
+    #[name="gCloud TTS (changeable)"]                 #[name="gcloud"]     gCloud,
+    #[name="Amazon Polly TTS (changeable)"]           #[name="polly"]      Polly,
 }
 
 impl From<TTSModeChoice> for TTSMode {
