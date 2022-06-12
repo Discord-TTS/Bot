@@ -590,9 +590,7 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
         match data.premium_check(guild_id).await? {
             None => return Ok(true),
             Some(FailurePoint::Guild) => Cow::Borrowed("Hey, this is a premium command so it must be run in a server!"),
-            Some(FailurePoint::PremiumUser) => Cow::Owned(
-                format!("Hey, this server isn't premium, please purchase TTS Bot Premium via Patreon! (`{}donate`)", ctx.prefix())
-            ),
+            Some(FailurePoint::PremiumUser) => Cow::Borrowed("Hey, this server isn't premium, please purchase TTS Bot Premium via Patreon! (`/donate`)"),
             Some(FailurePoint::NotSubscribed(premium_user_id)) => {
                 let premium_user = premium_user_id.to_user(ctx_discord).await?;
                 Cow::Owned(format!(concat!(
