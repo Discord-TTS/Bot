@@ -812,12 +812,30 @@ async fn process_support_dm(
 
                     let todm = require!(ctx.user_from_dm(&resolved.author.name).await, Ok(()));
 
-                    let (content, embed) = commands::owner::dm_generic(
-                        ctx,
-                        &message.author,
-                        &todm,
-                        &message.content
-                    ).await?;
+                    let (content, embed) = if channel.id == data.webhooks.suggestions.channel_id.try_unwrap()? {
+                        let sent = todm.direct_message(ctx, |b| {b.embed(|e| {e
+                            .title("Message from the developers:")
+                            .description(&message.content)
+                            .author(|a| {a
+                                .name(format!("{}#{:04}", &message.author.name, &message.author.discriminator))
+                                .icon_url(&message.author.face())
+                            })
+                            .field("In response to your suggestion:", &resolved.content, false)
+                        })}).await?;
+
+                        (
+                            format!("Sent message to {}#{:04}:", todm.name, todm.discriminator),
+                            sent.embeds.into_iter().next().unwrap()
+                        )
+                    }
+                    else {
+                        commands::owner::dm_generic(
+                            ctx,
+                            &message.author,
+                            &todm,
+                            &message.content
+                        ).await?
+                    };
 
                     channel.send_message(ctx, |b| {b
                         .content(content)
