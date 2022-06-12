@@ -46,7 +46,7 @@ mod funcs;
 use traits::SerenityContextExt;
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices, get_translation_langs};
-use structs::{TTSMode, Config, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig};
+use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig};
 
 
 use crate::structs::FailurePoint;
@@ -574,7 +574,14 @@ Ask questions by either responding here or asking on the support server!",
 }
 
 
-async fn premium_command_check(ctx: structs::Context<'_>) -> Result<bool> {
+async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
+    if let Context::Application(ctx) = ctx {
+        if let poise::ApplicationCommandOrAutocompleteInteraction::Autocomplete(_) = ctx.interaction {
+            // Ignore the premium check during autocomplete.
+            return Ok(true);
+        }
+    }
+
     let guild_id = ctx.guild_id();
     let ctx_discord = ctx.discord();
     let data = ctx.data();
