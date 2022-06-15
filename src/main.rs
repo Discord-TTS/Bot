@@ -366,21 +366,20 @@ struct EventHandler {
 
 impl EventHandler {
     async fn framework(&self) -> Option<FrameworkContext<'_>> {
-        match self.framework.get() {
-            None => None,
-            Some(framework) => Some(gnomeutils::framework_to_context(framework, self.bot_id).await),
-        }
+        Some(gnomeutils::framework_to_context(self.framework.get()?, self.bot_id).await)
     }
 }
 
 #[poise::async_trait]
 impl serenity::EventHandler for EventHandler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
-        let framework = require!(self.framework().await);
-        errors::handle_message(&ctx, framework, &new_message, tokio::try_join!(
-            process_tts_msg(&ctx, &new_message, framework.user_data),
-            process_support_dm(&ctx, &new_message, framework.user_data),
-            process_mention_msg(&ctx, &new_message, framework.user_data),
+        let framework = require!(self.framework.get());
+        let framework_ctx = gnomeutils::framework_to_context(framework, self.bot_id).await;
+
+        errors::handle_message(&ctx, framework_ctx, &new_message, tokio::try_join!(
+            process_tts_msg(&ctx, &new_message, framework.clone(), framework_ctx.user_data),
+            process_support_dm(&ctx, &new_message, framework_ctx.user_data),
+            process_mention_msg(&ctx, &new_message, framework_ctx.user_data),
         )).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
@@ -628,6 +627,7 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
 async fn process_tts_msg(
     ctx: &serenity::Context,
     message: &serenity::Message,
+    framework: Arc<Framework>,
     data: &Data,
 ) -> Result<()> {
     let guild_id = require!(message.guild_id, Ok(()));
@@ -711,10 +711,10 @@ async fn process_tts_msg(
     let input = Box::new(std::io::Cursor::new(audio.bytes().await?));
     let wrapped_audio = songbird::input::LiveInput::Raw(songbird::input::AudioStream{input, hint});
 
-    {
+    let track_handle = {
         let mut call = call_lock.lock().await;
-        call.enqueue_input(songbird::input::Input::Live(wrapped_audio, None)).await;
-    }
+        call.enqueue_input(songbird::input::Input::Live(wrapped_audio, None)).await
+    };
 
     data.analytics.log(Cow::Borrowed(match mode {
         TTSMode::gTTS => "gTTS_tts",
@@ -723,7 +723,26 @@ async fn process_tts_msg(
         TTSMode::Polly => "Polly_tts",
     }), false);
 
-    Ok(())
+    let guild = ctx.cache.guild(guild_id).try_unwrap()?;
+    let (blank_name, blank_value, blank_inline) = gnomeutils::errors::blank_field();
+
+    let extra_fields = [
+        ("Guild Name", Cow::Owned(guild.name.clone()), true),
+        ("Guild ID", Cow::Owned(guild.id.to_string()), true),
+        (blank_name, blank_value, blank_inline),
+        ("Message length", Cow::Owned(content.len().to_string()), true),
+        ("Voice", voice, true),
+        ("Mode", Cow::Owned(mode.to_string()), true),
+    ];
+
+    let author_name = message.author.name.clone();
+    let icon_url = message.author.face();
+
+    gnomeutils::errors::handle_track(
+        ctx.clone(), framework, extra_fields,
+        author_name, icon_url,
+        &track_handle
+    ).map_err(Into::into)
 }
 
 async fn process_mention_msg(
