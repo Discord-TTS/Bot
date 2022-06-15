@@ -27,6 +27,7 @@ use poise::serenity_prelude as serenity;
 use gnomeutils::{OptionGettext, OptionTryUnwrap};
 use serenity::json::prelude as json;
 
+use crate::database::GuildRow;
 use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError};
 use crate::constants::TRANSLATION_URL;
 use crate::require;
@@ -193,17 +194,10 @@ fn remove_repeated_chars(content: &str, limit: usize) -> String {
 pub async fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
-
-    channel: u64,
-    prefix: &str,
-    autojoin: bool,
-    bot_ignore: bool,
-    require_voice: bool,
-    audience_ignore: bool,
-    required_role: Option<i64>,
+    guild_row: &GuildRow,
 ) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
     let guild_id = require!(message.guild_id, Ok(None));
-    if channel as u64 != message.channel_id.get() {
+    if guild_row.channel as u64 != message.channel_id.get() {
         // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
         // checking if the message's channel_id is the author's voice channel_id
         let guild = require!(message.guild(&ctx.cache), Ok(None));
@@ -214,7 +208,7 @@ pub async fn run_checks(
         }
     }
 
-    if let Some(required_role) = required_role {
+    if let Some(required_role) = guild_row.required_role {
         if !message.member.as_ref().try_unwrap()?.roles.contains(&serenity::RoleId::new(required_role as u64)) {
             let member = guild_id.member(ctx, message.author.id).await?;
             let channel = require!(message.channel_id.to_channel(ctx).await?.guild(), Ok(None));
@@ -242,11 +236,11 @@ pub async fn run_checks(
     content = content.to_lowercase();
     content = String::from(
         content
-            .strip_prefix(&format!("{}{}", &prefix, "tts"))
+            .strip_prefix(&format!("{}{}", &guild_row.prefix, "tts"))
             .unwrap_or(&content),
     ); // remove -tts if starts with
 
-    if content.starts_with(&prefix) {
+    if content.starts_with(&guild_row.prefix) {
         return Ok(None)
     }
 
@@ -256,27 +250,27 @@ pub async fn run_checks(
 
     let mut to_autojoin = None;
     if message.author.bot {
-        if bot_ignore || bot_voice_state.is_none() {
+        if guild_row.bot_ignore || bot_voice_state.is_none() {
             return Ok(None) // Is bot
         }
     } else {
         // If the bot is in vc
         if let Some(vc) = bot_voice_state {
             // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
-            if require_voice && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
+            if guild_row.require_voice && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
                 return Ok(None); // Wrong vc
             }
         // Else if the user is in the vc and autojoin is on
-        } else if let Some(voice_state) = voice_state && autojoin {
+        } else if let Some(voice_state) = voice_state && guild_row.auto_join {
             to_autojoin = Some(voice_state.channel_id.try_unwrap()?);
         } else {
             return Ok(None); // Bot not in vc
         };
 
-        if require_voice {
+        if guild_row.require_voice {
             let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
             if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).try_unwrap()? {
-                if channel.kind == serenity::ChannelType::Stage && voice_state.map_or(false, |vs| vs.suppress) && audience_ignore {
+                if channel.kind == serenity::ChannelType::Stage && voice_state.map_or(false, |vs| vs.suppress) && guild_row.audience_ignore {
                     return Ok(None); // Is audience
                 }
             }

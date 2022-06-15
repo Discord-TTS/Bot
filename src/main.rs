@@ -368,12 +368,7 @@ impl EventHandler {
     async fn framework(&self) -> Option<FrameworkContext<'_>> {
         match self.framework.get() {
             None => None,
-            Some(framework) => Some(poise::FrameworkContext {
-                bot_id: self.bot_id,
-                options: framework.options(),
-                user_data: framework.user_data().await,
-                shard_manager: framework.shard_manager()
-            }),
+            Some(framework) => Some(gnomeutils::framework_to_context(framework, self.bot_id).await),
         }
     }
 }
@@ -636,67 +631,41 @@ async fn process_tts_msg(
     data: &Data,
 ) -> Result<()> {
     let guild_id = require!(message.guild_id, Ok(()));
+    let guild_row = data.guilds_db.get(guild_id.into()).await?;
 
-    let guilds_db = &data.guilds_db;
-    let nicknames = &data.nickname_db;
+    let (mut content, to_autojoin) = require!(run_checks(ctx, message, &guild_row).await?, Ok(()));
 
-    let guild_row = guilds_db.get(guild_id.into()).await?;
-    let xsaid = guild_row.xsaid;
-    let channel = guild_row.channel;
-    let prefix = &guild_row.prefix;
-    let autojoin = guild_row.auto_join;
-    let msg_length = guild_row.msg_length;
-    let bot_ignore = guild_row.bot_ignore;
-    let require_voice = guild_row.require_voice;
-    let repeated_limit = guild_row.repeated_chars;
-    let audience_ignore = guild_row.audience_ignore;
-    let required_role = guild_row.required_role;
-
-    let mode;
-    let voice;
-
-    let mut content = match run_checks(
-        ctx, message,
-        channel as u64, prefix, autojoin, bot_ignore, require_voice, audience_ignore, required_role,
-    ).await? {
-        None => return Ok(()),
-        Some((content, to_autojoin)) => {
-            if let Some(channel_id) = to_autojoin {
-                let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-                ctx.join_vc(join_vc_lock.lock().await, channel_id).await?;
-            }
-
-            (voice, mode) = data.parse_user_or_guild(message.author.id, Some(guild_id)).await?;
-
-            let nickname_row = nicknames.get([guild_id.into(), message.author.id.into()]).await?;
-
-            let m;
-            let is_ephemeral = message.flags.map_or(false, |f| f.contains(serenity::model::channel::MessageFlags::EPHEMERAL));
-
-            let member_nick = match &message.member {
-                Some(member) => member.nick.as_deref(),
-                None if message.webhook_id.is_none() && !is_ephemeral => {
-                    m = guild_id.member(ctx, message.author.id).await?;
-                    m.nick.as_deref()
-                },
-                None => None
-            };
-
-            clean_msg(
-                &content, &message.author, &ctx.cache, guild_id, member_nick, &message.attachments, &voice,
-                xsaid, repeated_limit as usize, nickname_row.name.as_deref(),
-                &data.last_to_xsaid_tracker
-            )
+    let (voice, mode) = {
+        if let Some(channel_id) = to_autojoin {
+            let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+            ctx.join_vc(join_vc_lock.lock().await, channel_id).await?;
         }
-    };
 
-    let speaking_rate = data.user_voice_db
-        .get((message.author.id.into(), mode)).await?
-        .speaking_rate
-        .map_or_else(
-            || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).map_or(Cow::Borrowed("1.0"), Cow::Owned),
-            |r| Cow::Owned(r.to_string())
+        let is_ephemeral = message.flags.map_or(false, |f|
+            f.contains(serenity::model::channel::MessageFlags::EPHEMERAL)
         );
+
+        let m;
+        let member_nick = match &message.member {
+            Some(member) => member.nick.as_deref(),
+            None if message.webhook_id.is_none() && !is_ephemeral => {
+                m = guild_id.member(ctx, message.author.id).await?;
+                m.nick.as_deref()
+            },
+            None => None
+        };
+
+        let (voice, mode) = data.parse_user_or_guild(message.author.id, Some(guild_id)).await?;
+        let nickname_row = data.nickname_db.get([guild_id.into(), message.author.id.into()]).await?;
+
+        content = clean_msg(
+            &content, &message.author, &ctx.cache, guild_id, member_nick, &message.attachments, &voice,
+            guild_row.xsaid, guild_row.repeated_chars as usize, nickname_row.name.as_deref(),
+            &data.last_to_xsaid_tracker
+        );
+
+        (voice, mode)
+    };
 
     if let Some(target_lang) = guild_row.target_lang.as_deref() {
         if guild_row.to_translate && data.premium_check(Some(guild_id)).await?.is_none() {
@@ -704,18 +673,12 @@ async fn process_tts_msg(
         };
     }
 
+    let speaking_rate = data.speaking_rate(message.author.id, mode).await?;
     let url = funcs::prepare_url(
         data.config.tts_service.clone(),
         &content, &voice, mode,
-        &speaking_rate, &msg_length.to_string()
+        &speaking_rate, &guild_row.msg_length.to_string()
     );
-
-    // Pre-fetch the audio to handle max_length errors
-    let audio = require!(funcs::fetch_audio(
-        &data.reqwest,
-        url.clone(),
-        data.config.tts_service_auth_key.as_deref()
-    ).await?, Ok(()));
 
     let call_lock = match songbird::get(ctx).await.unwrap().get(guild_id) {
         Some(call) => call,
@@ -731,6 +694,13 @@ async fn process_tts_msg(
             ctx.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
         }
     };
+
+    // Pre-fetch the audio to handle max_length errors
+    let audio = require!(funcs::fetch_audio(
+        &data.reqwest,
+        url.clone(),
+        data.config.tts_service_auth_key.as_deref()
+    ).await?, Ok(()));
 
     let hint = audio.headers().get(reqwest::header::CONTENT_TYPE).map(|ct| {
         let mut hint = songbird::input::core::probe::Hint::new();

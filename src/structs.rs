@@ -121,6 +121,15 @@ impl Data {
         self.inner.translations.get("en-US")
     }
 
+    pub async fn speaking_rate(&self, user_id: serenity::UserId, mode: TTSMode) -> Result<Cow<'static, str>> {
+        let row = self.user_voice_db.get((user_id.into(), mode)).await?;
+
+        Ok(row.speaking_rate.map_or_else(
+            || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).map_or(Cow::Borrowed("1.0"), Cow::Owned),
+            |r| Cow::Owned(r.to_string())
+        ))
+    }
+
     pub async fn fetch_patreon_info(&self, user_id: serenity::UserId) -> Result<Option<PatreonInfo>> {
         let mut url = self.config.patreon_service.clone();
         url.set_path(&format!("/members/{user_id}"));

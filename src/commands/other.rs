@@ -83,13 +83,7 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
         let (voice, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
 
         let author_name: String = author.name.chars().filter(|char| {char.is_alphanumeric()}).collect();
-        let speaking_rate = data.user_voice_db
-            .get((author.id.into(), mode)).await?
-            .speaking_rate
-            .map_or_else(
-                || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).map_or(Cow::Borrowed("1.0"), Cow::Owned),
-                |r| Cow::Owned(r.to_string())
-            );
+        let speaking_rate = data.speaking_rate(author.id, mode).await?;
 
         let url = prepare_url(
             data.config.tts_service.clone(),
