@@ -263,11 +263,11 @@ pub async fn dm_generic(
     let sent = todm.direct_message(ctx, |b| {b.embed(|e| {e
         .title("Message from the developers:")
         .description(message)
-        .author(|a| {a
-            .name(format!("{}#{:04}", author.name, author.discriminator))
+        .author(|a| a
+            .name(author.tag())
             .icon_url(author.face())
-        })
+        )
     })}).await?;
 
-    Ok((format!("Sent message to {}#{:04}:", todm.name, todm.discriminator), sent.embeds.into_iter().next().unwrap()))
+    Ok((format!("Sent message to {}:", todm.tag()), sent.embeds.into_iter().next().unwrap()))
 }

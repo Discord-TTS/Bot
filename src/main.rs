@@ -811,14 +811,14 @@ async fn process_support_dm(
                             .title("Message from the developers:")
                             .description(&message.content)
                             .author(|a| {a
-                                .name(format!("{}#{:04}", &message.author.name, &message.author.discriminator))
-                                .icon_url(&message.author.face())
+                                .name(message.author.tag())
+                                .icon_url(message.author.face())
                             })
                             .field("In response to your suggestion:", &resolved.content, false)
                         })}).await?;
 
                         (
-                            format!("Sent message to {}#{:04}:", todm.name, todm.discriminator),
+                            format!("Sent message to {}:", todm.tag()),
                             sent.embeds.into_iter().next().unwrap()
                         )
                     }
@@ -857,8 +857,7 @@ async fn process_support_dm(
                 } else if content.as_str() == "help" {
                     channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
                 } else if !userinfo.dm_blocked {
-                    let display_name = format!("{}#{:04}", &message.author.name, &message.author.discriminator);
-                    let webhook_username = format!("{} ({})", display_name, message.author.id.0);
+                    let webhook_username = format!("{} ({})", message.author.tag(), message.author.id);
                     let paths: Vec<serenity::AttachmentType<'_>> = message.attachments.iter()
                         .map(|a| serenity::AttachmentType::Path(Path::new(&a.url)))
                         .collect();
