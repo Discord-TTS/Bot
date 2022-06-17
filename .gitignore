@@ -1,6 +1,5 @@
 .vscode
 *.hidden
-Dockerfile
 config.ini
 keydb.conf
 config.toml

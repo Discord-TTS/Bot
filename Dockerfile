@@ -1,5 +1,5 @@
 FROM rustlang/rust:nightly as builder
-ENV RUSTFLAGS="-C target-cpu=native"
+ENV RUSTFLAGS="-C target-cpu=haswell"
 
 WORKDIR /bot
 
