@@ -19,7 +19,7 @@ use std::sync::atomic::Ordering::SeqCst;
 use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
 use gnomeutils::OptionTryUnwrap;
 
-use crate::structs::{Context, CommandResult, Result, TTSModeChoice};
+use crate::structs::{Context, CommandResult, PrefixContext, Result, TTSModeChoice};
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
@@ -27,19 +27,14 @@ pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
 }
 
 #[poise::command(prefix_command, hide_in_help, owners_only)]
-pub async fn dm(ctx: Context<'_>, todm: serenity::User, #[rest] message: String) -> CommandResult {
-    let ctx_discord = ctx.discord();
-    let (content, embed) = dm_generic(ctx_discord, ctx.author(), &todm, &message).await?;
-    
-    let http = &ctx_discord.http;
-    if let poise::Context::Prefix(ctx) = ctx {
-        ctx.msg.channel_id.send_message(http, |b| {b
-            .content(content)
-            .set_embed(serenity::CreateEmbed::from(embed))
-        }).await?;
-    }
+pub async fn dm(ctx: PrefixContext<'_>, todm: serenity::User, #[rest] message: String) -> CommandResult {
+    let attachment_url = ctx.msg.attachments.first().map(|a| a.url.clone());
+    let (content, embed) = dm_generic(ctx.discord, &ctx.msg.author, &todm, attachment_url, &message).await?;
 
-    Ok(())
+    ctx.msg.channel_id.send_message(&ctx.discord.http, |b| b
+        .content(content)
+        .set_embed(serenity::CreateEmbed::from(embed))
+    ).await.map(drop).map_err(Into::into)
 }
 
 #[poise::command(prefix_command, hide_in_help, owners_only)]
@@ -258,16 +253,23 @@ pub async fn dm_generic(
     ctx: &serenity::Context,
     author: &serenity::User,
     todm: &serenity::User,
+    attachment_url: Option<String>,
     message: &str,
 ) -> Result<(String, serenity::Embed)> {
-    let sent = todm.direct_message(ctx, |b| {b.embed(|e| {e
+    let sent = todm.direct_message(ctx, |b| b.embed(|e| {e
         .title("Message from the developers:")
         .description(message)
         .author(|a| a
             .name(author.tag())
             .icon_url(author.face())
-        )
-    })}).await?;
+        );
+
+        if let Some(url) = attachment_url {
+            e.image(url);
+        };
+
+        e
+    })).await?;
 
     Ok((format!("Sent message to {}:", todm.tag()), sent.embeds.into_iter().next().unwrap()))
 }

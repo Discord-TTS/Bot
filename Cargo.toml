@@ -41,7 +41,7 @@ branch = "fix-ogg-opus-timebase"
 default-features = false
 
 [dependencies.sqlx]
-version = "0.5"
+version = "0.6"
 default-features = false
 features = ["macros", "postgres", "runtime-tokio-rustls"]
 

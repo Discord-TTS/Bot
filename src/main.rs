@@ -31,7 +31,7 @@ use once_cell::sync::OnceCell;
 use tracing::{error, info, warn};
 
 use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt, require_guild};
-use poise::serenity_prelude::{self as serenity, Mentionable as _, json::prelude as json};
+use poise::serenity_prelude::{self as serenity, Mentionable as _};
 use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
 
 mod migration;
@@ -805,17 +805,24 @@ async fn process_support_dm(
                     }
 
                     let todm = require!(ctx.user_from_dm(&resolved.author.name).await, Ok(()));
+                    let attachment_url = message.attachments.first().map(|a| a.url.clone());
 
                     let (content, embed) = if channel.id == data.webhooks.suggestions.channel_id.try_unwrap()? {
-                        let sent = todm.direct_message(ctx, |b| {b.embed(|e| {e
+                        let sent = todm.direct_message(ctx, |b| b.embed(|e| {e
                             .title("Message from the developers:")
                             .description(&message.content)
                             .author(|a| {a
                                 .name(message.author.tag())
                                 .icon_url(message.author.face())
                             })
-                            .field("In response to your suggestion:", &resolved.content, false)
-                        })}).await?;
+                            .field("In response to your suggestion:", &resolved.content, false);
+
+                            if let Some(url) = attachment_url {
+                                e.image(url);
+                            };
+
+                            e
+                        })).await?;
 
                         (
                             format!("Sent message to {}:", todm.tag()),
@@ -823,12 +830,7 @@ async fn process_support_dm(
                         )
                     }
                     else {
-                        commands::owner::dm_generic(
-                            ctx,
-                            &message.author,
-                            &todm,
-                            &message.content
-                        ).await?
+                        commands::owner::dm_generic(ctx, &message.author, &todm, attachment_url, &message.content).await?
                     };
 
                     channel.send_message(ctx, |b| {b
@@ -867,7 +869,7 @@ async fn process_support_dm(
                         .content(&message.content)
                         .username(webhook_username)
                         .avatar_url(message.author.face())
-                        .embeds(message.embeds.iter().map(|e| json::to_value(e).unwrap()).collect())
+                        .embeds(message.embeds.iter().cloned().map(Into::into).collect())
                     }).await?;
                 }
             } else {
