@@ -22,6 +22,6 @@ FROM debian:buster-slim
 RUN apt-get update && apt-get upgrade -y && apt-get install -y ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /bot/target/release/discord_tts_bot /usr/local/bin/discord_tts_bot
-COPY Cargo.lock .
+COPY Cargo.lock translations /
 
 CMD ["/usr/local/bin/discord_tts_bot"]
