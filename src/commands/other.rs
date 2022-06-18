@@ -237,7 +237,7 @@ pub async fn ping(ctx: Context<'_>,) -> CommandResult {
 }
 
 /// Suggests a new feature!
-#[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
+#[poise::command(category="Extra Commands", prefix_command, slash_command, ephemeral, required_bot_permissions="SEND_MESSAGES")]
 pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"] #[rest] suggestion: String) -> CommandResult {
     let confirm_message = ctx.discord().cache.current_user_field(|b| ctx
         .gettext("Are you sure you want to make a suggestion to {bot_name}?")
