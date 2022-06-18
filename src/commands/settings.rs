@@ -497,88 +497,79 @@ pub async fn block(
     Ok(())
 }
 
-/// Makes the bot say "<user> said" before each message
-#[poise::command(
-    guild_only,
-    category="Settings",
-    prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
-    required_bot_permissions="SEND_MESSAGES"
-)]
-pub async fn xsaid(
-    ctx: Context<'_>,
-    #[description="Whether to say \"<user> said\" before each message"] value: Option<bool>
-) -> CommandResult {
+#[track_caller]
+async fn generic_bool_command(ctx: Context<'_>, key: &'static str, value: Option<bool>, resp: &'static str) -> CommandResult {
     let value = require!(bool_button(ctx, value).await?, Ok(()));
+    let resp = ctx.gettext(resp).replace("{}", to_enabled(ctx.current_catalog(), value));
 
-    ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "xsaid", &value).await?;
-    ctx.say(ctx.gettext("xsaid is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
-
-    Ok(())
+    ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), key, &value).await?;
+    ctx.say(resp).await.map(drop).map_err(Into::into)
 }
 
-/// Makes the bot join the voice channel automatically when a message is sent in the setup channel
-#[poise::command(
-    guild_only,
-    category="Settings",
-    prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
-    required_bot_permissions="SEND_MESSAGES",
-    aliases("auto_join")
-)]
-pub async fn autojoin(
-    ctx: Context<'_>,
-    #[description="Whether to autojoin voice channels"] value: Option<bool>
-) -> CommandResult {
-    let value = require!(bool_button(ctx, value).await?, Ok(()));
-
-    ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "auto_join", &value).await?;
-    ctx.say(ctx.gettext("Auto Join is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
-
-    Ok(())
+macro_rules! create_bool_command {
+    (
+        $description:literal,
+        $value_desc:literal,
+        $name:ident,
+        $key:literal,
+        gettext($resp:literal),
+        aliases($( $aliases:literal ),*),
+        $($extra:tt)*
+    ) => {
+        #[doc=$description]
+        #[poise::command(
+            category="Settings",
+            aliases($($aliases,)*),
+            required_permissions="ADMINISTRATOR",
+            required_bot_permissions="SEND_MESSAGES",
+            guild_only, prefix_command, slash_command,
+            $($extra)*
+        )]
+        pub async fn $name(ctx: Context<'_>, #[description=$value_desc] value: Option<bool>) -> CommandResult {
+            generic_bool_command(ctx, $key, value, $resp).await
+        }
+    }
 }
 
-/// Makes the bot ignore messages sent by bots and webhooks 
-#[poise::command(
-    guild_only,
-    category="Settings",
-    prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
-    required_bot_permissions="SEND_MESSAGES",
-    aliases("bot_ignore", "ignore_bots", "ignorebots")
-)]
-pub async fn botignore(
-    ctx: Context<'_>,
-    #[description="Whether to ignore messages sent by bots and webhooks"] value: Option<bool>
-) -> CommandResult {
-    let value = require!(bool_button(ctx, value).await?, Ok(()));
-
-    ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "bot_ignore", &value).await?;
-    ctx.say(ctx.gettext("Ignoring bots is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
-
-    Ok(())
-}
-
-/// Makes the bot require people to be in the voice channel to TTS
-#[poise::command(
-    guild_only,
-    category="Settings",
-    prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
-    required_bot_permissions="SEND_MESSAGES",
-    aliases("voice_require", "require_in_vc")
-)]
-pub async fn require_voice(
-    ctx: Context<'_>,
-    #[description="Whether to require people to be in the voice channel to TTS"] value: Option<bool>
-) -> CommandResult {
-    let value = require!(bool_button(ctx, value).await?, Ok(()));
-
-    ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "require_voice", &value).await?;
-    ctx.say(ctx.gettext("Requiring users to be in voice channel for TTS is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
-
-    Ok(())
-}
+create_bool_command!(
+    "Makes the bot say \"<user> said\" before each message",
+    "Whether to say \"<user> said\" before each message",
+    xsaid, "xsaid",
+    gettext("xsaid is now: {}"), aliases(),
+);
+create_bool_command!(
+    "Makes the bot join the voice channel automatically when a message is sent in the setup channel",
+    "Whether to automatically join voice channels",
+    autojoin, "auto_join",
+    gettext("Auto Join is now: {}"), aliases("auto_join"),
+);
+create_bool_command!(
+    "Makes the bot ignore messages sent by bots and webhooks",
+    "Whether to ignore messages sent by bots and webhooks",
+    botignore, "bot_ignore",
+    gettext("Ignoring bots is now: {}"), aliases("bot_ignore", "ignore_bots", "ignorebots"),
+);
+create_bool_command!(
+    "Makes the bot require people to be in the voice channel to TTS",
+    "Whether to require people to be in the voice channel to TTS",
+    require_voice, "require_voice",
+    gettext("Requiring users to be in voice channel for TTS is now: {}"),
+    aliases("voice_require", "require_in_vc"),
+);
+create_bool_command!(
+    "Makes the bot ignore messages sent by members of the audience in stage channels",
+    "Whether to ignore messages sent by the audience",
+    audience_ignore, "audience_ignore",
+    gettext("Ignoring audience is now: {}"),
+    aliases("audienceignore", "ignore_audience", "ignoreaudience"),
+);
+create_bool_command!(
+    "Whether to use DeepL translate to translate all TTS messages to the same language ",
+    "Whether to translate all messages to the same language",
+    translation, "to_translate",
+    gettext("Translation is now: {}"), aliases("translate", "to_translate", "should_translate"),
+    check="crate::premium_command_check",
+);
 
 /// Changes the required role to use the bot.
 #[poise::command(
@@ -690,25 +681,6 @@ pub async fn server_voice(
     Ok(())
 }
 
-/// Whether to use DeepL translate to translate all TTS messages to the same language 
-#[poise::command(
-    guild_only,
-    category="Settings",
-    check="crate::premium_command_check",
-    prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
-    required_bot_permissions="SEND_MESSAGES",
-    aliases("translate", "to_translate", "should_translate")
-)]
-pub async fn translation(ctx: Context<'_>, #[description="Whether to translate all messages to the same language"] value: Option<bool>) -> CommandResult {
-    let value = require!(bool_button(ctx, value).await?, Ok(()));
-
-    ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "to_translate", &value).await?;
-    ctx.say(ctx.gettext("Translation is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
-
-    Ok(())
-}
-
 /// Changes the target language for translation
 #[poise::command(
     guild_only,
@@ -816,26 +788,6 @@ pub async fn msg_length(ctx: Context<'_>, #[description="Max length of TTS messa
     };
 
     ctx.say(to_send).await?;
-    Ok(())
-}
-
-/// Makes the bot ignore messages sent by members of the audience in stage channels
-#[poise::command(
-    guild_only,
-    category="Settings",
-    prefix_command, slash_command,
-    required_permissions="ADMINISTRATOR",
-    required_bot_permissions="SEND_MESSAGES",
-    aliases("audience_ignore", "ignore_audience", "ignoreaudience")
-)]
-pub async fn audienceignore(
-    ctx: Context<'_>,
-    #[description="Whether to ignore messages sent by the audience"] value: Option<bool>
-) -> CommandResult {
-    let value = require!(bool_button(ctx, value).await?, Ok(()));
-
-    ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "audience_ignore", &value).await?;
-    ctx.say(ctx.gettext("Ignoring audience is now: {}").replace("{}", to_enabled(ctx.current_catalog(), value))).await?;
     Ok(())
 }
 
@@ -1268,7 +1220,7 @@ pub fn commands() -> [Command; 5] {
                 poise::Command {name: "channel", ..setup()},
                 xsaid(), autojoin(), required_role(), voice(), server_voice(), mode(),
                 server_mode(), msg_length(), botignore(), prefix(), translation(), translation_lang(), speaking_rate(),
-                nick(), repeated_characters(), audienceignore(), require_voice(), block(),
+                nick(), repeated_characters(), audience_ignore(), require_voice(), block(),
             ],
             ..set()
         },
