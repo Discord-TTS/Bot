@@ -194,19 +194,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "chrono"
-version = "0.4.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
-dependencies = [
- "libc",
- "num-integer",
- "num-traits 0.2.15",
- "serde",
- "winapi",
-]
-
-[[package]]
 name = "cipher"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1399,7 +1386,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#826fcdcca04eef19991b7e197310136af323e9cf"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#2e794ffb879d166bcf6a62a04978e5e147ebcf76"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1416,7 +1403,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#826fcdcca04eef19991b7e197310136af323e9cf"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#2e794ffb879d166bcf6a62a04978e5e147ebcf76"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1821,7 +1808,6 @@ dependencies = [
  "bitflags",
  "bytes",
  "cfg-if",
- "chrono",
  "dashmap",
  "flate2",
  "futures",
