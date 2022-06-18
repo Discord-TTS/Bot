@@ -41,6 +41,30 @@ pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunner
     status.into_iter().map(|(_, status)| status).join("\n")
 }
 
+pub async fn dm_generic(
+    ctx: &serenity::Context,
+    author: &serenity::User,
+    todm: &serenity::User,
+    attachment_url: Option<String>,
+    message: &str,
+) -> Result<(String, serenity::Embed)> {
+    let sent = todm.direct_message(ctx, |b| b.embed(|e| {e
+        .title("Message from the developers:")
+        .description(message)
+        .author(|a| a
+            .name(author.tag())
+            .icon_url(author.face())
+        );
+
+        if let Some(url) = attachment_url {
+            e.image(url);
+        };
+
+        e
+    })).await?;
+
+    Ok((format!("Sent message to {}:", todm.tag()), sent.embeds.into_iter().next().unwrap()))
+}
 
 pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url, auth_key: Option<&str>) -> Result<Option<reqwest::Response>> {
     let resp = reqwest

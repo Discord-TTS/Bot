@@ -25,7 +25,7 @@ use gnomeutils::{require, PoiseContextExt as _, OptionTryUnwrap as _};
 use crate::constants::OPTION_SEPERATORS;
 use crate::traits::PoiseContextExt as _;
 use crate::funcs::{confirm_dialog, fetch_audio, prepare_url};
-use crate::structs::{ApplicationContext, Context, CommandResult, TTSMode};
+use crate::structs::{ApplicationContext, Context, CommandResult, TTSMode, Command};
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
@@ -286,4 +286,8 @@ pub async fn invite(ctx: Context<'_>,) -> CommandResult {
             ).try_unwrap()?
         }
     ).await.map(drop).map_err(Into::into)
+}
+
+pub fn commands() -> [Command; 10] {
+    [tts(), uptime(), botstats(), channel(), premium(), ping(), suggest(), invite(), tts_speak(), tts_speak_as()]
 }

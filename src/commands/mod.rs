@@ -14,8 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod main;
-pub mod help;
-pub mod other;
-pub mod owner;
-pub mod settings;
+use crate::structs::Command;
+
+mod main;
+mod help;
+mod other;
+mod owner;
+mod settings;
+
+pub fn commands() -> Vec<Command> {
+    main::commands().into_iter()
+        .chain(other::commands())
+        .chain(settings::commands())
+        .chain(owner::commands())
+        .chain(help::commands())
+        .collect()
+}

@@ -21,7 +21,7 @@ use poise::serenity_prelude as serenity;
 use gnomeutils::{require, require_guild, OptionGettext as _, PoiseContextExt as _};
 use serenity::Mentionable;
 
-use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice};
+use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice, Command};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::traits::{PoiseContextExt};
 use crate::funcs::{random_footer, confirm_dialog};
@@ -1257,4 +1257,20 @@ pub async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String
 
     let gender = data.gcloud_voices[lang][variant];
     Ok((format!("{lang} {variant} ({gender})"), pages))
+}
+
+pub fn commands() -> [Command; 5] {
+    [
+        settings(), setup(), voices(), translation_languages(),
+
+        poise::Command {
+            subcommands: vec![
+                poise::Command {name: "channel", ..setup()},
+                xsaid(), autojoin(), required_role(), voice(), server_voice(), mode(),
+                server_mode(), msg_length(), botignore(), prefix(), translation(), translation_lang(), speaking_rate(),
+                nick(), repeated_characters(), audienceignore(), require_voice(), block(),
+            ],
+            ..set()
+        },
+    ]
 }

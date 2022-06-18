@@ -193,3 +193,7 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
 
     Ok(())
 }
+
+pub fn commands() -> [Command; 1] {
+    [help()]
+}

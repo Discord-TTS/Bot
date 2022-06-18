@@ -19,7 +19,8 @@ use std::sync::atomic::Ordering::SeqCst;
 use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
 use gnomeutils::OptionTryUnwrap;
 
-use crate::structs::{Context, CommandResult, PrefixContext, Result, TTSModeChoice};
+use crate::structs::{Context, CommandResult, PrefixContext, TTSModeChoice, Command};
+use crate::funcs::dm_generic;
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
@@ -248,28 +249,6 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
     songbird::get(ctx.discord()).await.unwrap().remove(guild_id).await.map_err(Into::into)
 }
 
-
-pub async fn dm_generic(
-    ctx: &serenity::Context,
-    author: &serenity::User,
-    todm: &serenity::User,
-    attachment_url: Option<String>,
-    message: &str,
-) -> Result<(String, serenity::Embed)> {
-    let sent = todm.direct_message(ctx, |b| b.embed(|e| {e
-        .title("Message from the developers:")
-        .description(message)
-        .author(|a| a
-            .name(author.tag())
-            .icon_url(author.face())
-        );
-
-        if let Some(url) = attachment_url {
-            e.image(url);
-        };
-
-        e
-    })).await?;
-
-    Ok((format!("Sent message to {}:", todm.tag()), sent.embeds.into_iter().next().unwrap()))
+pub fn commands() -> [Command; 8] {
+    [dm(), close(), debug(), register(), add_premium(), remove_cache(), refresh_ofs(), purge_guilds()]
 }

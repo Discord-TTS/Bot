@@ -45,7 +45,7 @@ mod funcs;
 
 use traits::SerenityContextExt;
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
-use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices, get_translation_langs};
+use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices, get_translation_langs, dm_generic};
 use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig};
 
 
@@ -224,6 +224,7 @@ async fn _main() -> Result<()> {
             .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
         )
         .options(poise::FrameworkOptions {
+            commands: commands::commands(),
             allowed_mentions: Some({
                 let mut allowed_mentions = serenity::CreateAllowedMentions::default();
                 allowed_mentions.parse(serenity::ParseValue::Users);
@@ -283,37 +284,7 @@ async fn _main() -> Result<()> {
                     Ok(true)
                 }
             })),
-            // Add all the commands, this ordering is important as it is shown on the help command
-            commands: vec![
-                commands::main::join(), commands::main::clear(), commands::main::leave(), commands::main::premium_activate(),
-
-                commands::other::tts(), commands::other::uptime(), commands::other::botstats(), commands::other::channel(),
-                commands::other::premium(), commands::other::ping(), commands::other::suggest(), commands::other::invite(),
-                commands::other::tts_speak(), commands::other::tts_speak_as(),
-
-                commands::settings::settings(),
-                poise::Command {
-                    subcommands: vec![
-                        poise::Command {
-                            name: "channel",
-                            ..commands::settings::setup()
-                        },
-                        commands::settings::xsaid(), commands::settings::autojoin(), commands::settings::required_role(),
-                        commands::settings::voice(), commands::settings::server_voice(), commands::settings::mode(),
-                        commands::settings::server_mode(), commands::settings::msg_length(),  commands::settings::botignore(), commands::settings::prefix(),
-                        commands::settings::translation(), commands::settings::translation_lang(), commands::settings::speaking_rate(),
-                        commands::settings::nick(), commands::settings::repeated_characters(), commands::settings::audienceignore(),
-                        commands::settings::require_voice(), commands::settings::block(),
-                    ],
-                    ..commands::settings::set()
-                },
-                commands::settings::setup(), commands::settings::voices(), commands::settings::translation_languages(),
-
-                commands::help::help(),
-                commands::owner::dm(), commands::owner::close(), commands::owner::debug(), commands::owner::register(),
-                commands::owner::add_premium(), commands::owner::remove_cache(), commands::owner::refresh_ofs(),
-                commands::owner::purge_guilds(),
-            ],..poise::FrameworkOptions::default()
+            ..poise::FrameworkOptions::default()
         })
         .build().await?;
 
@@ -830,7 +801,7 @@ async fn process_support_dm(
                         )
                     }
                     else {
-                        commands::owner::dm_generic(ctx, &message.author, &todm, attachment_url, &message.content).await?
+                        dm_generic(ctx, &message.author, &todm, attachment_url, &message.content).await?
                     };
 
                     channel.send_message(ctx, |b| {b

@@ -20,7 +20,7 @@ use sqlx::Row;
 use poise::serenity_prelude as serenity;
 use gnomeutils::{PoiseContextExt as _, require, require_guild};
 
-use crate::structs::{Context, Result, CommandResult, TTSMode, JoinVCToken};
+use crate::structs::{Context, Result, CommandResult, TTSMode, JoinVCToken, Command};
 use crate::traits::{SerenityContextExt, PoiseContextExt};
 use crate::funcs::random_footer;
 
@@ -256,4 +256,8 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
         author.name, author.discriminator, author.id, guild_name, guild_id, linked_guilds
     );
     Ok(())
+}
+
+pub fn commands() -> [Command; 4] {
+    [join(), leave(), clear(), premium_activate()]
 }
