@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-05-16 20:19+0000\n"
+"POT-Creation-Date: 2022-06-18 19:15+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,27 +17,27 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/commands/main.rs:33
+#: src/commands/main.rs:36
 msgid "you ran this command in the wrong channel"
 msgstr ""
 
-#: src/commands/main.rs:34
+#: src/commands/main.rs:37
 msgid "do `/channel` get the channel that has been setup"
 msgstr ""
 
-#: src/commands/main.rs:57
+#: src/commands/main.rs:52
 msgid "you need to be in a voice channel to make me join your voice channel"
 msgstr ""
 
-#: src/commands/main.rs:58
+#: src/commands/main.rs:53
 msgid "join a voice channel and try again"
 msgstr ""
 
-#: src/commands/main.rs:72
+#: src/commands/main.rs:73
 msgid "I do not have permissions to TTS in your voice channel!"
 msgstr ""
 
-#: src/commands/main.rs:73
+#: src/commands/main.rs:75
 msgid "please ask an administrator to give me: {missing_permissions}"
 msgstr ""
 
@@ -57,99 +57,99 @@ msgstr ""
 msgid "Just type normally and TTS Bot will say your messages!"
 msgstr ""
 
-#: src/commands/main.rs:142
+#: src/commands/main.rs:149
 msgid "Error: You need to be in the same voice channel as me to make me leave!"
 msgstr ""
 
-#: src/commands/main.rs:151
+#: src/commands/main.rs:154
 msgid "Left voice channel!"
 msgstr ""
 
-#: src/commands/main.rs:153
+#: src/commands/main.rs:157
 msgid "Error: How do I leave a voice channel if I am not in one?"
 msgstr ""
 
-#: src/commands/main.rs:187
+#: src/commands/main.rs:191
 msgid "**Error**: I am not in a voice channel!"
 msgstr ""
 
-#: src/commands/main.rs:205
+#: src/commands/main.rs:209
 msgid "Hey, this server is already premium!"
 msgstr ""
 
-#: src/commands/main.rs:221
+#: src/commands/main.rs:224
 msgid "Hey, you already have {server_count} servers linked, you are only subscribed to the {entitled_servers} tier!"
 msgstr ""
 
-#: src/commands/main.rs:229
+#: src/commands/main.rs:232
 msgid "Hey, you are not subscribed on Patreon!"
 msgstr ""
 
-#: src/commands/main.rs:247
+#: src/commands/main.rs:249
 msgid "Done! This server is now premium!"
 msgstr ""
 
-#: src/commands/help.rs:117
+#: src/commands/help.rs:123
 msgid "No command called {} found!"
 msgstr ""
 
-#: src/commands/help.rs:125
+#: src/commands/help.rs:131
 msgid "The group {group_name} does not have a subcommand called {subcommand_name}!"
 msgstr ""
 
-#: src/commands/help.rs:132
+#: src/commands/help.rs:138
 msgid "This command is only available to the bot owner!"
 msgstr ""
 
-#: src/commands/help.rs:146
+#: src/commands/help.rs:152
 msgid "{command_name} Help!"
 msgstr ""
 
-#: src/commands/help.rs:154
+#: src/commands/help.rs:160
 msgid "Command description not found!"
 msgstr ""
 
-#: src/commands/help.rs:159
+#: src/commands/help.rs:165
 msgid "__**Parameter Descriptions**__\n"
 ""
 msgstr ""
 
-#: src/commands/help.rs:161
+#: src/commands/help.rs:167
 msgid "no description"
 msgstr ""
 
-#: src/commands/help.rs:180
+#: src/commands/help.rs:186
 msgid "Use `/help {command_name} [command]` for more info on a command"
 msgstr ""
 
-#: src/commands/help.rs:183
+#: src/commands/help.rs:189
 msgid "Use `/help [command]` for more info on a command"
 msgstr ""
 
-#: src/commands/other.rs:33
+#: src/commands/other.rs:35
 msgid "{user_mention} has been up since: <t:{timestamp}:R>"
 msgstr ""
 
-#: src/commands/other.rs:53
+#: src/commands/other.rs:73
 msgid "You don't need to include the `/tts` for messages to be said!"
 msgstr ""
 
-#: src/commands/other.rs:98
+#: src/commands/other.rs:107
 msgid "Generated some TTS!"
 msgstr ""
 
-#: src/commands/other.rs:147
+#: src/commands/other.rs:162
 msgid "{bot_name}: Freshly rewritten in Rust!"
 msgstr ""
 
-#: src/commands/other.rs:151
+#: src/commands/other.rs:166
 msgid "\n"
 "Time to fetch: {time_to_fetch}ms\n"
 "Support Server: {main_server_invite}\n"
 "Repository: https://github.com/GnomedDev/Discord-TTS-Bot"
 msgstr ""
 
-#: src/commands/other.rs:158
+#: src/commands/other.rs:173
 msgid "\n"
 "Currently in:\n"
 "    {sep2} {total_voice_clients} voice channels\n"
@@ -160,65 +160,66 @@ msgid "\n"
 "and can be used by {total_members} people!"
 msgstr ""
 
-#: src/commands/other.rs:182
+#: src/commands/other.rs:197
 msgid "You are in the setup channel already!"
 msgstr ""
 
-#: src/commands/other.rs:184
+#: src/commands/other.rs:199
 msgid "The channel hasn't been setup, do `/setup #textchannel`"
 msgstr ""
 
-#: src/commands/other.rs:186
+#: src/commands/other.rs:201
 msgid "The current setup channel is: <#{channel}>"
 msgstr ""
 
-#: src/commands/other.rs:195
+#: src/commands/other.rs:210
 msgid "\n"
-"To donate to support the development and hosting of TTS Bot and get access to TTS Bot Premium, a more stable version of this bot with more and better voices you can donate via Patreon!\n"
+"To support the development and hosting of TTS Bot and get access to TTS Bot Premium, including more modes (`/set mode`), many more voices (`/set voice`), and extra options such as TTS translation, see:\n"
 "https://www.patreon.com/Gnome_the_Bot_Maker\n"
 "    "
 msgstr ""
 
-#: src/commands/other.rs:208
+#: src/commands/other.rs:223
 msgid "Current Latency: {}ms"
 msgstr ""
 
-#: src/commands/other.rs:228
+#: src/commands/other.rs:243
 msgid "Are you sure you want to make a suggestion to {bot_name}?"
 msgstr ""
 
-#: src/commands/other.rs:233
+#: src/commands/other.rs:248
 msgid "Suggestion cancelled"
 msgstr ""
 
-#: src/commands/other.rs:247
+#: src/commands/other.rs:262
 msgid "Suggestion noted"
 msgstr ""
 
-#: src/commands/other.rs:262
+#: src/commands/other.rs:277
 msgid "Check out {channel_mention} to invite {bot_mention}!"
 msgstr ""
 
-#: src/commands/other.rs:267
-msgid "Join {server_invite} and look in #{channel_name} to invite <@{bot_mention}>"
+#: src/commands/other.rs:282
+msgid "Join {server_invite} and look in #{channel_name} to invite {bot_mention}"
 msgstr ""
 
-#: src/commands/settings.rs:56
+#: src/commands/settings.rs:55
 msgid "none"
 msgstr ""
 
-#: src/commands/settings.rs:122
+#: src/commands/settings.rs:120
 msgid "Change these settings with `/set {property} {value}`!\n"
 "None = setting has not been set yet!"
 msgstr ""
 
-#: src/commands/settings.rs:125
+#: src/commands/settings.rs:123
 msgid "**General Server Settings**"
 msgstr ""
 
-#: src/commands/settings.rs:125
+#: src/commands/settings.rs:123
 msgid "\n"
-"{sep1} Setup Channel: `#{channel_name}`\n"
+"{sep1} Setup Channel: {channel_mention}\n"
+"{sep1} Required Role: {role_mention}\n"
 "{sep1} Command Prefix: `{prefix}`\n"
 "{sep1} Auto Join: `{autojoin}`\n"
 "        "
@@ -259,7 +260,7 @@ msgid "\n"
 "        "
 msgstr ""
 
-#: src/commands/settings.rs:205 src/commands/settings.rs:1121
+#: src/commands/settings.rs:205 src/commands/settings.rs:1145
 msgid "{bot_user} Voices | Mode: `{mode}`"
 msgstr ""
 
@@ -268,297 +269,346 @@ msgid "**Currently Supported Voice**\n"
 "{page}"
 msgstr ""
 
-#: src/commands/settings.rs:214 src/commands/settings.rs:1134
+#: src/commands/settings.rs:214 src/commands/settings.rs:1158
 msgid "Current voice used"
 msgstr ""
 
-#: src/commands/settings.rs:330
+#: src/commands/settings.rs:343
 msgid "What would you like to set this to?"
 msgstr ""
 
-#: src/commands/settings.rs:331
+#: src/commands/settings.rs:344
 msgid "True"
 msgstr ""
 
-#: src/commands/settings.rs:331
+#: src/commands/settings.rs:344
 msgid "False"
 msgstr ""
 
-#: src/commands/settings.rs:361
+#: src/commands/settings.rs:374
 msgid "If this is an error, please contact Gnome!#6669."
 msgstr ""
 
-#: src/commands/settings.rs:362
+#: src/commands/settings.rs:375
 msgid "\n"
 "                The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!\n"
-"                If this server has purchased premium, please run the `/activate` command to link yourself to this server!\n"
+"                If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!\n"
 "            "
 msgstr ""
 
-#: src/commands/settings.rs:378
+#: src/commands/settings.rs:391
 msgid "Changed the server TTS Mode to: {mode}"
 msgstr ""
 
-#: src/commands/settings.rs:379
+#: src/commands/settings.rs:392
 msgid "Changed your TTS Mode to: {mode}"
 msgstr ""
 
-#: src/commands/settings.rs:382
+#: src/commands/settings.rs:395
 msgid "Reset the server mode"
 msgstr ""
 
-#: src/commands/settings.rs:383
+#: src/commands/settings.rs:396
 msgid "Reset your mode"
 msgstr ""
 
-#: src/commands/settings.rs:412
+#: src/commands/settings.rs:425
 msgid "Changed the server voice to: {voice}"
 msgstr ""
 
-#: src/commands/settings.rs:413
+#: src/commands/settings.rs:426
 msgid "Changed your voice to {voice}"
 msgstr ""
 
-#: src/commands/settings.rs:416
+#: src/commands/settings.rs:429
 msgid "Invalid voice, do `/voices`"
 msgstr ""
 
-#: src/commands/settings.rs:421
+#: src/commands/settings.rs:434
 msgid "Reset the server voice"
 msgstr ""
 
-#: src/commands/settings.rs:422
+#: src/commands/settings.rs:435
 msgid "Reset your voice"
 msgstr ""
 
-#: src/commands/settings.rs:459
+#: src/commands/settings.rs:471
 msgid "Enabled"
 msgstr ""
 
-#: src/commands/settings.rs:461
+#: src/commands/settings.rs:473
 msgid "Disabled"
 msgstr ""
 
-#: src/commands/settings.rs:484
+#: src/commands/settings.rs:496
 msgid "Done!"
 msgstr ""
 
-#: src/commands/settings.rs:503
+#: src/commands/settings.rs:538
 msgid "xsaid is now: {}"
 msgstr ""
 
-#: src/commands/settings.rs:524
+#: src/commands/settings.rs:544
 msgid "Auto Join is now: {}"
 msgstr ""
 
-#: src/commands/settings.rs:545
+#: src/commands/settings.rs:550
 msgid "Ignoring bots is now: {}"
 msgstr ""
 
-#: src/commands/settings.rs:566
+#: src/commands/settings.rs:556
 msgid "Requiring users to be in voice channel for TTS is now: {}"
 msgstr ""
 
-#: src/commands/settings.rs:640
-msgid "Translation is now: {}"
-msgstr ""
-
-#: src/commands/settings.rs:671
-msgid "The target translation language is now: {}"
-msgstr ""
-
-#: src/commands/settings.rs:673
-msgid "You may want to enable translation with `/set translation on`"
-msgstr ""
-
-#: src/commands/settings.rs:680
-msgid "DeepL Translation - Supported languages"
-msgstr ""
-
-#: src/commands/settings.rs:704
-msgid "Command prefix for this server is now: {prefix}"
-msgstr ""
-
-#: src/commands/settings.rs:706
-msgid "**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space"
-msgstr ""
-
-#: src/commands/settings.rs:725
-msgid "**Error**: Cannot set the max repeated characters above 100"
-msgstr ""
-
-#: src/commands/settings.rs:727
-msgid "**Error**: Cannot set the max repeated characters below 5"
-msgstr ""
-
-#: src/commands/settings.rs:730
-msgid "Max repeated characters is now: {}"
-msgstr ""
-
-#: src/commands/settings.rs:750
-msgid "**Error**: Cannot set the max length of messages above 60 seconds"
-msgstr ""
-
-#: src/commands/settings.rs:752
-msgid "**Error**: Cannot set the max length of messages below 10 seconds"
-msgstr ""
-
-#: src/commands/settings.rs:755
-msgid "Max message length is now: {} seconds"
-msgstr ""
-
-#: src/commands/settings.rs:779
+#: src/commands/settings.rs:563
 msgid "Ignoring audience is now: {}"
 msgstr ""
 
-#: src/commands/settings.rs:799
+#: src/commands/settings.rs:570
+msgid "Translation is now: {}"
+msgstr ""
+
+#: src/commands/settings.rs:603
+msgid "Are you sure you want to change the required role?"
+msgstr ""
+
+#: src/commands/settings.rs:604
+msgid "No, keep {role_name} as the required role."
+msgstr ""
+
+#: src/commands/settings.rs:606
+msgid "Are you sure you want to set the required role?"
+msgstr ""
+
+#: src/commands/settings.rs:607
+msgid "No, keep {bot_name} usable by everyone."
+msgstr ""
+
+#: src/commands/settings.rs:610
+msgid "Are you sure you want to remove the required role?"
+msgstr ""
+
+#: src/commands/settings.rs:611
+msgid "No, keep {bot_name} restricted to {role_name}."
+msgstr ""
+
+#: src/commands/settings.rs:617
+msgid "Yes, I'm sure."
+msgstr ""
+
+#: src/commands/settings.rs:620
+msgid "{bot_name} now requires {required_role} to use."
+msgstr ""
+
+#: src/commands/settings.rs:622
+msgid "{bot_name} is now usable by everyone!"
+msgstr ""
+
+#: src/commands/settings.rs:625
+msgid "Cancelled!"
+msgstr ""
+
+#: src/commands/settings.rs:704
+msgid "The target translation language is now: `{}`"
+msgstr ""
+
+#: src/commands/settings.rs:706
+msgid "\n"
+"You may want to enable translation with `/set translation on`"
+msgstr ""
+
+#: src/commands/settings.rs:711
+msgid "Reset the target translation language"
+msgstr ""
+
+#: src/commands/settings.rs:714
+msgid "Invalid translation language, do `/translation_languages`"
+msgstr ""
+
+#: src/commands/settings.rs:735
+msgid "Command prefix for this server is now: {prefix}"
+msgstr ""
+
+#: src/commands/settings.rs:737
+msgid "**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space"
+msgstr ""
+
+#: src/commands/settings.rs:756
+msgid "**Error**: Cannot set the max repeated characters above 100"
+msgstr ""
+
+#: src/commands/settings.rs:758
+msgid "**Error**: Cannot set the max repeated characters below 5"
+msgstr ""
+
+#: src/commands/settings.rs:761
+msgid "Max repeated characters is now: {}"
+msgstr ""
+
+#: src/commands/settings.rs:781
+msgid "**Error**: Cannot set the max length of messages above 60 seconds"
+msgstr ""
+
+#: src/commands/settings.rs:783
+msgid "**Error**: Cannot set the max length of messages below 10 seconds"
+msgstr ""
+
+#: src/commands/settings.rs:786
+msgid "Max message length is now: {} seconds"
+msgstr ""
+
+#: src/commands/settings.rs:810
 msgid "**Error**: Cannot set speaking rate for the {mode} mode"
 msgstr ""
 
-#: src/commands/settings.rs:805
+#: src/commands/settings.rs:816
 msgid "**Error**: Cannot set the speaking rate multiplier above {max}{kind}"
 msgstr ""
 
-#: src/commands/settings.rs:807
+#: src/commands/settings.rs:818
 msgid "**Error**: Cannot set the speaking rate multiplier below {min}{kind}"
 msgstr ""
 
-#: src/commands/settings.rs:811
+#: src/commands/settings.rs:822
 msgid "Your speaking rate is now: {speaking_rate}{kind}"
 msgstr ""
 
-#: src/commands/settings.rs:838
+#: src/commands/settings.rs:849
 msgid "**Error**: You need admin to set other people's nicknames!"
 msgstr ""
 
-#: src/commands/settings.rs:847
+#: src/commands/settings.rs:858
 msgid "**Error**: You can't have mentions/emotes in your nickname!"
 msgstr ""
 
-#: src/commands/settings.rs:855
+#: src/commands/settings.rs:866
 msgid "Changed {user}'s nickname to {new_nick}"
 msgstr ""
 
-#: src/commands/settings.rs:859
+#: src/commands/settings.rs:870
 msgid "Reset {user}'s nickname"
 msgstr ""
 
-#: src/commands/settings.rs:920
+#: src/commands/settings.rs:937
 msgid "**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!"
 msgstr ""
 
-#: src/commands/settings.rs:922
+#: src/commands/settings.rs:939
 msgid "**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`"
 msgstr ""
 
-#: src/commands/settings.rs:928
+#: src/commands/settings.rs:945
 msgid "Select a channel!"
 msgstr ""
 
-#: src/commands/settings.rs:971
+#: src/commands/settings.rs:990
 msgid "{bot_name} has been setup!"
 msgstr ""
 
-#: src/commands/settings.rs:973
+#: src/commands/settings.rs:992
 msgid "\n"
 "TTS Bot will now accept commands and read from <#{channel}>.\n"
 "Just do `/join` and start talking!\n"
 ""
 msgstr ""
 
-#: src/commands/settings.rs:992
+#: src/commands/settings.rs:1008
 msgid "Would you like to set up TTS Bot update announcements for the setup channel?"
 msgstr ""
 
-#: src/commands/settings.rs:993
+#: src/commands/settings.rs:1009
 msgid "Yes"
 msgstr ""
 
-#: src/commands/settings.rs:994
+#: src/commands/settings.rs:1010
 msgid "No"
 msgstr ""
 
-#: src/commands/settings.rs:1132
+#: src/commands/settings.rs:1093
+msgid "{} Translation Languages"
+msgstr ""
+
+#: src/commands/settings.rs:1156
 msgid "Currently supported voices"
 msgstr ""
 
-#: src/commands/settings.rs:1135
+#: src/commands/settings.rs:1159
 msgid "None"
 msgstr ""
 
-#: src/error.rs:206
+#: ../rust-libs/gnomeutils/src/errors.rs:234
 msgid "{command_name} is on cooldown"
 msgstr ""
 
-#: src/error.rs:207
+#: ../rust-libs/gnomeutils/src/errors.rs:235
 msgid "try again in {} seconds"
 msgstr ""
 
-#: src/error.rs:234
+#: ../rust-libs/gnomeutils/src/errors.rs:262
 msgid "I cannot find the member: `{}`"
 msgstr ""
 
-#: src/error.rs:236
+#: ../rust-libs/gnomeutils/src/errors.rs:264
 msgid "I cannot find the server: `{}`"
 msgstr ""
 
-#: src/error.rs:238
+#: ../rust-libs/gnomeutils/src/errors.rs:266
 msgid "I cannot find the channel: `{}`"
 msgstr ""
 
-#: src/error.rs:240
+#: ../rust-libs/gnomeutils/src/errors.rs:268
 msgid "I cannot convert `{}` to a number"
 msgstr ""
 
-#: src/error.rs:242
+#: ../rust-libs/gnomeutils/src/errors.rs:270
 msgid "I cannot convert `{}` to True/False"
 msgstr ""
 
-#: src/error.rs:248
+#: ../rust-libs/gnomeutils/src/errors.rs:276
 msgid "check out `/help {command}`"
 msgstr ""
 
-#: src/error.rs:307
+#: ../rust-libs/gnomeutils/src/errors.rs:335
 msgid "I cannot run `{command}` as I am missing permissions"
 msgstr ""
 
-#: src/error.rs:308
+#: ../rust-libs/gnomeutils/src/errors.rs:336
 msgid "give me: {}"
 msgstr ""
 
-#: src/error.rs:313
+#: ../rust-libs/gnomeutils/src/errors.rs:341
 msgid "you cannot run this command"
 msgstr ""
 
-#: src/error.rs:315
+#: ../rust-libs/gnomeutils/src/errors.rs:343
 msgid "ask an administator for the following permissions: {}"
 msgstr ""
 
-#: src/error.rs:325
+#: ../rust-libs/gnomeutils/src/errors.rs:353
 msgid "an unknown error occurred during the premium check"
 msgstr ""
 
-#: src/error.rs:336
+#: ../rust-libs/gnomeutils/src/errors.rs:364
 msgid "{command_name} cannot be used in private messages"
 msgstr ""
 
-#: src/error.rs:338
+#: ../rust-libs/gnomeutils/src/errors.rs:366
 msgid "try running it on a server with {bot_name} in"
 msgstr ""
 
-#: src/funcs.rs:114
+#: src/funcs.rs:151
 msgid "If you find a bug or want to ask a question, join the support server: {server_invite}"
 msgstr ""
 
-#: src/funcs.rs:115
+#: src/funcs.rs:152
 msgid "You can vote for me or review me on top.gg!\n"
 "https://top.gg/bot/{client_id}"
 msgstr ""
 
-#: src/funcs.rs:116
-msgid "If you want to support the development and hosting of TTS Bot, check out `/donate`!"
+#: src/funcs.rs:153
+msgid "If you want to support the development and hosting of TTS Bot, check out `/premium`!"
 msgstr ""
 
-#: src/funcs.rs:117
+#: src/funcs.rs:154
 msgid "There are loads of customizable settings, check out `/help set`"
 msgstr ""
