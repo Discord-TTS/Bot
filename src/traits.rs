@@ -65,8 +65,15 @@ impl SerenityContextExt for serenity::Context {
         channel_id: serenity::ChannelId,
     ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>> {
         let manager = songbird::get(self).await.unwrap();
-        let (call, r) = manager.join(guild_id.0, channel_id).await;
-        r?;
-        Ok(call)
+        let (call, result) = manager.join(guild_id.0, channel_id).await;
+
+        if let Err(err) = result {
+            // On error, the Call is left in a semi-connected state.
+            // We need to correct this by removing the call from the manager.
+            drop(manager.leave(guild_id.0).await);
+            Err(err.into())
+        } else {
+            Ok(call)
+        }
     }
 }
