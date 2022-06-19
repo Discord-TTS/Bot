@@ -573,7 +573,7 @@ create_bool_command!(
 create_bool_command!(
     "Makes the bot ignore messages sent by members of the audience in stage channels",
     "Whether to ignore messages sent by the audience",
-    audience_ignore, "require_voice", "audience_ignore",
+    audience_ignore, "audience_ignore", "audience_ignore",
     gettext("Ignoring audience is now: {}"),
     aliases("audienceignore", "ignore_audience", "ignoreaudience"),
 );
