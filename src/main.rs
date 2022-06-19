@@ -23,7 +23,7 @@
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
 #![allow(clippy::unreadable_literal)]
 
-use std::{borrow::Cow, collections::BTreeMap, path::Path, str::FromStr, sync::{Arc, atomic::{AtomicBool, Ordering}}};
+use std::{borrow::Cow, collections::BTreeMap, str::FromStr, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 
 use anyhow::Ok;
 use sysinfo::SystemExt;
@@ -832,8 +832,8 @@ async fn process_support_dm(
                 } else if !userinfo.dm_blocked {
                     let webhook_username = format!("{} ({})", message.author.tag(), message.author.id);
                     let paths: Vec<serenity::AttachmentType<'_>> = message.attachments.iter()
-                        .map(|a| serenity::AttachmentType::Path(Path::new(&a.url)))
-                        .collect();
+                        .map(|a| reqwest::Url::parse(&a.url).map(serenity::AttachmentType::Image))
+                        .collect::<Result<_, _>>()?;
 
                     data.webhooks.dm_logs.execute(&ctx.http, false, |b| {b
                         .files(paths)
