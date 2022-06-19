@@ -511,7 +511,6 @@ macro_rules! create_bool_command {
         $description:literal,
         $value_desc:literal,
         $name:ident,
-        $cmd_name:literal,
         $key:literal,
         gettext($resp:literal),
         aliases($( $aliases:literal ),*),
@@ -525,7 +524,6 @@ macro_rules! create_bool_command {
 
             #[doc=$description]
             #[poise::command(
-                rename=$cmd_name,
                 category="Settings",
                 aliases($($aliases,)*),
                 guild_only, slash_command,
@@ -539,6 +537,7 @@ macro_rules! create_bool_command {
 
             Command {
                 prefix_action: prefix_bool().prefix_action,
+                name: stringify!($name),
                 ..slash_bool()
             }
         }
@@ -548,39 +547,39 @@ macro_rules! create_bool_command {
 create_bool_command!(
     "Makes the bot say \"<user> said\" before each message",
     "Whether to say \"<user> said\" before each message",
-    xsaid, "xsaid", "xsaid",
+    xsaid, "xsaid",
     gettext("xsaid is now: {}"), aliases(),
 );
 create_bool_command!(
     "Makes the bot join the voice channel automatically when a message is sent in the setup channel",
     "Whether to automatically join voice channels",
-    autojoin, "autojoin", "auto_join",
+    autojoin, "auto_join",
     gettext("Auto Join is now: {}"), aliases("auto_join"),
 );
 create_bool_command!(
     "Makes the bot ignore messages sent by bots and webhooks",
     "Whether to ignore messages sent by bots and webhooks",
-    botignore, "botignore", "bot_ignore",
+    botignore, "bot_ignore",
     gettext("Ignoring bots is now: {}"), aliases("bot_ignore", "ignore_bots", "ignorebots"),
 );
 create_bool_command!(
     "Makes the bot require people to be in the voice channel to TTS",
     "Whether to require people to be in the voice channel to TTS",
-    require_voice, "require_voice", "require_voice",
+    require_voice, "require_voice",
     gettext("Requiring users to be in voice channel for TTS is now: {}"),
     aliases("voice_require", "require_in_vc"),
 );
 create_bool_command!(
     "Makes the bot ignore messages sent by members of the audience in stage channels",
     "Whether to ignore messages sent by the audience",
-    audience_ignore, "audience_ignore", "audience_ignore",
+    audience_ignore, "audience_ignore",
     gettext("Ignoring audience is now: {}"),
     aliases("audienceignore", "ignore_audience", "ignoreaudience"),
 );
 create_bool_command!(
     "Whether to use DeepL translate to translate all TTS messages to the same language ",
     "Whether to translate all messages to the same language",
-    translation, "translation", "to_translate",
+    translation, "to_translate",
     gettext("Translation is now: {}"), aliases("translate", "to_translate", "should_translate"),
     check="crate::premium_command_check",
 );
