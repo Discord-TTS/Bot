@@ -235,7 +235,7 @@ impl<'a> MenuPaginator<'a> {
         self.ctx.send(|b| b
             .embed(|e| self.create_page(e, &self.pages[self.index]))
             .components(|c| c.create_action_row(|r| self.create_action_row(r, false)))
-        ).await?.message().await
+        ).await?.into_message().await
     }
 
     async fn edit_message(&self, message: &mut serenity::Message, disable: bool) -> serenity::Result<()> {
@@ -954,7 +954,7 @@ pub async fn setup(
 
             text_channels.sort_by(|f, s| Ord::cmp(&f.position, &s.position));
 
-            let message = ctx.send(|b| {b
+            let reply = ctx.send(|b| {b
                 .content(ctx.gettext("Select a channel!"))
                 .components(|c| {
                     for (i, chunked_channels) in text_channels.chunks(25).enumerate() {
@@ -975,9 +975,9 @@ pub async fn setup(
                     };
                     c
                 })
-            }).await?.message().await?;
+            }).await?;
 
-            let interaction = message
+            let interaction = reply.message().await?
                 .await_component_interaction(&ctx_discord.shard)
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(ctx.author().id)
