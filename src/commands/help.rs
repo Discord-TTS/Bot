@@ -150,7 +150,7 @@ pub async fn _help(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
     let neutral_colour = ctx.neutral_colour().await;
     ctx.send(|b| b.embed(|e| e
         .title(ctx.gettext("{command_name} Help!").replace("{command_name}", &match &mode {
-            HelpCommandMode::Root => ctx.discord().cache.current_user_field(|u| u.name.clone()),
+            HelpCommandMode::Root => ctx.discord().cache.current_user().name.clone(),
             HelpCommandMode::Group(c) | HelpCommandMode::Command(c) => format!("`{}`", c.qualified_name) 
         }))
         .description(match &mode {

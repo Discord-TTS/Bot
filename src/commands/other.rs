@@ -31,9 +31,14 @@ use crate::structs::{ApplicationContext, Context, CommandResult, TTSMode, Comman
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
 pub async fn uptime(ctx: Context<'_>,) -> CommandResult {
     let timestamp = ctx.data().start_time.duration_since(std::time::UNIX_EPOCH)?.as_secs();
+    let current_user_mention = {
+        let current_user = ctx.discord().cache.current_user();
+        current_user.mention().to_string()
+    };
+
     ctx.say(ctx
         .gettext("{user_mention} has been up since: <t:{timestamp}:R>")
-        .replace("{user_mention}", &ctx.discord().cache.current_user_field(|u| u.mention().to_string()))
+        .replace("{user_mention}", &current_user_mention)
         .replace("{timestamp}", &timestamp.to_string())
     ).await.map(drop).map_err(Into::into)
 }
@@ -53,7 +58,7 @@ pub async fn tts(
             if let Some(guild) = ctx.guild() {(
                 guild.id,
                 guild.voice_states.get(&ctx.author().id).and_then(|vc| vc.channel_id),
-                guild.voice_states.get(&ctx.discord().cache.current_user_id()).and_then(|vc| vc.channel_id)
+                guild.voice_states.get(&ctx.discord().cache.current_user().id).and_then(|vc| vc.channel_id)
             )} else {
                 return Ok(false)
             }
@@ -125,7 +130,7 @@ pub async fn tts_speak(ctx: ApplicationContext<'_>, message: serenity::Message) 
 pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
     let data = ctx.data();
     let ctx_discord = ctx.discord();
-    let bot_user_id = ctx_discord.cache.current_user_id();
+    let bot_user_id = ctx_discord.cache.current_user().id;
 
     let start_time = std::time::SystemTime::now();
 
@@ -159,8 +164,8 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
 
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
     ctx.send(|b| {b.embed(|e| { e
-        .title(ctx_discord.cache.current_user_field(|u| ctx.gettext("{bot_name}: Freshly rewritten in Rust!").replace("{bot_name}",  &u.name)))
-        .thumbnail(&ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
+        .title(ctx.gettext("{bot_name}: Freshly rewritten in Rust!").replace("{bot_name}", &ctx_discord.cache.current_user().name))
+        .thumbnail(ctx_discord.cache.current_user().face())
         .url(data.config.main_server_invite.clone())
         .colour(neutral_colour)
         .footer(|f| f.text(ctx.gettext("
@@ -239,12 +244,11 @@ pub async fn ping(ctx: Context<'_>,) -> CommandResult {
 /// Suggests a new feature!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, ephemeral, required_bot_permissions="SEND_MESSAGES")]
 pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"] #[rest] suggestion: String) -> CommandResult {
-    let confirm_message = ctx.discord().cache.current_user_field(|b| ctx
+    let confirm_message = ctx
         .gettext("Are you sure you want to make a suggestion to {bot_name}?")
-        .replace("{bot_name}", &b.name)
-    );
+        .replace("{bot_name}", &ctx.discord().cache.current_user().name);
 
-    if !require!(confirm_dialog(ctx, &confirm_message, "Yes", "Cancel").await?, Ok(())) {
+    if !require!(confirm_dialog(ctx, &confirm_message, "Yes".into(), "Cancel".into()).await?, Ok(())) {
         ctx.say(ctx.gettext("Suggestion cancelled")).await?;
         return Ok(());
     }
@@ -268,7 +272,7 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
 pub async fn invite(ctx: Context<'_>,) -> CommandResult {
     let ctx_discord = ctx.discord();
     let config = &ctx.data().config;
-    let bot_mention = ctx_discord.cache.current_user_id().mention().to_string();
+    let bot_mention = ctx_discord.cache.current_user().id.mention().to_string();
 
     let invite_channel = config.invite_channel;
     ctx.say(

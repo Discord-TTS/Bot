@@ -66,7 +66,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
     let missing_permissions =
         (serenity::Permissions::VIEW_CHANNEL | serenity::Permissions::CONNECT | serenity::Permissions::SPEAK) -
-        channel.permissions_for_user(ctx_discord, ctx_discord.cache.current_user_id())?;
+        channel.permissions_for_user(ctx_discord, ctx_discord.cache.current_user().id)?;
 
     if !missing_permissions.is_empty() {
         return ctx.send_error(
@@ -104,13 +104,13 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         m.embed(|e| e
             .title(ctx.gettext("Joined your voice channel!"))
             .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
-            .thumbnail(&ctx_discord.cache.current_user_field(serenity::CurrentUser::face))
+            .thumbnail(&ctx_discord.cache.current_user().face())
             .author(|a| a
                 .name(member.display_name().into_owned())
                 .icon_url(author.face())
             )
             .footer(|f| f.text(random_footer(
-                &data.config.main_server_invite, ctx_discord.cache.current_user_id(), ctx.current_catalog()
+                &data.config.main_server_invite, ctx_discord.cache.current_user().id, ctx.current_catalog()
             )))
         )
     ).await.map(drop).map_err(Into::into)

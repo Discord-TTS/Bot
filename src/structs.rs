@@ -81,6 +81,12 @@ pub struct PatreonInfo {
 }
 
 
+pub struct RegexCache {
+    pub replacements: [(regex::Regex, &'static str); 3],
+    pub id_in_brackets: regex::Regex,
+    pub emoji: regex::Regex,
+}
+
 pub struct Data {
     pub analytics: Arc<analytics::Handler>,
     pub guilds_db: database::Handler<i64, database::GuildRow>,
@@ -96,6 +102,7 @@ pub struct Data {
     pub start_time: std::time::SystemTime,
     pub premium_avatar_url: String,
     pub reqwest: reqwest::Client,
+    pub regex_cache: RegexCache,
     pub webhooks: WebhookConfig,
     pub config: MainConfig,
 

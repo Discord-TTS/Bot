@@ -184,6 +184,16 @@ async fn _main() -> Result<()> {
     let token = config.main.token.take().unwrap();
     let bot_id = serenity::utils::parse_token(&token).unwrap().0;
 
+    let cached_regex = structs::RegexCache {
+        replacements: [
+            (regex::Regex::new(r"\|\|(?s:.)*?\|\|").unwrap(), ". spoiler avoided."),
+            (regex::Regex::new(r"```(?s:.)*?```").unwrap(), ". code block."),
+            (regex::Regex::new(r"`(?s:.)*?`").unwrap(), ". code snippet."),
+        ],
+        id_in_brackets: regex::Regex::new(r"\((\d+)\)")?,
+        emoji: regex::Regex::new(r"<(a?):(.+):\d+>")?,
+    };
+
     let data = Data {
         bot_list_tokens: config.bot_list_tokens,
         inner: gnomeutils::GnomeData {
@@ -201,7 +211,7 @@ async fn _main() -> Result<()> {
         translation_languages,
 
         config: config.main, reqwest, premium_avatar_url,
-        analytics, webhooks, start_time, startup_message,
+        analytics, webhooks, start_time, startup_message, regex_cache: cached_regex,
         guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
     };
 
@@ -358,7 +368,7 @@ impl serenity::EventHandler for EventHandler {
         let framework = require!(self.framework().await);
         errors::handle_unexpected_default(&ctx, framework, "VoiceStateUpdate", async_try!({
             // If (on leave) the bot should also leave as it is alone
-            let bot_id = ctx.cache.current_user_id();
+            let bot_id = ctx.cache.current_user().id;
             let guild_id = new.guild_id.try_unwrap()?;
             let songbird = songbird::get(&ctx).await.unwrap();
 
@@ -386,17 +396,18 @@ impl serenity::EventHandler for EventHandler {
 
         errors::handle_guild("GuildCreate", &ctx, framework, Some(&guild), async_try!({
             // Send to servers channel and DM owner the welcome message
+            data.webhooks.servers.execute(&ctx.http, false, |b| {
+                b.content(format!("Just joined {}!", &guild.name))
+            }).await?;
 
-            let (owner, _) = tokio::join!(
-                guild.owner_id.to_user(&ctx),
-                data.webhooks.servers.execute(&ctx.http, false, |b| {
-                    b.content(format!("Just joined {}!", &guild.name))
-                }),
-            );
+            let (owner_tag, owner_face) = {
+                let owner = guild.owner_id.to_user(&ctx).await?;
+                (owner.tag(), owner.face())
+            };
 
-            let owner = owner?;
-            match owner.direct_message(&ctx, |b| b.embed(|e| e
-                .title(ctx.cache.current_user_field(|b| format!("Welcome to {}!", b.name)))
+            let dm_channel = guild.owner_id.create_dm_channel(&ctx).await?;
+            match dm_channel.send_message(&ctx, |b| b.embed(|e| e
+                .title(format!("Welcome to {}!", ctx.cache.current_user().name))
                 .description(format!("
 Hello! Someone invited me to your server `{}`!
 TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
@@ -411,7 +422,7 @@ You can view all the commands with `-help`
 Ask questions by either responding here or asking on the support server!",
                 guild.name))
                 .footer(|f| f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
-                .author(|a| a.name(format!("{}#{}", &owner.name, &owner.id)).icon_url(owner.face()))
+                .author(|a| a.name(owner_tag.clone()).icon_url(owner_face))
             )).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
                 Err(error) => return Err(anyhow::Error::from(error)),
@@ -420,7 +431,7 @@ Ask questions by either responding here or asking on the support server!",
 
             match ctx.http.add_member_role(
                 data.config.main_server.into(),
-                owner.id.get(),
+                guild.owner_id.get(),
                 data.config.ofs_role.into(),
                 None
             ).await {
@@ -429,7 +440,7 @@ Ask questions by either responding here or asking on the support server!",
                 Result::Ok(_) => (),
             }
 
-            info!("Added OFS role to {}#{}", owner.name, owner.discriminator);
+            info!("Added OFS role to {}", owner_tag);
 
             Ok(())
         })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
@@ -632,7 +643,7 @@ async fn process_tts_msg(
         content = clean_msg(
             &content, &message.author, &ctx.cache, guild_id, member_nick, &message.attachments, &voice,
             guild_row.xsaid, guild_row.repeated_chars as usize, nickname_row.name.as_deref(),
-            &data.last_to_xsaid_tracker
+            &data.regex_cache, &data.last_to_xsaid_tracker
         );
 
         (voice, mode)
@@ -721,7 +732,7 @@ async fn process_mention_msg(
     message: &serenity::Message,
     data: &Data,
 ) -> Result<()> {
-    let bot_user = ctx.cache.current_user_id();
+    let bot_user = ctx.cache.current_user().id;
     if ![format!("<@{}>", bot_user), format!("<@!{}>", bot_user)].contains(&message.content) {
         return Ok(());
     };
@@ -770,39 +781,44 @@ async fn process_support_dm(
                 };
 
                 if let Some(resolved_id) = reference.message_id {
-                    let resolved = channel.message(&ctx.http, resolved_id).await?;
-                    if resolved.author.discriminator != 0000 {
+                    let (resolved_author_name, resolved_author_discrim, resolved_content) = {
+                        let cached_info = {
+                            let cached = ctx.cache.channel_messages(channel.id);
+                            cached.as_ref().and_then(|msgs| msgs.get(&resolved_id)).map(|m| (
+                                m.author.name.clone(), m.author.discriminator, m.content.clone())
+                            )
+                        };
+
+                        if let Some(cached_info) = cached_info {
+                            cached_info
+                        } else {
+                            let message = channel.message(&ctx.http, resolved_id).await?;
+                            (message.author.name, message.author.discriminator, message.content)
+                        }
+                    };
+
+                    if resolved_author_discrim != 0000 {
                         return Ok(());
                     }
 
-                    let todm = require!(ctx.user_from_dm(&resolved.author.name).await, Ok(()));
-                    let attachment_url = message.attachments.first().map(|a| a.url.clone());
+                    let (target, target_tag) = {
+                        let re_match = require!(data.regex_cache.id_in_brackets.captures(&resolved_author_name), Ok(()));
 
-                    let (content, embed) = if channel.id == data.webhooks.suggestions.channel_id.try_unwrap()? {
-                        let sent = todm.direct_message(ctx, |b| b.embed(|e| {e
-                            .title("Message from the developers:")
-                            .description(&message.content)
-                            .author(|a| {a
-                                .name(message.author.tag())
-                                .icon_url(message.author.face())
-                            })
-                            .field("In response to your suggestion:", &resolved.content, false);
+                        let target: serenity::UserId = require!(re_match.get(1), Ok(())).as_str().parse()?;
+                        let target_tag = target.to_user(ctx).await?.tag();
 
-                            if let Some(url) = attachment_url {
-                                e.image(url);
-                            };
-
-                            e
-                        })).await?;
-
-                        (
-                            format!("Sent message to {}:", todm.tag()),
-                            sent.embeds.into_iter().next().unwrap()
-                        )
-                    }
-                    else {
-                        dm_generic(ctx, &message.author, &todm, attachment_url, &message.content).await?
+                        (target, target_tag)
                     };
+
+                    let attachment_url = message.attachments.first().map(|a| a.url.clone());
+                    let field = (channel.id == data.webhooks.suggestions.channel_id.try_unwrap()?).then(|| {
+                        ("In response to your suggestion:".into(), resolved_content, false)
+                    });
+
+                    let (content, embed) = dm_generic(
+                        ctx, &message.author, target, target_tag,
+                        attachment_url, field, message.content.clone()
+                    ).await?;
 
                     channel.send_message(ctx, |b| {b
                         .content(content)
@@ -825,7 +841,7 @@ async fn process_support_dm(
                 if content.contains("discord.gg") {
                     channel.say(&ctx.http, format!(
                         "Join {} and look in {} to invite {}!",
-                        data.config.main_server_invite, data.config.invite_channel.mention(), ctx.cache.current_user_id()
+                        data.config.main_server_invite, data.config.invite_channel.mention(), ctx.cache.current_user().id
                     )).await?;
                 } else if content.as_str() == "help" {
                     channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
@@ -845,13 +861,11 @@ async fn process_support_dm(
                 }
             } else {
                 let welcome_msg = channel.send_message(&ctx.http, |b| b.embed(|e| e
-                    .title(ctx.cache.current_user_field(|b| format!(
-                        "Welcome to {} Support DMs!", b.name
-                    )))
+                    .title(format!("Welcome to {} Support DMs!", ctx.cache.current_user().name))
                     .description(DM_WELCOME_MESSAGE)
                     .footer(|f| f.text(random_footer(
                         &data.config.main_server_invite,
-                        ctx.cache.current_user_id(),
+                        ctx.cache.current_user().id,
                         data.default_catalog(),
                     )))
                 )).await?;

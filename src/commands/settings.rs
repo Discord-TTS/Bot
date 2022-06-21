@@ -201,11 +201,11 @@ impl<'a> MenuPaginator<'a> {
         let author = self.ctx.author();
 
         embed
-            .title(self.ctx.discord().cache.current_user_field(|u| self.ctx
+            .title(self.ctx
                 .gettext("{bot_user} Voices | Mode: `{mode}`")
                 .replace("{mode}", self.mode.into())
-                .replace("{bot_user}", &u.name)
-            ))
+                .replace("{bot_user}", &self.ctx.discord().cache.current_user().name)
+            )
             .author(|a| a
                 .name(author.name.clone())
                 .icon_url(author.face())
@@ -341,7 +341,7 @@ async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<boo
         confirm_dialog(
             ctx,
             ctx.gettext("What would you like to set this to?"),
-            ctx.gettext("True"), ctx.gettext("False"),
+            ctx.gettext("True").into(), ctx.gettext("False").into(),
         ).await
     }
 }
@@ -609,30 +609,38 @@ pub async fn required_role(
             .map(|r| r.name.clone()))
         );
 
-    let bot_name = ctx_discord.cache.current_user_field(|u| u.name.clone());
-    let (question, neg) = {
-        if required_role.is_some() {
+    let response = {
+        let current_user = ctx_discord.cache.current_user();
+        if required_role.is_some() {Some(
             if let Some(currently_required_role) = currently_required_role {(
                 ctx.gettext("Are you sure you want to change the required role?"),
                 ctx.gettext("No, keep {role_name} as the required role.").replace("{role_name}", &currently_required_role)
             )} else {(
                 ctx.gettext("Are you sure you want to set the required role?"),
-                ctx.gettext("No, keep {bot_name} usable by everyone.").replace("{bot_name}", &bot_name)
+                ctx.gettext("No, keep {bot_name} usable by everyone.").replace("{bot_name}", &current_user.name)
             )}
-        } else if let Some(currently_required_role) = currently_required_role {(
+        )} else if let Some(currently_required_role) = currently_required_role {Some((
             ctx.gettext("Are you sure you want to remove the required role?"),
-            ctx.gettext("No, keep {bot_name} restricted to {role_name}.").replace("{bot_name}", &bot_name).replace("{role_name}", &currently_required_role)
-        )} else {
-            return ctx.say("**Error:** Cannot reset the required role if there isn't one set!").await.map(drop).map_err(Into::into)
+            ctx.gettext("No, keep {bot_name} restricted to {role_name}.").replace("{bot_name}", &current_user.name).replace("{role_name}", &currently_required_role)
+        ))} else {
+            None
         }
     };
 
-    if require!(confirm_dialog(ctx, question, ctx.gettext("Yes, I'm sure."), &neg).await?, Ok(())) {
+    let (question, negative) = require!(response, {
+        ctx.say("**Error:** Cannot reset the required role if there isn't one set!").await?;
+        Ok(())
+    });
+
+    if require!(confirm_dialog(ctx, question, ctx.gettext("Yes, I'm sure.").into(), negative).await?, Ok(())) {
         ctx.data().guilds_db.set_one(guild_id.into(), "required_role", &required_role.as_ref().map(|r| r.id.get() as i64)).await?;
-        ctx.say(if let Some(required_role) = required_role {
-            ctx.gettext("{bot_name} now requires {required_role} to use.").replace("{required_role}", &required_role.mention().to_string()).replace("{bot_name}", &bot_name)
-        } else {
-            ctx.gettext("{bot_name} is now usable by everyone!").replace("{bot_name}", &bot_name)
+        ctx.say({
+            let current_user = ctx_discord.cache.current_user();
+            if let Some(required_role) = required_role {
+                ctx.gettext("{bot_name} now requires {required_role} to use.").replace("{required_role}", &required_role.mention().to_string()).replace("{bot_name}", &current_user.name)
+            } else {
+                ctx.gettext("{bot_name} is now usable by everyone!").replace("{bot_name}", &current_user.name)
+            }
         }).await
     } else {
         ctx.say(ctx.gettext("Cancelled!")).await
@@ -919,8 +927,10 @@ pub async fn setup(
     let cache = &ctx_discord.cache;
     let guild_id = ctx.guild_id().unwrap();
 
-    let (bot_user_id, bot_user_name, bot_user_face) =
-        cache.current_user_field(|u| (u.id, u.name.clone(), u.face()));
+    let (bot_user_id, bot_user_name, bot_user_face) = {
+        let current_user = cache.current_user();
+        (current_user.id, current_user.name.clone(), current_user.face())
+    };
 
     let (bot_member, channel) = {
         let bot_member = guild_id.member(ctx_discord, bot_user_id).await?;
@@ -1007,7 +1017,7 @@ TTS Bot will now accept commands and read from <#{channel}>.
 Just do `/join` and start talking!
 ").replace("{channel}", &channel.id.0.to_string()))
         .footer(|f| f.text(random_footer(
-            &data.config.main_server_invite, cache.current_user_id(), ctx.current_catalog()
+            &data.config.main_server_invite, cache.current_user().id, ctx.current_catalog()
         )))
         .author(|a| a
             .name(&author.name)
@@ -1019,8 +1029,8 @@ Just do `/join` and start talking!
         require_guild!(ctx).user_permissions_in(&channel, &bot_member)?.manage_webhooks() &&
         confirm_dialog(ctx,
             ctx.gettext("Would you like to set up TTS Bot update announcements for the setup channel?"),
-            ctx.gettext("Yes"),
-            ctx.gettext("No")
+            ctx.gettext("Yes").into(),
+            ctx.gettext("No").into()
         ).await?.unwrap_or(false)
     {
         data.config.announcements_channel.follow(ctx_discord, channel.id).await?;
@@ -1103,10 +1113,10 @@ pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
     ctx.send(|b| b.embed(|e| e
         .colour(neutral_colour)
         .author(|a| a.name(author.name.clone()).icon_url(author.face()))
-        .title(cache.current_user_field(|u| ctx.gettext("{} Translation Languages").replace("{}", &u.name)))
+        .title(ctx.gettext("{} Translation Languages").replace("{}", &cache.current_user().name))
         .field("Currently Supported Languages", format_languages(data.translation_languages.keys()), false)
         .footer(|f| f.text(random_footer(
-            &data.config.main_server_invite, cache.current_user_id(), ctx.current_catalog()
+            &data.config.main_server_invite, cache.current_user().id, ctx.current_catalog()
         )))
     )).await.map(drop).map_err(Into::into)
 }
@@ -1133,7 +1143,7 @@ pub async fn voices(
     let voices = {
         let random_footer = || random_footer(
             &data.config.main_server_invite,
-            ctx.discord().cache.current_user_id(),
+            ctx.discord().cache.current_user().id,
             ctx.current_catalog(),
         );
 
@@ -1154,13 +1164,13 @@ pub async fn voices(
     let cache = &ctx.discord().cache;
     let user_voice_row = data.user_voice_db.get((author.id.into(), mode)).await?;
     ctx.send(|b| b.embed(|e| e
-        .title(cache.current_user_field(|u| ctx
+        .title(ctx
             .gettext("{bot_user} Voices | Mode: `{mode}`")
-            .replace("{bot_user}", &u.name)
+            .replace("{bot_user}", &cache.current_user().name)
             .replace("{mode}", mode.into())
-        ))
+        )
         .footer(|f| f.text(random_footer(
-            &data.config.main_server_invite, cache.current_user_id(), ctx.current_catalog()
+            &data.config.main_server_invite, cache.current_user().id, ctx.current_catalog()
         )))
         .author(|a| a
             .name(author.name.clone())

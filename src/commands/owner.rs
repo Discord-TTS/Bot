@@ -30,7 +30,10 @@ pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
 #[poise::command(prefix_command, hide_in_help, owners_only)]
 pub async fn dm(ctx: PrefixContext<'_>, todm: serenity::User, #[rest] message: String) -> CommandResult {
     let attachment_url = ctx.msg.attachments.first().map(|a| a.url.clone());
-    let (content, embed) = dm_generic(ctx.discord, &ctx.msg.author, &todm, attachment_url, &message).await?;
+    let (content, embed) = dm_generic(
+        ctx.discord, &ctx.msg.author, todm.id, todm.tag(),
+        attachment_url, None, message
+    ).await?;
 
     ctx.msg.channel_id.send_message(&ctx.discord.http, |b| b
         .content(content)

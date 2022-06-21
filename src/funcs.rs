@@ -20,15 +20,13 @@ use std::collections::{BTreeMap, HashMap};
 
 use itertools::Itertools as _;
 use rand::Rng as _;
-use regex::{Captures, Regex};
-use lazy_static::lazy_static;
 
 use poise::serenity_prelude as serenity;
 use gnomeutils::{OptionGettext, OptionTryUnwrap};
 use serenity::json::prelude as json;
 
 use crate::database::GuildRow;
-use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError};
+use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError, RegexCache};
 use crate::constants::TRANSLATION_URL;
 use crate::require;
 
@@ -44,17 +42,24 @@ pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunner
 pub async fn dm_generic(
     ctx: &serenity::Context,
     author: &serenity::User,
-    todm: &serenity::User,
+    target: serenity::UserId,
+    mut target_tag: String,
     attachment_url: Option<String>,
-    message: &str,
+    field: Option<(String, String, bool)>,
+    message: String,
 ) -> Result<(String, serenity::Embed)> {
-    let sent = todm.direct_message(ctx, |b| b.embed(|e| {e
+    let dm_channel = target.create_dm_channel(ctx).await?;
+    let sent = dm_channel.send_message(&ctx.http, |b| b.embed(|e| {e
         .title("Message from the developers:")
         .description(message)
         .author(|a| a
             .name(author.tag())
             .icon_url(author.face())
         );
+
+        if let Some((name, value, inline)) = field {
+            e.field(name, value, inline);
+        }
 
         if let Some(url) = attachment_url {
             e.image(url);
@@ -63,7 +68,8 @@ pub async fn dm_generic(
         e
     })).await?;
 
-    Ok((format!("Sent message to {}:", todm.tag()), sent.embeds.into_iter().next().unwrap()))
+    target_tag.insert_str(0, "Sent message to: ");
+    Ok((target_tag, sent.embeds.into_iter().next().unwrap()))
 }
 
 pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url, auth_key: Option<&str>) -> Result<Option<reqwest::Response>> {
@@ -278,7 +284,7 @@ pub async fn run_checks(
 
     let guild = require!(message.guild(&ctx.cache), Ok(None));
     let voice_state = guild.voice_states.get(&message.author.id);
-    let bot_voice_state = guild.voice_states.get(&ctx.cache.current_user_id());
+    let bot_voice_state = guild.voice_states.get(&ctx.cache.current_user().id);
 
     let mut to_autojoin = None;
     if message.author.bot {
@@ -333,24 +339,13 @@ pub fn clean_msg(
     repeated_limit: usize,
     nickname: Option<&str>,
 
+    regex_cache: &RegexCache,
     last_to_xsaid_tracker: &LastToXsaidTracker
 ) -> String {
     let (contained_url, mut content) = if content == "?" {
         (false, String::from("what"))
     } else {
-        // Regex
-        lazy_static! {
-            static ref EMOJI_REGEX: Regex = Regex::new(r"<(a?):(.+):\d+>").unwrap();
-            static ref REGEX_REPLACEMENTS: [(Regex, &'static str); 3] = {
-                [
-                    (Regex::new(r"\|\|(?s:.)*?\|\|").unwrap(), ". spoiler avoided."),
-                    (Regex::new(r"```(?s:.)*?```").unwrap(), ". code block."),
-                    (Regex::new(r"`(?s:.)*?`").unwrap(), ". code snippet."),
-                ]
-            };
-        }
-
-        let mut content: String = EMOJI_REGEX.replace_all(content, |re_match: &Captures<'_>| {
+        let mut content: String = regex_cache.emoji.replace_all(content, |re_match: &regex::Captures<'_>| {
             let is_animated = re_match.get(1).unwrap().as_str();
             let emoji_name = re_match.get(2).unwrap().as_str();
 
@@ -363,7 +358,7 @@ pub fn clean_msg(
             format!("{} {}", emoji_prefix, emoji_name)
         }).into_owned();
 
-        for (regex, replacement) in REGEX_REPLACEMENTS.iter() {
+        for (regex, replacement) in &regex_cache.replacements {
             content = regex.replace_all(&content, *replacement).into_owned();
         };
 
@@ -473,8 +468,8 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
     Ok(None)
 }
 
-pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: &str, negative: &str) -> Result<Option<bool>, Error> {
-    fn components<'a>(c: &'a mut serenity::CreateComponents, positive: &str, negative: &str, disabled: bool) -> &'a mut serenity::CreateComponents {
+pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, negative: String) -> Result<Option<bool>, Error> {
+    fn components(c: &mut serenity::CreateComponents, positive: String, negative: String, disabled: bool) -> &mut serenity::CreateComponents {
         c
             .create_action_row(|r| r
                 .create_button(|b| b
@@ -495,7 +490,7 @@ pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: &str, nega
     let reply = ctx.send(|b| b
         .content(prompt)
         .ephemeral(true)
-        .components(|c| components(c, positive, negative, false))
+        .components(|c| components(c, positive.clone(), negative.clone(), false))
     ).await?;
 
     let ctx_discord = ctx.discord();

@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use lazy_static::lazy_static;
-use regex::Regex;
-
 use gnomeutils::require_guild;
 use poise::serenity_prelude as serenity;
 
@@ -39,7 +36,6 @@ impl PoiseContextExt for Context<'_> {
 
 #[serenity::async_trait]
 pub trait SerenityContextExt {
-    async fn user_from_dm(&self, dm_name: &str) -> Option<serenity::User>;
     async fn join_vc(
         &self,
         guild_id: tokio::sync::MutexGuard<'_, JoinVCToken>,
@@ -49,16 +45,6 @@ pub trait SerenityContextExt {
 
 #[serenity::async_trait]
 impl SerenityContextExt for serenity::Context {
-    async fn user_from_dm(&self, dm_name: &str) -> Option<serenity::User> {
-        lazy_static! {
-            static ref ID_IN_BRACKETS_REGEX: Regex = Regex::new(r"\((\d+)\)").unwrap();
-        }
-
-        let re_match = ID_IN_BRACKETS_REGEX.captures(dm_name)?;
-        let user_id: serenity::UserId = re_match.get(1)?.as_str().parse().ok()?;
-        user_id.to_user(self).await.ok()
-    }
-
     async fn join_vc(
         &self,
         guild_id: tokio::sync::MutexGuard<'_, JoinVCToken>,

@@ -420,13 +420,9 @@ dependencies = [
  "generic-array",
  "gettext",
  "gnomeutils",
- "hmac",
- "hyper",
  "indexmap",
  "itertools",
- "lazy_static",
  "linkify",
- "md-5",
  "num-format",
  "once_cell",
  "parking_lot 0.12.1",
@@ -436,13 +432,11 @@ dependencies = [
  "reqwest",
  "serde",
  "serenity",
- "sha2",
  "songbird",
  "sqlx",
  "strfmt",
  "strsim",
  "strum_macros",
- "subtle",
  "symphonia",
  "sysinfo",
  "tokio",
@@ -748,7 +742,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#e7bc3df0586afc3ff547fc6d8e53a1b076bab1a2"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#c7864084943bd40f528d5bbbcf9b95707b94a0f8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1386,7 +1380,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#dede123f1047ffe8fb29af30fc508af703f6c1fb"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#4dc77dac041e0fd50f0ebea6cf6994fc7387bb4c"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1403,7 +1397,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#dede123f1047ffe8fb29af30fc508af703f6c1fb"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#4dc77dac041e0fd50f0ebea6cf6994fc7387bb4c"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1439,18 +1433,18 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.39"
+version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c54b25569025b7fc9651de43004ae593a75ad88543b17178aa5e1b9c4f15f56f"
+checksum = "dd96a1e8ed2596c337f8eae5f24924ec83f5ad5ab21ea8e455d3566c69fbcaf7"
 dependencies = [
  "unicode-ident",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.19"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f53dc8cf16a769a6f677e09e7ff2cd4be1ea0f48754aac39520536962011de0d"
+checksum = "3bcdf212e9776fbcb2d23ab029360416bb1706b1aea2d1a5ba002727cbcab804"
 dependencies = [
  "proc-macro2",
 ]
@@ -1678,9 +1672,9 @@ dependencies = [
 
 [[package]]
 name = "rustversion"
-version = "1.0.6"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
+checksum = "a0a5f7c728f5d284929a1cccb5bc19884422bfe6ef4d6c409da2c41838983fcf"
 
 [[package]]
 name = "rusty_pool"
@@ -1800,7 +1794,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.2"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#b9638e93fd68a10fb591894db716d227e959792d"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#bbc063c59d53cef8c968987166ab94e67a8113de"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1829,7 +1823,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#b9638e93fd68a10fb591894db716d227e959792d"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#bbc063c59d53cef8c968987166ab94e67a8113de"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -2258,9 +2252,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.9"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2702e08a7a860f005826c6815dcac101b19b5eb330c27fe4a5928fec1d20ddd"
+checksum = "82501a4c1c0330d640a6e176a3d6a204f5ec5237aca029029d21864a902e27b0"
 dependencies = [
  "itoa 1.0.2",
  "libc",
