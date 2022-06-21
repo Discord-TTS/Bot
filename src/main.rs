@@ -175,7 +175,7 @@ async fn _main() -> Result<()> {
         "TTS-Webhook",
         tracing::Level::from_str(&config.main.log_level)?,
         webhooks.logs.clone(),
-        webhooks.errors.as_ref().unwrap().clone(),
+        webhooks.errors.clone().unwrap(),
     );
 
     tracing::subscriber::set_global_default(logger.clone())?;
@@ -186,9 +186,9 @@ async fn _main() -> Result<()> {
 
     let cached_regex = structs::RegexCache {
         replacements: [
-            (regex::Regex::new(r"\|\|(?s:.)*?\|\|").unwrap(), ". spoiler avoided."),
-            (regex::Regex::new(r"```(?s:.)*?```").unwrap(), ". code block."),
-            (regex::Regex::new(r"`(?s:.)*?`").unwrap(), ". code snippet."),
+            (regex::Regex::new(r"\|\|(?s:.)*?\|\|")?, ". spoiler avoided."),
+            (regex::Regex::new(r"```(?s:.)*?```")?, ". code block."),
+            (regex::Regex::new(r"`(?s:.)*?`")?, ". code snippet."),
         ],
         id_in_brackets: regex::Regex::new(r"\((\d+)\)")?,
         emoji: regex::Regex::new(r"<(a?):(.+):\d+>")?,
