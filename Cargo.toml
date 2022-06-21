@@ -31,7 +31,7 @@ generic-array = "0.14"
 [dependencies.symphonia]
 git = "https://github.com/FelixMcFelix/Symphonia"
 features = ["mp3", "ogg", "wav", "pcm"]
-branch = "fix-ogg-opus-timebase"
+branch = "songbird-fixes"
 default-features = false
 
 [dependencies.sqlx]

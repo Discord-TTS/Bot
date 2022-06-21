@@ -932,9 +932,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.9.0"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c6392766afd7964e2531940894cffe4bd8d7d17dbc3c1c4857040fd4b33bdb3"
+checksum = "10a35a97730320ffe8e2d410b5d3b69279b98d2c14bdb8b70ea89ecf7888d41e"
 dependencies = [
  "autocfg",
  "hashbrown",
@@ -1897,7 +1897,7 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.2"
-source = "git+https://github.com/GnomedDev/songbird?branch=symphonia-personal#e24b468e31e08a94a23281809f4974a7231fed4b"
+source = "git+https://github.com/GnomedDev/songbird?branch=symphonia-personal#b8eb70e02a356115a5cc80dc0f0c3f9b0a8161b7"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -2110,7 +2110,7 @@ checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 [[package]]
 name = "symphonia"
 version = "0.5.0"
-source = "git+https://github.com/FelixMcFelix/Symphonia?branch=fix-ogg-opus-timebase#e15316c358aa09e4af02f1abfa68c833a7b66b49"
+source = "git+https://github.com/FelixMcFelix/Symphonia?branch=songbird-fixes#12f29a5a895b8c3c1680fe3d55fc3e2df30000bd"
 dependencies = [
  "lazy_static",
  "symphonia-bundle-mp3",
@@ -2124,7 +2124,7 @@ dependencies = [
 [[package]]
 name = "symphonia-bundle-mp3"
 version = "0.5.0"
-source = "git+https://github.com/FelixMcFelix/Symphonia?branch=fix-ogg-opus-timebase#e15316c358aa09e4af02f1abfa68c833a7b66b49"
+source = "git+https://github.com/FelixMcFelix/Symphonia?branch=songbird-fixes#12f29a5a895b8c3c1680fe3d55fc3e2df30000bd"
 dependencies = [
  "bitflags",
  "lazy_static",
@@ -2136,7 +2136,7 @@ dependencies = [
 [[package]]
 name = "symphonia-codec-pcm"
 version = "0.5.0"
-source = "git+https://github.com/FelixMcFelix/Symphonia?branch=fix-ogg-opus-timebase#e15316c358aa09e4af02f1abfa68c833a7b66b49"
+source = "git+https://github.com/FelixMcFelix/Symphonia?branch=songbird-fixes#12f29a5a895b8c3c1680fe3d55fc3e2df30000bd"
 dependencies = [
  "log",
  "symphonia-core",
@@ -2145,7 +2145,7 @@ dependencies = [
 [[package]]
 name = "symphonia-core"
 version = "0.5.0"
-source = "git+https://github.com/FelixMcFelix/Symphonia?branch=fix-ogg-opus-timebase#e15316c358aa09e4af02f1abfa68c833a7b66b49"
+source = "git+https://github.com/FelixMcFelix/Symphonia?branch=songbird-fixes#12f29a5a895b8c3c1680fe3d55fc3e2df30000bd"
 dependencies = [
  "arrayvec 0.7.2",
  "bitflags",
@@ -2157,7 +2157,7 @@ dependencies = [
 [[package]]
 name = "symphonia-format-ogg"
 version = "0.5.0"
-source = "git+https://github.com/FelixMcFelix/Symphonia?branch=fix-ogg-opus-timebase#e15316c358aa09e4af02f1abfa68c833a7b66b49"
+source = "git+https://github.com/FelixMcFelix/Symphonia?branch=songbird-fixes#12f29a5a895b8c3c1680fe3d55fc3e2df30000bd"
 dependencies = [
  "log",
  "symphonia-core",
@@ -2168,7 +2168,7 @@ dependencies = [
 [[package]]
 name = "symphonia-format-wav"
 version = "0.5.0"
-source = "git+https://github.com/FelixMcFelix/Symphonia?branch=fix-ogg-opus-timebase#e15316c358aa09e4af02f1abfa68c833a7b66b49"
+source = "git+https://github.com/FelixMcFelix/Symphonia?branch=songbird-fixes#12f29a5a895b8c3c1680fe3d55fc3e2df30000bd"
 dependencies = [
  "log",
  "symphonia-core",
@@ -2178,7 +2178,7 @@ dependencies = [
 [[package]]
 name = "symphonia-metadata"
 version = "0.5.0"
-source = "git+https://github.com/FelixMcFelix/Symphonia?branch=fix-ogg-opus-timebase#e15316c358aa09e4af02f1abfa68c833a7b66b49"
+source = "git+https://github.com/FelixMcFelix/Symphonia?branch=songbird-fixes#12f29a5a895b8c3c1680fe3d55fc3e2df30000bd"
 dependencies = [
  "encoding_rs",
  "lazy_static",
@@ -2189,7 +2189,7 @@ dependencies = [
 [[package]]
 name = "symphonia-utils-xiph"
 version = "0.5.0"
-source = "git+https://github.com/FelixMcFelix/Symphonia?branch=fix-ogg-opus-timebase#e15316c358aa09e4af02f1abfa68c833a7b66b49"
+source = "git+https://github.com/FelixMcFelix/Symphonia?branch=songbird-fixes#12f29a5a895b8c3c1680fe3d55fc3e2df30000bd"
 dependencies = [
  "symphonia-core",
  "symphonia-metadata",
