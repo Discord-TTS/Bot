@@ -73,6 +73,7 @@ pub struct GuildRow {
     pub repeated_chars: i16,
     pub prefix: String,
     pub target_lang: Option<String>,
+    pub required_prefix: Option<String>,
     pub voice_mode: TTSMode,
 }
 

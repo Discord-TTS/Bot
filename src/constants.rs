@@ -64,6 +64,7 @@ pub const DB_SETUP_QUERY: &str = "
         msg_length      smallint    DEFAULT 30,
         repeated_chars  smallint    DEFAULT 0,
         prefix          varchar(6)  DEFAULT '-',
+        required_prefix varchar(6),
         target_lang     varchar(5),
         audience_ignore bool        DEFAULT True,
         voice_mode      TTSMode     DEFAULT 'gtts',

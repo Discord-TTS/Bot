@@ -272,11 +272,14 @@ pub async fn run_checks(
     }
 
     content = content.to_lowercase();
-    content = String::from(
-        content
-            .strip_prefix(&format!("{}{}", &guild_row.prefix, "tts"))
-            .unwrap_or(&content),
-    ); // remove -tts if starts with
+
+    if let Some(required_prefix) = &guild_row.required_prefix {
+        if let Some(stripped_content) = content.strip_prefix(required_prefix) {
+            content = String::from(stripped_content);
+        } else {
+            return Ok(None)
+        }
+    }
 
     if content.starts_with(&guild_row.prefix) {
         return Ok(None)

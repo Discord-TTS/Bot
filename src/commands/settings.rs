@@ -68,6 +68,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let guild_mode = guild_row.voice_mode;
     let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
     let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
+    let required_prefix = guild_row.required_prefix.as_ref().map(|p| p.replace('`', r#"\`"#));
     let required_role = guild_row.required_role.map(|r| serenity::RoleId::new(r as u64).mention().to_string());
 
     let user_mode = if data.premium_check(Some(guild_id)).await?.is_none() {
@@ -137,6 +138,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep2} Ignore bot's messages: `{bot_ignore}`
 {sep2} Ignore audience messages: `{audience_ignore}`
 {sep2} Require users in voice channel: `{require_voice}`
+{sep2} Required prefix for TTS: `{required_prefix}`
 
 **{sep2} Default Server Voice Mode: `{guild_mode}`**
 **{sep2} Default Server Voice: `{default_voice}`**
@@ -149,6 +151,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{bot_ignore}", &guild_row.bot_ignore.to_string())
             .replace("{audience_ignore}", &guild_row.audience_ignore.to_string())
             .replace("{require_voice}", &guild_row.require_voice.to_string())
+            .replace("{required_prefix}", required_prefix.as_deref().unwrap_or(none_str))
             .replace("{guild_mode}", guild_mode.into())
             .replace("{default_voice}", &default_voice)
             .replace("{msg_length}", &guild_row.msg_length.to_string())
@@ -474,6 +477,14 @@ fn to_enabled(catalog: Option<&gettext::Catalog>, value: bool) -> &str {
     }
 }
 
+fn check_prefix<'a>(ctx: &'a Context<'_>, prefix: &str) -> Result<(), &'a str> {
+    if prefix.len() <= 5 && prefix.matches(' ').count() <= 1 {
+        Ok(())
+    } else {
+        Err(ctx.gettext("**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space"))
+    }
+}
+
 /// Changes a setting!
 #[poise::command(category="Settings", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
 pub async fn set(ctx: Context<'_>, ) -> CommandResult {
@@ -647,6 +658,29 @@ pub async fn required_role(
     }.map(drop).map_err(Into::into)
 }
 
+/// Changes the required prefix for TTS.
+#[poise::command(
+    guild_only,
+    category="Settings",
+    prefix_command, slash_command,
+    required_permissions="ADMINISTRATOR",
+    required_bot_permissions="SEND_MESSAGES",
+    aliases("required_role", "require_role")
+)]
+async fn required_prefix(
+    ctx: Context<'_>,
+    #[description="The required prefix for TTS"] tts_prefix: Option<String>
+) -> CommandResult {
+    let guild_id = ctx.guild_id().unwrap();
+    if let Some(prefix) = tts_prefix.as_deref() && let Err(err) = check_prefix(&ctx, prefix) {
+        return ctx.say(err).await.map(drop).map_err(Into::into);
+    }
+
+    ctx.data().guilds_db.set_one(guild_id.into(), "required_prefix", &tts_prefix).await?;
+    ctx.say(ctx.gettext("The required prefix for TTS is now: {}").replace("{}", tts_prefix.as_deref().unwrap_or("`None`"))).await?;
+    Ok(())
+}
+
 /// Changes the default mode for TTS that messages are read in
 #[poise::command(
     guild_only,
@@ -747,15 +781,15 @@ pub async fn translation_lang(
     required_permissions="ADMINISTRATOR",
     required_bot_permissions="SEND_MESSAGES",
 )]
-pub async fn prefix(
+pub async fn command_prefix(
     ctx: Context<'_>,
     #[description="The prefix to be used before commands"] #[rest] prefix: String
 ) -> CommandResult {
-    let to_send = if prefix.len() <= 5 && prefix.matches(' ').count() <= 1 {
+    let to_send = if let Err(err) = check_prefix(&ctx, &prefix) {
+        Cow::Borrowed(err)
+    } else {
         ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), "prefix", &prefix).await?;
         Cow::Owned(ctx.gettext("Command prefix for this server is now: {prefix}").replace("{prefix}", &prefix))
-    } else {
-        Cow::Borrowed(ctx.gettext("**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space"))
     };
 
     ctx.say(to_send).await?;
@@ -1241,9 +1275,9 @@ pub fn commands() -> [Command; 5] {
         poise::Command {
             subcommands: vec![
                 poise::Command {name: "channel", ..setup()},
-                xsaid(), autojoin(), required_role(), voice(), server_voice(), mode(),
-                server_mode(), msg_length(), botignore(), prefix(), translation(), translation_lang(), speaking_rate(),
-                nick(), repeated_characters(), audience_ignore(), require_voice(), block(),
+                xsaid(), autojoin(), required_role(), voice(), server_voice(), mode(), server_mode(),
+                msg_length(), botignore(), translation(), translation_lang(), speaking_rate(), nick(),
+                repeated_characters(), audience_ignore(), require_voice(), required_prefix(), command_prefix(), block(),
             ],
             ..set()
         },

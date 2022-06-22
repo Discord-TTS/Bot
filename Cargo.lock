@@ -742,7 +742,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#c7864084943bd40f528d5bbbcf9b95707b94a0f8"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#7cefb69b5e8a1e992c003fb04d7ceedd155a791e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1794,7 +1794,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.2"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#bbc063c59d53cef8c968987166ab94e67a8113de"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#22f8ba8b596f81a38eef58eed655fd6b72abcea1"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1823,7 +1823,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#bbc063c59d53cef8c968987166ab94e67a8113de"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#22f8ba8b596f81a38eef58eed655fd6b72abcea1"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -1897,7 +1897,7 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.2"
-source = "git+https://github.com/GnomedDev/songbird?branch=symphonia-personal#b8eb70e02a356115a5cc80dc0f0c3f9b0a8161b7"
+source = "git+https://github.com/GnomedDev/songbird?branch=symphonia-personal#cbc3ada22add25990129f3e75f1e9a383bdcc704"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -2252,9 +2252,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82501a4c1c0330d640a6e176a3d6a204f5ec5237aca029029d21864a902e27b0"
+checksum = "72c91f41dcb2f096c05f0873d667dceec1087ce5bcf984ec8ffb19acddbb3217"
 dependencies = [
  "itoa 1.0.2",
  "libc",
