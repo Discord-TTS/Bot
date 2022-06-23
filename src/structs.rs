@@ -100,6 +100,7 @@ pub struct Data {
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub start_time: std::time::SystemTime,
+    pub songbird: Arc<songbird::Songbird>,
     pub premium_avatar_url: String,
     pub reqwest: reqwest::Client,
     pub regex_cache: RegexCache,

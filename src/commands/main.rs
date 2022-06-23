@@ -21,7 +21,7 @@ use poise::serenity_prelude as serenity;
 use gnomeutils::{PoiseContextExt as _, require, require_guild};
 
 use crate::structs::{Context, Result, CommandResult, TTSMode, JoinVCToken, Command};
-use crate::traits::{SerenityContextExt, PoiseContextExt};
+use crate::traits::{SongbirdManagerExt, PoiseContextExt};
 use crate::funcs::random_footer;
 
 async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>) -> Result<bool> {
@@ -78,7 +78,8 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         ).await.map(drop).map_err(Into::into)
     }
 
-    if let Some(bot_vc) = songbird::get(ctx_discord).await.unwrap().get(guild_id) {
+    let data = ctx.data();
+    if let Some(bot_vc) = data.songbird.get(guild_id) {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
             if bot_channel_id.0 == author_vc.0 {
@@ -91,13 +92,11 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         }
     };
 
-    let data = ctx.data();
-
     {
         let _typing = ctx.defer_or_broadcast().await?;
 
         let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-        ctx_discord.join_vc(join_vc_lock.lock().await, author_vc).await?;
+        data.songbird.join_vc(join_vc_lock.lock().await, author_vc).await?;
     }
 
     ctx.send(|m|
@@ -133,9 +132,9 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         (guild.id, channel_id)
     };
 
-    let manager = songbird::get(ctx.discord()).await.unwrap();
+    let data = ctx.data();
     let bot_vc = {
-        if let Some(handler) = manager.get(guild_id) {
+        if let Some(handler) = data.songbird.get(guild_id) {
             handler.lock().await.current_channel()
         } else {
             None
@@ -148,8 +147,8 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         } else if author_vc.map_or(true, |author_vc| bot_vc.0 != author_vc.0) {
             ctx.say(ctx.gettext("Error: You need to be in the same voice channel as me to make me leave!")).await?;
         } else {
-            manager.remove(guild_id).await?;
-            ctx.data().last_to_xsaid_tracker.remove(&guild_id);
+            data.songbird.remove(guild_id).await?;
+            data.last_to_xsaid_tracker.remove(&guild_id);
 
             ctx.say(ctx.gettext("Left voice channel!")).await?;
         }
@@ -173,8 +172,7 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     }
 
     let guild_id = ctx.guild_id().unwrap();
-    let manager = songbird::get(ctx.discord()).await.unwrap();
-    if let Some(call_lock) = manager.get(guild_id) {
+    if let Some(call_lock) = ctx.data().songbird.get(guild_id) {
         call_lock.lock().await.queue().stop();
 
         match ctx {

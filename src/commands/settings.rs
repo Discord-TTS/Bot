@@ -68,7 +68,6 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let guild_mode = guild_row.voice_mode;
     let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
     let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
-    let required_prefix = guild_row.required_prefix.as_ref().map(|p| p.replace('`', r#"\`"#));
     let required_role = guild_row.required_role.map(|r| serenity::RoleId::new(r as u64).mention().to_string());
 
     let user_mode = if data.premium_check(Some(guild_id)).await?.is_none() {
@@ -151,7 +150,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{bot_ignore}", &guild_row.bot_ignore.to_string())
             .replace("{audience_ignore}", &guild_row.audience_ignore.to_string())
             .replace("{require_voice}", &guild_row.require_voice.to_string())
-            .replace("{required_prefix}", required_prefix.as_deref().unwrap_or(none_str))
+            .replace("{required_prefix}", guild_row.required_prefix.as_deref().unwrap_or(none_str))
             .replace("{guild_mode}", guild_mode.into())
             .replace("{default_voice}", &default_voice)
             .replace("{msg_length}", &guild_row.msg_length.to_string())

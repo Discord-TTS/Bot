@@ -32,7 +32,6 @@ use tracing::{error, info, warn};
 
 use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt, require_guild};
 use poise::serenity_prelude::{self as serenity, Mentionable as _};
-use songbird::SerenityInit; // adds serenity::ClientBuilder.register_songbird
 
 mod migration;
 mod constants;
@@ -43,7 +42,7 @@ mod traits;
 mod macros;
 mod funcs;
 
-use traits::SerenityContextExt;
+use traits::SongbirdManagerExt;
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
 use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices, get_translation_langs, dm_generic};
 use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig};
@@ -137,6 +136,7 @@ async fn _main() -> Result<()> {
             .collect();
 
     let reqwest = reqwest::Client::new();
+    let songbird = songbird::Songbird::serenity();
     let auth_key = config.main.tts_service_auth_key.as_deref();
     let http = serenity::Http::new(config.main.token.as_deref().unwrap());
 
@@ -203,9 +203,10 @@ async fn _main() -> Result<()> {
             system_info: parking_lot::Mutex::new(sysinfo::System::new()),
         },
 
+        songbird: songbird.clone(),
         join_vc_tokens: dashmap::DashMap::new(),
-        last_to_xsaid_tracker: dashmap::DashMap::new(),
         currently_purging: AtomicBool::new(false),
+        last_to_xsaid_tracker: dashmap::DashMap::new(),
 
         gtts_voices, espeak_voices, gcloud_voices, polly_voices,
         translation_languages,
@@ -230,8 +231,8 @@ async fn _main() -> Result<()> {
             | serenity::GatewayIntents::MESSAGE_CONTENT,
         )
         .client_settings(move |f| f
+            .voice_manager_arc(songbird)
             .event_handler(EventHandler {bot_id, framework: framework_oc_clone, fully_started: AtomicBool::new(false)})
-            .register_songbird_from_config(songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass))
         )
         .options(poise::FrameworkOptions {
             commands: commands::commands(),
@@ -370,7 +371,7 @@ impl serenity::EventHandler for EventHandler {
             // If (on leave) the bot should also leave as it is alone
             let bot_id = ctx.cache.current_user().id;
             let guild_id = new.guild_id.try_unwrap()?;
-            let songbird = songbird::get(&ctx).await.unwrap();
+            let songbird = &framework.user_data().await.songbird;
 
             if songbird.get(guild_id).is_some()
                 && let Some(old) = old && new.channel_id.is_none() // user left vc
@@ -620,7 +621,7 @@ async fn process_tts_msg(
     let (voice, mode) = {
         if let Some(channel_id) = to_autojoin {
             let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-            ctx.join_vc(join_vc_lock.lock().await, channel_id).await?;
+            data.songbird.join_vc(join_vc_lock.lock().await, channel_id).await?;
         }
 
         let is_ephemeral = message.flags.map_or(false, |f|
@@ -662,7 +663,7 @@ async fn process_tts_msg(
         &speaking_rate, &guild_row.msg_length.to_string()
     );
 
-    let call_lock = match songbird::get(ctx).await.unwrap().get(guild_id) {
+    let call_lock = match data.songbird.get(guild_id) {
         Some(call) => call,
         None => {
             // At this point, the bot is "in" the voice channel, but without a voice client,
@@ -673,7 +674,7 @@ async fn process_tts_msg(
             };
 
             let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-            ctx.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
+            data.songbird.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
         }
     };
 

@@ -229,7 +229,7 @@ pub async fn _info(ctx: Context<'_>) -> CommandResult {
         None => None
     };
 
-    let voice_client = songbird::get(ctx_discord).await.unwrap().get(guild_id);
+    let voice_client = &data.songbird;
     ctx.send(|b| {b.embed(|e| {e
         .title("TTS Bot Debug Info")
         .description(format!("
@@ -249,7 +249,7 @@ Guild Voice Data: `{guild_voice_row:?}`
 #[poise::command(prefix_command, guild_only, hide_in_help)]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
-    songbird::get(ctx.discord()).await.unwrap().remove(guild_id).await.map_err(Into::into)
+    ctx.data().songbird.remove(guild_id).await.map_err(Into::into)
 }
 
 pub fn commands() -> [Command; 8] {
