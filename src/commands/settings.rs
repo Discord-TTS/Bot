@@ -253,13 +253,13 @@ impl<'a> MenuPaginator<'a> {
         let mut message = self.create_message().await?;
 
         loop {
-            let collector = message
-                .await_component_interaction(&ctx_discord.shard)
+            let builder = message
+                .component_interaction_collector(&ctx_discord.shard)
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(self.ctx.author().id)
                 .collect_limit(1);
 
-            let interaction = require!(collector.await, Ok(()));
+            let interaction = require!(builder.collect_single().await, Ok(()));
             match interaction.data.custom_id.as_str() {
                 "⏮️" => {
                     self.index = 0;
@@ -1021,10 +1021,11 @@ pub async fn setup(
             }).await?;
 
             let interaction = reply.message().await?
-                .await_component_interaction(&ctx_discord.shard)
+                .component_interaction_collector(&ctx_discord.shard)
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(ctx.author().id)
                 .collect_limit(1)
+                .collect_single()
                 .await;
 
             if let Some(interaction) = interaction {

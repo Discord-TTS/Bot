@@ -498,10 +498,11 @@ pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, ne
 
     let ctx_discord = ctx.discord();
     let interaction = reply.message().await?
-        .await_component_interaction(&ctx_discord.shard)
+        .component_interaction_collector(&ctx_discord.shard)
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(ctx.author().id)
         .collect_limit(1)
+        .collect_single()
         .await;
 
     reply.edit(ctx, |b| b.components(|c|
