@@ -1898,7 +1898,7 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.2"
-source = "git+https://github.com/GnomedDev/songbird?branch=symphonia-personal#65b475fed2cd7cb86cfd6f2aa0706a6646f116e2"
+source = "git+https://github.com/GnomedDev/songbird?branch=symphonia-personal#10c21b7f8836d9eeaf51cfeb12b4048097bf59cf"
 dependencies = [
  "async-trait",
  "async-tungstenite",
