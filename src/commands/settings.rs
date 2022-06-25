@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -1239,14 +1240,16 @@ pub async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>
         lang_to_voices.entry(&voice.language_name).or_insert_with(Vec::new).push(voice);
     }
 
-    let format_voice = |voice: &PollyVoice| format!("{} - {} ({})\n", voice.id, voice.language_name, voice.gender);
-    let pages = lang_to_voices.into_iter().map(|(_, voices)| voices
-        .into_iter()
-        .map(format_voice)
-        .collect()
-    ).collect();
+    let pages = lang_to_voices.into_iter().map(|(_, voices)| {
+        let mut buf = String::with_capacity(voices.len() * 12);
+        for voice in voices {
+            writeln!(buf, "{} - {} ({})", voice.id, voice.language_name, voice.gender)?;
+        }
 
-    Ok((format_voice(voice).trim_end().to_string(), pages))
+        anyhow::Ok(buf)
+    }).collect::<Result<_>>()?;
+
+    Ok((format!("{} - {} ({})", voice.id, voice.language_name, voice.gender), pages))
 }
 
 pub async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
@@ -1259,10 +1262,13 @@ pub async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String
     }.split_once(' ').unwrap();
 
     let pages = data.gcloud_voices.iter().map(|(language, variants)| {
-        variants.iter().map(|(variant, gender)| {
-            format!("{language} {variant} ({gender})\n")
-        }).collect()
-    }).collect();
+        let mut buf = String::with_capacity(variants.len() * 12);
+        for (variant, gender) in variants {
+            writeln!(buf, "{language} {variant} ({gender})")?;
+        }
+
+        anyhow::Ok(buf)
+    }).collect::<Result<_>>()?;
 
     let gender = data.gcloud_voices[lang][variant];
     Ok((format!("{lang} {variant} ({gender})"), pages))
