@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-06-18 19:15+0000\n"
-"PO-Revision-Date: 2022-06-28 22:05\n"
+"PO-Revision-Date: 2022-06-28 23:01\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -542,15 +542,15 @@ msgstr ""
 
 #: ../rust-libs/gnomeutils/src/errors.rs:262
 msgid "I cannot find the member: `{}`"
-msgstr ""
+msgstr "No puedo encontrar el miembro: `{}`"
 
 #: ../rust-libs/gnomeutils/src/errors.rs:264
 msgid "I cannot find the server: `{}`"
-msgstr ""
+msgstr "No puedo encontrar el servidor: `{}`"
 
 #: ../rust-libs/gnomeutils/src/errors.rs:266
 msgid "I cannot find the channel: `{}`"
-msgstr ""
+msgstr "No puedo encontrar el canal: `{}`"
 
 #: ../rust-libs/gnomeutils/src/errors.rs:268
 msgid "I cannot convert `{}` to a number"
