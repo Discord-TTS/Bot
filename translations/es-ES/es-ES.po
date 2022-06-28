@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: discord-tts-bot\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-06-18 19:15+0000\n"
-"PO-Revision-Date: 2022-06-19 15:49\n"
+"PO-Revision-Date: 2022-06-28 22:05\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -169,7 +169,7 @@ msgstr ""
 
 #: src/commands/other.rs:201
 msgid "The current setup channel is: <#{channel}>"
-msgstr ""
+msgstr "El canal de configuración es: <#{channel}>"
 
 #: src/commands/other.rs:210
 msgid "\n"
@@ -391,7 +391,7 @@ msgstr ""
 
 #: src/commands/settings.rs:617
 msgid "Yes, I'm sure."
-msgstr ""
+msgstr "Sí estoy seguro."
 
 #: src/commands/settings.rs:620
 msgid "{bot_name} now requires {required_role} to use."
