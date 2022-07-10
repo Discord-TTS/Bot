@@ -485,6 +485,7 @@ Ask questions by either responding here or asking on the support server!",
         gnomeutils::errors::interaction_create(ctx, interaction, framework).await;
     }
 
+    #[allow(clippy::explicit_auto_deref)]
     async fn ready(&self, ctx: serenity::Context, data_about_bot: serenity::Ready) {
         let framework = require!(self.framework().await);
         let data = framework.user_data;
@@ -663,19 +664,18 @@ async fn process_tts_msg(
         &speaking_rate, &guild_row.msg_length.to_string()
     );
 
-    let call_lock = match data.songbird.get(guild_id) {
-        Some(call) => call,
-        None => {
-            // At this point, the bot is "in" the voice channel, but without a voice client,
-            // this is usually if the bot restarted but the bot is still in the vc from the last boot.
-            let voice_channel_id = {
-                let guild = ctx.cache.guild(guild_id).try_unwrap()?;
-                guild.voice_states.get(&message.author.id).and_then(|vs| vs.channel_id).try_unwrap()?
-            };
+    let call_lock = if let Some(call) = data.songbird.get(guild_id) {
+        call
+    } else {
+        // At this point, the bot is "in" the voice channel, but without a voice client,
+        // this is usually if the bot restarted but the bot is still in the vc from the last boot.
+        let voice_channel_id = {
+            let guild = ctx.cache.guild(guild_id).try_unwrap()?;
+            guild.voice_states.get(&message.author.id).and_then(|vs| vs.channel_id).try_unwrap()?
+        };
 
-            let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-            data.songbird.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
-        }
+        let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+        data.songbird.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
     };
 
     // Pre-fetch the audio to handle max_length errors
