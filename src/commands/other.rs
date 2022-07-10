@@ -101,9 +101,8 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
         serenity::AttachmentType::Bytes {
             data: Cow::Borrowed(&audio),
             filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
-                TTSMode::gTTS => "mp3",
+                TTSMode::gTTS | TTSMode::TikTok | TTSMode::gCloud | TTSMode::Polly => "mp3",
                 TTSMode::eSpeak => "wav",
-                TTSMode::gCloud | TTSMode::Polly => "ogg",
             })
         }
     };

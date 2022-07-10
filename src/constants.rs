@@ -39,6 +39,7 @@ pub const DB_SETUP_QUERY: &str = "
     CREATE type TTSMode AS ENUM (
         'gtts',
         'polly',
+        'tiktok',
         'espeak',
         'gcloud'
     );

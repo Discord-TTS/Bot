@@ -112,6 +112,7 @@ pub struct Data {
 
     pub espeak_voices: Vec<String>,
     pub gtts_voices: BTreeMap<String, String>,
+    pub tiktok_voices: BTreeMap<String, String>,
     pub polly_voices: BTreeMap<String, PollyVoice>,
     pub gcloud_voices: BTreeMap<String, BTreeMap<String, GoogleGender>>,
 
@@ -133,7 +134,7 @@ impl Data {
         let row = self.user_voice_db.get((user_id.into(), mode)).await?;
 
         Ok(row.speaking_rate.map_or_else(
-            || mode.speaking_rate_info().map(|(_, d, _, _)| d.to_string()).map_or(Cow::Borrowed("1.0"), Cow::Owned),
+            || mode.speaking_rate_info().map(|info| info.default.to_string()).map_or(Cow::Borrowed("1.0"), Cow::Owned),
             |r| Cow::Owned(r.to_string())
         ))
     }
@@ -226,6 +227,20 @@ impl Data {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct SpeakingRateInfo {
+    pub min: f32,
+    pub max: f32,
+    pub default: f32,
+    pub kind: &'static str,
+}
+
+impl SpeakingRateInfo {
+    #[allow(clippy::unnecessary_wraps)]
+    const fn new(min: f32, default: f32, max: f32, kind: &'static str) -> Option<Self> {
+        Some(Self {min, max, default, kind})
+    }
+}
 
 #[derive(
     IntoStaticStr, sqlx::Type,
@@ -237,6 +252,7 @@ impl Data {
 pub enum TTSMode {
     gTTS,
     Polly,
+    TikTok,
     eSpeak,
     gCloud,
 }
@@ -258,7 +274,7 @@ impl TTSMode {
     pub const fn is_premium(self) -> bool {
         match self {
             Self::gTTS | Self::eSpeak => false,
-            Self::Polly | Self::gCloud => true,
+            Self::Polly | Self::gCloud | Self::TikTok => true,
         }
     }
 
@@ -268,16 +284,16 @@ impl TTSMode {
             Self::eSpeak => "en1",
             Self::Polly => "Brian",
             Self::gCloud => "en-US A",
+            Self::TikTok => "en_us_001",
         }
     }
 
-    // min default max kind
-    pub const fn speaking_rate_info(self) -> Option<(f32, f32, f32, &'static str)> {
+    pub const fn speaking_rate_info(self) -> Option<SpeakingRateInfo> {
         match self {
-            Self::gTTS => None,
-            Self::gCloud => Some((0.25, 1.0, 4.0, "x")),
-            Self::Polly  => Some((10.0, 100.0, 500.0, "%")),
-            Self::eSpeak => Some((100.0, 175.0, 400.0, " words per minute")),
+            Self::gTTS | Self::TikTok => None,
+            Self::gCloud => SpeakingRateInfo::new(0.25, 1.0, 4.0, "x"),
+            Self::Polly  => SpeakingRateInfo::new(10.0, 100.0, 500.0, "%"),
+            Self::eSpeak => SpeakingRateInfo::new(100.0, 175.0, 400.0, " words per minute"),
         }
     }
 }
@@ -296,6 +312,7 @@ pub enum TTSModeChoice {
     // Name to show in slash command invoke           Aliases for prefix
     #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       gTTS,
     #[name="eSpeak TTS (male)"]                       #[name="espeak"]     eSpeak,
+    #[name="TikTok TTS (changeable)"]                 #[name="tiktok"]     TikTok,
     #[name="gCloud TTS (changeable)"]                 #[name="gcloud"]     gCloud,
     #[name="Amazon Polly TTS (changeable)"]           #[name="polly"]      Polly,
 }
@@ -305,6 +322,7 @@ impl From<TTSModeChoice> for TTSMode {
         match mode {
             TTSModeChoice::gTTS => Self::gTTS,
             TTSModeChoice::Polly => Self::Polly,
+            TTSModeChoice::TikTok => Self::TikTok,
             TTSModeChoice::eSpeak => Self::eSpeak,
             TTSModeChoice::gCloud => Self::gCloud,
         }
@@ -330,9 +348,10 @@ pub struct PollyVoice {
 }
 
 #[derive(serde::Deserialize, IntoStaticStr, Copy, Clone)]
+#[serde(rename_all="UPPERCASE")]
 pub enum GoogleGender {
-    #[serde(rename="MALE")] Male,
-    #[serde(rename="FEMALE")] Female
+    Male,
+    Female
 }
 
 #[derive(serde::Deserialize, IntoStaticStr, Copy, Clone)]

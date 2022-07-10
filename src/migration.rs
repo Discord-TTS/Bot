@@ -120,6 +120,12 @@ async fn _run(main_config: &mut toml::value::Table, transaction: &mut Transactio
             WHEN OTHERS THEN null;
         END $$;
 
+        DO $$ BEGIN
+            ALTER TYPE TTSMode ADD VALUE 'tiktok';
+        EXCEPTION
+            WHEN OTHERS THEN null;
+        END $$;
+
         CREATE TABLE IF NOT EXISTS guild_voice (
             guild_id      bigint,
             mode          TTSMode,

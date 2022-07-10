@@ -22,7 +22,7 @@ use poise::serenity_prelude as serenity;
 use gnomeutils::{require, require_guild, OptionGettext as _, PoiseContextExt as _};
 use serenity::Mentionable;
 
-use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice, Command};
+use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice, Command, SpeakingRateInfo};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::traits::{PoiseContextExt};
 use crate::funcs::{random_footer, confirm_dialog};
@@ -100,7 +100,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let (speaking_rate, speaking_rate_kind) =
         if let Some(mode) = user_mode {
             let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
-            let (default, kind) = mode.speaking_rate_info().map_or((1.0, "x"), |(_, d, _, k)| (d, k));
+            let (default, kind) = mode.speaking_rate_info().map_or((1.0, "x"), |info| (info.default, info.kind));
 
             (
                 Cow::Owned(user_voice_row.speaking_rate.unwrap_or(default).to_string()),
@@ -290,22 +290,27 @@ impl<'a> MenuPaginator<'a> {
 }
 
 async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> Vec<poise::AutocompleteChoice<String>> {
+    fn clone_tuple_items<K: Clone, V: Clone>(t: (&K, &V)) -> (K, V) {
+        (t.0.clone(), t.1.clone())
+    }
+
     let (_, mode) = match ctx.data.parse_user_or_guild(ctx.interaction.user().id, ctx.interaction.guild_id()).await {
         Ok(v) => v,
         Err(_) => return Vec::new()
     };
 
-    let (mut i1, mut i2, mut i3, mut i4);
+    let (mut i1, mut i2, mut i3, mut i4, mut i5);
     let voices: &mut dyn Iterator<Item=_> = match mode {
-        TTSMode::gTTS => {i1 = ctx.data.gtts_voices.clone().into_iter().map(|(value, name)| poise::AutocompleteChoice {name, value}); &mut i1},
-        TTSMode::eSpeak => {i2 = ctx.data.espeak_voices.clone().into_iter().map(poise::AutocompleteChoice::from); &mut i2},
-        TTSMode::Polly => {i3 =
+        TTSMode::gTTS => {i1 = ctx.data.gtts_voices.iter().map(clone_tuple_items).map(|(value, name)| poise::AutocompleteChoice {name, value}); &mut i1},
+        TTSMode::TikTok => {i2 = ctx.data.tiktok_voices.iter().map(clone_tuple_items).map(|(value, name)| poise::AutocompleteChoice {name, value}); &mut i2},
+        TTSMode::eSpeak => {i3 = ctx.data.espeak_voices.iter().cloned().map(poise::AutocompleteChoice::from); &mut i3},
+        TTSMode::Polly => {i4 =
             ctx.data.polly_voices.iter().map(|(_, voice)| poise::AutocompleteChoice{
                 name: format!("{} - {} ({})", voice.name, voice.language_name, voice.gender),
                 value: voice.id.clone()
             });
-        &mut i3}
-        TTSMode::gCloud => {i4 =
+        &mut i4}
+        TTSMode::gCloud => {i5 =
             ctx.data.gcloud_voices.iter().flat_map(|(language, variants)| {
                 variants.iter().map(move |(variant, gender)| {
                     poise::AutocompleteChoice {
@@ -314,7 +319,7 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
                     }
                 })
             });
-        &mut i4}
+        &mut i5}
     };
 
     let mut filtered_voices: Vec<_> = voices
@@ -461,6 +466,7 @@ fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> bool {
         TTSMode::gTTS => data.gtts_voices.contains_key(voice),
         TTSMode::eSpeak => data.espeak_voices.contains(voice),
         TTSMode::Polly => data.polly_voices.contains_key(voice),
+        TTSMode::TikTok => data.tiktok_voices.contains_key(voice),
         TTSMode::gCloud => {
             voice.split_once(' ')
                 .and_then(|(language, variant)| data.gcloud_voices.get(language).map(|l| (l, variant)))
@@ -861,7 +867,7 @@ pub async fn speaking_rate(
     let author = ctx.author();
 
     let (_, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
-    let (min, _, max, kind) = require!(mode.speaking_rate_info(), {
+    let SpeakingRateInfo {min, max, default: _, kind} = require!(mode.speaking_rate_info(), {
         ctx.say(ctx.gettext("**Error**: Cannot set speaking rate for the {mode} mode").replace("{mode}", mode.into())).await?;
         Ok(())
     });
@@ -1183,8 +1189,9 @@ pub async fn voices(
         );
 
         match mode {
-            TTSMode::gTTS => format_languages(data.gtts_voices.keys()),
             TTSMode::eSpeak => format_languages(data.espeak_voices.iter()),
+            TTSMode::gTTS => format_languages(data.gtts_voices.keys()),
+            TTSMode::TikTok => format_languages(data.tiktok_voices.keys()),
             TTSMode::Polly => return {
                 let (current_voice, pages) = list_polly_voices(&ctx).await?;
                 MenuPaginator::new(ctx, pages, current_voice, mode, random_footer()).start().await.map_err(Into::into)

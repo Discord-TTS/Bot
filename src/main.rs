@@ -44,11 +44,8 @@ mod funcs;
 
 use traits::SongbirdManagerExt;
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
-use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices, get_translation_langs, dm_generic};
-use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig};
-
-
-use crate::structs::FailurePoint;
+use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices, prepare_tiktok_voices, get_translation_langs, dm_generic};
+use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig, FailurePoint};
 
 enum EntryCheck {
     IsFile,
@@ -143,18 +140,21 @@ async fn _main() -> Result<()> {
     let (
         guilds_db, userinfo_db, user_voice_db, guild_voice_db, nickname_db,
         mut webhooks, translation_languages, premium_avatar_url,
-        gtts_voices, espeak_voices, gcloud_voices, polly_voices
+        gtts_voices, espeak_voices, tiktok_voices, gcloud_voices, polly_voices
     ) = tokio::try_join!(
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
         create_db_handler!(pool.clone(), "userinfo", "user_id"),
         create_db_handler!(pool.clone(), "user_voice", "user_id", "mode"),
         create_db_handler!(pool.clone(), "guild_voice", "guild_id", "mode"),
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
+
         get_webhooks(&http, config.webhooks),
         get_translation_langs(&reqwest, &config.main.translation_token),
         async {serenity::UserId::new(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
+
         async {Ok(TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
         async {Ok(TTSMode::eSpeak.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
+        async {Ok(prepare_tiktok_voices(TTSMode::TikTok.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json().await?))},
         async {Ok(prepare_gcloud_voices(TTSMode::gCloud.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json().await?))},
         async {Ok(TTSMode::Polly
             .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<PollyVoice>>().await?
@@ -208,7 +208,7 @@ async fn _main() -> Result<()> {
         currently_purging: AtomicBool::new(false),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
 
-        gtts_voices, espeak_voices, gcloud_voices, polly_voices,
+        gtts_voices, espeak_voices, gcloud_voices, polly_voices, tiktok_voices,
         translation_languages,
 
         config: config.main, reqwest, premium_avatar_url,
@@ -701,6 +701,7 @@ async fn process_tts_msg(
 
     data.analytics.log(Cow::Borrowed(match mode {
         TTSMode::gTTS => "gTTS_tts",
+        TTSMode::TikTok => "TikTok_tts",
         TTSMode::eSpeak => "eSpeak_tts",
         TTSMode::gCloud => "gCloud_tts",
         TTSMode::Polly => "Polly_tts",

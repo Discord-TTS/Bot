@@ -138,6 +138,11 @@ pub async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Re
     Ok(languages.into_iter().map(|v| (v.language.to_lowercase(), v.name)).collect())
 }
 
+pub fn prepare_tiktok_voices(mut map: BTreeMap<String, String>) -> BTreeMap<String, String> {
+    map.retain(|_, name| !name.starts_with("Singing"));
+    map
+}
+
 pub fn prepare_gcloud_voices(raw_map: Vec<GoogleVoice>) -> BTreeMap<String, BTreeMap<String, GoogleGender>> {
     // {lang_accent: {variant: gender}}
     let mut cleaned_map = BTreeMap::new();
