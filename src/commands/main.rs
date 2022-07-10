@@ -57,16 +57,27 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         return Ok(())
     }
 
-    let author = ctx.author();
     let ctx_discord = ctx.discord();
     let guild_id = ctx.guild_id().unwrap();
+    let bot_id = ctx_discord.cache.current_user().id;
 
+    let bot_member = guild_id.member(ctx_discord, bot_id).await?;
+    if let Some(communication_disabled_until) = bot_member.communication_disabled_until {
+        if communication_disabled_until > serenity::Timestamp::now() {
+            return ctx.send_error(
+                ctx.gettext("I am timed out"),
+                Some(ctx.gettext("ask a moderator to remove the timeout"))
+            ).await.map(drop).map_err(Into::into)
+        }
+    }
+
+    let author = ctx.author();
     let member = guild_id.member(ctx_discord, author.id).await?;
     let channel = author_vc.to_channel(ctx_discord).await?.guild().unwrap();
 
     let missing_permissions =
         (serenity::Permissions::VIEW_CHANNEL | serenity::Permissions::CONNECT | serenity::Permissions::SPEAK) -
-        channel.permissions_for_user(ctx_discord, ctx_discord.cache.current_user().id)?;
+        channel.permissions_for_user(ctx_discord, bot_id)?;
 
     if !missing_permissions.is_empty() {
         return ctx.send_error(
@@ -109,7 +120,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 .icon_url(author.face())
             )
             .footer(|f| f.text(random_footer(
-                &data.config.main_server_invite, ctx_discord.cache.current_user().id, ctx.current_catalog()
+                &data.config.main_server_invite, bot_id, ctx.current_catalog()
             )))
         )
     ).await.map(drop).map_err(Into::into)
