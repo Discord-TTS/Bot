@@ -184,7 +184,7 @@ async fn _main() -> Result<()> {
     let token = config.main.token.take().unwrap();
     let bot_id = serenity::utils::parse_token(&token).unwrap().0;
 
-    let cached_regex = structs::RegexCache {
+    let regex_cache = structs::RegexCache {
         replacements: [
             (regex::Regex::new(r"\|\|(?s:.)*?\|\|")?, ". spoiler avoided."),
             (regex::Regex::new(r"```(?s:.)*?```")?, ". code block."),
@@ -212,7 +212,7 @@ async fn _main() -> Result<()> {
         translation_languages,
 
         config: config.main, reqwest, premium_avatar_url,
-        analytics, webhooks, start_time, startup_message, regex_cache: cached_regex,
+        analytics, webhooks, start_time, startup_message, regex_cache,
         guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
     };
 

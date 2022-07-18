@@ -238,17 +238,25 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
                 None
             }
         },
-        None => Some(Cow::Borrowed(ctx.gettext("Hey, you are not subscribed on Patreon!")))
+        None => Some(Cow::Borrowed(ctx.gettext("Hey, I don't think you are subscribed on Patreon!")))
     };
 
     if let Some(error_msg) = error_msg {
-        return ctx.send(|b| b.embed(|e| {e
+        return ctx.send(|b| b.embed(|e| e
             .title("TTS Bot Premium")
             .description(error_msg)
             .thumbnail(&data.premium_avatar_url)
             .colour(crate::constants::PREMIUM_NEUTRAL_COLOUR)
-            .footer(|f| f.text("If this is an error, please contact Gnome!#6669."))
-        })).await.map(drop).map_err(Into::into)
+            .footer(|f| f.text( {
+                let line1 = ctx.gettext("If you have just subscribed, please wait for up to an hour for the member list to update!\n");
+                let line2 = ctx.gettext("If this is incorrect, and you have waited an hour, please contact Gnome!#6669.");
+
+                let mut concat = String::with_capacity(line1.len() + line2.len());
+                concat.push_str(line1);
+                concat.push_str(line2);
+                concat
+            }))
+        )).await.map(drop).map_err(Into::into)
     }
 
     data.userinfo_db.create_row(author_id).await?;
