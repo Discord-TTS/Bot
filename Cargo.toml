@@ -54,7 +54,7 @@ default-features = false
 
 [dependencies.gnomeutils]
 git = "https://github.com/GnomedDev/GnomeUtils"
-features = ["error_handling", "analytics", "i18n", "bot_list", "logging", "songbird"]
+features = ["error_handling", "help_command", "analytics", "i18n", "bot_list", "logging", "songbird"]
 branch = "personal"
 
 [dependencies.serenity_feature_only]

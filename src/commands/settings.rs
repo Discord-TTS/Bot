@@ -494,7 +494,7 @@ fn check_prefix<'a>(ctx: &'a Context<'_>, prefix: &str) -> Result<(), &'a str> {
 /// Changes a setting!
 #[poise::command(category="Settings", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
 pub async fn set(ctx: Context<'_>, ) -> CommandResult {
-    crate::commands::help::_help(ctx, Some("set")).await
+    gnomeutils::help::command(ctx, Some("set"), ctx.neutral_colour().await).await
 }
 
 /// Owner only: used to block a user from dms
