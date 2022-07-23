@@ -192,6 +192,10 @@ impl Data {
             }
         };
 
+        if mode == TTSMode::gTTS {
+            mode = TTSMode::eSpeak;
+        }
+
         let user_voice_row = self.user_voice_db.get((author_id.into(), mode)).await?;
         let voice =
             // Get user voice for user mode
@@ -210,7 +214,7 @@ impl Data {
             }.unwrap_or_else(|| Cow::Borrowed(mode.default_voice()));
 
         if mode.is_premium() && !guild_is_premium {
-            mode = TTSMode::default();
+            mode = TTSMode::eSpeak;
 
             if user_row.voice_mode.map_or(false, TTSMode::is_premium) {
                 warn!("User ID {author_id}'s normal voice mode is set to a premium mode! Resetting.");
