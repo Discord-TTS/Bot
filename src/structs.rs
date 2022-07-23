@@ -313,12 +313,12 @@ impl Default for TTSMode {
 #[derive(poise::ChoiceParameter, Clone, Copy)]
 #[allow(non_camel_case_types)]
 pub enum TTSModeChoice {
-    // Name to show in slash command invoke           Aliases for prefix
-    #[name="Google Translate TTS (female) (default)"] #[name="gtts"]       gTTS,
-    #[name="eSpeak TTS (male)"]                       #[name="espeak"]     eSpeak,
-    #[name="TikTok TTS (changeable)"]                 #[name="tiktok"]     TikTok,
-    #[name="gCloud TTS (changeable)"]                 #[name="gcloud"]     gCloud,
-    #[name="Amazon Polly TTS (changeable)"]           #[name="polly"]      Polly,
+    // Name to show in slash command invoke               Aliases for prefix
+    #[name="Google Translate TTS (female) (default)"]     #[name="gtts"]       gTTS,
+    #[name="eSpeak TTS (male)"]                           #[name="espeak"]     eSpeak,
+    #[name="⭐ TikTok TTS (changeable) ⭐"]                 #[name="tiktok"]     TikTok,
+    #[name="⭐ gCloud TTS (changeable) ⭐"]                 #[name="gcloud"]     gCloud,
+    #[name="⭐ Amazon Polly TTS (changeable) ⭐"]           #[name="polly"]      Polly,
 }
 
 impl From<TTSModeChoice> for TTSMode {
