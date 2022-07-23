@@ -252,7 +252,8 @@ pub async fn run_checks(
     }
 
     if let Some(required_role) = guild_row.required_role {
-        if !message.member.as_ref().try_unwrap()?.roles.contains(&serenity::RoleId::new(required_role as u64)) {
+        let message_member = require!(message.member.as_ref(), Ok(None));
+        if !message_member.roles.contains(&serenity::RoleId::new(required_role as u64)) {
             let member = guild_id.member(ctx, message.author.id).await?;
             let channel = require!(message.channel_id.to_channel(ctx).await?.guild(), Ok(None));
 
