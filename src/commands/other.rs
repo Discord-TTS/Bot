@@ -13,13 +13,13 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt::Write as _};
 
 use anyhow::Error;
 use sysinfo::{SystemExt, ProcessExt};
 use num_format::{Locale, ToFormattedString};
 
-use poise::serenity_prelude::{self as serenity, Mentionable as _};
+use poise::{CreateReply, serenity_prelude::{self as serenity, builder::*, Mentionable as _}};
 use gnomeutils::{require, PoiseContextExt as _, OptionTryUnwrap as _};
 
 use crate::constants::OPTION_SEPERATORS;
@@ -82,7 +82,6 @@ pub async fn tts(
 }
 
 async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> CommandResult {
-    let audio;
     let attachment = {
         let data = ctx.data();
         let (voice, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
@@ -96,18 +95,17 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             &speaking_rate, &u64::MAX.to_string()
         );
 
-        audio = fetch_audio(&data.reqwest, url, data.config.tts_service_auth_key.as_deref()).await?.try_unwrap()?.bytes().await?;
-
+        let audio = fetch_audio(&data.reqwest, url, data.config.tts_service_auth_key.as_deref()).await?.try_unwrap()?.bytes().await?;
         serenity::AttachmentType::Bytes {
-            data: Cow::Borrowed(&audio),
+            data: Cow::Owned(audio.to_vec()),
             filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
                 TTSMode::gTTS | TTSMode::TikTok | TTSMode::gCloud | TTSMode::Polly => "mp3",
                 TTSMode::eSpeak => "wav",
-            })
+            }).into()
         }
     };
 
-    ctx.send(|b| b
+    ctx.send(CreateReply::default()
         .content(ctx.gettext("Generated some TTS!"))
         .attachment(attachment)
     ).await.map(drop).map_err(Into::into)
@@ -161,13 +159,22 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
     let neutral_colour = ctx.neutral_colour().await;
 
+    let (embed_title, embed_thumbnail) = {
+        let current_user = ctx_discord.cache.current_user();
+
+        let title = ctx.gettext("{bot_name}: Freshly rewritten in Rust!").replace("{bot_name}", &current_user.name);
+        let thumbnail = current_user.face();
+
+        (title, thumbnail)
+    };
+
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
-    ctx.send(|b| {b.embed(|e| { e
-        .title(ctx.gettext("{bot_name}: Freshly rewritten in Rust!").replace("{bot_name}", &ctx_discord.cache.current_user().name))
-        .thumbnail(ctx_discord.cache.current_user().face())
+    ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
+        .title(embed_title)
+        .thumbnail(embed_thumbnail)
         .url(data.config.main_server_invite.clone())
         .colour(neutral_colour)
-        .footer(|f| f.text(ctx.gettext("
+        .footer(CreateEmbedFooter::default().text(ctx.gettext("
 Time to fetch: {time_to_fetch}ms
 Support Server: {main_server_invite}
 Repository: https://github.com/GnomedDev/Discord-TTS-Bot")
@@ -189,7 +196,7 @@ and can be used by {total_members} people!")
             .replace("{total_members}", &total_members)
             .replace("{shard_count}", &shard_count.to_string())
             .replace("{ram_usage}", &format!("{ram_usage:.1}"))
-    )})}).await.map(drop).map_err(Into::into)
+    ))).await.map(drop).map_err(Into::into)
 }
 
 /// Shows the current setup channel!
@@ -223,19 +230,10 @@ pub async fn ping(ctx: Context<'_>,) -> CommandResult {
     let ping_before = std::time::SystemTime::now();
     let ping_msg = ctx.say("Loading!").await?;
 
-    let content = ctx
+    ping_msg.edit(ctx, CreateReply::default().content(ctx
         .gettext("Current Latency: {}ms")
-        .replace("{}", &ping_before.elapsed()?.as_millis().to_string());
-
-    match ping_msg {
-        poise::ReplyHandle::Autocomplete => unreachable!(),
-        poise::ReplyHandle::Known(mut msg) => {
-            msg.edit(ctx.discord(), |b| b.content(content)).await?;
-        },
-        poise::ReplyHandle::Unknown { http, interaction } => {
-            interaction.edit_original_interaction_response(http, |b| b.content(content)).await?;
-        },
-    }
+        .replace("{}", &ping_before.elapsed()?.as_millis().to_string())
+    )).await?;
 
     Ok(())
 }
@@ -255,10 +253,14 @@ pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"]
     let data = ctx.data();
     let author = ctx.author();
     if !data.userinfo_db.get(author.id.into()).await?.dm_blocked {
-        data.webhooks.suggestions.execute(&ctx.discord().http, false, |b| b
+        data.webhooks.suggestions.execute(&ctx.discord().http, false, ExecuteWebhook::default()
             .content(suggestion)
             .avatar_url(author.face())
-            .username(format!("{} ({})", author.tag(), author.id))
+            .username({
+                let mut tag = author.tag();
+                write!(tag, " ({})", author.id)?;
+                tag
+            })
         ).await?;
     }
 

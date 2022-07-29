@@ -23,12 +23,16 @@ use rand::Rng as _;
 
 use poise::serenity_prelude as serenity;
 use gnomeutils::{OptionGettext, OptionTryUnwrap};
-use serenity::json::prelude as json;
+use serenity::{json::prelude as json, builder::*};
 
 use crate::database::GuildRow;
 use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError, RegexCache};
 use crate::constants::TRANSLATION_URL;
 use crate::require;
+
+pub fn current_user_id(cache: &serenity::Cache) -> serenity::UserId {
+    cache.current_user().id
+}
 
 pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
     let mut status: Vec<_> = shards.iter()
@@ -49,23 +53,23 @@ pub async fn dm_generic(
     message: String,
 ) -> Result<(String, serenity::Embed)> {
     let dm_channel = target.create_dm_channel(ctx).await?;
-    let sent = dm_channel.send_message(&ctx.http, |b| b.embed(|e| {e
-        .title("Message from the developers:")
-        .description(message)
-        .author(|a| a
-            .name(author.tag())
-            .icon_url(author.face())
-        );
-
+    let sent = dm_channel.send_message(&ctx.http, CreateMessage::default().embed({
+        let mut embed = CreateEmbed::default();
         if let Some((name, value, inline)) = field {
-            e.field(name, value, inline);
+            embed = embed.field(name, value, inline);
         }
 
         if let Some(url) = attachment_url {
-            e.image(url);
+            embed = embed.image(url);
         };
 
-        e
+        embed
+            .title("Message from the developers:")
+            .description(message)
+            .author(CreateEmbedAuthor::default()
+                .name(author.tag())
+                .icon_url(author.face())
+            )
     })).await?;
 
     target_tag.insert_str(0, "Sent message to: ");
@@ -478,16 +482,16 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
 }
 
 pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, negative: String) -> Result<Option<bool>, Error> {
-    fn components(c: &mut serenity::CreateComponents, positive: String, negative: String, disabled: bool) -> &mut serenity::CreateComponents {
-        c
-            .create_action_row(|r| r
-                .create_button(|b| b
+    fn components(positive: String, negative: String, disabled: bool) -> serenity::CreateComponents {
+        serenity::CreateComponents::default()
+            .add_action_row(CreateActionRow::default()
+                .add_button(CreateButton::default()
                     .style(serenity::ButtonStyle::Success)
                     .disabled(disabled)
                     .custom_id("True")
                     .label(positive)
                 )
-                .create_button(|b| b
+                .add_button(CreateButton::default()
                     .style(serenity::ButtonStyle::Danger)
                     .disabled(disabled)
                     .custom_id("False")
@@ -496,10 +500,10 @@ pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, ne
             )
     }
 
-    let reply = ctx.send(|b| b
+    let reply = ctx.send(poise::CreateReply::default()
         .content(prompt)
         .ephemeral(true)
-        .components(|c| components(c, positive.clone(), negative.clone(), false))
+        .components(components(positive.clone(), negative.clone(), false))
     ).await?;
 
     let ctx_discord = ctx.discord();
@@ -507,12 +511,11 @@ pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, ne
         .component_interaction_collector(&ctx_discord.shard)
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(ctx.author().id)
-        .collect_limit(1)
         .collect_single()
         .await;
 
-    reply.edit(ctx, |b| b.components(|c|
-        components(c, positive, negative, true)
+    reply.edit(ctx, poise::CreateReply::default().components(
+        components(positive, negative, true)
     )).await?;
 
     if let Some(interaction) = interaction {

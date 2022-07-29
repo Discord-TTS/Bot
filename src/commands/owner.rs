@@ -16,7 +16,7 @@
 
 use std::sync::atomic::Ordering::SeqCst;
 
-use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
+use poise::{serenity_prelude as serenity, futures_util::TryStreamExt, serenity::builder::*};
 use gnomeutils::OptionTryUnwrap;
 
 use crate::structs::{Context, CommandResult, PrefixContext, TTSModeChoice, Command};
@@ -35,9 +35,9 @@ pub async fn dm(ctx: PrefixContext<'_>, todm: serenity::User, #[rest] message: S
         attachment_url, None, message
     ).await?;
 
-    ctx.msg.channel_id.send_message(&ctx.discord.http, |b| b
+    ctx.msg.channel_id.send_message(&ctx.discord.http, CreateMessage::default()
         .content(content)
-        .set_embed(serenity::CreateEmbed::from(embed))
+        .add_embed(CreateEmbed::from(embed))
     ).await.map(drop).map_err(Into::into)
 }
 
@@ -137,11 +137,11 @@ pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandRes
             guild.leave(ctx_discord).await?;
 
             if !data.currently_purging.load(SeqCst) {
-                return msg.edit(ctx, |b| b.content("Aborted!")).await.map(drop).map_err(Into::into)
+                return msg.edit(ctx, poise::CreateReply::default().content("Aborted!")).await.map(drop).map_err(Into::into)
             }
         }
 
-        msg.edit(ctx, |b| b.content("Done! Left {to_leave_count} guilds!")).await.map(drop)
+        msg.edit(ctx, poise::CreateReply::default().content("Done! Left {to_leave_count} guilds!")).await.map(drop)
     } else {
         ctx.say(format!("Would purge {to_leave_count} guilds!")).await.map(drop)
     }.map_err(Into::into)
@@ -230,7 +230,7 @@ pub async fn _info(ctx: Context<'_>) -> CommandResult {
     };
 
     let voice_client = &data.songbird;
-    ctx.send(|b| {b.embed(|e| {e
+    ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
         .title("TTS Bot Debug Info")
         .description(format!("
 Shard ID: `{shard_id}`
@@ -242,7 +242,7 @@ Nickname Data: `{nick_row:?}`
 User Voice Data: `{user_voice_row:?}`
 Guild Voice Data: `{guild_voice_row:?}`
 "))
-    })}).await.map(drop).map_err(Into::into)
+    )).await.map(drop).map_err(Into::into)
 }
 
 /// Force leaves the voice channel in the current server to bypass buggy states

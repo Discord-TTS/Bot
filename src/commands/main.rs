@@ -17,7 +17,7 @@ use std::borrow::Cow;
 
 use sqlx::Row;
 
-use poise::serenity_prelude as serenity;
+use poise::{CreateReply, serenity_prelude::{self as serenity, builder::*}};
 use gnomeutils::{PoiseContextExt as _, require, require_guild};
 
 use crate::structs::{Context, Result, CommandResult, TTSMode, JoinVCToken, Command};
@@ -59,7 +59,10 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
     let ctx_discord = ctx.discord();
     let guild_id = ctx.guild_id().unwrap();
-    let bot_id = ctx_discord.cache.current_user().id;
+    let (bot_id, bot_face) = {
+        let current_user = ctx_discord.cache.current_user();
+        (current_user.id, current_user.face())
+    };
 
     let bot_member = guild_id.member(ctx_discord, bot_id).await?;
     if let Some(communication_disabled_until) = bot_member.communication_disabled_until {
@@ -110,20 +113,18 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         data.songbird.join_vc(join_vc_lock.lock().await, author_vc).await?;
     }
 
-    ctx.send(|m|
-        m.embed(|e| e
-            .title(ctx.gettext("Joined your voice channel!"))
-            .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
-            .thumbnail(&ctx_discord.cache.current_user().face())
-            .author(|a| a
-                .name(member.display_name().into_owned())
-                .icon_url(author.face())
-            )
-            .footer(|f| f.text(random_footer(
-                &data.config.main_server_invite, bot_id, ctx.current_catalog()
-            )))
+    ctx.send(poise::CreateReply::default().embed(serenity::CreateEmbed::default()
+        .title(ctx.gettext("Joined your voice channel!"))
+        .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
+        .thumbnail(bot_face)
+        .author(CreateEmbedAuthor::default()
+            .name(member.display_name().into_owned())
+            .icon_url(author.face())
         )
-    ).await.map(drop).map_err(Into::into)
+        .footer(CreateEmbedFooter::default().text(random_footer(
+            &data.config.main_server_invite, bot_id, ctx.current_catalog()
+        )))
+    )).await.map(drop).map_err(Into::into)
 }
 
 /// Leaves voice channel TTS Bot is in!
@@ -242,12 +243,12 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     };
 
     if let Some(error_msg) = error_msg {
-        return ctx.send(|b| b.embed(|e| e
+        return ctx.send(CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .description(error_msg)
             .thumbnail(&data.premium_avatar_url)
             .colour(crate::constants::PREMIUM_NEUTRAL_COLOUR)
-            .footer(|f| f.text( {
+            .footer(CreateEmbedFooter::default().text({
                 let line1 = ctx.gettext("If you have just subscribed, please wait for up to an hour for the member list to update!\n");
                 let line2 = ctx.gettext("If this is incorrect, and you have waited an hour, please contact Gnome!#6669.");
 

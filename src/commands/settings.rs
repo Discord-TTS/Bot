@@ -18,14 +18,13 @@ use std::fmt::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity, Mentionable, builder::*};
 use gnomeutils::{require, require_guild, OptionGettext as _, PoiseContextExt as _};
-use serenity::Mentionable;
 
 use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice, Command, SpeakingRateInfo};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::traits::{PoiseContextExt};
-use crate::funcs::{random_footer, confirm_dialog};
+use crate::funcs::{random_footer, confirm_dialog, current_user_id};
 use crate::database;
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
@@ -113,11 +112,11 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let neutral_colour = ctx.neutral_colour().await;
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
 
-    ctx.send(|b| {b.embed(|e| {e
+    ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
         .title("Current Settings")
         .url(&data.config.main_server_invite)
         .colour(neutral_colour)
-        .footer(|f| f.text(ctx.gettext(
+        .footer(CreateEmbedFooter::default().text(ctx.gettext(
             "Change these settings with `/set {property} {value}`!\nNone = setting has not been set yet!"
         )))
 
@@ -178,7 +177,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{speaking_rate}", &speaking_rate)
             .replace("{speaking_rate_kind}", speaking_rate_kind),
         false)
-    })}).await.map(drop).map_err(Into::into)
+    )).await.map(drop).map_err(Into::into)
 }
 
 
@@ -200,27 +199,27 @@ impl<'a> MenuPaginator<'a> {
     }
 
 
-    fn create_page<'b>(&self, embed: &'b mut serenity::CreateEmbed, page: &str) -> &'b mut serenity::CreateEmbed {
+    fn create_page(&self, page: &str) -> CreateEmbed {
         let author = self.ctx.author();
 
-        embed
+        CreateEmbed::default()
             .title(self.ctx
                 .gettext("{bot_user} Voices | Mode: `{mode}`")
                 .replace("{mode}", self.mode.into())
                 .replace("{bot_user}", &self.ctx.discord().cache.current_user().name)
             )
-            .author(|a| a
+            .author(CreateEmbedAuthor::default()
                 .name(author.name.clone())
                 .icon_url(author.face())
             )
             .description(self.ctx.gettext("**Currently Supported Voice**\n{page}").replace("{page}", page))
             .field(self.ctx.gettext("Current voice used"), &self.current_voice, false)
-            .footer(|f| f.text(self.footer.to_string()))
+            .footer(CreateEmbedFooter::default().text(self.footer.to_string()))
     }
 
-    fn create_action_row<'b>(&self, builder: &'b mut serenity::CreateActionRow, disabled: bool) -> &'b mut serenity::CreateActionRow {
-        for emoji in ["⏮️", "◀", "⏹️", "▶️", "⏭️"] {
-            builder.create_button(|b| {b
+    fn create_action_row(&self, disabled: bool) -> serenity::CreateActionRow {
+        ["⏮️", "◀", "⏹️", "▶️", "⏭️"].into_iter().fold(CreateActionRow::default(), |b, emoji|
+            b.add_button(CreateButton::default()
                 .custom_id(emoji)
                 .style(serenity::ButtonStyle::Primary)
                 .emoji(serenity::ReactionType::Unicode(String::from(emoji)))
@@ -229,22 +228,21 @@ impl<'a> MenuPaginator<'a> {
                     (["⏮️", "◀"].contains(&emoji) && self.index == 0) ||
                     (["▶️", "⏭️"].contains(&emoji) && self.index == (self.pages.len() - 1))
                 )
-            });
-        };
-        builder
+            )
+        )
     }
 
     async fn create_message(&self) -> serenity::Result<serenity::Message> {
-        self.ctx.send(|b| b
-            .embed(|e| self.create_page(e, &self.pages[self.index]))
-            .components(|c| c.create_action_row(|r| self.create_action_row(r, false)))
+        self.ctx.send(poise::CreateReply::default()
+            .embed(self.create_page(&self.pages[self.index]))
+            .components(CreateComponents::default().add_action_row(self.create_action_row(false)))
         ).await?.into_message().await
     }
 
     async fn edit_message(&self, message: &mut serenity::Message, disable: bool) -> serenity::Result<()> {
-        message.edit(self.ctx.discord(), |b| b
-            .embed(|e| self.create_page(e, &self.pages[self.index]))
-            .components(|c| c.create_action_row(|r| self.create_action_row(r, disable)))
+        message.edit(self.ctx.discord(), EditMessage::default()
+            .embed(self.create_page(&self.pages[self.index]))
+            .components(CreateComponents::default().add_action_row(self.create_action_row(disable)))
         ).await
     }
 
@@ -257,8 +255,7 @@ impl<'a> MenuPaginator<'a> {
             let builder = message
                 .component_interaction_collector(&ctx_discord.shard)
                 .timeout(std::time::Duration::from_secs(60 * 5))
-                .author_id(self.ctx.author().id)
-                .collect_limit(1);
+                .author_id(self.ctx.author().id);
 
             let interaction = require!(builder.collect_single().await, Ok(()));
             match interaction.data.custom_id.as_str() {
@@ -374,17 +371,19 @@ where
 {
     let data = ctx.data();
     if mode.map_or(false, TTSMode::is_premium) && data.premium_check(Some(guild_id)).await?.is_some() {
-        ctx.send(|b| b.embed(|e| {e
+        ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
             .thumbnail(&data.premium_avatar_url)
             .url("https://www.patreon.com/Gnome_the_Bot_Maker")
-            .footer(|f| f.text(ctx.gettext("If this is an error, please contact Gnome!#6669.")))
+            .footer(CreateEmbedFooter::default().text(ctx.gettext(
+                "If this is an error, please contact Gnome!#6669."
+            )))
             .description(ctx.gettext("
                 The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
                 If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!
             "))
-        })).await?;
+        )).await?;
         Ok(None)
     } else {
         let key = if guild_is_premium {
@@ -1004,34 +1003,25 @@ pub async fn setup(
 
             text_channels.sort_by(|f, s| Ord::cmp(&f.position, &s.position));
 
-            let reply = ctx.send(|b| {b
+            let reply = ctx.send(poise::CreateReply::default()
                 .content(ctx.gettext("Select a channel!"))
-                .components(|c| {
-                    for (i, chunked_channels) in text_channels.chunks(25).enumerate() {
-                        c.create_action_row(|r| {
-                            r.create_select_menu(|s| {s
-                                .custom_id(format!("select::channels::{i}"))
-                                .options(|os| {
-                                    for channel in chunked_channels {
-                                        os.create_option(|o| {o
-                                            .label(&channel.name)
-                                            .value(channel.id.to_string())
-                                        });
-                                    };
-                                    os
-                                })
-                            })
-                        });
-                    };
-                    c
-                })
-            }).await?;
+                .components(text_channels.chunks(25).enumerate().into_iter().fold(CreateComponents::default(), |c, (i, chunked_channels)|
+                    c.add_action_row(CreateActionRow::default().add_select_menu(CreateSelectMenu::default()
+                        .custom_id(format!("select::channels::{i}"))
+                        .options(chunked_channels.iter().fold(CreateSelectMenuOptions::default(), |os, channel|
+                            os.add_option(CreateSelectMenuOption::default()
+                                .label(&channel.name)
+                                .value(channel.id.to_string())
+                            )
+                        ))
+                    ))
+                ))
+            ).await?;
 
             let interaction = reply.message().await?
                 .component_interaction_collector(&ctx_discord.shard)
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(ctx.author().id)
-                .collect_limit(1)
                 .collect_single()
                 .await;
 
@@ -1050,17 +1040,17 @@ pub async fn setup(
     };
 
     data.guilds_db.set_one(guild_id.into(), "channel", &(channel.id.get() as i64)).await?;
-    ctx.send(|b| b.embed(|e| e
+    ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
         .title(ctx.gettext("{bot_name} has been setup!").replace("{bot_name}", &bot_user_name))
         .thumbnail(&bot_user_face)
         .description(ctx.gettext("
 TTS Bot will now accept commands and read from <#{channel}>.
 Just do `/join` and start talking!
 ").replace("{channel}", &channel.id.0.to_string()))
-        .footer(|f| f.text(random_footer(
-            &data.config.main_server_invite, cache.current_user().id, ctx.current_catalog()
+        .footer(CreateEmbedFooter::default().text(random_footer(
+            &data.config.main_server_invite, current_user_id(cache), ctx.current_catalog()
         )))
-        .author(|a| a
+        .author(CreateEmbedAuthor::default()
             .name(&author.name)
             .icon_url(author.face())
         )
@@ -1151,13 +1141,21 @@ pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
     let cache = &ctx.discord().cache;
     let neutral_colour = ctx.neutral_colour().await;
 
-    ctx.send(|b| b.embed(|e| e
+    let (embed_title, client_id) = {
+        let current_user = cache.current_user();
+        (
+            ctx.gettext("{} Translation Languages").replace("{}", &current_user.name),
+            current_user.id
+        )
+    };
+
+    ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
+        .title(embed_title)
         .colour(neutral_colour)
-        .author(|a| a.name(author.name.clone()).icon_url(author.face()))
-        .title(ctx.gettext("{} Translation Languages").replace("{}", &cache.current_user().name))
         .field("Currently Supported Languages", format_languages(data.translation_languages.keys()), false)
-        .footer(|f| f.text(random_footer(
-            &data.config.main_server_invite, cache.current_user().id, ctx.current_catalog()
+        .author(CreateEmbedAuthor::default().name(author.name.clone()).icon_url(author.face()))
+        .footer(CreateEmbedFooter::default().text(random_footer(
+            &data.config.main_server_invite, client_id, ctx.current_catalog()
         )))
     )).await.map(drop).map_err(Into::into)
 }
@@ -1205,16 +1203,23 @@ pub async fn voices(
 
     let cache = &ctx.discord().cache;
     let user_voice_row = data.user_voice_db.get((author.id.into(), mode)).await?;
-    ctx.send(|b| b.embed(|e| e
-        .title(ctx
+
+    let (embed_title, client_id) = {
+        let current_user = cache.current_user();
+        let embed_title = ctx
             .gettext("{bot_user} Voices | Mode: `{mode}`")
             .replace("{bot_user}", &cache.current_user().name)
-            .replace("{mode}", mode.into())
-        )
-        .footer(|f| f.text(random_footer(
-            &data.config.main_server_invite, cache.current_user().id, ctx.current_catalog()
+            .replace("{mode}", mode.into());
+
+        (embed_title, current_user.id)
+    };
+
+    ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
+        .title(embed_title)
+        .footer(CreateEmbedFooter::default().text(random_footer(
+            &data.config.main_server_invite, client_id, ctx.current_catalog()
         )))
-        .author(|a| a
+        .author(CreateEmbedAuthor::default()
             .name(author.name.clone())
             .icon_url(author.face())
         )

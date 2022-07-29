@@ -14,14 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#![feature(let_chains, must_not_suspend)]
-
-#![warn(rust_2018_idioms, missing_copy_implementations, must_not_suspend, noop_method_call, unused)]
+#![warn(rust_2018_idioms, missing_copy_implementations, noop_method_call, unused)]
 #![warn(clippy::pedantic)]
 
 // clippy::pedantic complains about u64 -> i64 and back when db conversion, however it is fine
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
-#![allow(clippy::unreadable_literal)]
+#![allow(clippy::unreadable_literal, clippy::wildcard_imports)]
 
 use std::{borrow::Cow, collections::BTreeMap, str::FromStr, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 
@@ -31,7 +29,7 @@ use once_cell::sync::OnceCell;
 use tracing::{error, info, warn};
 
 use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt, require_guild};
-use poise::serenity_prelude::{self as serenity, Mentionable as _};
+use poise::serenity_prelude::{self as serenity, Mentionable as _, builder::*};
 
 mod migration;
 mod constants;
@@ -165,7 +163,7 @@ async fn _main() -> Result<()> {
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));
     tokio::spawn(analytics.clone().start());
 
-    let startup_message = webhooks.logs.execute(&http, true, |b| b
+    let startup_message = webhooks.logs.execute(&http, true, ExecuteWebhook::default()
         .content("**TTS Bot is starting up**")
     ).await?.unwrap().id;
 
@@ -236,12 +234,10 @@ async fn _main() -> Result<()> {
         )
         .options(poise::FrameworkOptions {
             commands: commands::commands(),
-            allowed_mentions: Some({
-                let mut allowed_mentions = serenity::CreateAllowedMentions::default();
-                allowed_mentions.parse(serenity::ParseValue::Users);
-                allowed_mentions.replied_user(true);
-                allowed_mentions
-            }),
+            allowed_mentions: Some(serenity::CreateAllowedMentions::default()
+                .parse(serenity::ParseValue::Users)
+                .replied_user(true)
+            ),
             pre_command: |ctx| Box::pin(async move {
                 let analytics_handler: &analytics::Handler = &ctx.data().analytics;
 
@@ -397,9 +393,9 @@ impl serenity::EventHandler for EventHandler {
 
         errors::handle_guild("GuildCreate", &ctx, framework, Some(&guild), async_try!({
             // Send to servers channel and DM owner the welcome message
-            data.webhooks.servers.execute(&ctx.http, false, |b| {
-                b.content(format!("Just joined {}!", &guild.name))
-            }).await?;
+            data.webhooks.servers.execute(&ctx.http, false, ExecuteWebhook::default()
+                .content(format!("Just joined {}!", &guild.name))
+            ).await?;
 
             let (owner_tag, owner_face) = {
                 let owner = guild.owner_id.to_user(&ctx).await?;
@@ -407,7 +403,7 @@ impl serenity::EventHandler for EventHandler {
             };
 
             let dm_channel = guild.owner_id.create_dm_channel(&ctx).await?;
-            match dm_channel.send_message(&ctx, |b| b.embed(|e| e
+            match dm_channel.send_message(&ctx, serenity::CreateMessage::default().embed(CreateEmbed::default()
                 .title(format!("Welcome to {}!", ctx.cache.current_user().name))
                 .description(format!("
 Hello! Someone invited me to your server `{}`!
@@ -422,8 +418,8 @@ Then, you can just type normal messages and I will say them, like magic!
 You can view all the commands with `-help`
 Ask questions by either responding here or asking on the support server!",
                 guild.name))
-                .footer(|f| f.text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
-                .author(|a| a.name(owner_tag.clone()).icon_url(owner_face))
+                .footer(CreateEmbedFooter::default().text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
+                .author(CreateEmbedAuthor::default().name(owner_tag.clone()).icon_url(owner_face))
             )).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
                 Err(error) => return Err(anyhow::Error::from(error)),
@@ -470,7 +466,7 @@ Ask questions by either responding here or asking on the support server!",
                     ).await?;
                 }
 
-                data.webhooks.servers.execute(&ctx.http, false, |b| b.content(format!(
+                data.webhooks.servers.execute(&ctx.http, false, ExecuteWebhook::default().content(format!(
                     "Just got kicked from {}. I'm now in {} servers",
                     guild.name, ctx.cache.guilds().len()
                 ))).await?;
@@ -495,9 +491,9 @@ Ask questions by either responding here or asking on the support server!",
             let user_name = &data_about_bot.user.name;
             let status = generate_status(&*framework.shard_manager.lock().await.runners.lock().await);
 
-            data.webhooks.logs.edit_message(&ctx.http, data.startup_message, |m| {m
+            data.webhooks.logs.edit_message(&ctx.http, data.startup_message, serenity::EditWebhookMessage::default()
                 .content("")
-                .embeds(vec![serenity::Embed::fake(|e| {e
+                .embeds(vec![CreateEmbed::default()
                     .description(status)
                     .colour(FREE_NEUTRAL_COLOUR)
                     .title(if last_shard {
@@ -505,8 +501,8 @@ Ask questions by either responding here or asking on the support server!",
                     } else {
                         format!("{user_name} is starting up!")
                     })
-                })])
-            }).await?;
+                ])
+            ).await?;
 
             if last_shard && !self.fully_started.load(Ordering::SeqCst) {
                 self.fully_started.store(true, Ordering::SeqCst);
@@ -589,18 +585,19 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
 
     let permissions = ctx.author_permissions().await?;
     if permissions.send_messages() {
-        ctx.send(|b| {
+        let builder = poise::CreateReply::default();
+        ctx.send({
             const FOOTER_MSG: &str = "If this is an error, please contact Gnome!#6669.";
             if permissions.embed_links() {
-                b.embed(|e| {e
+                builder.embed(CreateEmbed::default()
                     .title("TTS Bot Premium - Premium Only Command!")
                     .description(main_msg)
                     .colour(PREMIUM_NEUTRAL_COLOUR)
                     .thumbnail(&data.premium_avatar_url)
-                    .footer(|f| f.text(FOOTER_MSG))
-                })
+                    .footer(serenity::CreateEmbedFooter::default().text(FOOTER_MSG))
+                )
             } else {
-                b.content(format!("{}\n{}", main_msg, FOOTER_MSG))
+                builder.content(format!("{}\n{}", main_msg, FOOTER_MSG))
             }
         }).await?;
     }
@@ -756,7 +753,7 @@ async fn process_mention_msg(
             format!("My prefix for `{guild_name}` is {prefix} however I do not have permission to send messages so I cannot respond to your commands!")
         };
 
-        match message.author.direct_message(ctx, |b| b.content(msg)).await {
+        match message.author.direct_message(ctx, CreateMessage::default().content(msg)).await {
             Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
             Err(error) => return Err(anyhow::Error::from(error)),
             _ => {}
@@ -822,10 +819,10 @@ async fn process_support_dm(
                         attachment_url, field, message.content.clone()
                     ).await?;
 
-                    channel.send_message(ctx, |b| {b
+                    channel.send_message(ctx, CreateMessage::default()
                         .content(content)
-                        .set_embed(serenity::CreateEmbed::from(embed))
-                    }).await?;
+                        .embed(CreateEmbed::from(embed))
+                    ).await?;
                 }
             }
         }
@@ -841,34 +838,42 @@ async fn process_support_dm(
                 let content = message.content.to_lowercase();
 
                 if content.contains("discord.gg") {
-                    channel.say(&ctx.http, format!(
-                        "Join {} and look in {} to invite {}!",
-                        data.config.main_server_invite, data.config.invite_channel.mention(), ctx.cache.current_user().id
-                    )).await?;
+                    let content = {
+                        let current_user = ctx.cache.current_user();
+                        format!(
+                            "Join {} and look in {} to invite <@{}>!",
+                            data.config.main_server_invite, data.config.invite_channel.mention(), current_user.id
+                        )
+                    };
+
+                    channel.say(&ctx, content).await?;
                 } else if content.as_str() == "help" {
-                    channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
+                    channel.say(&ctx, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
                 } else if !userinfo.dm_blocked {
                     let webhook_username = format!("{} ({})", message.author.tag(), message.author.id);
                     let paths: Vec<serenity::AttachmentType<'_>> = message.attachments.iter()
                         .map(|a| reqwest::Url::parse(&a.url).map(serenity::AttachmentType::Image))
                         .collect::<Result<_, _>>()?;
 
-                    data.webhooks.dm_logs.execute(&ctx.http, false, |b| {b
+                    data.webhooks.dm_logs.execute(&ctx, false, ExecuteWebhook::default()
                         .files(paths)
                         .content(&message.content)
                         .username(webhook_username)
                         .avatar_url(message.author.face())
                         .embeds(message.embeds.iter().cloned().map(Into::into).collect())
-                    }).await?;
+                    ).await?;
                 }
             } else {
-                let welcome_msg = channel.send_message(&ctx.http, |b| b.embed(|e| e
-                    .title(format!("Welcome to {} Support DMs!", ctx.cache.current_user().name))
+                let (client_id, title) = {
+                    let current_user = ctx.cache.current_user();
+                    (current_user.id, format!("Welcome to {} Support DMs!", current_user.name))
+                };
+
+                let welcome_msg = channel.send_message(&ctx.http, CreateMessage::default().embed(CreateEmbed::default()
+                    .title(title)
                     .description(DM_WELCOME_MESSAGE)
-                    .footer(|f| f.text(random_footer(
-                        &data.config.main_server_invite,
-                        ctx.cache.current_user().id,
-                        data.default_catalog(),
+                    .footer(CreateEmbedFooter::default().text(random_footer(
+                        &data.config.main_server_invite, client_id, data.default_catalog(),
                     )))
                 )).await?;
 
