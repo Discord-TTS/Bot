@@ -370,19 +370,18 @@ where
     RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Send + Sync + Unpin,
 {
     let data = ctx.data();
-    if mode.map_or(false, TTSMode::is_premium) && data.premium_check(Some(guild_id)).await?.is_some() {
+    if let Some(mode) = mode && mode.is_premium() && data.premium_check(Some(guild_id)).await?.is_some() {
         ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
             .thumbnail(&data.premium_avatar_url)
             .url("https://www.patreon.com/Gnome_the_Bot_Maker")
             .footer(CreateEmbedFooter::default().text(ctx.gettext(
-                "If this is an error, please contact Gnome!#6669."
+                "If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!"
             )))
             .description(ctx.gettext("
-                The `Premium` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
-                If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!
-            "))
+                The `{mode_name}` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
+            ").replace("{mode_name}", mode.into()))
         )).await?;
         Ok(None)
     } else {
@@ -428,10 +427,12 @@ where
         if check_valid_voice(data, &voice, mode) {
             general_db.create_row(key).await?;
             voice_db.set_one((key, mode), "voice", &voice).await?;
+
+            let name = get_voice_name(data, &voice, mode).unwrap_or(&voice);
             Cow::Owned(match target {
                 Target::Guild => ctx.gettext("Changed the server voice to: {voice}"),
                 Target::User => ctx.gettext("Changed your voice to {voice}")
-            }.replace("{voice}", &voice))
+            }.replace("{voice}", name))
         } else {
             Cow::Borrowed(ctx.gettext("Invalid voice, do `/voices`"))
         }
@@ -460,14 +461,22 @@ fn format_languages<'a>(mut iter: impl Iterator<Item=&'a String>) -> String {
     buf
 }
 
-fn check_valid_voice(data: &Data, voice: &String, mode: TTSMode) -> bool {
+fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a String> {
     match mode {
-        TTSMode::gTTS => data.gtts_voices.contains_key(voice),
-        TTSMode::eSpeak => data.espeak_voices.contains(voice),
-        TTSMode::Polly => data.polly_voices.contains_key(voice),
-        TTSMode::TikTok => data.tiktok_voices.contains_key(voice),
+        TTSMode::gTTS => data.gtts_voices.get(code),
+        TTSMode::TikTok => data.tiktok_voices.get(code),
+        TTSMode::Polly => data.polly_voices.get(code).map(|n| &n.name),
+        TTSMode::eSpeak | TTSMode::gCloud => None,
+    }
+
+}
+
+fn check_valid_voice(data: &Data, code: &String, mode: TTSMode) -> bool {
+    match mode {
+        TTSMode::gTTS | TTSMode::Polly | TTSMode::TikTok => get_voice_name(data, code, mode).is_some(),
+        TTSMode::eSpeak => data.espeak_voices.contains(code),
         TTSMode::gCloud => {
-            voice.split_once(' ')
+            code.split_once(' ')
                 .and_then(|(language, variant)| data.gcloud_voices.get(language).map(|l| (l, variant)))
                 .map_or(false, |(ls, v)| ls.contains_key(v))
         }

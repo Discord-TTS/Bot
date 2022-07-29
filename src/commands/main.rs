@@ -84,7 +84,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
     if !missing_permissions.is_empty() {
         return ctx.send_error(
-            ctx.gettext("I do not have permissions to TTS in your voice channel!"),
+            ctx.gettext("I do not have permissions to TTS in your voice channel"),
             Some(&ctx
                 .gettext("please ask an administrator to give me: {missing_permissions}")
                 .replace("{missing_permissions}", &missing_permissions.get_permission_names().join(", "))

@@ -19,7 +19,7 @@
 
 // clippy::pedantic complains about u64 -> i64 and back when db conversion, however it is fine
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
-#![allow(clippy::unreadable_literal, clippy::wildcard_imports)]
+#![allow(clippy::unreadable_literal, clippy::wildcard_imports, clippy::similar_names)]
 
 use std::{borrow::Cow, collections::BTreeMap, str::FromStr, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 
@@ -71,17 +71,17 @@ async fn get_webhooks(
 }
 
 fn main() -> Result<()> {
+    let start_time = std::time::SystemTime::now();
+
+    std::env::set_var("RUST_LIB_BACKTRACE", "1");
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
-        .block_on(_main())
+        .block_on(_main(start_time))
 }
 
 #[allow(clippy::too_many_lines)]
-async fn _main() -> Result<()> {
-    let start_time = std::time::SystemTime::now();
-    std::env::set_var("RUST_LIB_BACKTRACE", "1");
-
+async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let (pool, mut config) = {
         let mut config_toml: toml::Value = std::fs::read_to_string("config.toml")?.parse()?;
         let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
