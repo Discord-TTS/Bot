@@ -171,9 +171,9 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "bytes"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0b3de4a0c5e67e16066a0715723abd91edc2f9001d09c46e1dca929351e130e"
+checksum = "ec8a7b6a70fde80372154c65702f00a0f56f3e1c36abbc6c440484be248856db"
 
 [[package]]
 name = "cache-padded"
@@ -742,7 +742,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#04c3fb9a3af7e0cf8f59bcfcd357bc0cedc71e6d"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#72a7928dcf1936fd75a5cfd43d30c58ba015ff7f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1843,7 +1843,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.4"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#5652a37eca63eb25d16dc797ea596b47ff4ee2dd"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#aec16ffd57e9fe68a5fb11ef507dd844a835b360"
 dependencies = [
  "async-trait",
  "base64",
@@ -1875,7 +1875,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/GnomedDev/serenity?branch=personal#5652a37eca63eb25d16dc797ea596b47ff4ee2dd"
+source = "git+https://github.com/GnomedDev/serenity?branch=personal#aec16ffd57e9fe68a5fb11ef507dd844a835b360"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -2125,9 +2125,9 @@ checksum = "a3ff2f71c82567c565ba4b3009a9350a96a7269eaa4001ebedae926230bc2254"
 
 [[package]]
 name = "strfmt"
-version = "0.1.6"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b278b244ef7aa5852b277f52dd0c6cac3a109919e1f6d699adde63251227a30f"
+checksum = "9076d8267599bf1564cda8ca1660298d67d7f4cd45b17624179a71fcf3e313c2"
 
 [[package]]
 name = "stringprep"
@@ -2265,9 +2265,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.24.7"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54cb4ebf3d49308b99e6e9dc95e989e2fdbdc210e4f67c39db0bb89ba927001c"
+checksum = "252a4e486cfea04683a1dc0c389d2fad2409bcf32d8958c92abab5b76ce334f4"
 dependencies = [
  "cfg-if",
  "core-foundation-sys",
@@ -2435,9 +2435,9 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tracing"
-version = "0.1.35"
+version = "0.1.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a400e31aa60b9d44a52a8ee0343b5b18566b03a8321e0d321f695cf56e940160"
+checksum = "2fce9567bd60a67d08a16488756721ba392f24f29006402881e43b19aac64307"
 dependencies = [
  "cfg-if",
  "log",
@@ -2459,9 +2459,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.28"
+version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b7358be39f2f274f322d2aaed611acc57f382e8eb1e5b48cb9ae30933495ce7"
+checksum = "5aeea4303076558a00714b823f9ad67d58a3bbda1df83d8827d21193156e22f7"
 dependencies = [
  "once_cell",
  "valuable",
