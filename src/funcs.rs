@@ -514,9 +514,10 @@ pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, ne
         .collect_single()
         .await;
 
-    reply.edit(ctx, poise::CreateReply::default().components(
-        components(positive, negative, true)
-    )).await?;
+    // TOOD: Fix, seems to always give interaction failed currently!
+    // reply.edit(ctx, poise::CreateReply::default().components(
+    //     components(positive, negative, true)
+    // )).await?;
 
     if let Some(interaction) = interaction {
         interaction.defer(&ctx_discord.http).await?;
