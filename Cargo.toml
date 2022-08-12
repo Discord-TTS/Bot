@@ -59,7 +59,7 @@ branch = "personal"
 
 [dependencies.serenity_feature_only]
 git = "https://github.com/GnomedDev/serenity"
-features = ["unstable_discord_api"]
+features = ["unstable_discord_api", "simd-json"]
 default-features = false
 package = "serenity"
 branch = "personal"
@@ -70,9 +70,9 @@ features = ["cache"]
 branch = "personal"
 
 [dependencies.songbird]
-git = "https://github.com/GnomedDev/songbird"
-features = ["builtin-queue"]
-branch = "symphonia-personal"
+git = "https://github.com/serenity-rs/songbird"
+features = ["builtin-queue", "simd-json"]
+branch = "next"
 
 [patch."https://github.com/serenity-rs/serenity"]
 serenity = {git = "https://github.com/GnomedDev/serenity", branch = "personal"}

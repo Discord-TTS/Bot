@@ -1,4 +1,4 @@
-FROM rustlang/rust:nightly as builder
+FROM rust:latest as builder
 ENV RUSTFLAGS="-C target-cpu=haswell"
 
 WORKDIR /bot

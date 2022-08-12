@@ -1017,12 +1017,13 @@ pub async fn setup(
                 .components(text_channels.chunks(25).enumerate().into_iter().fold(CreateComponents::default(), |c, (i, chunked_channels)|
                     c.add_action_row(CreateActionRow::default().add_select_menu(CreateSelectMenu::default()
                         .custom_id(format!("select::channels::{i}"))
-                        .options(chunked_channels.iter().fold(CreateSelectMenuOptions::default(), |os, channel|
-                            os.add_option(CreateSelectMenuOption::default()
-                                .label(&channel.name)
-                                .value(channel.id.to_string())
-                            )
-                        ))
+                        .options(chunked_channels.iter()
+                            .map(|channel|
+                                CreateSelectMenuOption::default()
+                                    .label(channel.name.clone())
+                                    .value(channel.id.to_string())
+                            ).collect()
+                        )
                     ))
                 ))
             ).await?;

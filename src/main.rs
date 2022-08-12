@@ -30,6 +30,7 @@ use tracing::{error, info, warn};
 
 use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt, require_guild};
 use poise::serenity_prelude::{self as serenity, Mentionable as _, builder::*};
+use serenity::json::decode_resp;
 
 mod migration;
 mod constants;
@@ -150,13 +151,12 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         get_translation_langs(&reqwest, &config.main.translation_token),
         async {serenity::UserId::new(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
 
-        async {Ok(TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<BTreeMap<String, String>>().await?)},
-        async {Ok(TTSMode::eSpeak.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<String>>().await?)},
-        async {Ok(prepare_tiktok_voices(TTSMode::TikTok.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json().await?))},
-        async {Ok(prepare_gcloud_voices(TTSMode::gCloud.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json().await?))},
-        async {Ok(TTSMode::Polly
-            .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?.json::<Vec<PollyVoice>>().await?
-            .into_iter().map(|v| (v.id.clone(), v)).collect::<BTreeMap<String, PollyVoice>>())
+        async {Ok(decode_resp::<BTreeMap<String, String>>(TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?)},
+        async {Ok(decode_resp::<Vec<String>>(TTSMode::eSpeak.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?)},
+        async {Ok(prepare_tiktok_voices(decode_resp(TTSMode::TikTok.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?))},
+        async {Ok(prepare_gcloud_voices(decode_resp(TTSMode::gCloud.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?))},
+        async {Ok(decode_resp::<Vec<PollyVoice>>(TTSMode::Polly.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?
+            .into_iter().map(|v| (v.id.clone(), v)).collect::<BTreeMap<_, _>>())
         },
     )?;
 

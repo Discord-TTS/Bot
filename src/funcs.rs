@@ -85,7 +85,7 @@ pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url, auth_key:
     match resp.error_for_status_ref() {
         Ok(_) => Ok(Some(resp)),
         Err(backup_err) => {
-            match resp.json::<TTSServiceError>().await {
+            match json::decode_resp::<TTSServiceError>(resp).await {
                 Ok(err) => {
                     if err.code.should_ignore() {
                         Ok(None)
@@ -132,12 +132,12 @@ pub async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Re
         auth_key: token
     };
 
-    let resp = reqwest
+    let mut resp = reqwest
         .get(format!("{TRANSLATION_URL}/languages")).query(&request)
         .send().await?.error_for_status()?
-        .bytes().await?;
+        .bytes().await?.to_vec();
 
-    let languages: Vec<DeeplVoice<'_>> = json::from_slice(&resp)?;
+    let languages: Vec<DeeplVoice<'_>> = json::from_slice(&mut resp)?;
 
     Ok(languages.into_iter().map(|v| (v.language.to_lowercase(), v.name)).collect())
 }
@@ -466,12 +466,12 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
         auth_key: &data.config.translation_token
     };
 
-    let resp = data.reqwest
+    let mut resp = data.reqwest
         .get(format!("{TRANSLATION_URL}/translate")).query(&request)
         .send().await?.error_for_status()?
-        .bytes().await?;
+        .bytes().await?.to_vec();
 
-    let response: DeeplTranslateResponse<'_> = json::from_slice(&resp)?;
+    let response: DeeplTranslateResponse<'_> = json::from_slice(&mut resp)?;
     if let Some(translation) = response.translations.into_iter().next() {
         if translation.detected_source_language != target_lang {
             return Ok(Some(translation.text))

@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 use strum_macros::IntoStaticStr;
 use serde::Deserialize as _;
 
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity, json::prelude as json};
 use tracing::warn;
 
 use crate::{database, analytics, into_static_display};
@@ -143,11 +143,12 @@ impl Data {
         let mut url = self.config.patreon_service.clone();
         url.set_path(&format!("/members/{user_id}"));
 
-        self.reqwest.get(url)
+        let mut resp = self.reqwest.get(url)
             .send().await?
             .error_for_status()?
-            .json().await
-            .map_err(Into::into)
+            .bytes().await?.to_vec();
+
+        json::from_slice(&mut resp).map_err(Into::into)
     }
 
     pub async fn premium_check(&self, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>> {
