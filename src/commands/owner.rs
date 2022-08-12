@@ -224,12 +224,9 @@ pub async fn _info(ctx: Context<'_>) -> CommandResult {
     let guild_row = data.guilds_db.get(guild_id_db).await?;
     let nick_row = data.nickname_db.get([guild_id_db, author_id]).await?;
     let guild_voice_row = data.guild_voice_db.get((guild_id_db, guild_row.voice_mode)).await?;
-    let user_voice_row = match user_row.voice_mode {
-        Some(mode) => Some(data.user_voice_db.get((author_id, mode)).await?),
-        None => None
-    };
+    let user_voice_row = data.user_voice_db.get((author_id, user_row.voice_mode.unwrap_or_default())).await?;
 
-    let voice_client = &data.songbird;
+    let voice_client = data.songbird.get(guild_id);
     ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
         .title("TTS Bot Debug Info")
         .description(format!("

@@ -760,7 +760,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#9510e47477a1a007320945f9ec120bfbbd5c6fb4"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#b559a438214413dfb503b50a1e2d711b6edd3e29"
 dependencies = [
  "anyhow",
  "async-trait",
