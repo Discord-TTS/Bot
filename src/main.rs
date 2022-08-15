@@ -848,19 +848,8 @@ async fn process_support_response(
 
     let resolved_id = require!(reference.message_id, Ok(()));
     let (resolved_author_name, resolved_author_discrim, resolved_content) = {
-        let cached_info = {
-            let cached = ctx.cache.channel_messages(channel.id);
-            cached.as_ref().and_then(|msgs| msgs.get(&resolved_id)).map(|m| (
-                m.author.name.clone(), m.author.discriminator, m.content.clone())
-            )
-        };
-
-        if let Some(cached_info) = cached_info {
-            cached_info
-        } else {
-            let message = channel.message(&ctx.http, resolved_id).await?;
-            (message.author.name, message.author.discriminator, message.content)
-        }
+        let message = ctx.http.get_message(channel.id.get(), resolved_id.get()).await?;
+        (message.author.name, message.author.discriminator, message.content)
     };
 
     if resolved_author_discrim != 0000 {
