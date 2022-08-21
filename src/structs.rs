@@ -20,10 +20,10 @@ pub struct Config {
 #[derive(serde::Deserialize)]
 pub struct MainConfig {
     pub announcements_channel: serenity::ChannelId,
+    pub patreon_service: Option<reqwest::Url>,
     pub tts_service_auth_key: Option<String>,
     pub invite_channel: serenity::ChannelId,
     pub main_server: serenity::GuildId,
-    pub patreon_service: reqwest::Url,
     pub ofs_role: serenity::RoleId,
     pub main_server_invite: String,
     pub translation_token: String,
@@ -140,15 +140,22 @@ impl Data {
     }
 
     pub async fn fetch_patreon_info(&self, user_id: serenity::UserId) -> Result<Option<PatreonInfo>> {
-        let mut url = self.config.patreon_service.clone();
-        url.set_path(&format!("/members/{user_id}"));
+        if let Some(mut url) = self.config.patreon_service.clone() {
+            url.set_path(&format!("/members/{user_id}"));
 
-        let mut resp = self.reqwest.get(url)
-            .send().await?
-            .error_for_status()?
-            .bytes().await?.to_vec();
+            let mut resp = self.reqwest.get(url)
+                .send().await?
+                .error_for_status()?
+                .bytes().await?.to_vec();
 
-        json::from_slice(&mut resp).map_err(Into::into)
+            json::from_slice(&mut resp).map_err(Into::into)
+        } else {
+            // Return fake PatreonInfo if `patreon_service` has not been set to simplify self-hosting.
+            Ok(Some(PatreonInfo {
+                tier: u8::MAX,
+                entitled_servers: u8::MAX
+            }))
+        }
     }
 
     pub async fn premium_check(&self, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>> {
