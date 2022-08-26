@@ -30,6 +30,9 @@ pub struct MainConfig {
     pub tts_service: reqwest::Url,
     pub token: Option<String>,
     pub log_level: String,
+
+    // Only for situations where gTTS has broken
+    pub gtts_disabled: Option<()>
 }
 
 #[derive(serde::Deserialize)]
@@ -200,6 +203,10 @@ impl Data {
             }
         };
 
+        if self.config.gtts_disabled.is_some() && mode == TTSMode::gTTS {
+            mode = TTSMode::eSpeak;
+        }
+
         if mode.is_premium() && !guild_is_premium {
             mode = TTSMode::default();
 
@@ -310,7 +317,7 @@ into_static_display!(TTSMode);
 
 impl Default for TTSMode {
     fn default() -> Self {
-        Self::gTTS
+        Self::eSpeak
     }
 }
 
