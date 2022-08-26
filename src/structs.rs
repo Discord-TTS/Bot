@@ -32,7 +32,8 @@ pub struct MainConfig {
     pub log_level: String,
 
     // Only for situations where gTTS has broken
-    pub gtts_disabled: Option<()>
+    #[serde(default)]
+    pub gtts_disabled: bool
 }
 
 #[derive(serde::Deserialize)]
@@ -203,7 +204,7 @@ impl Data {
             }
         };
 
-        if self.config.gtts_disabled.is_some() && mode == TTSMode::gTTS {
+        if self.config.gtts_disabled && mode == TTSMode::gTTS {
             mode = TTSMode::eSpeak;
         }
 
