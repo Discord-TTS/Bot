@@ -260,13 +260,13 @@ impl SpeakingRateInfo {
 
 #[derive(
     IntoStaticStr, sqlx::Type,
-    Debug, Hash, PartialEq, Eq, Copy, Clone,
+    Debug, Default, Hash, PartialEq, Eq, Copy, Clone,
 )]
 #[allow(non_camel_case_types)]
 #[sqlx(rename_all="lowercase")]
 #[sqlx(type_name="ttsmode")]
 pub enum TTSMode {
-    gTTS,
+    #[default] gTTS,
     Polly,
     TikTok,
     eSpeak,
@@ -315,12 +315,6 @@ impl TTSMode {
 }
 
 into_static_display!(TTSMode);
-
-impl Default for TTSMode {
-    fn default() -> Self {
-        Self::eSpeak
-    }
-}
 
 #[derive(poise::ChoiceParameter, Clone, Copy)]
 #[allow(non_camel_case_types)]
