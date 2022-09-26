@@ -223,7 +223,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let author_id = ctx.author().id.get() as i64;
 
     let linked_guilds: i64 = sqlx::query("SELECT count(*) FROM guilds WHERE premium_user = $1")
-        .bind(&author_id)
+        .bind(author_id)
         .fetch_one(&data.inner.pool)
         .await?.get("count");
 

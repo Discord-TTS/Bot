@@ -302,7 +302,7 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
         TTSMode::TikTok => {i2 = ctx.data.tiktok_voices.iter().map(clone_tuple_items).map(|(value, name)| poise::AutocompleteChoice {name, value}); &mut i2},
         TTSMode::eSpeak => {i3 = ctx.data.espeak_voices.iter().cloned().map(poise::AutocompleteChoice::from); &mut i3},
         TTSMode::Polly => {i4 =
-            ctx.data.polly_voices.iter().map(|(_, voice)| poise::AutocompleteChoice{
+            ctx.data.polly_voices.values().map(|voice| poise::AutocompleteChoice{
                 name: format!("{} - {} ({})", voice.name, voice.language_name, voice.gender),
                 value: voice.id.clone()
             });
@@ -989,8 +989,7 @@ pub async fn setup(
 
             let mut text_channels: Vec<_> = {
                 let guild = require_guild!(ctx);
-                guild.channels.iter()
-                    .map(|(_, v)| v)
+                guild.channels.values()
                     .filter_map(|c| match c {
                         serenity::Channel::Guild(channel) => Some(channel),
                         _ => None
@@ -1262,7 +1261,7 @@ pub async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>
         lang_to_voices.entry(&voice.language_name).or_insert_with(Vec::new).push(voice);
     }
 
-    let pages = lang_to_voices.into_iter().map(|(_, voices)| {
+    let pages = lang_to_voices.into_values().map(|voices| {
         let mut buf = String::with_capacity(voices.len() * 12);
         for voice in voices {
             writeln!(buf, "{} - {} ({})", voice.id, voice.language_name, voice.gender)?;

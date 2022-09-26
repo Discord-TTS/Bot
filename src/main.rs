@@ -744,10 +744,10 @@ async fn process_mention_msg(
     let permissions = channel.permissions_for_user(ctx, bot_user)?;
 
     let mut prefix = data.guilds_db.get(guild_id.into()).await?.prefix.clone();
-    prefix = prefix.replace('`', "").replace('\\', "");
+    prefix = prefix.replace(['`', '\\'], "");
 
     if permissions.send_messages() {
-        channel.say(ctx, format!("Current prefix for this server is: {}", prefix)).await?;
+        channel.say(ctx, format!("Current prefix for this server is: {prefix}")).await?;
     } else {
         let msg = {
             let guild = ctx.cache.guild(guild_id);

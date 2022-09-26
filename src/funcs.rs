@@ -273,7 +273,7 @@ pub async fn run_checks(
             .clean_here(false)
             .clean_everyone(false)
             .show_discriminator(false)
-            .display_as_member_from(&guild_id),
+            .display_as_member_from(guild_id),
         &message.mentions
     );
 
