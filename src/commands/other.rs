@@ -153,7 +153,7 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
         );
 
         let pid = sysinfo::get_current_pid().unwrap();
-        system_info.process(pid).unwrap().memory() / 1024
+        system_info.process(pid).unwrap().memory() / 1024 / 1024
     };
 
     let [sep1, sep2, ..] = OPTION_SEPERATORS;
