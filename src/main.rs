@@ -29,12 +29,14 @@ use std::{borrow::Cow, collections::BTreeMap, str::FromStr, sync::{Arc, atomic::
 use anyhow::Ok;
 use sysinfo::SystemExt;
 use once_cell::sync::OnceCell;
+use parking_lot::{RwLock, Mutex};
 use tracing::{error, info, warn};
 
 use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt, require_guild};
 use poise::serenity_prelude::{self as serenity, Mentionable as _, builder::*};
 use serenity::json::decode_resp;
 
+mod web_updater;
 mod migration;
 mod constants;
 mod database;
@@ -183,8 +185,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     tokio::spawn(logger.0.start());
 
     let token = config.main.token.take().unwrap();
-    let bot_id = serenity::utils::parse_token(&token).unwrap().0;
-
     let regex_cache = structs::RegexCache {
         replacements: [
             (regex::Regex::new(r"\|\|(?s:.)*?\|\|")?, ". spoiler avoided."),
@@ -200,8 +200,8 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         inner: gnomeutils::GnomeData {
             pool, translations,
             error_webhook: webhooks.errors.take().unwrap(),
+            system_info: Mutex::new(sysinfo::System::new()),
             main_server_invite: config.main.main_server_invite.clone(),
-            system_info: parking_lot::Mutex::new(sysinfo::System::new()),
         },
 
         songbird: songbird.clone(),
@@ -212,6 +212,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         gtts_voices, espeak_voices, gcloud_voices, polly_voices, tiktok_voices,
         translation_languages,
 
+        website_info: RwLock::new(config.website_info),
         config: config.main, reqwest, premium_avatar_url,
         analytics, webhooks, start_time, startup_message, regex_cache,
         guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
@@ -233,7 +234,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         )
         .client_settings(move |f| f
             .voice_manager_arc(songbird)
-            .event_handler(EventHandler {bot_id, framework: framework_oc_clone, fully_started: AtomicBool::new(false)})
+            .event_handler(EventHandler {framework: framework_oc_clone, fully_started: AtomicBool::new(false)})
         )
         .options(poise::FrameworkOptions {
             commands: commands::commands(),
@@ -340,14 +341,13 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
 
 struct EventHandler {
-    bot_id: serenity::UserId,
     fully_started: AtomicBool,
     framework: Arc<OnceCell<Arc<Framework>>>
 }
 
 impl EventHandler {
     async fn framework(&self) -> Option<FrameworkContext<'_>> {
-        Some(gnomeutils::framework_to_context(self.framework.get()?, self.bot_id).await)
+        Some(gnomeutils::framework_to_context(self.framework.get()?).await)
     }
 }
 
@@ -355,7 +355,7 @@ impl EventHandler {
 impl serenity::EventHandler for EventHandler {
     async fn message(&self, ctx: serenity::Context, new_message: serenity::Message) {
         let framework = require!(self.framework.get());
-        let framework_ctx = gnomeutils::framework_to_context(framework, self.bot_id).await;
+        let framework_ctx = gnomeutils::framework_to_context(framework).await;
 
         errors::handle_message(&ctx, framework_ctx, &new_message, tokio::try_join!(
             process_tts_msg(&ctx, &new_message, framework.clone(), framework_ctx.user_data),
@@ -512,6 +512,17 @@ Ask questions by either responding here or asking on the support server!",
                 let stats_updater = Arc::new(gnomeutils::BotListUpdater::new(
                     data.reqwest.clone(), ctx.cache.clone(), data.bot_list_tokens.clone()
                 ));
+
+                if let Some(website_info) = data.website_info.write().take() {
+                    let web_updater = Arc::new(web_updater::Updater {
+                        config: website_info,
+                        cache: ctx.cache.clone(),
+                        reqwest: data.reqwest.clone(),
+                        database: data.inner.pool.clone(),
+                    });
+
+                    tokio::spawn(web_updater.start());
+                }
 
                 tokio::spawn(stats_updater.start());
             }

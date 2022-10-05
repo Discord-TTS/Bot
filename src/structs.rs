@@ -1,5 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 
+use parking_lot::RwLock;
 use strum_macros::IntoStaticStr;
 use serde::Deserialize as _;
 
@@ -14,6 +15,7 @@ pub use anyhow::{Error, Result};
 pub struct Config {
     #[serde(rename="Main")] pub main: MainConfig,
     #[serde(rename="Webhook-Info")] pub webhooks: WebhookConfigRaw,
+    #[serde(rename="Website-Info")] pub website_info: Option<WebsiteInfo>,
     #[serde(rename="Bot-List-Tokens")] #[serde(default)] pub bot_list_tokens: gnomeutils::BotListTokens,
 }
 
@@ -23,6 +25,7 @@ pub struct MainConfig {
     pub patreon_service: Option<reqwest::Url>,
     pub tts_service_auth_key: Option<String>,
     pub invite_channel: serenity::ChannelId,
+    pub website_url: Option<reqwest::Url>,
     pub main_server: serenity::GuildId,
     pub ofs_role: serenity::RoleId,
     pub main_server_invite: String,
@@ -43,6 +46,12 @@ pub struct PostgresConfig {
     pub database: String,
     pub password: String,
     pub max_connections: Option<u32>
+}
+
+#[derive(serde::Deserialize)]
+pub struct WebsiteInfo {
+    pub url: reqwest::Url,
+    pub stats_key: String
 }
 
 #[derive(serde::Deserialize)]
@@ -102,6 +111,7 @@ pub struct Data {
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
     pub currently_purging: std::sync::atomic::AtomicBool,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
+    pub website_info: RwLock<Option<WebsiteInfo>>,
     pub startup_message: serenity::MessageId,
     pub start_time: std::time::SystemTime,
     pub songbird: Arc<songbird::Songbird>,

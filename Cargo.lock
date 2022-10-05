@@ -749,7 +749,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#377980b9c65fd6dc881f48f4026e061d84a56229"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#0c7c2ea081e5c433494dd98355bedba0c5622dec"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1441,7 +1441,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#0a0cebcd49a36aa11fe00d4c3a53c4f0435c6267"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#b6059f103609127c4e086472b8b25401aef49646"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1458,7 +1458,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.2.1"
-source = "git+https://github.com/GnomedDev/poise?branch=personal#0a0cebcd49a36aa11fe00d4c3a53c4f0435c6267"
+source = "git+https://github.com/GnomedDev/poise?branch=personal#b6059f103609127c4e086472b8b25401aef49646"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1943,7 +1943,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#7ce20fcb1134dc11253cb528d25bd9a648e63684"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#252d1f93c23366b62d6cfb3a84036f3470104354"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -2033,9 +2033,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
+checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
 name = "socket2"
@@ -2410,9 +2410,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.14"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c3f9a28b618c3a6b9251b6908e9c99e04b9e5c02e6581ccbb67d59c34ef7f9b"
+checksum = "d634a985c4d4238ec39cacaed2e7ae552fbd3c476b552c1deac3021b7d7eaf0c"
 dependencies = [
  "itoa",
  "libc",
@@ -2646,9 +2646,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-gateway"
-version = "0.13.2"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3d86532689973fa62c54c06af32586ca7de71a70e3e9e1d10506614f151195b"
+checksum = "510e142bac2b3f7ecc439bcfde1a841320fe1f20b417080cdd87eee33c6b2fcb"
 dependencies = [
  "bitflags",
  "futures-util",
@@ -2679,9 +2679,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-http"
-version = "0.13.1"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a22140a2742b2a554b4c2a3de56c9882439d48562feacfa6c45e3c4d28a2a137"
+checksum = "4bb51e1a73e14ddd1ccbad0e3d0b739ef11b101e4acf5fe2e39d079c275cb3db"
 dependencies = [
  "hyper",
  "hyper-rustls",
@@ -2710,9 +2710,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-model"
-version = "0.13.4"
+version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abe8a5c81619dd677e06f6e5a367b05e472a969090a4d78683904225edbbe4f6"
+checksum = "7e8bed7791a3e790a633d89082c78e5f7f1109d30135fd465f716772c19b6fbb"
 dependencies = [
  "bitflags",
  "serde",
