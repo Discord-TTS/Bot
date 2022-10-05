@@ -27,5 +27,5 @@ jobs:
         with:
           push: true
           tags: |
-            Discord-TTS/Bot:latest
-            Discord-TTS/Bot:${{ github.sha }}
+            gnomeddev/discord-tts-bot:latest
+            gnomeddev/discord-tts-bot:${{ github.sha }}
