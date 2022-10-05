@@ -163,7 +163,7 @@ msgstr ""
 msgid "\n"
 "Time to fetch: {time_to_fetch}ms\n"
 "Support Server: {main_server_invite}\n"
-"Repository: https://github.com/GnomedDev/Discord-TTS-Bot"
+"Repository: https://github.com/Discord-TTS/Bot"
 msgstr ""
 
 #: src/commands/other.rs:177

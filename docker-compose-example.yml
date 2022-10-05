@@ -1,6 +1,6 @@
 services:
     bot:
-        image: gnomeddev/discord-tts-bot
+        image: Discord-TTS/Bot
         volumes:
           - type: bind
             source: ./config.toml

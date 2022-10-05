@@ -177,7 +177,7 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
         .footer(CreateEmbedFooter::default().text(ctx.gettext("
 Time to fetch: {time_to_fetch}ms
 Support Server: {main_server_invite}
-Repository: https://github.com/GnomedDev/Discord-TTS-Bot")
+Repository: https://github.com/Discord-TTS/Bot")
             .replace("{time_to_fetch}", &format!("{time_to_fetch:.2}"))
             .replace("{main_server_invite}", &data.config.main_server_invite)
         ))
