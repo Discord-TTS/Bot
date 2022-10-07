@@ -48,7 +48,7 @@ impl gnomeutils::Looper for Updater {
     async fn loop_func(&self) -> Result<()> {
         #[derive(sqlx::FromRow)]
         struct AnalyticsQueryResult {
-            count: i64
+            count: i32
         }
 
         #[derive(sqlx::FromRow)]
@@ -77,7 +77,7 @@ impl gnomeutils::Looper for Updater {
                     event = 'gCloud_tts' OR
                     event = 'Polly_tts'
                 )
-            ").fetch_all(&mut db_conn).await?.into_iter().map(|r| r.count).sum::<i64>();
+            ").fetch_all(&mut db_conn).await?.into_iter().map(|r| r.count as i64).sum::<i64>();
 
             let premium_guild_ids = sqlx::query_as::<_, PremiumGuildsQueryResult>("SELECT guild_id FROM guilds WHERE premium_user = ANY($1)")
                 .bind(&patreon_members).fetch_all(&mut db_conn).await?
