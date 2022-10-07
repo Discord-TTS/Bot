@@ -515,10 +515,11 @@ Ask questions by either responding here or asking on the support server!",
 
                 if let Some(website_info) = data.website_info.write().take() {
                     let web_updater = Arc::new(web_updater::Updater {
-                        config: website_info,
-                        cache: ctx.cache.clone(),
+                        patreon_service: data.config.patreon_service.clone(),
                         reqwest: data.reqwest.clone(),
-                        database: data.inner.pool.clone(),
+                        pool: data.inner.pool.clone(),
+                        cache: ctx.cache.clone(),
+                        config: website_info,
                     });
 
                     tokio::spawn(web_updater.start());
