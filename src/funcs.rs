@@ -229,7 +229,7 @@ fn attachments_to_format(attachments: &[serenity::Attachment]) -> Option<&'stati
 fn remove_repeated_chars(content: &str, limit: usize) -> String {
     content.chars().group_by(|&c| c).into_iter().map(|(key, group)| {
         let group: String = group.collect();
-        if group.len() > limit {
+        if group.chars().count() > limit {
             key.to_string().repeat(limit)
         } else {
             group
