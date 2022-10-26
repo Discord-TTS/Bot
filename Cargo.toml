@@ -29,7 +29,7 @@ generic-array = "0.14"
 
 [dependencies.num-format]
 git = "https://github.com/niklasha/num-format"
-branch = "master"
+branch = "main"
 
 [dependencies.symphonia]
 git = "https://github.com/FelixMcFelix/Symphonia"
