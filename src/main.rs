@@ -34,7 +34,6 @@ use tracing::{error, info, warn};
 
 use gnomeutils::{analytics, errors, logging, Looper, require, OptionTryUnwrap, PoiseContextExt, require_guild};
 use poise::serenity_prelude::{self as serenity, Mentionable as _, builder::*};
-use serenity::json::decode_resp;
 
 mod web_updater;
 mod migration;
@@ -48,7 +47,7 @@ mod funcs;
 
 use traits::SongbirdManagerExt;
 use constants::{DM_WELCOME_MESSAGE, FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
-use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices, prepare_tiktok_voices, get_translation_langs, dm_generic};
+use funcs::{clean_msg, run_checks, random_footer, generate_status, prepare_gcloud_voices, prepare_tiktok_voices, get_translation_langs, dm_generic, decode_resp};
 use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, JoinVCToken, PollyVoice, FrameworkContext, Framework, WebhookConfigRaw, WebhookConfig, FailurePoint};
 
 enum EntryCheck {
@@ -221,7 +220,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let framework_oc = Arc::new(once_cell::sync::OnceCell::new());
     let framework_oc_clone = framework_oc.clone();
 
-    let framework = poise::Framework::build()
+    let framework = poise::Framework::builder()
         .token(token)
         .user_data_setup(|_, _, _| {Box::pin(async {Ok(data)})})
         .intents(
@@ -239,8 +238,8 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         .options(poise::FrameworkOptions {
             commands: commands::commands(),
             allowed_mentions: Some(serenity::CreateAllowedMentions::default()
-                .parse(serenity::ParseValue::Users)
                 .replied_user(true)
+                .all_users(true)
             ),
             pre_command: |ctx| Box::pin(async move {
                 let analytics_handler: &analytics::Handler = &ctx.data().analytics;
@@ -249,8 +248,8 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
                 analytics_handler.log(Cow::Borrowed(match ctx {
                     poise::Context::Prefix(_) => "command",
                     poise::Context::Application(ctx) => match ctx.interaction {
-                        poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(_) => "slash_command",
-                        poise::ApplicationCommandOrAutocompleteInteraction::Autocomplete(_) => "autocomplete",
+                        poise::CommandOrAutocompleteInteraction::Autocomplete(_) => "autocomplete",
+                        poise::CommandOrAutocompleteInteraction::Command(_) => "slash_command",
                     },
                 }), false);
             }),
@@ -274,10 +273,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
                     let is_admin = || {
                         let guild = require_guild!(ctx, Ok(false));
-                        let channel = guild.channels.get(&ctx.channel_id()).and_then(|c| match c {
-                            serenity::Channel::Guild(c) => Some(c),
-                            _ => None,
-                        }).try_unwrap()?;
+                        let channel = guild.channels.get(&ctx.channel_id()).try_unwrap()?;
 
                         let permissions = guild.user_permissions_in(channel, &member)?;
                         Ok(permissions.administrator())
@@ -388,8 +384,8 @@ impl serenity::EventHandler for EventHandler {
         })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
-    async fn guild_create(&self, ctx: serenity::Context, guild: serenity::Guild, is_new: bool) {
-        if !is_new {return};
+    async fn guild_create(&self, ctx: serenity::Context, guild: serenity::Guild, is_new: Option<bool>) {
+        if !is_new.unwrap() {return};
 
         let framework = require!(self.framework().await);
         let data = framework.user_data;
@@ -421,8 +417,8 @@ Then, you can just type normal messages and I will say them, like magic!
 You can view all the commands with `-help`
 Ask questions by either responding here or asking on the support server!",
                 guild.name))
-                .footer(CreateEmbedFooter::default().text(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
-                .author(CreateEmbedAuthor::default().name(owner_tag.clone()).icon_url(owner_face))
+                .footer(CreateEmbedFooter::new(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
+                .author(CreateEmbedAuthor::new(owner_tag.clone()).icon_url(owner_face))
             )).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
                 Err(error) => return Err(anyhow::Error::from(error)),
@@ -430,9 +426,9 @@ Ask questions by either responding here or asking on the support server!",
             }
 
             match ctx.http.add_member_role(
-                data.config.main_server.into(),
-                guild.owner_id.get(),
-                data.config.ofs_role.into(),
+                data.config.main_server,
+                guild.owner_id,
+                data.config.ofs_role,
                 None
             ).await {
                 Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => return Ok(()),
@@ -462,9 +458,9 @@ Ask questions by either responding here or asking on the support server!",
                     .any(|m| m.user.id == guild.owner_id)
                 {
                     ctx.http.remove_member_role(
-                        data.config.main_server.get(),
-                        guild.owner_id.get(),
-                        data.config.ofs_role.get(),
+                        data.config.main_server,
+                        guild.owner_id,
+                        data.config.ofs_role,
                         None
                     ).await?;
                 }
@@ -542,9 +538,9 @@ Ask questions by either responding here or asking on the support server!",
         {
             errors::handle_member(&ctx, framework, &member,
                 match ctx.http.add_member_role(
-                    data.config.main_server.get(),
-                    member.user.id.get(),
-                    data.config.ofs_role.get(),
+                    data.config.main_server,
+                    member.user.id,
+                    data.config.ofs_role,
                     None
                 ).await {
                     // Unknown member
@@ -565,7 +561,7 @@ Ask questions by either responding here or asking on the support server!",
 
 async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     if let Context::Application(ctx) = ctx {
-        if let poise::ApplicationCommandOrAutocompleteInteraction::Autocomplete(_) = ctx.interaction {
+        if let poise::CommandOrAutocompleteInteraction::Autocomplete(_) = ctx.interaction {
             // Ignore the premium check during autocomplete.
             return Ok(true);
         }
@@ -594,7 +590,7 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
         "{}#{} | {} failed the premium check in {}",
         author.name, author.discriminator, author.id,
         guild_id.and_then(|g_id| ctx_discord.cache.guild(g_id).map(|g| (
-            Cow::Owned(format!("{} | {}", g.name, g_id))
+            Cow::Owned(format!("{} | {g_id}", g.name))
         ))).unwrap_or(Cow::Borrowed("DMs"))
     );
 
@@ -609,10 +605,10 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
                     .description(main_msg)
                     .colour(PREMIUM_NEUTRAL_COLOUR)
                     .thumbnail(&data.premium_avatar_url)
-                    .footer(serenity::CreateEmbedFooter::default().text(FOOTER_MSG))
+                    .footer(serenity::CreateEmbedFooter::new(FOOTER_MSG))
                 )
             } else {
-                builder.content(format!("{}\n{}", main_msg, FOOTER_MSG))
+                builder.content(format!("{main_msg}\n{FOOTER_MSG}"))
             }
         }).await?;
     }
@@ -747,7 +743,7 @@ async fn process_mention_msg(
     data: &Data,
 ) -> Result<()> {
     let bot_user = ctx.cache.current_user().id;
-    if ![format!("<@{}>", bot_user), format!("<@!{}>", bot_user)].contains(&message.content) {
+    if ![format!("<@{bot_user}>"), format!("<@!{bot_user}>")].contains(&message.content) {
         return Ok(());
     };
 
@@ -813,12 +809,15 @@ async fn process_support_dm(
             channel.say(&ctx, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
         } else if !userinfo.dm_blocked {
             let webhook_username = format!("{} ({})", message.author.tag(), message.author.id);
-            let paths: Vec<serenity::AttachmentType<'_>> = message.attachments.iter()
-                .map(|a| reqwest::Url::parse(&a.url).map(serenity::AttachmentType::Image))
-                .collect::<Result<_, _>>()?;
+
+            let mut attachments = Vec::new();
+            for attachment in &message.attachments {
+                let attachment_builder = serenity::CreateAttachment::url(&ctx.http, &attachment.url).await?;
+                attachments.push(attachment_builder);
+            }
 
             data.webhooks.dm_logs.execute(&ctx, false, ExecuteWebhook::default()
-                .files(paths)
+                .files(attachments)
                 .content(&message.content)
                 .username(webhook_username)
                 .avatar_url(message.author.face())
@@ -834,9 +833,7 @@ async fn process_support_dm(
         let welcome_msg = channel.send_message(&ctx.http, CreateMessage::default().embed(CreateEmbed::default()
             .title(title)
             .description(DM_WELCOME_MESSAGE)
-            .footer(CreateEmbedFooter::default().text(random_footer(
-                &data.config.main_server_invite, client_id, data.default_catalog(),
-            )))
+            .footer(CreateEmbedFooter::new(random_footer(&data.config.main_server_invite, client_id, data.default_catalog())))
         )).await?;
 
         data.userinfo_db.set_one(message.author.id.into(), "dm_welcomed", &true).await?;
@@ -863,7 +860,7 @@ async fn process_support_response(
 
     let resolved_id = require!(reference.message_id, Ok(()));
     let (resolved_author_name, resolved_author_discrim, resolved_content) = {
-        let message = ctx.http.get_message(channel.id.get(), resolved_id.get()).await?;
+        let message = ctx.http.get_message(channel.id, resolved_id).await?;
         (message.author.name, message.author.discriminator, message.content)
     };
 

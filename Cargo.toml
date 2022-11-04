@@ -58,28 +58,27 @@ default-features = false
 [dependencies.gnomeutils]
 git = "https://github.com/GnomedDev/GnomeUtils"
 features = ["error_handling", "help_command", "analytics", "i18n", "bot_list", "logging", "songbird"]
-branch = "personal"
+branch = "it's-not-personal-kid"
 
 [dependencies.serenity_feature_only]
-git = "https://github.com/GnomedDev/serenity"
+git = "https://github.com/serenity-rs/serenity"
 features = ["unstable_discord_api", "simd-json"]
 default-features = false
 package = "serenity"
-branch = "personal"
+branch = "next"
 
 [dependencies.poise]
 git = "https://github.com/GnomedDev/poise"
 features = ["cache"]
-branch = "personal"
+branch = "serenity-next"
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue", "simd-json"]
 branch = "next"
 
-[patch."https://github.com/serenity-rs/serenity"]
-serenity = {git = "https://github.com/GnomedDev/serenity", branch = "personal"}
+[patch.crates-io]
+serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next" }
 
-[patch.crates-io."serenity"]
-git = "https://github.com/GnomedDev/serenity"
-branch = "personal"
+[patch."https://github.com/kangalioo/poise"]
+poise = {git = "https://github.com/GnomedDev/poise", branch = "serenity-next"}

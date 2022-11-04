@@ -13,7 +13,7 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::{borrow::Cow, fmt::Write as _};
+use std::fmt::Write as _;
 
 use anyhow::Error;
 use sysinfo::{SystemExt, ProcessExt};
@@ -96,13 +96,13 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
         );
 
         let audio = fetch_audio(&data.reqwest, url, data.config.tts_service_auth_key.as_deref()).await?.try_unwrap()?.bytes().await?;
-        serenity::AttachmentType::Bytes {
-            data: Cow::Owned(audio.to_vec()),
-            filename: format!("{}-{}.{}", author_name, ctx.id(), match mode {
+        serenity::CreateAttachment::bytes(
+            audio.to_vec(),
+            format!("{author_name}-{}.{}", ctx.id(), match mode {
                 TTSMode::gTTS | TTSMode::TikTok | TTSMode::gCloud | TTSMode::Polly => "mp3",
                 TTSMode::eSpeak => "wav",
-            }).into()
-        }
+            })
+        )
     };
 
     ctx.send(CreateReply::default()
@@ -174,7 +174,7 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
         .thumbnail(embed_thumbnail)
         .url(data.config.main_server_invite.clone())
         .colour(neutral_colour)
-        .footer(CreateEmbedFooter::default().text(ctx.gettext("
+        .footer(CreateEmbedFooter::new(ctx.gettext("
 Time to fetch: {time_to_fetch}ms
 Support Server: {main_server_invite}
 Repository: https://github.com/Discord-TTS/Bot")

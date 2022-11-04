@@ -3,7 +3,7 @@ use std::{sync::Arc, collections::{HashMap, HashSet}};
 use gnomeutils::serenity::{self as serenity, json::prelude as json};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
-use crate::{Result, structs::{TTSMode, WebsiteInfo}};
+use crate::{Result, structs::{TTSMode, WebsiteInfo}, funcs::decode_resp};
 
 
 #[allow(dead_code, clippy::match_same_arms)]
@@ -59,7 +59,7 @@ impl gnomeutils::Looper for Updater {
         let patreon_members = if let Some(mut patreon_service) = self.patreon_service.clone() {
             patreon_service.set_path("members");
             let resp = self.reqwest.get(patreon_service).send().await?.error_for_status()?;
-            let raw_members: HashMap<i64, serde::de::IgnoredAny> = json::decode_resp(resp).await?;
+            let raw_members: HashMap<i64, serde::de::IgnoredAny> = decode_resp(resp).await?;
 
             raw_members.into_keys().collect()
         } else {

@@ -16,8 +16,9 @@
 
 use std::sync::atomic::Ordering::SeqCst;
 
-use poise::{serenity_prelude as serenity, futures_util::TryStreamExt, serenity::builder::*};
+use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
 use gnomeutils::OptionTryUnwrap;
+use self::serenity::builder::*;
 
 use crate::structs::{Context, CommandResult, PrefixContext, TTSModeChoice, Command};
 use crate::funcs::dm_generic;
@@ -176,9 +177,9 @@ pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
     for member in should_be_ofs_members {
         added_role += 1;
         http.add_member_role(
-            support_guild_id.get(),
-            member.get(),
-            data.config.ofs_role.get(),
+            support_guild_id,
+            *member,
+            data.config.ofs_role,
             None
         ).await?;
     }
@@ -187,9 +188,9 @@ pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
     for member in should_not_be_ofs_members {
         removed_role += 1;
         http.remove_member_role(
-            support_guild_id.get(),
-            member.get(),
-            data.config.ofs_role.get(),
+            support_guild_id,
+            *member,
+            data.config.ofs_role,
             None
         ).await?;
     }

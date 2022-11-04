@@ -133,6 +133,12 @@ pub struct Data {
     pub translation_languages: BTreeMap<String, String>,
 }
 
+impl std::fmt::Debug for Data {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Data").finish()
+    }
+}
+
 impl AsRef<gnomeutils::GnomeData> for Data {
     fn as_ref(&self) -> &gnomeutils::GnomeData {
         &self.inner

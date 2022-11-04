@@ -18,6 +18,8 @@ use std::fmt::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use anyhow::bail;
+use gnomeutils::serenity::ComponentInteractionDataKind;
 use poise::serenity_prelude::{self as serenity, Mentionable, builder::*};
 use gnomeutils::{require, require_guild, OptionGettext as _, PoiseContextExt as _};
 
@@ -114,9 +116,9 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 
     ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
         .title("Current Settings")
-        .url(&data.config.main_server_invite)
         .colour(neutral_colour)
-        .footer(CreateEmbedFooter::default().text(ctx.gettext(
+        .url(&data.config.main_server_invite)
+        .footer(CreateEmbedFooter::new(ctx.gettext(
             "Change these settings with `/set {property} {value}`!\nNone = setting has not been set yet!"
         )))
 
@@ -208,19 +210,15 @@ impl<'a> MenuPaginator<'a> {
                 .replace("{mode}", self.mode.into())
                 .replace("{bot_user}", &self.ctx.discord().cache.current_user().name)
             )
-            .author(CreateEmbedAuthor::default()
-                .name(author.name.clone())
-                .icon_url(author.face())
-            )
             .description(self.ctx.gettext("**Currently Supported Voice**\n{page}").replace("{page}", page))
             .field(self.ctx.gettext("Current voice used"), &self.current_voice, false)
-            .footer(CreateEmbedFooter::default().text(self.footer.to_string()))
+            .author(CreateEmbedAuthor::new(author.name.clone()).icon_url(author.face()))
+            .footer(CreateEmbedFooter::new(self.footer.to_string()))
     }
 
     fn create_action_row(&self, disabled: bool) -> serenity::CreateActionRow {
-        ["⏮️", "◀", "⏹️", "▶️", "⏭️"].into_iter().fold(CreateActionRow::default(), |b, emoji|
-            b.add_button(CreateButton::default()
-                .custom_id(emoji)
+        let buttons = ["⏮️", "◀", "⏹️", "▶️", "⏭️"].into_iter().map(|emoji|
+            CreateButton::new(emoji)
                 .style(serenity::ButtonStyle::Primary)
                 .emoji(serenity::ReactionType::Unicode(String::from(emoji)))
                 .disabled(
@@ -228,21 +226,22 @@ impl<'a> MenuPaginator<'a> {
                     (["⏮️", "◀"].contains(&emoji) && self.index == 0) ||
                     (["▶️", "⏭️"].contains(&emoji) && self.index == (self.pages.len() - 1))
                 )
-            )
-        )
+        ).collect();
+
+        serenity::CreateActionRow::Buttons(buttons)
     }
 
     async fn create_message(&self) -> serenity::Result<serenity::Message> {
         self.ctx.send(poise::CreateReply::default()
             .embed(self.create_page(&self.pages[self.index]))
-            .components(CreateComponents::default().add_action_row(self.create_action_row(false)))
+            .components(vec![self.create_action_row(false)])
         ).await?.into_message().await
     }
 
     async fn edit_message(&self, message: &mut serenity::Message, disable: bool) -> serenity::Result<()> {
         message.edit(self.ctx.discord(), EditMessage::default()
             .embed(self.create_page(&self.pages[self.index]))
-            .components(CreateComponents::default().add_action_row(self.create_action_row(disable)))
+            .components(vec![self.create_action_row(disable)])
         ).await
     }
 
@@ -286,7 +285,7 @@ impl<'a> MenuPaginator<'a> {
     }
 }
 
-async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> Vec<poise::AutocompleteChoice<String>> {
+async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<poise::AutocompleteChoice<String>> {
     fn clone_tuple_items<K: Clone, V: Clone>(t: (&K, &V)) -> (K, V) {
         (t.0.clone(), t.1.clone())
     }
@@ -320,22 +319,22 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> V
     };
 
     let mut filtered_voices: Vec<_> = voices
-        .filter(|choice| choice.name.starts_with(&searching))
+        .filter(|choice| choice.name.starts_with(searching))
         .collect();
 
-    filtered_voices.sort_by_key(|choice| strsim::levenshtein(&choice.name, &searching));
+    filtered_voices.sort_by_key(|choice| strsim::levenshtein(&choice.name, searching));
     filtered_voices
 }
 
 #[allow(clippy::unused_async)]
-async fn translation_languages_autocomplete(ctx: ApplicationContext<'_>, searching: String) -> Vec<poise::AutocompleteChoice<String>> {
+async fn translation_languages_autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<poise::AutocompleteChoice<String>> {
     let mut filtered_languages = ctx.data.translation_languages.iter()
-        .filter(|(_, name)| name.starts_with(&searching))
+        .filter(|(_, name)| name.starts_with(searching))
         .map(|(value, name)| (value.clone(), name.clone()))
         .map(|(value, name)| poise::AutocompleteChoice {name, value})
         .collect::<Vec<_>>();
 
-    filtered_languages.sort_by_key(|choice| strsim::levenshtein(&choice.name, &searching));
+    filtered_languages.sort_by_key(|choice| strsim::levenshtein(&choice.name, searching));
     filtered_languages
 }
 
@@ -376,7 +375,7 @@ where
             .colour(PREMIUM_NEUTRAL_COLOUR)
             .thumbnail(&data.premium_avatar_url)
             .url("https://www.patreon.com/Gnome_the_Bot_Maker")
-            .footer(CreateEmbedFooter::default().text(ctx.gettext(
+            .footer(CreateEmbedFooter::new(ctx.gettext(
                 "If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!"
             )))
             .description(ctx.gettext("
@@ -562,7 +561,7 @@ macro_rules! create_bool_command {
 
             Command {
                 prefix_action: prefix_bool().prefix_action,
-                name: stringify!($name),
+                name: String::from(stringify!($name)),
                 ..slash_bool()
             }
         }
@@ -990,10 +989,6 @@ pub async fn setup(
             let mut text_channels: Vec<_> = {
                 let guild = require_guild!(ctx);
                 guild.channels.values()
-                    .filter_map(|c| match c {
-                        serenity::Channel::Guild(channel) => Some(channel),
-                        _ => None
-                    })
                     .filter(|c| {
                         c.kind == serenity::ChannelType::Text &&
                         can_send(&guild, c, &author_member) &&
@@ -1013,18 +1008,17 @@ pub async fn setup(
 
             let reply = ctx.send(poise::CreateReply::default()
                 .content(ctx.gettext("Select a channel!"))
-                .components(text_channels.chunks(25).enumerate().into_iter().fold(CreateComponents::default(), |c, (i, chunked_channels)|
-                    c.add_action_row(CreateActionRow::default().add_select_menu(CreateSelectMenu::default()
-                        .custom_id(format!("select::channels::{i}"))
-                        .options(chunked_channels.iter()
-                            .map(|channel|
-                                CreateSelectMenuOption::default()
-                                    .label(channel.name.clone())
-                                    .value(channel.id.to_string())
-                            ).collect()
-                        )
+                .components(text_channels.chunks(25).enumerate().into_iter().map(|(i, chunked_channels)|
+                    CreateActionRow::SelectMenu(CreateSelectMenu::new(
+                        format!("select::channels::{i}"),
+                        CreateSelectMenuKind::String {
+                            options: chunked_channels.iter().map(|channel| CreateSelectMenuOption::new(
+                                channel.name.clone(),
+                                channel.id.to_string()
+                            )).collect()
+                        }
                     ))
-                ))
+                ).collect())
             ).await?;
 
             let interaction = reply.message().await?
@@ -1037,7 +1031,9 @@ pub async fn setup(
             if let Some(interaction) = interaction {
                 interaction.defer(&ctx_discord.http).await?;
 
-                let selected_id = serenity::ChannelId(interaction.data.values[0].parse().unwrap());
+                let ComponentInteractionDataKind::StringSelect { values } = &interaction.data.kind else {bail!("Expected a string value")};
+                let selected_id = serenity::ChannelId(values[0].parse().unwrap());
+
                 text_channels.into_iter().find(|c| c.id == selected_id).unwrap()
             } else {
                 // The timeout was hit
@@ -1056,11 +1052,10 @@ pub async fn setup(
 TTS Bot will now accept commands and read from <#{channel}>.
 Just do `/join` and start talking!
 ").replace("{channel}", &channel.id.0.to_string()))
-        .footer(CreateEmbedFooter::default().text(random_footer(
+        .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite, current_user_id(cache), ctx.current_catalog()
         )))
-        .author(CreateEmbedAuthor::default()
-            .name(&author.name)
+        .author(CreateEmbedAuthor::new(&author.name)
             .icon_url(author.face())
         )
     )).await?;
@@ -1162,8 +1157,8 @@ pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
         .title(embed_title)
         .colour(neutral_colour)
         .field("Currently Supported Languages", format_languages(data.translation_languages.keys()), false)
-        .author(CreateEmbedAuthor::default().name(author.name.clone()).icon_url(author.face()))
-        .footer(CreateEmbedFooter::default().text(random_footer(
+        .author(CreateEmbedAuthor::new(author.name.clone()).icon_url(author.face()))
+        .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite, client_id, ctx.current_catalog()
         )))
     )).await.map(drop).map_err(Into::into)
@@ -1225,11 +1220,10 @@ pub async fn voices(
 
     ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
         .title(embed_title)
-        .footer(CreateEmbedFooter::default().text(random_footer(
+        .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite, client_id, ctx.current_catalog()
         )))
-        .author(CreateEmbedAuthor::default()
-            .name(author.name.clone())
+        .author(CreateEmbedAuthor::new(author.name.clone())
             .icon_url(author.face())
         )
         .field(ctx.gettext("Currently supported voices"), &voices, true)
@@ -1301,7 +1295,7 @@ pub fn commands() -> [Command; 5] {
 
         poise::Command {
             subcommands: vec![
-                poise::Command {name: "channel", ..setup()},
+                poise::Command {name: String::from("channel"), ..setup()},
                 xsaid(), autojoin(), required_role(), voice(), server_voice(), mode(), server_mode(),
                 msg_length(), botignore(), translation(), translation_lang(), speaking_rate(), nick(),
                 repeated_characters(), audience_ignore(), require_voice(), required_prefix(), command_prefix(), block(),

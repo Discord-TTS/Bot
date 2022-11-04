@@ -34,6 +34,10 @@ pub fn current_user_id(cache: &serenity::Cache) -> serenity::UserId {
     cache.current_user().id
 }
 
+pub async fn decode_resp<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Result<T> {
+    json::from_slice(&mut resp.bytes().await?.to_vec()).map_err(Into::into)
+}
+
 pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
     let mut status: Vec<_> = shards.iter()
         .map(|(id, shard)| (id, format!("Shard {id}: `{}`", shard.stage)))
@@ -66,8 +70,7 @@ pub async fn dm_generic(
         embed
             .title("Message from the developers:")
             .description(message)
-            .author(CreateEmbedAuthor::default()
-                .name(author.tag())
+            .author(CreateEmbedAuthor::new(author.tag())
                 .icon_url(author.face())
             )
     })).await?;
@@ -85,7 +88,7 @@ pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url, auth_key:
     match resp.error_for_status_ref() {
         Ok(_) => Ok(Some(resp)),
         Err(backup_err) => {
-            match json::decode_resp::<TTSServiceError>(resp).await {
+            match decode_resp::<TTSServiceError>(resp).await {
                 Ok(err) => {
                     if err.code.should_ignore() {
                         Ok(None)
@@ -320,10 +323,10 @@ pub async fn run_checks(
 
         if guild_row.require_voice {
             let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
-            if let serenity::Channel::Guild(channel) = guild.channels.get(&voice_channel).try_unwrap()? {
-                if channel.kind == serenity::ChannelType::Stage && voice_state.map_or(false, |vs| vs.suppress) && guild_row.audience_ignore {
-                    return Ok(None); // Is audience
-                }
+            let channel = guild.channels.get(&voice_channel).try_unwrap()?;
+
+            if channel.kind == serenity::ChannelType::Stage && voice_state.map_or(false, |vs| vs.suppress) && guild_row.audience_ignore {
+                return Ok(None); // Is audience
             }
         }
     }
@@ -368,7 +371,7 @@ pub fn clean_msg(
                 "animated emoji"
             };
 
-            format!("{} {}", emoji_prefix, emoji_name)
+            format!("{emoji_prefix} {emoji_name}")
         }).into_owned();
 
         for (regex, replacement) in &regex_cache.replacements {
@@ -416,9 +419,9 @@ pub fn clean_msg(
 
         let said_name = nickname.unwrap_or_else(|| member_nick.unwrap_or(&user.name));
         content = match attachments_to_format(attachments) {
-            Some(file_format) if content.is_empty() => format!("{} sent {}", said_name, file_format),
-            Some(file_format) => format!("{} sent {} and said {}", said_name, file_format, content),
-            None => format!("{} said: {}", said_name, content),
+            Some(file_format) if content.is_empty() => format!("{said_name} sent {file_format}"),
+            Some(file_format) => format!("{said_name} sent {file_format} and said {content}"),
+            None => format!("{said_name} said: {content}"),
         }
     } else if contained_url {
         write!(content, "{}",
@@ -432,7 +435,7 @@ pub fn clean_msg(
     }
 
     if repeated_limit != 0 {
-        content = remove_repeated_chars(&content, repeated_limit as usize);
+        content = remove_repeated_chars(&content, repeated_limit);
     }
 
     content
@@ -482,22 +485,19 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
 }
 
 pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, negative: String) -> Result<Option<bool>, Error> {
-    fn components(positive: String, negative: String, disabled: bool) -> serenity::CreateComponents {
-        serenity::CreateComponents::default()
-            .add_action_row(CreateActionRow::default()
-                .add_button(CreateButton::default()
+    fn components(positive: String, negative: String, disabled: bool) -> Vec<CreateActionRow> {
+        vec![
+            CreateActionRow::Buttons(vec![
+                CreateButton::new("True")
                     .style(serenity::ButtonStyle::Success)
                     .disabled(disabled)
-                    .custom_id("True")
-                    .label(positive)
-                )
-                .add_button(CreateButton::default()
+                    .label(positive),
+                CreateButton::new("False")
                     .style(serenity::ButtonStyle::Danger)
                     .disabled(disabled)
-                    .custom_id("False")
                     .label(negative)
-                )
-            )
+            ])
+        ]
     }
 
     let reply = ctx.send(poise::CreateReply::default()

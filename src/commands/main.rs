@@ -117,11 +117,10 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         .title(ctx.gettext("Joined your voice channel!"))
         .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
         .thumbnail(bot_face)
-        .author(CreateEmbedAuthor::default()
-            .name(member.display_name().into_owned())
+        .author(CreateEmbedAuthor::new(member.display_name().into_owned())
             .icon_url(author.face())
         )
-        .footer(CreateEmbedFooter::default().text(random_footer(
+        .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite, bot_id, ctx.current_catalog()
         )))
     )).await.map(drop).map_err(Into::into)
@@ -248,7 +247,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
             .description(error_msg)
             .thumbnail(&data.premium_avatar_url)
             .colour(crate::constants::PREMIUM_NEUTRAL_COLOUR)
-            .footer(CreateEmbedFooter::default().text({
+            .footer(CreateEmbedFooter::new({
                 let line1 = ctx.gettext("If you have just subscribed, please wait for up to an hour for the member list to update!\n");
                 let line2 = ctx.gettext("If this is incorrect, and you have waited an hour, please contact Gnome!#6669.");
 
