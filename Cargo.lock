@@ -818,7 +818,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#873529a46a416e99a03ab2c8572bcda02ffbcdcc"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#072d6fff4fa9998ee4803389dbcf10bab990a9bb"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2062,7 +2062,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.5"
-source = "git+https://github.com/GnomedDev/serenity?rev=bf046980c5db4eb247d4c3a7d0447aa6af564c25#bf046980c5db4eb247d4c3a7d0447aa6af564c25"
+source = "git+https://github.com/GnomedDev/serenity?branch=pinned-serenity#0910c1e7af71c406f5c4c11b5ce1fb4f5165a467"
 dependencies = [
  "async-trait",
  "base64",

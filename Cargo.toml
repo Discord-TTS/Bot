@@ -74,10 +74,10 @@ features = ["builtin-queue", "simd-json"]
 branch = "next"
 
 [patch.crates-io]
-serenity = {git = "https://github.com/GnomedDev/serenity", rev = "bf046980c5db4eb247d4c3a7d0447aa6af564c25"}
+serenity = {git = "https://github.com/GnomedDev/serenity", branch = "pinned-serenity"}
 
 [patch."https://github.com/serenity-rs/serenity"]
-serenity = {git = "https://github.com/GnomedDev/serenity", rev = "bf046980c5db4eb247d4c3a7d0447aa6af564c25"}
+serenity = {git = "https://github.com/GnomedDev/serenity", branch = "pinned-serenity"}
 
 [patch."https://github.com/kangalioo/poise"]
 poise = {git = "https://github.com/GnomedDev/poise", rev = "ad3a5d806b0ef20d4940811e021d86ce3c16e610"}
