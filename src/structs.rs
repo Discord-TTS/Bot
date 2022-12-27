@@ -335,7 +335,6 @@ pub enum TTSModeChoice {
     // Name to show in slash command invoke               Aliases for prefix
     #[name="Google Translate TTS (female) (default)"]     #[name="gtts"]       gTTS,
     #[name="eSpeak TTS (male)"]                           #[name="espeak"]     eSpeak,
-    #[name="⭐ TikTok TTS (changeable) ⭐"]                 #[name="tiktok"]     TikTok,
     #[name="⭐ gCloud TTS (changeable) ⭐"]                 #[name="gcloud"]     gCloud,
     #[name="⭐ Amazon Polly TTS (changeable) ⭐"]           #[name="polly"]      Polly,
 }
@@ -345,7 +344,6 @@ impl From<TTSModeChoice> for TTSMode {
         match mode {
             TTSModeChoice::gTTS => Self::gTTS,
             TTSModeChoice::Polly => Self::Polly,
-            TTSModeChoice::TikTok => Self::TikTok,
             TTSModeChoice::eSpeak => Self::eSpeak,
             TTSModeChoice::gCloud => Self::gCloud,
         }
