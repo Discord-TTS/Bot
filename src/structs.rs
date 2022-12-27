@@ -179,10 +179,7 @@ impl Data {
     }
 
     pub async fn premium_check(&self, guild_id: Option<serenity::GuildId>) -> Result<Option<FailurePoint>> {
-        let guild_id = match guild_id {
-            Some(guild) => guild,
-            None => return Ok(Some(FailurePoint::Guild))
-        };
+        let Some(guild_id) = guild_id else { return Ok(Some(FailurePoint::Guild)) };
 
         let guild_row = self.guilds_db.get(guild_id.get() as i64).await?;
         if let Some(raw_user_id) = guild_row.premium_user {

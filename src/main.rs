@@ -384,7 +384,9 @@ impl serenity::EventHandler for EventHandler {
         })).await.unwrap_or_else(|err| error!("on_error: {:?}", err));
     }
 
+    #[allow(unused)]
     async fn guild_create(&self, ctx: serenity::Context, guild: serenity::Guild, is_new: Option<bool>) {
+        return; // is_new currently seems bugged and is always true
         if !is_new.unwrap() {return};
 
         let framework = require!(self.framework().await);

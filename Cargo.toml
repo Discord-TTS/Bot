@@ -29,9 +29,8 @@ strum_macros = "0.24"
 generic-array = "0.14"
 
 [dependencies.symphonia]
-git = "https://github.com/FelixMcFelix/Symphonia"
+git = "https://github.com/pdeljanov/Symphonia"
 features = ["mp3", "ogg", "wav", "pcm"]
-branch = "songbird-fixes"
 default-features = false
 
 [dependencies.sqlx]
@@ -55,7 +54,7 @@ default-features = false
 [dependencies.gnomeutils]
 git = "https://github.com/GnomedDev/GnomeUtils"
 features = ["error_handling", "help_command", "analytics", "i18n", "bot_list", "logging", "songbird"]
-branch = "it's-not-personal-kid"
+branch = "personal"
 
 [dependencies.serenity_feature_only]
 git = "https://github.com/serenity-rs/serenity"
@@ -67,7 +66,7 @@ branch = "next"
 [dependencies.poise]
 git = "https://github.com/GnomedDev/poise"
 features = ["cache"]
-branch = "serenity-next"
+rev = "ad3a5d806b0ef20d4940811e021d86ce3c16e610"
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
@@ -75,7 +74,10 @@ features = ["builtin-queue", "simd-json"]
 branch = "next"
 
 [patch.crates-io]
-serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next" }
+serenity = {git = "https://github.com/GnomedDev/serenity", rev = "bf046980c5db4eb247d4c3a7d0447aa6af564c25"}
+
+[patch."https://github.com/serenity-rs/serenity"]
+serenity = {git = "https://github.com/GnomedDev/serenity", rev = "bf046980c5db4eb247d4c3a7d0447aa6af564c25"}
 
 [patch."https://github.com/kangalioo/poise"]
-poise = {git = "https://github.com/GnomedDev/poise", branch = "serenity-next"}
+poise = {git = "https://github.com/GnomedDev/poise", rev = "ad3a5d806b0ef20d4940811e021d86ce3c16e610"}

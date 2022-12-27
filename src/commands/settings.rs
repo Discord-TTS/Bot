@@ -290,9 +290,8 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec
         (t.0.clone(), t.1.clone())
     }
 
-    let (_, mode) = match ctx.data.parse_user_or_guild(ctx.interaction.user().id, ctx.interaction.guild_id()).await {
-        Ok(v) => v,
-        Err(_) => return Vec::new()
+    let Ok((_, mode)) = ctx.data.parse_user_or_guild(ctx.interaction.user().id, ctx.interaction.guild_id()).await else {
+        return Vec::new();
     };
 
     let (mut i1, mut i2, mut i3, mut i4, mut i5);
@@ -521,7 +520,6 @@ pub async fn block(
     Ok(())
 }
 
-#[track_caller]
 async fn generic_bool_command(ctx: Context<'_>, key: &'static str, value: Option<bool>, resp: &'static str) -> CommandResult {
     let value = require!(bool_button(ctx, value).await?, Ok(()));
     let resp = ctx.gettext(resp).replace("{}", to_enabled(ctx.current_catalog(), value));
@@ -979,6 +977,7 @@ pub async fn setup(
         (current_user.id, current_user.name.clone(), current_user.face())
     };
 
+    #[allow(clippy::manual_let_else)] // false positive
     let (bot_member, channel) = {
         let bot_member = guild_id.member(ctx_discord, bot_user_id).await?;
         let channel = if let Some(channel) = channel {
