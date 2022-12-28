@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::borrow::Cow;
 
+use songbird::error::JoinError;
 use sqlx::Row;
 
 use poise::{CreateReply, serenity_prelude::{self as serenity, builder::*}};
@@ -110,7 +111,18 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         let _typing = ctx.defer_or_broadcast().await?;
 
         let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-        data.songbird.join_vc(join_vc_lock.lock().await, author_vc).await?;
+        let join_vc_result = data.songbird.join_vc(join_vc_lock.lock().await, author_vc).await;
+
+        if let Err(err) = join_vc_result {
+            return if let JoinError::TimedOut = err {
+                ctx.send_error(
+                    ctx.gettext("a timeout occurred while joining your voice channel"),
+                    Some(ctx.gettext("wait a few seconds and try again"))
+                ).await.map(drop).map_err(Into::into)
+            } else {
+                Err(err.into())
+            }
+        };
     }
 
     ctx.send(poise::CreateReply::default().embed(serenity::CreateEmbed::default()
