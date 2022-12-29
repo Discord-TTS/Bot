@@ -818,7 +818,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#072d6fff4fa9998ee4803389dbcf10bab990a9bb"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#6f1a1158790d9b9818a7eca9ac376111e3fc51f0"
 dependencies = [
  "anyhow",
  "async-trait",
