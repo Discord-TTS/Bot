@@ -508,10 +508,9 @@ pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, ne
 
     let ctx_discord = ctx.discord();
     let interaction = reply.message().await?
-        .component_interaction_collector(&ctx_discord.shard)
+        .await_component_interaction(&ctx_discord.shard)
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(ctx.author().id)
-        .collect_single()
         .await;
 
     // TOOD: Fix, seems to always give interaction failed currently!

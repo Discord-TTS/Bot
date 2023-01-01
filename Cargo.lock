@@ -818,7 +818,7 @@ dependencies = [
 [[package]]
 name = "gnomeutils"
 version = "0.1.0"
-source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#6f1a1158790d9b9818a7eca9ac376111e3fc51f0"
+source = "git+https://github.com/GnomedDev/GnomeUtils?branch=personal#83353e52270cb466e2172a72dc80bca2160dff5b"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1339,9 +1339,9 @@ checksum = "43794a0ace135be66a25d3ae77d41b91615fb68ae937f904090203e81f755b65"
 
 [[package]]
 name = "nom"
-version = "7.1.1"
+version = "7.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8903e5a29a317527874d0402f867152a3d21c908bb0b933e416c65e301d4c36"
+checksum = "e5507769c4919c998e69e49c839d9dc6e693ede4cc4290d6ad8b41d4f09c548c"
 dependencies = [
  "memchr",
  "minimal-lexical",
@@ -1425,9 +1425,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.16.0"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+checksum = "6f61fba1741ea2b3d6a1e3178721804bb716a68a6aeba1149b5d52e3d464ea66"
 
 [[package]]
 name = "opaque-debug"
@@ -1587,7 +1587,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.4.1"
-source = "git+https://github.com/GnomedDev/poise?rev=ad3a5d806b0ef20d4940811e021d86ce3c16e610#ad3a5d806b0ef20d4940811e021d86ce3c16e610"
+source = "git+https://github.com/GnomedDev/poise?branch=serenity-next#a1e75a54f809f10fc844c8895ff9250b94537eaf"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1605,7 +1605,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.4.0"
-source = "git+https://github.com/GnomedDev/poise?rev=ad3a5d806b0ef20d4940811e021d86ce3c16e610#ad3a5d806b0ef20d4940811e021d86ce3c16e610"
+source = "git+https://github.com/GnomedDev/poise?branch=serenity-next#a1e75a54f809f10fc844c8895ff9250b94537eaf"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -2062,7 +2062,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.5"
-source = "git+https://github.com/GnomedDev/serenity?branch=pinned-serenity#0910c1e7af71c406f5c4c11b5ce1fb4f5165a467"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#72c76467dab136f50c2b1739e1945736e4a7ff39"
 dependencies = [
  "async-trait",
  "base64",
@@ -2070,11 +2070,11 @@ dependencies = [
  "bytes",
  "chrono",
  "dashmap",
- "derivative",
  "flate2",
  "futures",
  "fxhash",
  "mime_guess",
+ "once_cell",
  "parking_lot 0.12.1",
  "percent-encoding",
  "reqwest",
@@ -2535,9 +2535,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.26.8"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29ddf41e393a9133c81d5f0974195366bd57082deac6e0eb02ed39b8341c2bb6"
+checksum = "17351d0e9eb8841897b14e9669378f3c69fb57779cc04f8ca9a9d512edfb2563"
 dependencies = [
  "cfg-if",
  "core-foundation-sys",
@@ -3187,11 +3187,10 @@ dependencies = [
 
 [[package]]
 name = "whoami"
-version = "1.2.3"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6631b6a2fd59b1841b622e8f1a7ad241ef0a46f2d580464ce8140ac94cbd571"
+checksum = "45dbc71f0cdca27dc261a9bd37ddec174e4a0af2b900b890f378460f745426e3"
 dependencies = [
- "bumpalo",
  "wasm-bindgen",
  "web-sys",
 ]

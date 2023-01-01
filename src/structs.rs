@@ -100,7 +100,24 @@ pub struct RegexCache {
     pub emoji: regex::Regex,
 }
 
-pub struct Data {
+#[derive(Clone)]
+pub struct Data(pub Arc<DataInner>);
+
+impl AsRef<gnomeutils::GnomeData> for Data {
+    fn as_ref(&self) -> &gnomeutils::GnomeData {
+        &self.inner
+    }
+}
+
+impl std::ops::Deref for Data {
+    type Target = DataInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub struct DataInner {
     pub analytics: Arc<analytics::Handler>,
     pub guilds_db: database::Handler<i64, database::GuildRow>,
     pub userinfo_db: database::Handler<i64, database::UserRow>,
@@ -110,6 +127,7 @@ pub struct Data {
 
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
     pub currently_purging: std::sync::atomic::AtomicBool,
+    pub fully_started: std::sync::atomic::AtomicBool,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub website_info: RwLock<Option<WebsiteInfo>>,
     pub startup_message: serenity::MessageId,
@@ -136,12 +154,6 @@ pub struct Data {
 impl std::fmt::Debug for Data {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Data").finish()
-    }
-}
-
-impl AsRef<gnomeutils::GnomeData> for Data {
-    fn as_ref(&self) -> &gnomeutils::GnomeData {
-        &self.inner
     }
 }
 
@@ -430,6 +442,5 @@ pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Data, CommandErr
 
 pub type CommandError = Error;
 pub type CommandResult<E=Error> = Result<(), E>;
-pub type Framework = poise::Framework<Data, CommandError>;
 pub type FrameworkContext<'a> = poise::FrameworkContext<'a, Data, CommandError>;
 pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, (serenity::UserId, std::time::SystemTime)>;
