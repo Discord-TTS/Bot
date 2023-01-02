@@ -53,13 +53,12 @@ async fn process_tts_msg(
         };
 
         let (voice, mode) = data.parse_user_or_guild(message.author.id, Some(guild_id)).await?;
-        let nickname_row = data.nickname_db.get([guild_id.into(), message.author.id.into()]).await?;
 
         content = clean_msg(
-            &content, &message.author, &ctx.cache, guild_id, member_nick, &message.attachments, &voice,
-            guild_row.xsaid, guild_row.repeated_chars as usize, nickname_row.name.as_deref(),
+            &content, &message.author, ctx, guild_id, member_nick, &message.attachments, &message.mentions, &voice,
+            guild_row.xsaid, guild_row.repeated_chars as usize, &data.nickname_db,
             &data.regex_cache, &data.last_to_xsaid_tracker
-        );
+        ).await?;
 
         (voice, mode)
     };
