@@ -145,7 +145,6 @@ pub struct DataInner {
 
     pub espeak_voices: Vec<String>,
     pub gtts_voices: BTreeMap<String, String>,
-    pub tiktok_voices: BTreeMap<String, String>,
     pub polly_voices: BTreeMap<String, PollyVoice>,
     pub gcloud_voices: BTreeMap<String, BTreeMap<String, GoogleGender>>,
 
@@ -294,7 +293,6 @@ impl SpeakingRateInfo {
 pub enum TTSMode {
     #[default] gTTS,
     Polly,
-    TikTok,
     eSpeak,
     gCloud,
 }
@@ -316,7 +314,7 @@ impl TTSMode {
     pub const fn is_premium(self) -> bool {
         match self {
             Self::gTTS | Self::eSpeak => false,
-            Self::Polly | Self::gCloud | Self::TikTok => true,
+            Self::Polly | Self::gCloud => true,
         }
     }
 
@@ -326,13 +324,12 @@ impl TTSMode {
             Self::eSpeak => "en1",
             Self::Polly => "Brian",
             Self::gCloud => "en-US A",
-            Self::TikTok => "en_us_001",
         }
     }
 
     pub const fn speaking_rate_info(self) -> Option<SpeakingRateInfo> {
         match self {
-            Self::gTTS | Self::TikTok => None,
+            Self::gTTS => None,
             Self::gCloud => SpeakingRateInfo::new(0.25, 1.0, 4.0, "x"),
             Self::Polly  => SpeakingRateInfo::new(10.0, 100.0, 500.0, "%"),
             Self::eSpeak => SpeakingRateInfo::new(100.0, 175.0, 400.0, " words per minute"),

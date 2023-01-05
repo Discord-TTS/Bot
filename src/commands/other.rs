@@ -99,7 +99,7 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
         serenity::CreateAttachment::bytes(
             audio.to_vec(),
             format!("{author_name}-{}.{}", ctx.id(), match mode {
-                TTSMode::gTTS | TTSMode::TikTok | TTSMode::gCloud | TTSMode::Polly => "mp3",
+                TTSMode::gTTS | TTSMode::gCloud | TTSMode::Polly => "mp3",
                 TTSMode::eSpeak => "wav",
             })
         )

@@ -113,7 +113,6 @@ async fn process_tts_msg(
 
     data.analytics.log(Cow::Borrowed(match mode {
         TTSMode::gTTS => "gTTS_tts",
-        TTSMode::TikTok => "TikTok_tts",
         TTSMode::eSpeak => "eSpeak_tts",
         TTSMode::gCloud => "gCloud_tts",
         TTSMode::Polly => "Polly_tts",

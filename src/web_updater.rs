@@ -11,7 +11,6 @@ fn remember_to_update_analytics_query() {
     match TTSMode::gTTS {
         TTSMode::gTTS => (),
         TTSMode::Polly => (),
-        TTSMode::TikTok => (),
         TTSMode::eSpeak => (),
         TTSMode::gCloud => (),
     }
@@ -72,7 +71,6 @@ impl gnomeutils::Looper for Updater {
                 SELECT count FROM analytics
                 WHERE date_collected = (CURRENT_DATE - 1) AND (
                     event = 'gTTS_tts'   OR
-                    event = 'TikTok_tts' OR
                     event = 'eSpeak_tts' OR
                     event = 'gCloud_tts' OR
                     event = 'Polly_tts'

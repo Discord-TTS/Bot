@@ -294,18 +294,17 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec
         return Vec::new();
     };
 
-    let (mut i1, mut i2, mut i3, mut i4, mut i5);
+    let (mut i1, mut i2, mut i3, mut i4);
     let voices: &mut dyn Iterator<Item=_> = match mode {
         TTSMode::gTTS => {i1 = ctx.data.gtts_voices.iter().map(clone_tuple_items).map(|(value, name)| poise::AutocompleteChoice {name, value}); &mut i1},
-        TTSMode::TikTok => {i2 = ctx.data.tiktok_voices.iter().map(clone_tuple_items).map(|(value, name)| poise::AutocompleteChoice {name, value}); &mut i2},
-        TTSMode::eSpeak => {i3 = ctx.data.espeak_voices.iter().cloned().map(poise::AutocompleteChoice::from); &mut i3},
-        TTSMode::Polly => {i4 =
+        TTSMode::eSpeak => {i2 = ctx.data.espeak_voices.iter().cloned().map(poise::AutocompleteChoice::from); &mut i2},
+        TTSMode::Polly => {i3 =
             ctx.data.polly_voices.values().map(|voice| poise::AutocompleteChoice{
                 name: format!("{} - {} ({})", voice.name, voice.language_name, voice.gender),
                 value: voice.id.clone()
             });
-        &mut i4}
-        TTSMode::gCloud => {i5 =
+        &mut i3}
+        TTSMode::gCloud => {i4 =
             ctx.data.gcloud_voices.iter().flat_map(|(language, variants)| {
                 variants.iter().map(move |(variant, gender)| {
                     poise::AutocompleteChoice {
@@ -314,7 +313,7 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec
                     }
                 })
             });
-        &mut i5}
+        &mut i4}
     };
 
     let mut filtered_voices: Vec<_> = voices
@@ -462,7 +461,6 @@ fn format_languages<'a>(mut iter: impl Iterator<Item=&'a String>) -> String {
 fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a String> {
     match mode {
         TTSMode::gTTS => data.gtts_voices.get(code),
-        TTSMode::TikTok => data.tiktok_voices.get(code),
         TTSMode::Polly => data.polly_voices.get(code).map(|n| &n.name),
         TTSMode::eSpeak | TTSMode::gCloud => None,
     }
@@ -471,7 +469,7 @@ fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a S
 
 fn check_valid_voice(data: &Data, code: &String, mode: TTSMode) -> bool {
     match mode {
-        TTSMode::gTTS | TTSMode::Polly | TTSMode::TikTok => get_voice_name(data, code, mode).is_some(),
+        TTSMode::gTTS | TTSMode::Polly => get_voice_name(data, code, mode).is_some(),
         TTSMode::eSpeak => data.espeak_voices.contains(code),
         TTSMode::gCloud => {
             code.split_once(' ')
@@ -1191,7 +1189,6 @@ pub async fn voices(
         match mode {
             TTSMode::eSpeak => format_languages(data.espeak_voices.iter()),
             TTSMode::gTTS => format_languages(data.gtts_voices.keys()),
-            TTSMode::TikTok => format_languages(data.tiktok_voices.keys()),
             TTSMode::Polly => return {
                 let (current_voice, pages) = list_polly_voices(&ctx).await?;
                 MenuPaginator::new(ctx, pages, current_voice, mode, random_footer()).start().await.map_err(Into::into)

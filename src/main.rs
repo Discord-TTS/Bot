@@ -46,7 +46,7 @@ mod events;
 mod funcs;
 
 use constants::{PREMIUM_NEUTRAL_COLOUR};
-use funcs::{prepare_gcloud_voices, prepare_tiktok_voices, get_translation_langs, decode_resp};
+use funcs::{prepare_gcloud_voices, get_translation_langs, decode_resp};
 use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, PollyVoice, WebhookConfigRaw, WebhookConfig, FailurePoint, DataInner};
 
 enum EntryCheck {
@@ -142,7 +142,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let (
         guilds_db, userinfo_db, user_voice_db, guild_voice_db, nickname_db,
         mut webhooks, translation_languages, premium_avatar_url,
-        gtts_voices, espeak_voices, tiktok_voices, gcloud_voices, polly_voices
+        gtts_voices, espeak_voices, gcloud_voices, polly_voices
     ) = tokio::try_join!(
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
         create_db_handler!(pool.clone(), "userinfo", "user_id"),
@@ -156,7 +156,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
         async {Ok(decode_resp::<BTreeMap<String, String>>(TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?)},
         async {Ok(decode_resp::<Vec<String>>(TTSMode::eSpeak.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?)},
-        async {Ok(prepare_tiktok_voices(decode_resp(TTSMode::TikTok.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?))},
         async {Ok(prepare_gcloud_voices(decode_resp(TTSMode::gCloud.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?))},
         async {Ok(decode_resp::<Vec<PollyVoice>>(TTSMode::Polly.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?
             .into_iter().map(|v| (v.id.clone(), v)).collect::<BTreeMap<_, _>>())
@@ -209,7 +208,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         currently_purging: AtomicBool::new(false),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
 
-        gtts_voices, espeak_voices, gcloud_voices, polly_voices, tiktok_voices,
+        gtts_voices, espeak_voices, gcloud_voices, polly_voices,
         translation_languages,
 
         website_info: RwLock::new(config.website_info),
