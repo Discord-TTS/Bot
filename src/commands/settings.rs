@@ -1005,7 +1005,7 @@ pub async fn setup(
 
             let reply = ctx.send(poise::CreateReply::default()
                 .content(ctx.gettext("Select a channel!"))
-                .components(text_channels.chunks(25).enumerate().into_iter().map(|(i, chunked_channels)|
+                .components(text_channels.chunks(25).enumerate().map(|(i, chunked_channels)|
                     CreateActionRow::SelectMenu(CreateSelectMenu::new(
                         format!("select::channels::{i}"),
                         CreateSelectMenuKind::String {
