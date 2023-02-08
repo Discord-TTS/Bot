@@ -50,15 +50,14 @@ impl SongbirdManagerExt for songbird::Songbird {
         guild_id: tokio::sync::MutexGuard<'_, JoinVCToken>,
         channel_id: serenity::ChannelId,
     ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>, songbird::error::JoinError> {
-        let (call, result) = self.join(guild_id.0, channel_id).await;
-
-        if let Err(err) = result {
-            // On error, the Call is left in a semi-connected state.
-            // We need to correct this by removing the call from the manager.
-            drop(self.leave(guild_id.0).await);
-            Err(err)
-        } else {
-            Ok(call)
+        match self.join(guild_id.0, channel_id).await {
+            Ok(call) => Ok(call),
+            Err(err) => {
+                // On error, the Call is left in a semi-connected state.
+                // We need to correct this by removing the call from the manager.
+                drop(self.leave(guild_id.0).await);
+                Err(err)
+            }
         }
     }
 }

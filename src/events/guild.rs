@@ -6,9 +6,7 @@ use serenity::builder::*;
 
 use crate::{serenity, Data, Result};
 
-#[allow(unused)]
 pub async fn guild_create(ctx: &serenity::Context, data: &Data, guild: &serenity::Guild, is_new: Option<bool>) -> Result<()> {
-    return Ok(()); // is_new currently seems bugged and is always true
     if !is_new.unwrap() {return Ok(())};
 
     // Send to servers channel and DM owner the welcome message

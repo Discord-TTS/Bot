@@ -10,7 +10,7 @@ lto = "thin"
 [dependencies]
 serde = "1"
 regex = "1"
-toml = "0.5"
+toml = "0.7"
 rand = "0.8"
 anyhow = "1"
 strfmt = "0.2"
@@ -29,9 +29,9 @@ strum_macros = "0.24"
 generic-array = "0.14"
 
 [dependencies.symphonia]
-git = "https://github.com/pdeljanov/Symphonia"
 features = ["mp3", "ogg", "wav", "pcm"]
 default-features = false
+version = "0.5.2"
 
 [dependencies.sqlx]
 version = "0.6"
@@ -64,7 +64,7 @@ package = "serenity"
 branch = "next"
 
 [dependencies.poise]
-git = "https://github.com/GnomedDev/poise"
+git = "https://github.com/serenity-rs/poise"
 features = ["cache"]
 branch = "serenity-next"
 
@@ -75,6 +75,3 @@ branch = "next"
 
 [patch.crates-io]
 serenity = {git = "https://github.com/serenity-rs/serenity", branch = "next"}
-
-[patch."https://github.com/serenity-rs/poise"]
-poise = {git = "https://github.com/GnomedDev/poise", branch = "serenity-next"}
