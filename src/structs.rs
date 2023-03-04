@@ -27,6 +27,7 @@ pub struct MainConfig {
     pub invite_channel: serenity::ChannelId,
     pub website_url: Option<reqwest::Url>,
     pub main_server: serenity::GuildId,
+    pub translation_url: reqwest::Url,
     pub ofs_role: serenity::RoleId,
     pub main_server_invite: String,
     pub translation_token: String,

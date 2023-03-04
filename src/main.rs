@@ -151,7 +151,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
 
         get_webhooks(&http, config.webhooks),
-        get_translation_langs(&reqwest, &config.main.translation_token),
+        get_translation_langs(&reqwest, &config.main.translation_url, &config.main.translation_token),
         async {serenity::UserId::new(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
 
         async {Ok(decode_resp::<BTreeMap<String, String>>(TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?)},

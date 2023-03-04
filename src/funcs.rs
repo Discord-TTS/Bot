@@ -28,7 +28,6 @@ use serenity::{json::prelude as json, builder::*};
 
 use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError, RegexCache};
 use crate::database::{GuildRow, NicknameRow, Handler};
-use crate::constants::TRANSLATION_URL;
 use crate::require;
 
 pub fn current_user_id(cache: &serenity::Cache) -> serenity::UserId {
@@ -117,7 +116,7 @@ pub fn prepare_url(mut tts_service: reqwest::Url, content: &str, lang: &str, mod
 }
 
 #[allow(clippy::similar_names)]
-pub async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Result<BTreeMap<String, String>> {
+pub async fn get_translation_langs(reqwest: &reqwest::Client, url: &reqwest::Url, token: &str) -> Result<BTreeMap<String, String>> {
     #[derive(serde::Deserialize)]
     pub struct DeeplVoice<'a> {
         pub name: String,
@@ -137,7 +136,7 @@ pub async fn get_translation_langs(reqwest: &reqwest::Client, token: &str) -> Re
     };
 
     let mut resp = reqwest
-        .get(format!("{TRANSLATION_URL}/languages")).query(&request)
+        .get(format!("{url}/languages")).query(&request)
         .send().await?.error_for_status()?
         .bytes().await?.to_vec();
 
@@ -512,7 +511,7 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
     };
 
     let mut resp = data.reqwest
-        .get(format!("{TRANSLATION_URL}/translate")).query(&request)
+        .get(format!("{}/translate", data.config.translation_url)).query(&request)
         .send().await?.error_for_status()?
         .bytes().await?.to_vec();
 

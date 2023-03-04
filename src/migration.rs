@@ -103,7 +103,9 @@ pub async fn run(config: &mut toml::Value, pool: &sqlx::PgPool) -> Result<()> {
 async fn _run(main_config: &mut toml::value::Table, transaction: &mut Transaction<'_>) -> Result<()> {
     if main_config.get("setup").is_none() {
         transaction.execute(DB_SETUP_QUERY).await?;
-        main_config.insert(String::from("setup"), toml::Value::Boolean(true));
+        main_config.insert("setup".into(), true.into());
+    } else if main_config.get("translation_url").is_none() {
+        main_config.insert("translation_url".into(), "https://api-free.deepl.com/v2".into());
     }
 
     transaction.execute("
