@@ -124,19 +124,18 @@ pub async fn get_translation_langs(reqwest: &reqwest::Client, url: &reqwest::Url
     }
 
     #[derive(serde::Serialize)]
-    struct DeeplVoiceRequest<'a> {
+    struct DeeplVoiceRequest {
         #[serde(rename = "type")]
         kind: &'static str,
-        auth_key: &'a str,
     }
 
     let request = DeeplVoiceRequest{
         kind: "target",
-        auth_key: token
     };
 
     let mut resp = reqwest
         .get(format!("{url}/languages")).query(&request)
+        .header("Authorization", format!("DeepL-Auth-Key {token}"))
         .send().await?.error_for_status()?
         .bytes().await?.to_vec();
 
@@ -498,7 +497,6 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
     #[derive(serde::Serialize)]
     struct DeeplTranslateRequest<'a> {
         text: &'a str,
-        auth_key: &'a str,
         target_lang: &'a str,
         preserve_formatting: u8,
     }
@@ -507,11 +505,11 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
         target_lang,
         text: content,
         preserve_formatting: 1,
-        auth_key: &data.config.translation_token
     };
 
     let mut resp = data.reqwest
         .get(format!("{}/translate", data.config.translation_url)).query(&request)
+        .header("Authorization", format!("DeepL-Auth-Key {}", data.config.translation_token))
         .send().await?.error_for_status()?
         .bytes().await?.to_vec();
 
