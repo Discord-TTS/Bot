@@ -188,7 +188,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             (regex::Regex::new(r"```(?s:.)*?```")?, ". code block."),
             (regex::Regex::new(r"`(?s:.)*?`")?, ". code snippet."),
         ],
-        user_mention: regex::Regex::new(r"<@!?(\d+)>")?,
         id_in_brackets: regex::Regex::new(r"\((\d+)\)")?,
         emoji: regex::Regex::new(r"<(a?):([^<>]+):\d+>")?,
     };

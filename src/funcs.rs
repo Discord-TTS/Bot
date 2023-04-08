@@ -17,7 +17,6 @@
 use std::borrow::Cow;
 use std::fmt::Write;
 use std::collections::{BTreeMap, HashMap};
-use std::num::NonZeroU64;
 
 use itertools::Itertools as _;
 use rand::Rng as _;
@@ -26,8 +25,8 @@ use poise::serenity_prelude as serenity;
 use gnomeutils::{OptionGettext, OptionTryUnwrap};
 use serenity::{json::prelude as json, builder::*};
 
+use crate::database::GuildRow;
 use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError, RegexCache};
-use crate::database::{GuildRow, NicknameRow, Handler};
 use crate::require;
 
 pub fn current_user_id(cache: &serenity::Cache) -> serenity::UserId {
@@ -176,48 +175,6 @@ pub fn random_footer<'a>(server_invite: &str, client_id: serenity::UserId, catal
     }
 }
 
-async fn replace_user_mentions(
-    regex: &RegexCache,
-    nickname_db: &Handler<[i64; 2], NicknameRow>,
-
-    ctx: &serenity::Context,
-    guild_id: &serenity::GuildId,
-    mentions: &[serenity::User],
-
-    content: &str
-) -> Result<String> {
-    let mut last_match_end = 0;
-    let mut replaced_content = String::with_capacity(content.len());
-
-    for captures in regex.user_mention.captures_iter(content) {
-        let capture = captures.get(0).unwrap();
-        let mention_match = captures.get(1).unwrap();
-
-        let Ok(mention_id) = mention_match.as_str().parse::<NonZeroU64>() else {continue};
-        let mention_id = serenity::UserId(mention_id);
-
-        if let Some(m) = mentions.iter().find(|m| m.id == mention_id) {
-            let nickname_row = nickname_db.get([guild_id.get() as i64, m.id.get() as i64]).await?;
-            let user_name = match &nickname_row.name {
-                Some(name) => Cow::Borrowed(name),
-                None => match guild_id.member(ctx, m.id).await?.nick {
-                    Some(nick) => Cow::Owned(nick),
-                    None => Cow::Borrowed(&m.name)
-                }
-            };
-
-            replaced_content.push_str(&content[last_match_end..capture.start()]);
-            replaced_content.push('@');
-            replaced_content.push_str(&user_name);
-
-            last_match_end = capture.end();
-        }
-    }
-
-    replaced_content.push_str(&content[last_match_end..]);
-    Ok(replaced_content)
-}
-
 fn parse_acronyms(original: &str) -> String {
     original.split(' ').map(|word|
         match word {
@@ -311,7 +268,8 @@ pub async fn run_checks(
         &serenity::ContentSafeOptions::default()
             .clean_here(false)
             .clean_everyone(false)
-            .clean_user(false), // Done later, in order to handle TTS Bot nicknames
+            .show_discriminator(false)
+            .display_as_member_from(guild_id),
         &message.mentions
     );
 
@@ -376,28 +334,27 @@ pub async fn run_checks(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn clean_msg(
+pub fn clean_msg(
     content: &str,
 
     user: &serenity::User,
-    ctx: &serenity::Context,
+    cache: &serenity::Cache,
     guild_id: serenity::GuildId,
     member_nick: Option<&str>,
     attachments: &[serenity::Attachment],
-    mentions: &[serenity::User],
 
     voice: &str,
     xsaid: bool,
     repeated_limit: usize,
-    nickname_db: &Handler<[i64; 2], NicknameRow>,
+    nickname: Option<&str>,
 
     regex_cache: &RegexCache,
     last_to_xsaid_tracker: &LastToXsaidTracker
-) -> Result<String> {
+) -> String {
     let (contained_url, mut content) = if content == "?" {
         (false, String::from("what"))
     } else {
-        let content = regex_cache.emoji.replace_all(content, |re_match: &regex::Captures<'_>| {
+        let mut content: String = regex_cache.emoji.replace_all(content, |re_match: &regex::Captures<'_>| {
             let is_animated = re_match.get(1).unwrap().as_str();
             let emoji_name = re_match.get(2).unwrap().as_str();
 
@@ -408,13 +365,12 @@ pub async fn clean_msg(
             };
 
             format!("{emoji_prefix} {emoji_name}")
-        });
-
-        let mut content = replace_user_mentions(regex_cache, nickname_db, ctx, &guild_id, mentions, &content).await?;
+        }).into_owned();
 
         for (regex, replacement) in &regex_cache.replacements {
             content = regex.replace_all(&content, *replacement).into_owned();
         };
+
 
         if voice.starts_with("en") {
             content = parse_acronyms(&content);
@@ -434,7 +390,7 @@ pub async fn clean_msg(
 
     if xsaid && match last_to_xsaid.map(|i| *i) {
         None => true,
-        Some((u_id, last_time)) => ctx.cache.guild(guild_id).map(|guild|
+        Some((u_id, last_time)) => cache.guild(guild_id).map(|guild|
             guild.voice_states.get(&user.id).and_then(|vs| vs.channel_id).map_or(true, |voice_channel_id|
                 (user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) &&
                     // If more than 2 users in vc
@@ -454,10 +410,7 @@ pub async fn clean_msg(
             ).unwrap();
         }
 
-        let nick_id = [guild_id.get() as i64, user.id.get() as i64];
-        let nick_row = nickname_db.get(nick_id).await?;
-
-        let said_name = nick_row.name.as_deref().unwrap_or_else(|| member_nick.unwrap_or(&user.name));
+        let said_name = nickname.unwrap_or_else(|| member_nick.unwrap_or(&user.name));
         content = match attachments_to_format(attachments) {
             Some(file_format) if content.is_empty() => format!("{said_name} sent {file_format}"),
             Some(file_format) => format!("{said_name} sent {file_format} and said {content}"),
@@ -478,7 +431,7 @@ pub async fn clean_msg(
         content = remove_repeated_chars(&content, repeated_limit);
     }
 
-    Ok(content)
+    content
 }
 
 

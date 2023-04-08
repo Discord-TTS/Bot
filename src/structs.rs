@@ -98,7 +98,6 @@ pub struct PatreonInfo {
 pub struct RegexCache {
     pub replacements: [(regex::Regex, &'static str); 3],
     pub id_in_brackets: regex::Regex,
-    pub user_mention: regex::Regex,
     pub emoji: regex::Regex,
 }
 
