@@ -75,3 +75,7 @@ branch = "next"
 
 [patch.crates-io]
 serenity = {git = "https://github.com/serenity-rs/serenity", branch = "next"}
+
+[patch."https://github.com/serenity-rs/songbird".songbird]
+git = "https://github.com/GnomedDev/songbird"
+branch = "fix-ws"
