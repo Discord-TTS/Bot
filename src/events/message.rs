@@ -19,7 +19,7 @@ pub async fn message(framework_ctx: FrameworkContext<'_>, ctx: &serenity::Contex
     Ok(())
 }
 
-
+#[allow(clippy::too_many_lines)]
 async fn process_tts_msg(
     ctx: &serenity::Context,
     message: &serenity::Message,
@@ -35,7 +35,11 @@ async fn process_tts_msg(
     let (voice, mode) = {
         if let Some(channel_id) = to_autojoin {
             let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-            data.songbird.join_vc(join_vc_lock.lock().await, channel_id).await?;
+            match data.songbird.join_vc(join_vc_lock.lock().await, channel_id).await {
+                Ok(call) => call,
+                Err(songbird::error::JoinError::TimedOut) => return Ok(()),
+                Err(err) => return Err(err.into()),
+            };
         }
 
         let is_ephemeral = message.flags.map_or(false, |f|
@@ -88,7 +92,11 @@ async fn process_tts_msg(
         };
 
         let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-        data.songbird.join_vc(join_vc_lock.lock().await, voice_channel_id).await?
+        match data.songbird.join_vc(join_vc_lock.lock().await, voice_channel_id).await {
+            Ok(call) => call,
+            Err(songbird::error::JoinError::TimedOut) => return Ok(()),
+            Err(err) => return Err(err.into())
+        }
     };
 
     // Pre-fetch the audio to handle max_length errors

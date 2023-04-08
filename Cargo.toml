@@ -6,7 +6,6 @@ edition = "2021"
 
 [profile.release]
 lto = "thin"
-debug = true
 
 [dependencies]
 serde = "1"
