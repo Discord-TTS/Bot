@@ -33,7 +33,7 @@ pub async fn dm(ctx: PrefixContext<'_>, todm: serenity::User, #[rest] message: S
     let attachment_url = ctx.msg.attachments.first().map(|a| a.url.clone());
     let (content, embed) = dm_generic(
         ctx.discord, &ctx.msg.author, todm.id, todm.tag(),
-        attachment_url, None, message
+        attachment_url, message
     ).await?;
 
     ctx.msg.channel_id.send_message(&ctx.discord.http, CreateMessage::default()

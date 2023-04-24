@@ -52,16 +52,11 @@ pub async fn dm_generic(
     target: serenity::UserId,
     mut target_tag: String,
     attachment_url: Option<String>,
-    field: Option<(String, String, bool)>,
     message: String,
 ) -> Result<(String, serenity::Embed)> {
     let dm_channel = target.create_dm_channel(ctx).await?;
     let sent = dm_channel.send_message(&ctx.http, CreateMessage::default().embed({
         let mut embed = CreateEmbed::default();
-        if let Some((name, value, inline)) = field {
-            embed = embed.field(name, value, inline);
-        }
-
         if let Some(url) = attachment_url {
             embed = embed.image(url);
         };

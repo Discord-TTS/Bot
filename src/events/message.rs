@@ -268,14 +268,14 @@ async fn process_support_response(
     channel: serenity::GuildChannel
 ) -> Result<()> {
     let reference = require!(&message.message_reference, Ok(()));
-    if ![data.webhooks.dm_logs.channel_id.try_unwrap()?, data.webhooks.suggestions.channel_id.try_unwrap()?].contains(&channel.id) {
+    if data.webhooks.dm_logs.channel_id.try_unwrap()? != channel.id {
         return Ok(());
     };
 
     let resolved_id = require!(reference.message_id, Ok(()));
-    let (resolved_author_name, resolved_author_discrim, resolved_content) = {
+    let (resolved_author_name, resolved_author_discrim) = {
         let message = ctx.http.get_message(channel.id, resolved_id).await?;
-        (message.author.name, message.author.discriminator, message.content)
+        (message.author.name, message.author.discriminator)
     };
 
     if resolved_author_discrim != 0000 {
@@ -292,13 +292,10 @@ async fn process_support_response(
     };
 
     let attachment_url = message.attachments.first().map(|a| a.url.clone());
-    let field = (channel.id == data.webhooks.suggestions.channel_id.try_unwrap()?).then(|| {
-        ("In response to your suggestion:".into(), resolved_content, false)
-    });
 
     let (content, embed) = dm_generic(
         ctx, &message.author, target, target_tag,
-        attachment_url, field, message.content.clone()
+        attachment_url, message.content.clone()
     ).await?;
 
     channel.send_message(ctx, CreateMessage::default()

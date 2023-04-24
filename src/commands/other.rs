@@ -13,18 +13,16 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::fmt::Write as _;
-
 use anyhow::Error;
 use sysinfo::{SystemExt, ProcessExt};
 use num_format::{Locale, ToFormattedString};
 
 use poise::{CreateReply, serenity_prelude::{self as serenity, builder::*, Mentionable as _}};
-use gnomeutils::{require, PoiseContextExt as _, OptionTryUnwrap as _};
+use gnomeutils::{PoiseContextExt as _, OptionTryUnwrap as _};
 
 use crate::constants::OPTION_SEPERATORS;
 use crate::traits::PoiseContextExt as _;
-use crate::funcs::{confirm_dialog, fetch_audio, prepare_url};
+use crate::funcs::{fetch_audio, prepare_url};
 use crate::structs::{ApplicationContext, Context, CommandResult, TTSMode, Command};
 
 /// Shows how long TTS Bot has been online
@@ -240,32 +238,19 @@ pub async fn ping(ctx: Context<'_>,) -> CommandResult {
 
 /// Suggests a new feature!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, ephemeral, required_bot_permissions="SEND_MESSAGES")]
-pub async fn suggest(ctx: Context<'_>, #[description="the suggestion to submit"] #[rest] suggestion: String) -> CommandResult {
-    let confirm_message = ctx
-        .gettext("Are you sure you want to make a suggestion to {bot_name}?")
-        .replace("{bot_name}", &ctx.discord().cache.current_user().name);
+#[allow(unused_variables)]
+pub async fn suggest(ctx: Context<'_>, #[rest] suggestion: String) -> CommandResult {
+    let (bot_name, face) = {
+        let user = ctx.discord().cache.current_user();
+        (user.name.clone(), user.face())
+    };
 
-    if !require!(confirm_dialog(ctx, &confirm_message, "Yes".into(), "Cancel".into()).await?, Ok(())) {
-        ctx.say(ctx.gettext("Suggestion cancelled")).await?;
-        return Ok(());
-    }
-
-    let data = ctx.data();
-    let author = ctx.author();
-    if !data.userinfo_db.get(author.id.into()).await?.dm_blocked {
-        data.webhooks.suggestions.execute(&ctx.discord().http, false, ExecuteWebhook::default()
-            .content(suggestion)
-            .avatar_url(author.face())
-            .username({
-                let mut tag = author.tag();
-                write!(tag, " ({})", author.id)?;
-                tag
-            })
-        ).await?;
-    }
-
-    ctx.say(ctx.gettext("Suggestion noted")).await?;
-    Ok(())
+    ctx.send(CreateReply::default().embed(CreateEmbed::default()
+        .colour(ctx.neutral_colour().await)
+        .author(CreateEmbedAuthor::new(bot_name).icon_url(face))
+        .title("`/suggest` has been removed due to spam and misuse.")
+        .description("If you want to suggest a new feature, use `/invite` and ask us in the support server!")
+    )).await.map(drop).map_err(Into::into)
 }
 
 /// Sends the instructions to invite TTS Bot and join the support server!

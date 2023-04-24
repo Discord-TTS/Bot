@@ -63,15 +63,14 @@ async fn get_webhooks(
         Ok(http.get_webhook_with_token(webhook_id, token).await?)
     };
 
-    let (logs, errors, servers, dm_logs, suggestions) = tokio::try_join!(
+    let (logs, errors, servers, dm_logs) = tokio::try_join!(
         get_webhook(webhooks_raw.logs),
         get_webhook(webhooks_raw.errors),
         get_webhook(webhooks_raw.servers),
         get_webhook(webhooks_raw.dm_logs),
-        get_webhook(webhooks_raw.suggestions),
     )?;
 
-    Ok(WebhookConfig{logs, servers, dm_logs, suggestions, errors: Some(errors)})
+    Ok(WebhookConfig{logs, servers, dm_logs, errors: Some(errors)})
 }
 
 fn main() -> Result<()> {
