@@ -13,7 +13,7 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::borrow::Cow;
+use std::{borrow::Cow, num::NonZeroU16};
 
 use songbird::error::JoinError;
 use sqlx::Row;
@@ -282,7 +282,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
 
     tracing::info!(
         "{}#{} | {} linked premium to {} | {}, they had {} linked servers",
-        author.name, author.discriminator, author.id, guild_name, guild_id, linked_guilds
+        author.name, author.discriminator.map_or(0, NonZeroU16::get), author.id, guild_name, guild_id, linked_guilds
     );
     Ok(())
 }

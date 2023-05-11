@@ -252,7 +252,7 @@ pub async fn run_checks(
             let member = guild_id.member(ctx, message.author.id).await?;
             let channel = require!(message.channel_id.to_channel(ctx).await?.guild(), Ok(None));
 
-            let author_permissions = require!(message.guild(&ctx.cache), Ok(None)).user_permissions_in(&channel, &member)?;
+            let author_permissions = require!(message.guild(&ctx.cache), Ok(None)).user_permissions_in(&channel, &member);
             if !author_permissions.administrator() {
                 return Ok(None)
             }

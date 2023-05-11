@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, num::NonZeroU16};
 
 use gnomeutils::{require, OptionTryUnwrap, serenity::{CreateMessage, ExecuteWebhook, Mentionable, CreateEmbed, CreateEmbedFooter}};
 use poise::serenity_prelude as serenity;
@@ -255,7 +255,7 @@ async fn process_support_dm(
             welcome_msg.pin(ctx).await?;
         }
 
-        info!("{}#{} just got the 'Welcome to support DMs' message", message.author.name, message.author.discriminator);
+        info!("{}#{} just got the 'Welcome to support DMs' message", message.author.name, message.author.discriminator.map_or(0, NonZeroU16::get));
     };
 
     Ok(())
@@ -278,7 +278,7 @@ async fn process_support_response(
         (message.author.name, message.author.discriminator)
     };
 
-    if resolved_author_discrim != 0000 {
+    if resolved_author_discrim.is_some() {
         return Ok(());
     }
 

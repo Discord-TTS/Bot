@@ -24,7 +24,7 @@
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
 #![allow(clippy::unreadable_literal, clippy::wildcard_imports, clippy::similar_names)]
 
-use std::{borrow::Cow, collections::BTreeMap, str::FromStr, sync::{Arc, atomic::AtomicBool}};
+use std::{borrow::Cow, collections::BTreeMap, str::FromStr, sync::{Arc, atomic::AtomicBool}, num::NonZeroU16};
 
 use anyhow::Ok;
 use sysinfo::SystemExt;
@@ -263,7 +263,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
                     let guild = require_guild!(ctx, Ok(false));
                     let channel = guild.channels.get(&ctx.channel_id()).try_unwrap()?;
 
-                    let permissions = guild.user_permissions_in(channel, &member)?;
+                    let permissions = guild.user_permissions_in(channel, &member);
                     Ok(permissions.administrator())
                 };
 
@@ -350,14 +350,14 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
                 Cow::Owned(format!(concat!(
                     "Hey, this server has a premium user setup, however they are not longer a patreon! ",
                     "Please ask {}#{} to renew their membership."
-                ), premium_user.name, premium_user.discriminator))
+                ), premium_user.name, premium_user.discriminator.map_or(0, NonZeroU16::get)))
             }
         };
 
     let author = ctx.author();
     warn!(
         "{}#{} | {} failed the premium check in {}",
-        author.name, author.discriminator, author.id,
+        author.name, author.discriminator.map_or(0, NonZeroU16::get), author.id,
         guild_id.and_then(|g_id| ctx_discord.cache.guild(g_id).map(|g| (
             Cow::Owned(format!("{} | {g_id}", g.name))
         ))).unwrap_or(Cow::Borrowed("DMs"))

@@ -944,9 +944,7 @@ fn can_send(guild: &serenity::Guild, channel: &serenity::GuildChannel, member: &
         serenity::Permissions::SEND_MESSAGES.bits() | serenity::Permissions::VIEW_CHANNEL.bits()
     );
 
-    guild.user_permissions_in(channel, member)
-        .map(|p| (REQUIRED_PERMISSIONS - p).is_empty())
-        .unwrap_or(false)
+    (REQUIRED_PERMISSIONS - guild.user_permissions_in(channel, member)).is_empty()
 }
 
 
@@ -1057,7 +1055,7 @@ Just do `/join` and start talking!
     )).await?;
 
     if let poise::Context::Application(_) = ctx &&
-        require_guild!(ctx).user_permissions_in(&channel, &bot_member)?.manage_webhooks() &&
+        require_guild!(ctx).user_permissions_in(&channel, &bot_member).manage_webhooks() &&
         confirm_dialog(ctx,
             ctx.gettext("Would you like to set up TTS Bot update announcements for the setup channel?"),
             ctx.gettext("Yes").into(),

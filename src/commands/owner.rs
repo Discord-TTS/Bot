@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::num::NonZeroU16;
 use std::sync::atomic::Ordering::SeqCst;
 
 use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
@@ -60,7 +61,7 @@ pub async fn add_premium(ctx: Context<'_>, guild: serenity::Guild, user: serenit
 
     ctx.say(format!(
         "Linked <@{}> ({}#{} | {}) to {}",
-        user.id, user.name, user.discriminator, user.id, guild.name
+        user.id, user.name, user.discriminator.map_or(0, NonZeroU16::get), user.id, guild.name
     )).await?;
     Ok(())
 }
