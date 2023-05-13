@@ -387,7 +387,7 @@ pub fn clean_msg(
         None => true,
         Some((u_id, last_time)) => cache.guild(guild_id).map(|guild|
             guild.voice_states.get(&user.id).and_then(|vs| vs.channel_id).map_or(true, |voice_channel_id|
-                (user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) &&
+                (user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > guild_row.xsaid_duration) &&
                     // If more than 2 users in vc
                     guild.voice_states.values()
                         .filter(|vs| vs.channel_id.map_or(false, |vc| vc == voice_channel_id))

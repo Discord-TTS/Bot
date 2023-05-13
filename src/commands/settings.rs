@@ -136,6 +136,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         false)
         .field("**TTS Settings**", &ctx.gettext("
 {sep2} <User> said: message: `{xsaid}`
+{sep2} xsaid duration (in seconds): `{xsaid_duration}`
 {sep2} Ignore bot's messages: `{bot_ignore}`
 {sep2} Ignore audience messages: `{audience_ignore}`
 {sep2} Require users in voice channel: `{require_voice}`
@@ -148,7 +149,8 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep2} Max Repeated Characters: `{repeated_chars}`
         ")
             .replace("{sep2}", sep2)
-            .replace("{xsaid}", &guild_row.xsaid.to_string())
+            .replace("{xsaid}", &guild_row.xsaid.to_string()),
+            .replace("{xsaid_duration}", &guild_row.xsaid.to_string()),
             .replace("{bot_ignore}", &guild_row.bot_ignore.to_string())
             .replace("{audience_ignore}", &guild_row.audience_ignore.to_string())
             .replace("{require_voice}", &guild_row.require_voice.to_string())
@@ -336,6 +338,40 @@ async fn translation_languages_autocomplete(ctx: ApplicationContext<'_>, searchi
     filtered_languages
 }
 
+async fn time_button(ctx: Context<'_>, value: Option<String>) -> Result<Option<u64>, Error> {
+    let duration = if let Some(duration_str) = value {
+        let regex = regex::Regex::new(r"(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?").unwrap();
+        let captures = regex.captures(duration_str).ok_or_else(|| Error::new("Invalid duration format."))?;
+
+        let hours = captures.get(1).map(|m| m.as_str().parse::<u64>().unwrap_or(0)).unwrap_or(0);
+        let minutes = captures.get(2).map(|m| m.as_str().parse::<u64>().unwrap_or(0)).unwrap_or(0);
+        let seconds = captures.get(3).map(|m| m.as_str().parse::<u64>().unwrap_or(0)).unwrap_or(0);
+
+        Ok(hours * 3600 + minutes * 60 + seconds)
+    } else {
+        let result = confirm_dialog(
+            ctx,
+            ctx.gettext("What duration would you like to set?"),
+            ctx.gettext("Cancel").into(),
+        ).await?;
+        
+        if let Some(duration_str) = result {
+            let regex = regex::Regex::new(r"(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?").unwrap();
+            let captures = regex.captures(duration_str).ok_or_else(|| Error::new("Invalid duration format."))?;
+
+            let hours = captures.get(1).map(|m| m.as_str().parse::<u64>().unwrap_or(0)).unwrap_or(0);
+            let minutes = captures.get(2).map(|m| m.as_str().parse::<u64>().unwrap_or(0)).unwrap_or(0);
+            let seconds = captures.get(3).map(|m| m.as_str().parse::<u64>().unwrap_or(0)).unwrap_or(0);
+
+            Ok(hours * 3600 + minutes * 60 + seconds)
+        } else {
+            Ok(None)
+        }
+    };
+
+    duration.map(Some)
+}
+
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
     if let Some(value) = value {
         Ok(Some(value))
@@ -347,6 +383,7 @@ async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<boo
         ).await
     }
 }
+
 
 
 enum Target {
@@ -518,12 +555,76 @@ pub async fn block(
     Ok(())
 }
 
+async fn generic_time_command(ctx: Context<'_>, key: &'static str, value: Option<u16>, resp: &'static str) -> CommandResult {
+    let value = require!(time_button(ctx, value).await?, Ok(()));
+
+    let formatted_resp = if let Some(value) = value {
+        if value >= 3600 {
+            let hours = value / 3600;
+            let minutes = (value % 3600) / 60;
+            let seconds = value % 60;
+            format!("{} hours, {} minutes, {} seconds", hours, minutes, seconds)
+        } else if value >= 60 {
+            let minutes = value / 60;
+            let seconds = value % 60;
+            format!("{} minutes, {} seconds", minutes, seconds)
+        } else {
+            format!("{} seconds", value)
+        }
+    } else {
+        "N/A".to_owned()
+    };
+
+    let resp = ctx.gettext(resp).replace("{}", &formatted_resp);
+
+    ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), key, &value).await?;
+    ctx.say(resp).await.map(drop).map_err(Into::into)
+}
+
 async fn generic_bool_command(ctx: Context<'_>, key: &'static str, value: Option<bool>, resp: &'static str) -> CommandResult {
     let value = require!(bool_button(ctx, value).await?, Ok(()));
     let resp = ctx.gettext(resp).replace("{}", to_enabled(ctx.current_catalog(), value));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), key, &value).await?;
     ctx.say(resp).await.map(drop).map_err(Into::into)
+}
+
+macro_rules! create_time_command {
+    (
+        $description:literal,
+        $value_desc:literal,
+        $name:ident,
+        $key:literal,
+        gettext($resp:literal),
+        aliases($( $aliases:literal ),*),
+        $($extra:tt)*
+    ) => {
+        pub fn $name() -> Command {
+            #[poise::command(prefix_command)]
+            pub async fn prefix_time(ctx: Context<'_> value: Option<u16>) -> CommandResult {
+                generic_time_command(ctx, $key, value, $resp).await
+            }
+
+            #[doc=#description]
+            #[poise::command(
+                category="Settings",
+                aliases($($aliases,)*),
+                guild_only, slash_command,
+                required_permissions="ADMINISTRATOR",
+                required_bot_permissions="SEND_MESSAGES",
+                $($extra)*
+            )]
+            pub async fn slash_time(ctx:: Context<'_>, #[description=$value_desc] value: u16) -> CommandResult {
+                generic_time_command(ctx, $key, Some(value), $resp).await
+            }
+
+            Command {
+                prefix_action: prefix_time().prefix_action,
+                name: String::from(stringify!($name)),
+                ..slash_time()
+            }
+        }
+    }
 }
 
 macro_rules! create_bool_command {
@@ -563,6 +664,13 @@ macro_rules! create_bool_command {
         }
     }
 }
+
+create_time_command!(
+    "How long to wait before saying \"<user> said\" if only a single person is typing",
+    "How long to wait before saying \"<user> said\" if only a single person is typing",  // idk what seprate description to put here
+    xsaid_duration, "duration",
+    gettext("xsaid will now wait {} before triggering."), aliases(),
+)
 
 create_bool_command!(
     "Makes the bot say \"<user> said\" before each message",

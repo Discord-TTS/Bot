@@ -245,6 +245,7 @@ msgstr ""
 #: src/commands/settings.rs:136
 msgid "\n"
 "{sep2} <User> said: message: `{xsaid}`\n"
+"{sep2} xsaid duration (in seconds): `{xsaid_duration}`\n"
 "{sep2} Ignore bot's messages: `{bot_ignore}`\n"
 "{sep2} Ignore audience messages: `{audience_ignore}`\n"
 "{sep2} Require users in voice channel: `{require_voice}`\n"

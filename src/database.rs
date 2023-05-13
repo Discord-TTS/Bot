@@ -64,6 +64,7 @@ pub struct GuildRow {
     pub premium_user: Option<i64>,
     pub required_role: Option<i64>,
     pub xsaid: bool,
+    pub xsaid_duration: u16,
     pub auto_join: bool,
     pub bot_ignore: bool,
     pub to_translate: bool,

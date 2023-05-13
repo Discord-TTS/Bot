@@ -55,6 +55,7 @@ pub const DB_SETUP_QUERY: &str = "
         premium_user    bigint,
         required_role   bigint,
         xsaid           bool        DEFAULT True,
+        xsaid_duration  u16         DEFAULT 60,
         bot_ignore      bool        DEFAULT True,
         auto_join       bool        DEFAULT False,
         to_translate    bool        DEFAULT False,
