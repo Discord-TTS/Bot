@@ -1,5 +1,5 @@
 FROM rustlang/rust:nightly as builder
-ENV RUSTFLAGS="-C target-cpu=haswell"
+ENV RUSTFLAGS="-C target-cpu=skylake"
 
 WORKDIR /bot
 
