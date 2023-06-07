@@ -32,7 +32,7 @@ generic-array = "0.14"
 [dependencies.symphonia]
 features = ["mp3", "ogg", "wav", "pcm"]
 default-features = false
-version = "0.5.2"
+version = "0.5.3"
 
 [dependencies.sqlx]
 version = "0.6"
