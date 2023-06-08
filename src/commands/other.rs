@@ -11,6 +11,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
 
+use std::{borrow::Cow, cmp::Ordering};
+
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::Error;
@@ -24,6 +26,11 @@ use crate::constants::OPTION_SEPERATORS;
 use crate::traits::PoiseContextExt as _;
 use crate::funcs::{fetch_audio, prepare_url};
 use crate::structs::{ApplicationContext, Context, CommandResult, TTSMode, Command};
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // Required for generic type
+fn cmp_float(a: &f64, b: &f64) -> Ordering {
+    a.partial_cmp(b).unwrap_or(Ordering::Less)
+}
 
 /// Shows how long TTS Bot has been online
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
@@ -128,9 +135,11 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
     let bot_user_id = ctx_discord.cache.current_user().id;
 
     let start_time = std::time::SystemTime::now();
+    let [sep1, sep2, sep3, ..] = OPTION_SEPERATORS;
 
+    let guild_ids = ctx_discord.cache.guilds();
     let (total_guild_count, total_voice_clients, total_members) = {
-        let guilds: Vec<_> = ctx_discord.cache.guilds().iter()
+        let guilds: Vec<_> = guild_ids.iter()
             .filter_map(|id| ctx_discord.cache.guild(id))
             .collect();
 
@@ -139,6 +148,31 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
             guilds.iter().filter(|g| g.voice_states.get(&bot_user_id).is_some()).count(),
             guilds.into_iter().map(|g| g.member_count).sum::<u64>().to_formatted_string(&Locale::en),
         )
+    };
+
+    #[allow(clippy::cast_precision_loss)]
+    let scheduler_stats = {
+        let scheduler = &*songbird::driver::DEFAULT_SCHEDULER;
+        if let Ok(stats) = scheduler.worker_thread_stats().await && !stats.is_empty() {
+            const NANOS_PER_MILLI: f64 = 1_000_000.0;
+            let compute_time_iter = stats.iter().map(|s| (s.last_compute_cost_ns() as f64) / NANOS_PER_MILLI);
+
+            // Unwraps are safe due to !stats.is_empty()
+            let min = compute_time_iter.clone().min_by(cmp_float).try_unwrap()?;
+            let max = compute_time_iter.clone().max_by(cmp_float).try_unwrap()?;
+            let avg = compute_time_iter.sum::<f64>() / (stats.len() as f64);
+
+            let mixer_use = (scheduler.live_tasks() as f64 / scheduler.total_tasks() as f64) * 100.0;
+
+            Cow::Owned(format!("
+With the songbird scheduler stats of
+{sep3} Minimum compute cost: {min}
+{sep3} Average compute cost: {avg}
+{sep3} Maximum compute cost: {max}
+{sep3} Mixer usage percentage: {mixer_use:.2}%"))
+        } else {
+            Cow::Borrowed("")
+        }
     };
 
     let shard_count = ctx_discord.cache.shard_count();
@@ -154,9 +188,7 @@ pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
         system_info.process(pid).unwrap().memory() / 1024 / 1024
     };
 
-    let [sep1, sep2, ..] = OPTION_SEPERATORS;
     let neutral_colour = ctx.neutral_colour().await;
-
     let (embed_title, embed_thumbnail) = {
         let current_user = ctx_discord.cache.current_user();
 
@@ -185,7 +217,7 @@ Currently in:
     {sep2} {total_guild_count} servers
 Currently using:
     {sep1} {shard_count} shards
-    {sep1} {ram_usage}MB of RAM
+    {sep1} {ram_usage}MB of RAM{scheduler_stats}
 and can be used by {total_members} people!")
             .replace("{sep1}", sep1)
             .replace("{sep2}", sep2)
@@ -194,6 +226,7 @@ and can be used by {total_members} people!")
             .replace("{total_members}", &total_members)
             .replace("{shard_count}", &shard_count.to_string())
             .replace("{ram_usage}", &format!("{ram_usage:.1}"))
+            .replace("{scheduler_stats}", &scheduler_stats)
     ))).await.map(drop).map_err(Into::into)
 }
 
