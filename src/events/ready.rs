@@ -11,7 +11,7 @@ pub async fn ready(framework_ctx: FrameworkContext<'_>, ctx: &serenity::Context,
     let data = framework_ctx.user_data;
 
     let user_name = &data_about_bot.user.name;
-    let last_shard = (ctx.shard_id + 1) == ctx.cache.shard_count();
+    let last_shard = (ctx.shard_id.0 + 1) == ctx.cache.shard_count();
     let status = generate_status(&*framework_ctx.shard_manager.lock().await.runners.lock().await);
 
     data.webhooks.logs.edit_message(&ctx.http, data.startup_message, serenity::EditWebhookMessage::default()

@@ -129,7 +129,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         .title(ctx.gettext("Joined your voice channel!"))
         .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
         .thumbnail(bot_face)
-        .author(CreateEmbedAuthor::new(member.display_name().into_owned())
+        .author(CreateEmbedAuthor::new(member.display_name())
             .icon_url(author.face())
         )
         .footer(CreateEmbedFooter::new(random_footer(
