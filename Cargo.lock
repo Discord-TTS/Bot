@@ -90,6 +90,9 @@ name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "async-trait"
@@ -2139,8 +2142,9 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.5"
-source = "git+https://github.com/mkrasnitski/serenity?branch=gateway-revert#959fee984e34b7b4db16aa8b5d7a47b0f532ff06"
+source = "git+https://github.com/mkrasnitski/serenity?branch=gateway-revert#627aad792f9e60058c8395b1281a17a22232823f"
 dependencies = [
+ "arrayvec",
  "async-trait",
  "base64 0.21.2",
  "bitflags",
