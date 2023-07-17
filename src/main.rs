@@ -45,7 +45,7 @@ mod macros;
 mod events;
 mod funcs;
 
-use constants::{PREMIUM_NEUTRAL_COLOUR};
+use constants::PREMIUM_NEUTRAL_COLOUR;
 use funcs::{prepare_gcloud_voices, get_translation_langs, decode_resp};
 use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, PollyVoice, WebhookConfigRaw, WebhookConfig, FailurePoint, DataInner};
 

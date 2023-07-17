@@ -362,6 +362,7 @@ impl From<TTSModeChoice> for TTSMode {
 #[derive(serde::Deserialize)]
 pub struct GoogleVoice {
     pub name: String,
+    #[serde(default)]
     pub ssmlGender: GoogleGender,
     pub languageCodes: [String; 1],
 }
@@ -376,11 +377,14 @@ pub struct PollyVoice {
     pub id: String,
 }
 
-#[derive(serde::Deserialize, IntoStaticStr, Copy, Clone)]
+#[derive(serde::Deserialize, IntoStaticStr, Copy, Clone, Default)]
 #[serde(rename_all="UPPERCASE")]
 pub enum GoogleGender {
     Male,
-    Female
+    Female,
+    #[serde(rename="SSML_VOICE_GENDER_UNSPECIFIED")]
+    #[default]
+    Unspecified,
 }
 
 #[derive(serde::Deserialize, IntoStaticStr, Copy, Clone)]

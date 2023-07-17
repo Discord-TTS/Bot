@@ -25,7 +25,7 @@ use gnomeutils::{require, require_guild, OptionGettext as _, PoiseContextExt as 
 
 use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice, Command, SpeakingRateInfo};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
-use crate::traits::{PoiseContextExt};
+use crate::traits::PoiseContextExt;
 use crate::funcs::{random_footer, confirm_dialog, current_user_id};
 use crate::database;
 
