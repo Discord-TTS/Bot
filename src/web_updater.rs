@@ -75,10 +75,10 @@ impl gnomeutils::Looper for Updater {
                     event = 'gCloud_tts' OR
                     event = 'Polly_tts'
                 )
-            ").fetch_all(&mut db_conn).await?.into_iter().map(|r| r.count as i64).sum::<i64>();
+            ").fetch_all(&mut *db_conn).await?.into_iter().map(|r| r.count as i64).sum::<i64>();
 
             let premium_guild_ids = sqlx::query_as::<_, PremiumGuildsQueryResult>("SELECT guild_id FROM guilds WHERE premium_user = ANY($1)")
-                .bind(&patreon_members).fetch_all(&mut db_conn).await?
+                .bind(&patreon_members).fetch_all(&mut *db_conn).await?
                 .into_iter().map(|g| g.guild_id).collect::<HashSet<_>>();
 
             (message_count, premium_guild_ids)
