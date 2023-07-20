@@ -16,9 +16,10 @@
 
 #[macro_export]
 macro_rules! async_try {
-    ($inner:block) => {async {$inner}.await};
+    ($inner:block) => {
+        async { $inner }.await
+    };
 }
-
 
 #[macro_export]
 macro_rules! into_static_display {

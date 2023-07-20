@@ -18,12 +18,15 @@ use std::{borrow::Cow, num::NonZeroU16};
 use songbird::error::JoinError;
 use sqlx::Row;
 
-use poise::{CreateReply, serenity_prelude::{self as serenity, builder::*}};
-use gnomeutils::{PoiseContextExt as _, require, require_guild};
+use gnomeutils::{require, require_guild, PoiseContextExt as _};
+use poise::{
+    serenity_prelude::{self as serenity, builder::*},
+    CreateReply,
+};
 
-use crate::structs::{Context, Result, CommandResult, TTSMode, JoinVCToken, Command};
-use crate::traits::{SongbirdManagerExt, PoiseContextExt};
 use crate::funcs::random_footer;
+use crate::structs::{Command, CommandResult, Context, JoinVCToken, Result, TTSMode};
+use crate::traits::{PoiseContextExt, SongbirdManagerExt};
 
 async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>) -> Result<bool> {
     let guild_id = ctx.guild_id().unwrap();
@@ -35,27 +38,34 @@ async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>
     } else {
         ctx.send_error(
             ctx.gettext("you ran this command in the wrong channel"),
-            Some(ctx.gettext("do `/channel` get the channel that has been setup"))
-        ).await?;
+            Some(ctx.gettext("do `/channel` get the channel that has been setup")),
+        )
+        .await?;
         Ok(false)
     }
 }
 
-
 /// Joins the voice channel you're in!
 #[poise::command(
-    category="Main Commands",
-    guild_only, prefix_command, slash_command,
+    category = "Main Commands",
+    guild_only,
+    prefix_command,
+    slash_command,
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
-    let author_vc = require!(ctx.author_vc(), ctx.send_error(
-        ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
-        Some(ctx.gettext("join a voice channel and try again")),
-    ).await.map(drop));
+    let author_vc = require!(
+        ctx.author_vc(),
+        ctx.send_error(
+            ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
+            Some(ctx.gettext("join a voice channel and try again")),
+        )
+        .await
+        .map(drop)
+    );
 
     if !channel_check(&ctx, Some(author_vc)).await? {
-        return Ok(())
+        return Ok(());
     }
 
     let ctx_discord = ctx.discord();
@@ -68,10 +78,14 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let bot_member = guild_id.member(ctx_discord, bot_id).await?;
     if let Some(communication_disabled_until) = bot_member.communication_disabled_until {
         if communication_disabled_until > serenity::Timestamp::now() {
-            return ctx.send_error(
-                ctx.gettext("I am timed out"),
-                Some(ctx.gettext("ask a moderator to remove the timeout"))
-            ).await.map(drop).map_err(Into::into)
+            return ctx
+                .send_error(
+                    ctx.gettext("I am timed out"),
+                    Some(ctx.gettext("ask a moderator to remove the timeout")),
+                )
+                .await
+                .map(drop)
+                .map_err(Into::into);
         }
     }
 
@@ -79,18 +93,26 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let member = guild_id.member(ctx_discord, author.id).await?;
     let channel = author_vc.to_channel(ctx_discord).await?.guild().unwrap();
 
-    let missing_permissions =
-        (serenity::Permissions::VIEW_CHANNEL | serenity::Permissions::CONNECT | serenity::Permissions::SPEAK) -
-        channel.permissions_for_user(ctx_discord, bot_id)?;
+    let missing_permissions = (serenity::Permissions::VIEW_CHANNEL
+        | serenity::Permissions::CONNECT
+        | serenity::Permissions::SPEAK)
+        - channel.permissions_for_user(ctx_discord, bot_id)?;
 
     if !missing_permissions.is_empty() {
-        return ctx.send_error(
-            ctx.gettext("I do not have permissions to TTS in your voice channel"),
-            Some(&ctx
-                .gettext("please ask an administrator to give me: {missing_permissions}")
-                .replace("{missing_permissions}", &missing_permissions.get_permission_names().join(", "))
+        return ctx
+            .send_error(
+                ctx.gettext("I do not have permissions to TTS in your voice channel"),
+                Some(
+                    &ctx.gettext("please ask an administrator to give me: {missing_permissions}")
+                        .replace(
+                            "{missing_permissions}",
+                            &missing_permissions.get_permission_names().join(", "),
+                        ),
+                ),
             )
-        ).await.map(drop).map_err(Into::into)
+            .await
+            .map(drop)
+            .map_err(Into::into);
     }
 
     let data = ctx.data();
@@ -98,11 +120,16 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
             if bot_channel_id.0 == author_vc.0 {
-                ctx.say(ctx.gettext("I am already in your voice channel!")).await?;
+                ctx.say(ctx.gettext("I am already in your voice channel!"))
+                    .await?;
                 return Ok(());
             };
 
-            ctx.say(ctx.gettext("I am already in <#{channel_id}>!").replace("{channel_id}", &bot_channel_id.0.to_string())).await?;
+            ctx.say(
+                ctx.gettext("I am already in <#{channel_id}>!")
+                    .replace("{channel_id}", &bot_channel_id.0.to_string()),
+            )
+            .await?;
             return Ok(());
         }
     };
@@ -111,37 +138,51 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         let _typing = ctx.defer_or_broadcast().await?;
 
         let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-        let join_vc_result = data.songbird.join_vc(join_vc_lock.lock().await, author_vc).await;
+        let join_vc_result = data
+            .songbird
+            .join_vc(join_vc_lock.lock().await, author_vc)
+            .await;
 
         if let Err(err) = join_vc_result {
             return if let JoinError::TimedOut = err {
                 ctx.send_error(
                     ctx.gettext("a timeout occurred while joining your voice channel"),
-                    Some(ctx.gettext("wait a few seconds and try again"))
-                ).await.map(drop).map_err(Into::into)
+                    Some(ctx.gettext("wait a few seconds and try again")),
+                )
+                .await
+                .map(drop)
+                .map_err(Into::into)
             } else {
                 Err(err.into())
-            }
+            };
         };
     }
 
-    ctx.send(poise::CreateReply::default().embed(serenity::CreateEmbed::default()
-        .title(ctx.gettext("Joined your voice channel!"))
-        .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
-        .thumbnail(bot_face)
-        .author(CreateEmbedAuthor::new(member.display_name())
-            .icon_url(author.face())
-        )
-        .footer(CreateEmbedFooter::new(random_footer(
-            &data.config.main_server_invite, bot_id, ctx.current_catalog()
-        )))
-    )).await.map(drop).map_err(Into::into)
+    ctx.send(
+        poise::CreateReply::default().embed(
+            serenity::CreateEmbed::default()
+                .title(ctx.gettext("Joined your voice channel!"))
+                .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
+                .thumbnail(bot_face)
+                .author(CreateEmbedAuthor::new(member.display_name()).icon_url(author.face()))
+                .footer(CreateEmbedFooter::new(random_footer(
+                    &data.config.main_server_invite,
+                    bot_id,
+                    ctx.current_catalog(),
+                ))),
+        ),
+    )
+    .await
+    .map(drop)
+    .map_err(Into::into)
 }
 
 /// Leaves voice channel TTS Bot is in!
 #[poise::command(
-    category="Main Commands",
-    guild_only, prefix_command, slash_command,
+    category = "Main Commands",
+    guild_only,
+    prefix_command,
+    slash_command,
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
@@ -166,9 +207,11 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
 
     if let Some(bot_vc) = bot_vc {
         if !channel_check(&ctx, author_vc).await? {
-
         } else if author_vc.map_or(true, |author_vc| bot_vc.0 != author_vc.0) {
-            ctx.say(ctx.gettext("Error: You need to be in the same voice channel as me to make me leave!")).await?;
+            ctx.say(ctx.gettext(
+                "Error: You need to be in the same voice channel as me to make me leave!",
+            ))
+            .await?;
         } else {
             data.songbird.remove(guild_id).await?;
             data.last_to_xsaid_tracker.remove(&guild_id);
@@ -176,7 +219,8 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
             ctx.say(ctx.gettext("Left voice channel!")).await?;
         }
     } else {
-        ctx.say(ctx.gettext("Error: How do I leave a voice channel if I am not in one?")).await?;
+        ctx.say(ctx.gettext("Error: How do I leave a voice channel if I am not in one?"))
+            .await?;
     }
 
     Ok(())
@@ -185,13 +229,15 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
 /// Clears the message queue!
 #[poise::command(
     aliases("skip"),
-    category="Main Commands",
-    guild_only, prefix_command, slash_command,
+    category = "Main Commands",
+    guild_only,
+    prefix_command,
+    slash_command,
     required_bot_permissions = "SEND_MESSAGES | ADD_REACTIONS"
 )]
 pub async fn clear(ctx: Context<'_>) -> CommandResult {
     if !channel_check(&ctx, ctx.author_vc()).await? {
-        return Ok(())
+        return Ok(());
     }
 
     let guild_id = ctx.guild_id().unwrap();
@@ -209,7 +255,8 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
             }
         }
     } else {
-        ctx.say(ctx.gettext("**Error**: I am not in a voice channel!")).await?;
+        ctx.say(ctx.gettext("**Error**: I am not in a voice channel!"))
+            .await?;
     };
 
     Ok(())
@@ -217,8 +264,10 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
 
 /// Activates a server for TTS Bot Premium!
 #[poise::command(
-    category="Main Commands",
-    guild_only, prefix_command, slash_command,
+    category = "Main Commands",
+    guild_only,
+    prefix_command,
+    slash_command,
     aliases("activate"),
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
@@ -227,7 +276,11 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
 
     if data.premium_check(Some(guild_id)).await?.is_none() {
-        return ctx.say(ctx.gettext("Hey, this server is already premium!")).await.map(drop).map_err(Into::into)
+        return ctx
+            .say(ctx.gettext("Hey, this server is already premium!"))
+            .await
+            .map(drop)
+            .map_err(Into::into);
     }
 
     let author = ctx.author();
@@ -236,7 +289,8 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let linked_guilds: i64 = sqlx::query("SELECT count(*) FROM guilds WHERE premium_user = $1")
         .bind(author_id)
         .fetch_one(&data.inner.pool)
-        .await?.get("count");
+        .await?
+        .get("count");
 
     let error_msg = match data.fetch_patreon_info(author.id).await? {
         Some(tier) => {
@@ -249,8 +303,10 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
             } else {
                 None
             }
-        },
-        None => Some(Cow::Borrowed(ctx.gettext("Hey, I don't think you are subscribed on Patreon!")))
+        }
+        None => Some(Cow::Borrowed(
+            ctx.gettext("Hey, I don't think you are subscribed on Patreon!"),
+        )),
     };
 
     if let Some(error_msg) = error_msg {
@@ -268,21 +324,31 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
                 concat.push_str(line2);
                 concat
             }))
-        )).await.map(drop).map_err(Into::into)
+        )).await.map(drop).map_err(Into::into);
     }
 
     data.userinfo_db.create_row(author_id).await?;
-    data.guilds_db.set_one(guild_id.into(), "premium_user", &author_id).await?;
-    data.guilds_db.set_one(guild_id.into(), "voice_mode", &TTSMode::gCloud).await?;
+    data.guilds_db
+        .set_one(guild_id.into(), "premium_user", &author_id)
+        .await?;
+    data.guilds_db
+        .set_one(guild_id.into(), "voice_mode", &TTSMode::gCloud)
+        .await?;
 
-    ctx.say(ctx.gettext("Done! This server is now premium!")).await?;
+    ctx.say(ctx.gettext("Done! This server is now premium!"))
+        .await?;
 
     let guild = ctx.discord().cache.guild(guild_id);
     let guild_name = guild.as_ref().map_or("<Unknown>", |g| g.name.as_str());
 
     tracing::info!(
         "{}#{} | {} linked premium to {} | {}, they had {} linked servers",
-        author.name, author.discriminator.map_or(0, NonZeroU16::get), author.id, guild_name, guild_id, linked_guilds
+        author.name,
+        author.discriminator.map_or(0, NonZeroU16::get),
+        author.id,
+        guild_name,
+        guild_id,
+        linked_guilds
     );
     Ok(())
 }

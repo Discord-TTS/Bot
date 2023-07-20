@@ -14,21 +14,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::structs::{Context, Command, CommandResult};
+use crate::structs::{Command, CommandResult, Context};
 use crate::traits::PoiseContextExt;
 
-/// Shows TTS Bot's commands and descriptions of them 
+/// Shows TTS Bot's commands and descriptions of them
 #[poise::command(
-    prefix_command, slash_command,
+    prefix_command,
+    slash_command,
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn help(
     ctx: Context<'_>,
-    #[rest] #[description="The command to get help with"] #[autocomplete="gnomeutils::help::autocomplete"] command: Option<String>
+    #[rest]
+    #[description = "The command to get help with"]
+    #[autocomplete = "gnomeutils::help::autocomplete"]
+    command: Option<String>,
 ) -> CommandResult {
     gnomeutils::help::command(ctx, command.as_deref(), ctx.neutral_colour().await).await
 }
-
 
 pub fn commands() -> [Command; 1] {
     [help()]

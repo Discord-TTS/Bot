@@ -1,29 +1,40 @@
 services:
     bot:
-        image: Discord-TTS/Bot
+        image: tts-bot:latest
         volumes:
           - type: bind
             source: ./config.toml
             target: /config.toml
-
         depends_on: [database, tts-service]
         network_mode: "host"
     database:
         image: postgres:13
         ports: [5432:5432]
         environment: 
-            POSTGRES_USER: tts
-            POSTGRES_PASSWORD: tts_password
+          -  POSTGRES_USER: tts
+          -  POSTGRES_PASSWORD: tts_password
+    cache:
+        image: redis:6.2-alpine
+        restart: always
+        ports:
+          - '6379:6379'
+        command: redis-server --save 20 1 --loglevel warning --requirepass lolpassword
+        volumes: 
+          - cache:/data
     tts-service:
-        image: gnomeddev/tts-service
+        image: tts-service:latest
         volumes:
           - type: bind
             source: ${GOOGLE_APPLICATION_CREDENTIALS}
             target: /gcp.json
         environment:
-          -  IPV6_BLOCK
-          -  LOG_LEVEL=INFO
-          -  BIND_ADDR=0.0.0.0:20310
-          -  GOOGLE_APPLICATION_CREDENTIALS=/gcp.json
+          -  IPV6_BLOCK: DISABLE
+          -  LOG_LEVEL: DEBUG
+          -  BIND_ADDR: 0.0.0.0:20310
+          -  GOOGLE_APPLICATION_CREDENTIALS: /gcp.json
+          -  REDIS_HOST: cache
+          -  REDIS_PORT: 6379
+          -  REDIS_PASSWORD: lolpassword
         network_mode: "host"
         expose: [20310]
+        depends_on: [cache]

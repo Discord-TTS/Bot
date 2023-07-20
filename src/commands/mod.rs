@@ -16,14 +16,15 @@
 
 use crate::structs::Command;
 
-mod main;
 mod help;
+mod main;
 mod other;
 mod owner;
 mod settings;
 
 pub fn commands() -> Vec<Command> {
-    main::commands().into_iter()
+    main::commands()
+        .into_iter()
         .chain(other::commands())
         .chain(settings::commands())
         .chain(owner::commands())

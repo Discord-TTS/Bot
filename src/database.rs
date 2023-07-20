@@ -56,7 +56,6 @@ impl CacheKeyTrait for (i64, TTSMode) {
     }
 }
 
-
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, sqlx::FromRow)]
 pub struct GuildRow {
@@ -105,10 +104,9 @@ pub struct NicknameRow {
     pub name: Option<String>,
 }
 
-
 pub struct Handler<
     CacheKey: CacheKeyTrait + std::cmp::Eq + std::hash::Hash,
-    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>
+    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>,
 > {
     pool: sqlx::PgPool,
     cache: DashMap<CacheKey, Arc<RowT>>,
@@ -136,14 +134,28 @@ where
         Ok(Self {
             cache: DashMap::new(),
             query_cache: DashMap::new(),
-            default_row: Self::_get(&pool, CacheKey::default(), select).await?.expect("Default row not in table!"),
-            pool, select, delete, create_row, single_insert,
+            default_row: Self::_get(&pool, CacheKey::default(), select)
+                .await?
+                .expect("Default row not in table!"),
+            pool,
+            select,
+            delete,
+            create_row,
+            single_insert,
         })
     }
 
-    async fn _get(pool: &sqlx::PgPool, key: CacheKey, select: &'static str) -> Result<Option<Arc<RowT>>> {
+    async fn _get(
+        pool: &sqlx::PgPool,
+        key: CacheKey,
+        select: &'static str,
+    ) -> Result<Option<Arc<RowT>>> {
         let query = key.bind_query_as(sqlx::query_as(select));
-        query.fetch_optional(pool).await.map(|r| r.map(Arc::new)).map_err(Into::into)
+        query
+            .fetch_optional(pool)
+            .await
+            .map(|r| r.map(Arc::new))
+            .map_err(Into::into)
     }
 
     pub async fn get(&self, identifier: CacheKey) -> Result<Arc<RowT>> {
@@ -151,19 +163,19 @@ where
             return Ok(row.clone());
         }
 
-        let row = Self::_get(&self.pool, identifier, self.select).await?.unwrap_or_else(|| self.default_row.clone());
+        let row = Self::_get(&self.pool, identifier, self.select)
+            .await?
+            .unwrap_or_else(|| self.default_row.clone());
 
         self.cache.insert(identifier, row.clone());
         Ok(row)
     }
 
-    pub async fn create_row(
-        &self,
-        identifier: CacheKey
-    ) -> Result<()> {
+    pub async fn create_row(&self, identifier: CacheKey) -> Result<()> {
         identifier
             .bind_query(sqlx::query(self.create_row))
-            .execute(&self.pool).await?;
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }
@@ -175,16 +187,20 @@ where
         value: impl sqlx::Type<sqlx::Postgres> + sqlx::Encode<'a, sqlx::Postgres> + Sync + Send + 'a,
     ) -> Result<()> {
         let query_raw = *self.query_cache.entry(key).or_insert_with(|| {
-            Box::leak(Box::new(strfmt::strfmt(
-                self.single_insert,
-                &HashMap::from_iter([(String::from("key"), key)])
-            ).unwrap()))
+            Box::leak(Box::new(
+                strfmt::strfmt(
+                    self.single_insert,
+                    &HashMap::from_iter([(String::from("key"), key)]),
+                )
+                .unwrap(),
+            ))
         });
 
         identifier
             .bind_query(sqlx::query(query_raw))
             .bind(value)
-            .execute(&self.pool).await?;
+            .execute(&self.pool)
+            .await?;
 
         self.cache.remove(&identifier);
         Ok(())
@@ -193,7 +209,8 @@ where
     pub async fn delete(&self, identifier: CacheKey) -> Result<()> {
         identifier
             .bind_query(sqlx::query(self.delete))
-            .execute(&self.pool).await?;
+            .execute(&self.pool)
+            .await?;
 
         self.cache.remove(&identifier);
         Ok(())
@@ -210,17 +227,22 @@ macro_rules! create_db_handler {
         const TABLE_NAME: &str = $table_name;
         const ID_NAME: &str = $id_name;
 
-        database::Handler::new($pool,
+        database::Handler::new(
+            $pool,
             const_format::formatcp!("SELECT * FROM {TABLE_NAME} WHERE {ID_NAME} = $1"),
             const_format::formatcp!("DELETE FROM {TABLE_NAME} WHERE {ID_NAME} = $1"),
-            const_format::formatcp!("
+            const_format::formatcp!(
+                "
                 INSERT INTO {TABLE_NAME}({ID_NAME}) VALUES ($1)
                 ON CONFLICT ({ID_NAME}) DO NOTHING
-            "),
-            const_format::formatcp!("
+            "
+            ),
+            const_format::formatcp!(
+                "
                 INSERT INTO {TABLE_NAME}({ID_NAME}, {{key}}) VALUES ($1, $2)
                 ON CONFLICT ({ID_NAME}) DO UPDATE SET {{key}} = $2
-            ")
+            "
+            ),
         )
     }};
     ($pool:expr, $table_name:literal, $id_name1:literal, $id_name2:literal) => {{
@@ -228,17 +250,26 @@ macro_rules! create_db_handler {
         const ID_NAME1: &str = $id_name1;
         const ID_NAME2: &str = $id_name2;
 
-        database::Handler::new($pool,
-            const_format::formatcp!("SELECT * FROM {TABLE_NAME} WHERE {ID_NAME1} = $1 AND {ID_NAME2} = $2"),
-            const_format::formatcp!("DELETE FROM {TABLE_NAME} WHERE {ID_NAME1} = $1 AND {ID_NAME2} = $2"),
-            const_format::formatcp!("
+        database::Handler::new(
+            $pool,
+            const_format::formatcp!(
+                "SELECT * FROM {TABLE_NAME} WHERE {ID_NAME1} = $1 AND {ID_NAME2} = $2"
+            ),
+            const_format::formatcp!(
+                "DELETE FROM {TABLE_NAME} WHERE {ID_NAME1} = $1 AND {ID_NAME2} = $2"
+            ),
+            const_format::formatcp!(
+                "
                 INSERT INTO {TABLE_NAME}({ID_NAME1}, {ID_NAME2}) VALUES ($1, $2)
                 ON CONFLICT ({ID_NAME1}, {ID_NAME2}) DO NOTHING
-            "),
-            const_format::formatcp!("
+            "
+            ),
+            const_format::formatcp!(
+                "
                 INSERT INTO {TABLE_NAME}({ID_NAME1}, {ID_NAME2}, {{key}}) VALUES ($1, $2, $3)
                 ON CONFLICT ({ID_NAME1}, {ID_NAME2}) DO UPDATE SET {{key}} = $3
-            ")
+            "
+            ),
         )
     }};
 }

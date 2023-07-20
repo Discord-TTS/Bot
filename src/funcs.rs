@@ -15,19 +15,22 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::borrow::Cow;
-use std::fmt::Write;
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write;
 
 use itertools::Itertools as _;
 use rand::Rng as _;
 
-use poise::serenity_prelude as serenity;
 use gnomeutils::{OptionGettext, OptionTryUnwrap};
-use serenity::{json::prelude as json, builder::*};
+use poise::serenity_prelude as serenity;
+use serenity::{builder::*, json::prelude as json};
 
 use crate::database::GuildRow;
-use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError, RegexCache};
 use crate::require;
+use crate::structs::{
+    Context, Data, Error, GoogleGender, GoogleVoice, LastToXsaidTracker, RegexCache, Result,
+    TTSMode, TTSServiceError,
+};
 
 pub fn current_user_id(cache: &serenity::Cache) -> serenity::UserId {
     cache.current_user().id
@@ -38,7 +41,8 @@ pub async fn decode_resp<T: serde::de::DeserializeOwned>(resp: reqwest::Response
 }
 
 pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
-    let mut status: Vec<_> = shards.iter()
+    let mut status: Vec<_> = shards
+        .iter()
         .map(|(id, shard)| (id, format!("Shard {id}: `{}`", shard.stage)))
         .collect();
 
@@ -55,50 +59,64 @@ pub async fn dm_generic(
     message: String,
 ) -> Result<(String, serenity::Embed)> {
     let dm_channel = target.create_dm_channel(ctx).await?;
-    let sent = dm_channel.send_message(&ctx.http, CreateMessage::default().embed({
-        let mut embed = CreateEmbed::default();
-        if let Some(url) = attachment_url {
-            embed = embed.image(url);
-        };
+    let sent = dm_channel
+        .send_message(
+            &ctx.http,
+            CreateMessage::default().embed({
+                let mut embed = CreateEmbed::default();
+                if let Some(url) = attachment_url {
+                    embed = embed.image(url);
+                };
 
-        embed
-            .title("Message from the developers:")
-            .description(message)
-            .author(CreateEmbedAuthor::new(author.tag())
-                .icon_url(author.face())
-            )
-    })).await?;
+                embed
+                    .title("Message from the developers:")
+                    .description(message)
+                    .author(CreateEmbedAuthor::new(author.tag()).icon_url(author.face()))
+            }),
+        )
+        .await?;
 
     target_tag.insert_str(0, "Sent message to: ");
     Ok((target_tag, sent.embeds.into_iter().next().unwrap()))
 }
 
-pub async fn fetch_audio(reqwest: &reqwest::Client, url: reqwest::Url, auth_key: Option<&str>) -> Result<Option<reqwest::Response>> {
+pub async fn fetch_audio(
+    reqwest: &reqwest::Client,
+    url: reqwest::Url,
+    auth_key: Option<&str>,
+) -> Result<Option<reqwest::Response>> {
     let resp = reqwest
         .get(url)
         .header(reqwest::header::AUTHORIZATION, auth_key.unwrap_or(""))
-        .send().await?;
+        .send()
+        .await?;
 
     match resp.error_for_status_ref() {
         Ok(_) => Ok(Some(resp)),
-        Err(backup_err) => {
-            match decode_resp::<TTSServiceError>(resp).await {
-                Ok(err) => {
-                    if err.code.should_ignore() {
-                        Ok(None)
-                    } else {
-                        Err(anyhow::anyhow!("Error fetching audio: {}", err.display))
-                    }
+        Err(backup_err) => match decode_resp::<TTSServiceError>(resp).await {
+            Ok(err) => {
+                if err.code.should_ignore() {
+                    Ok(None)
+                } else {
+                    Err(anyhow::anyhow!("Error fetching audio: {}", err.display))
                 }
-                Err(_) => Err(backup_err.into())
             }
-        }
+            Err(_) => Err(backup_err.into()),
+        },
     }
 }
 
-pub fn prepare_url(mut tts_service: reqwest::Url, content: &str, lang: &str, mode: TTSMode, speaking_rate: &str, max_length: &str) -> reqwest::Url {
+pub fn prepare_url(
+    mut tts_service: reqwest::Url,
+    content: &str,
+    lang: &str,
+    mode: TTSMode,
+    speaking_rate: &str,
+    max_length: &str,
+) -> reqwest::Url {
     tts_service.set_path("tts");
-    tts_service.query_pairs_mut()
+    tts_service
+        .query_pairs_mut()
         .append_pair("text", content)
         .append_pair("lang", lang)
         .append_pair("mode", mode.into())
@@ -110,7 +128,11 @@ pub fn prepare_url(mut tts_service: reqwest::Url, content: &str, lang: &str, mod
 }
 
 #[allow(clippy::similar_names)]
-pub async fn get_translation_langs(reqwest: &reqwest::Client, url: &reqwest::Url, token: &str) -> Result<BTreeMap<String, String>> {
+pub async fn get_translation_langs(
+    reqwest: &reqwest::Client,
+    url: &reqwest::Url,
+    token: &str,
+) -> Result<BTreeMap<String, String>> {
     #[derive(serde::Deserialize)]
     pub struct DeeplVoice<'a> {
         pub name: String,
@@ -123,28 +145,38 @@ pub async fn get_translation_langs(reqwest: &reqwest::Client, url: &reqwest::Url
         kind: &'static str,
     }
 
-    let request = DeeplVoiceRequest{
-        kind: "target",
-    };
+    let request = DeeplVoiceRequest { kind: "target" };
 
     let mut resp = reqwest
-        .get(format!("{url}/languages")).query(&request)
+        .get(format!("{url}/languages"))
+        .query(&request)
         .header("Authorization", format!("DeepL-Auth-Key {token}"))
-        .send().await?.error_for_status()?
-        .bytes().await?.to_vec();
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?
+        .to_vec();
 
     let languages: Vec<DeeplVoice<'_>> = json::from_slice(&mut resp)?;
 
-    Ok(languages.into_iter().map(|v| (v.language.to_lowercase(), v.name)).collect())
+    Ok(languages
+        .into_iter()
+        .map(|v| (v.language.to_lowercase(), v.name))
+        .collect())
 }
 
-pub fn prepare_gcloud_voices(raw_map: Vec<GoogleVoice>) -> BTreeMap<String, BTreeMap<String, GoogleGender>> {
+pub fn prepare_gcloud_voices(
+    raw_map: Vec<GoogleVoice>,
+) -> BTreeMap<String, BTreeMap<String, GoogleGender>> {
     // {lang_accent: {variant: gender}}
     let mut cleaned_map = BTreeMap::new();
     for gvoice in raw_map {
-        let variant = gvoice.name
-            .splitn(3, '-').nth(2)
-            .and_then(|mode_variant| {mode_variant.split_once('-')})
+        let variant = gvoice
+            .name
+            .splitn(3, '-')
+            .nth(2)
+            .and_then(|mode_variant| mode_variant.split_once('-'))
             .filter(|(mode, _)| *mode == "Standard")
             .map(|(_, variant)| variant);
 
@@ -160,7 +192,11 @@ pub fn prepare_gcloud_voices(raw_map: Vec<GoogleVoice>) -> BTreeMap<String, BTre
     cleaned_map
 }
 
-pub fn random_footer<'a>(server_invite: &str, client_id: serenity::UserId, catalog: Option<&'a gettext::Catalog>) -> Cow<'a, str> {
+pub fn random_footer<'a>(
+    server_invite: &str,
+    client_id: serenity::UserId,
+    catalog: Option<&'a gettext::Catalog>,
+) -> Cow<'a, str> {
     match rand::thread_rng().gen_range(0..4) {
         0 => Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
         1 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
@@ -171,8 +207,9 @@ pub fn random_footer<'a>(server_invite: &str, client_id: serenity::UserId, catal
 }
 
 fn parse_acronyms(original: &str) -> String {
-    original.split(' ').map(|word|
-        match word {
+    original
+        .split(' ')
+        .map(|word| match word {
             "iirc" => "if I recall correctly",
             "afaik" => "as far as I know",
             "wdym" => "what do you mean",
@@ -194,8 +231,8 @@ fn parse_acronyms(original: &str) -> String {
             "@" => "at",
             "™️" => "tm",
             _ => word,
-        }
-    ).join(" ")
+        })
+        .join(" ")
 }
 
 fn attachments_to_format(attachments: &[serenity::Attachment]) -> Option<&'static str> {
@@ -218,14 +255,19 @@ fn attachments_to_format(attachments: &[serenity::Attachment]) -> Option<&'stati
 }
 
 fn remove_repeated_chars(content: &str, limit: usize) -> String {
-    content.chars().group_by(|&c| c).into_iter().map(|(key, group)| {
-        let group: String = group.collect();
-        if group.chars().count() > limit {
-            key.to_string().repeat(limit)
-        } else {
-            group
-        }
-    }).collect()
+    content
+        .chars()
+        .group_by(|&c| c)
+        .into_iter()
+        .map(|(key, group)| {
+            let group: String = group.collect();
+            if group.chars().count() > limit {
+                key.to_string().repeat(limit)
+            } else {
+                group
+            }
+        })
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
@@ -239,33 +281,42 @@ pub async fn run_checks(
         // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
         // checking if the message's channel_id is the author's voice channel_id
         let guild = require!(message.guild(&ctx.cache), Ok(None));
-        let author_vc = guild.voice_states.get(&message.author.id).and_then(|c| c.channel_id);
+        let author_vc = guild
+            .voice_states
+            .get(&message.author.id)
+            .and_then(|c| c.channel_id);
 
         if author_vc.map_or(true, |author_vc| author_vc != message.channel_id) {
-            return Ok(None)
+            return Ok(None);
         }
     }
 
     if let Some(required_role) = guild_row.required_role {
         let message_member = require!(message.member.as_ref(), Ok(None));
-        if !message_member.roles.contains(&serenity::RoleId::new(required_role as u64)) {
+        if !message_member
+            .roles
+            .contains(&serenity::RoleId::new(required_role as u64))
+        {
             let member = guild_id.member(ctx, message.author.id).await?;
             let channel = require!(message.channel_id.to_channel(ctx).await?.guild(), Ok(None));
 
-            let author_permissions = require!(message.guild(&ctx.cache), Ok(None)).user_permissions_in(&channel, &member);
+            let author_permissions = require!(message.guild(&ctx.cache), Ok(None))
+                .user_permissions_in(&channel, &member);
             if !author_permissions.administrator() {
-                return Ok(None)
+                return Ok(None);
             }
         }
     }
 
-    let mut content = serenity::content_safe(&ctx.cache, &message.content,
+    let mut content = serenity::content_safe(
+        &ctx.cache,
+        &message.content,
         &serenity::ContentSafeOptions::default()
             .clean_here(false)
             .clean_everyone(false)
             .show_discriminator(false)
             .display_as_member_from(guild_id),
-        &message.mentions
+        &message.mentions,
     );
 
     if content.len() >= 1500 {
@@ -278,12 +329,12 @@ pub async fn run_checks(
         if let Some(stripped_content) = content.strip_prefix(required_prefix) {
             content = String::from(stripped_content);
         } else {
-            return Ok(None)
+            return Ok(None);
         }
     }
 
     if content.starts_with(&guild_row.prefix) {
-        return Ok(None)
+        return Ok(None);
     }
 
     let guild = require!(message.guild(&ctx.cache), Ok(None));
@@ -293,7 +344,7 @@ pub async fn run_checks(
     let mut to_autojoin = None;
     if message.author.bot {
         if guild_row.bot_ignore || bot_voice_state.is_none() {
-            return Ok(None) // Is bot
+            return Ok(None); // Is bot
         }
     } else {
         // If the bot is in vc
@@ -313,7 +364,10 @@ pub async fn run_checks(
             let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
             let channel = guild.channels.get(&voice_channel).try_unwrap()?;
 
-            if channel.kind == serenity::ChannelType::Stage && voice_state.map_or(false, |vs| vs.suppress) && guild_row.audience_ignore {
+            if channel.kind == serenity::ChannelType::Stage
+                && voice_state.map_or(false, |vs| vs.suppress)
+                && guild_row.audience_ignore
+            {
                 return Ok(None); // Is audience
             }
         }
@@ -322,7 +376,7 @@ pub async fn run_checks(
     let mut removed_chars_content = content.clone();
     removed_chars_content.retain(|c| !" ?.)'!\":".contains(c));
     if removed_chars_content.is_empty() {
-        return Ok(None)
+        return Ok(None);
     }
 
     Ok(Some((content, to_autojoin)))
@@ -344,28 +398,30 @@ pub fn clean_msg(
     nickname: Option<&str>,
 
     regex_cache: &RegexCache,
-    last_to_xsaid_tracker: &LastToXsaidTracker
+    last_to_xsaid_tracker: &LastToXsaidTracker,
 ) -> String {
     let (contained_url, mut content) = if content == "?" {
         (false, String::from("what"))
     } else {
-        let mut content: String = regex_cache.emoji.replace_all(content, |re_match: &regex::Captures<'_>| {
-            let is_animated = re_match.get(1).unwrap().as_str();
-            let emoji_name = re_match.get(2).unwrap().as_str();
+        let mut content: String = regex_cache
+            .emoji
+            .replace_all(content, |re_match: &regex::Captures<'_>| {
+                let is_animated = re_match.get(1).unwrap().as_str();
+                let emoji_name = re_match.get(2).unwrap().as_str();
 
-            let emoji_prefix = if is_animated.is_empty() {
-                "emoji"
-            } else {
-                "animated emoji"
-            };
+                let emoji_prefix = if is_animated.is_empty() {
+                    "emoji"
+                } else {
+                    "animated emoji"
+                };
 
-            format!("{emoji_prefix} {emoji_name}")
-        }).into_owned();
+                format!("{emoji_prefix} {emoji_name}")
+            })
+            .into_owned();
 
         for (regex, replacement) in &regex_cache.replacements {
             content = regex.replace_all(&content, *replacement).into_owned();
-        };
-
+        }
 
         if voice.starts_with("en") {
             content = parse_acronyms(&content);
@@ -383,26 +439,41 @@ pub fn clean_msg(
     // If xsaid is enabled, and the author has not been announced last (in one minute if more than 2 users in vc)
     let last_to_xsaid = last_to_xsaid_tracker.get(&guild_id);
 
-    if xsaid && match last_to_xsaid.map(|i| *i) {
-        None => true,
-        Some((u_id, last_time)) => cache.guild(guild_id).map(|guild|
-            guild.voice_states.get(&user.id).and_then(|vs| vs.channel_id).map_or(true, |voice_channel_id|
-                (user.id != u_id) || ((last_time.elapsed().unwrap().as_secs() > 60) &&
+    if xsaid
+        && match last_to_xsaid.map(|i| *i) {
+            None => true,
+            Some((u_id, last_time)) => cache
+                .guild(guild_id)
+                .map(|guild| {
+                    guild
+                        .voice_states
+                        .get(&user.id)
+                        .and_then(|vs| vs.channel_id)
+                        .map_or(true, |voice_channel_id| {
+                            (user.id != u_id)
+                                || ((last_time.elapsed().unwrap().as_secs() > 60) &&
                     // If more than 2 users in vc
                     guild.voice_states.values()
                         .filter(|vs| vs.channel_id.map_or(false, |vc| vc == voice_channel_id))
                         .filter_map(|vs| guild.members.get(&vs.user_id))
                         .filter(|member| !member.user.bot)
-                        .count() > 2
-                )
-            )
-        ).unwrap()
-    } {
+                        .count() > 2)
+                        })
+                })
+                .unwrap(),
+        }
+    {
         if contained_url {
-            write!(content, " {}",
-                if content.is_empty() {"a link."}
-                else {"and sent a link"}
-            ).unwrap();
+            write!(
+                content,
+                " {}",
+                if content.is_empty() {
+                    "a link."
+                } else {
+                    "and sent a link"
+                }
+            )
+            .unwrap();
         }
 
         let said_name = nickname.unwrap_or_else(|| member_nick.unwrap_or(&user.name));
@@ -412,10 +483,16 @@ pub fn clean_msg(
             None => format!("{said_name} said: {content}"),
         }
     } else if contained_url {
-        write!(content, "{}",
-            if content.is_empty() {"a link."}
-            else {". This message contained a link"}
-        ).unwrap();
+        write!(
+            content,
+            "{}",
+            if content.is_empty() {
+                "a link."
+            } else {
+                ". This message contained a link"
+            }
+        )
+        .unwrap();
     }
 
     if xsaid {
@@ -429,17 +506,17 @@ pub fn clean_msg(
     content
 }
 
-
 pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<Option<String>> {
     #[derive(serde::Deserialize)]
     pub struct DeeplTranslateResponse<'a> {
-        #[serde(borrow)] pub translations: Vec<DeeplTranslation<'a>>
+        #[serde(borrow)]
+        pub translations: Vec<DeeplTranslation<'a>>,
     }
 
     #[derive(serde::Deserialize)]
     pub struct DeeplTranslation<'a> {
         pub text: String,
-        pub detected_source_language: &'a str
+        pub detected_source_language: &'a str,
     }
 
     #[derive(serde::Serialize)]
@@ -455,46 +532,63 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
         preserve_formatting: 1,
     };
 
-    let mut resp = data.reqwest
-        .get(format!("{}/translate", data.config.translation_url)).query(&request)
-        .header("Authorization", format!("DeepL-Auth-Key {}", data.config.translation_token))
-        .send().await?.error_for_status()?
-        .bytes().await?.to_vec();
+    let mut resp = data
+        .reqwest
+        .get(format!("{}/translate", data.config.translation_url))
+        .query(&request)
+        .header(
+            "Authorization",
+            format!("DeepL-Auth-Key {}", data.config.translation_token),
+        )
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?
+        .to_vec();
 
     let response: DeeplTranslateResponse<'_> = json::from_slice(&mut resp)?;
     if let Some(translation) = response.translations.into_iter().next() {
         if translation.detected_source_language != target_lang {
-            return Ok(Some(translation.text))
+            return Ok(Some(translation.text));
         }
     }
 
     Ok(None)
 }
 
-pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, negative: String) -> Result<Option<bool>, Error> {
+pub async fn confirm_dialog(
+    ctx: Context<'_>,
+    prompt: &str,
+    positive: String,
+    negative: String,
+) -> Result<Option<bool>, Error> {
     fn components(positive: String, negative: String, disabled: bool) -> Vec<CreateActionRow> {
-        vec![
-            CreateActionRow::Buttons(vec![
-                CreateButton::new("True")
-                    .style(serenity::ButtonStyle::Success)
-                    .disabled(disabled)
-                    .label(positive),
-                CreateButton::new("False")
-                    .style(serenity::ButtonStyle::Danger)
-                    .disabled(disabled)
-                    .label(negative)
-            ])
-        ]
+        vec![CreateActionRow::Buttons(vec![
+            CreateButton::new("True")
+                .style(serenity::ButtonStyle::Success)
+                .disabled(disabled)
+                .label(positive),
+            CreateButton::new("False")
+                .style(serenity::ButtonStyle::Danger)
+                .disabled(disabled)
+                .label(negative),
+        ])]
     }
 
-    let reply = ctx.send(poise::CreateReply::default()
-        .content(prompt)
-        .ephemeral(true)
-        .components(components(positive.clone(), negative.clone(), false))
-    ).await?;
+    let reply = ctx
+        .send(
+            poise::CreateReply::default()
+                .content(prompt)
+                .ephemeral(true)
+                .components(components(positive.clone(), negative.clone(), false)),
+        )
+        .await?;
 
     let ctx_discord = ctx.discord();
-    let interaction = reply.message().await?
+    let interaction = reply
+        .message()
+        .await?
         .await_component_interaction(&ctx_discord.shard)
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(ctx.author().id)
@@ -507,7 +601,7 @@ pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, ne
         match &*interaction.data.custom_id {
             "True" => Ok(Some(true)),
             "False" => Ok(Some(false)),
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     } else {
         Ok(None)

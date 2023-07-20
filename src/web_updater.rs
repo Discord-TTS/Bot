@@ -1,10 +1,16 @@
-use std::{sync::Arc, collections::{HashMap, HashSet}};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use gnomeutils::serenity::{self as serenity, json::prelude as json};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
-use crate::{Result, structs::{TTSMode, WebsiteInfo}, funcs::decode_resp};
-
+use crate::{
+    funcs::decode_resp,
+    structs::{TTSMode, WebsiteInfo},
+    Result,
+};
 
 #[allow(dead_code, clippy::match_same_arms)]
 fn remember_to_update_analytics_query() {
@@ -16,10 +22,9 @@ fn remember_to_update_analytics_query() {
     }
 }
 
-fn count_members<'a>(guilds: impl Iterator<Item=serenity::cache::GuildRef<'a>>) -> u64 {
+fn count_members<'a>(guilds: impl Iterator<Item = serenity::cache::GuildRef<'a>>) -> u64 {
     guilds.map(|g| g.member_count).sum()
 }
-
 
 #[derive(serde::Serialize)]
 struct Statistics {
@@ -29,7 +34,6 @@ struct Statistics {
     guild_count: u32,
     user_count: u64,
 }
-
 
 pub struct Updater {
     pub patreon_service: Option<reqwest::Url>,
@@ -47,17 +51,22 @@ impl gnomeutils::Looper for Updater {
     async fn loop_func(&self) -> Result<()> {
         #[derive(sqlx::FromRow)]
         struct AnalyticsQueryResult {
-            count: i32
+            count: i32,
         }
 
         #[derive(sqlx::FromRow)]
         struct PremiumGuildsQueryResult {
-            guild_id: i64
+            guild_id: i64,
         }
 
         let patreon_members = if let Some(mut patreon_service) = self.patreon_service.clone() {
             patreon_service.set_path("members");
-            let resp = self.reqwest.get(patreon_service).send().await?.error_for_status()?;
+            let resp = self
+                .reqwest
+                .get(patreon_service)
+                .send()
+                .await?
+                .error_for_status()?;
             let raw_members: HashMap<i64, serde::de::IgnoredAny> = decode_resp(resp).await?;
 
             raw_members.into_keys().collect()
@@ -67,7 +76,8 @@ impl gnomeutils::Looper for Updater {
 
         let (message_count, premium_guild_ids) = {
             let mut db_conn = self.pool.acquire().await?;
-            let message_count = sqlx::query_as::<_, AnalyticsQueryResult>("
+            let message_count = sqlx::query_as::<_, AnalyticsQueryResult>(
+                "
                 SELECT count FROM analytics
                 WHERE date_collected = (CURRENT_DATE - 1) AND (
                     event = 'gTTS_tts'   OR
@@ -75,11 +85,23 @@ impl gnomeutils::Looper for Updater {
                     event = 'gCloud_tts' OR
                     event = 'Polly_tts'
                 )
-            ").fetch_all(&mut *db_conn).await?.into_iter().map(|r| r.count as i64).sum::<i64>();
+            ",
+            )
+            .fetch_all(&mut *db_conn)
+            .await?
+            .into_iter()
+            .map(|r| r.count as i64)
+            .sum::<i64>();
 
-            let premium_guild_ids = sqlx::query_as::<_, PremiumGuildsQueryResult>("SELECT guild_id FROM guilds WHERE premium_user = ANY($1)")
-                .bind(&patreon_members).fetch_all(&mut *db_conn).await?
-                .into_iter().map(|g| g.guild_id).collect::<HashSet<_>>();
+            let premium_guild_ids = sqlx::query_as::<_, PremiumGuildsQueryResult>(
+                "SELECT guild_id FROM guilds WHERE premium_user = ANY($1)",
+            )
+            .bind(&patreon_members)
+            .fetch_all(&mut *db_conn)
+            .await?
+            .into_iter()
+            .map(|g| g.guild_id)
+            .collect::<HashSet<_>>();
 
             (message_count, premium_guild_ids)
         };
@@ -89,12 +111,14 @@ impl gnomeutils::Looper for Updater {
         let guild_ref_iter = guild_ids.iter().filter_map(|g| self.cache.guild(*g));
         let user_count = count_members(guild_ref_iter.clone());
 
-        let premium_guild_ref_iter = guild_ref_iter.filter(|g| premium_guild_ids.contains(&(g.id.get() as i64)));
+        let premium_guild_ref_iter =
+            guild_ref_iter.filter(|g| premium_guild_ids.contains(&(g.id.get() as i64)));
         let premium_user_count = count_members(premium_guild_ref_iter.clone());
         let premium_guild_count = premium_guild_ref_iter.count();
 
         let stats = Statistics {
-            user_count, premium_user_count,
+            user_count,
+            premium_user_count,
             message_count: message_count as u64,
             guild_count: guild_ids.len() as u32,
             premium_guild_count: premium_guild_count as u32,
@@ -106,12 +130,15 @@ impl gnomeutils::Looper for Updater {
             url
         };
 
-        self.reqwest.post(url)
+        self.reqwest
+            .post(url)
             .header(AUTHORIZATION, self.config.stats_key.clone())
             .header(CONTENT_TYPE, "application/json")
             .body(json::to_string(&stats)?)
-            .send().await?
+            .send()
+            .await?
             .error_for_status()
-            .map(drop).map_err(Into::into)
-        }
+            .map(drop)
+            .map_err(Into::into)
+    }
 }

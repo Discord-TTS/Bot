@@ -3,9 +3,8 @@ use std::sync::Arc;
 use gnomeutils::require_guild;
 use poise::serenity_prelude as serenity;
 
-use crate::structs::{Result, JoinVCToken, Context, TTSMode};
 use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
-
+use crate::structs::{Context, JoinVCToken, Result, TTSMode};
 
 #[serenity::async_trait]
 pub trait PoiseContextExt {
@@ -25,8 +24,11 @@ impl PoiseContextExt for Context<'_> {
     async fn neutral_colour(&self) -> u32 {
         if let Some(guild_id) = self.guild_id() {
             let row = self.data().guilds_db.get(guild_id.get() as i64).await;
-            if row.map(|row| row.voice_mode).map_or(false, TTSMode::is_premium) {
-                return PREMIUM_NEUTRAL_COLOUR
+            if row
+                .map(|row| row.voice_mode)
+                .map_or(false, TTSMode::is_premium)
+            {
+                return PREMIUM_NEUTRAL_COLOUR;
             }
         }
 

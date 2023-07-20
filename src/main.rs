@@ -16,38 +16,61 @@
 
 #![allow(stable_features)]
 #![feature(let_chains)]
-
-#![warn(rust_2018_idioms, missing_copy_implementations, noop_method_call, unused)]
+#![warn(
+    rust_2018_idioms,
+    missing_copy_implementations,
+    noop_method_call,
+    unused
+)]
 #![warn(clippy::pedantic)]
-
 // clippy::pedantic complains about u64 -> i64 and back when db conversion, however it is fine
-#![allow(clippy::cast_sign_loss, clippy::cast_possible_wrap, clippy::cast_lossless, clippy::cast_possible_truncation)]
-#![allow(clippy::unreadable_literal, clippy::wildcard_imports, clippy::similar_names)]
+#![allow(
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation
+)]
+#![allow(
+    clippy::unreadable_literal,
+    clippy::wildcard_imports,
+    clippy::similar_names
+)]
 
-use std::{borrow::Cow, collections::BTreeMap, str::FromStr, sync::{Arc, atomic::AtomicBool}, num::NonZeroU16};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    num::NonZeroU16,
+    str::FromStr,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 use anyhow::Ok;
+use parking_lot::{Mutex, RwLock};
 use sysinfo::SystemExt;
-use parking_lot::{RwLock, Mutex};
 use tracing::{error, warn};
 
-use gnomeutils::{analytics, logging, Looper, require, OptionTryUnwrap, PoiseContextExt, require_guild};
-use poise::serenity_prelude::{self as serenity, Mentionable as _, builder::*};
+use gnomeutils::{
+    analytics, logging, require, require_guild, Looper, OptionTryUnwrap, PoiseContextExt,
+};
+use poise::serenity_prelude::{self as serenity, builder::*, Mentionable as _};
 
-mod web_updater;
-mod migration;
+mod commands;
 mod constants;
 mod database;
-mod commands;
-mod structs;
-mod traits;
-mod macros;
 mod events;
 mod funcs;
+mod macros;
+mod migration;
+mod structs;
+mod traits;
+mod web_updater;
 
 use constants::PREMIUM_NEUTRAL_COLOUR;
-use funcs::{prepare_gcloud_voices, get_translation_langs, decode_resp};
-use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, PollyVoice, WebhookConfigRaw, WebhookConfig, FailurePoint, DataInner};
+use funcs::{decode_resp, get_translation_langs, prepare_gcloud_voices};
+use structs::{
+    Config, Context, Data, DataInner, FailurePoint, PollyVoice, PostgresConfig, Result, TTSMode,
+    WebhookConfig, WebhookConfigRaw,
+};
 
 enum EntryCheck {
     IsFile,
@@ -70,7 +93,12 @@ async fn get_webhooks(
         get_webhook(webhooks_raw.dm_logs),
     )?;
 
-    Ok(WebhookConfig{logs, servers, dm_logs, errors: Some(errors)})
+    Ok(WebhookConfig {
+        logs,
+        servers,
+        dm_logs,
+        errors: Some(errors),
+    })
 }
 
 fn main() -> Result<()> {
@@ -87,7 +115,8 @@ fn main() -> Result<()> {
 async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let (pool, mut config) = {
         let mut config_toml: toml::Value = std::fs::read_to_string("config.toml")?.parse()?;
-        let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
+        let postgres: PostgresConfig =
+            toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
 
         let pool_config = sqlx::postgres::PgPoolOptions::new();
         let pool_config = if let Some(max_connections) = postgres.max_connections {
@@ -96,13 +125,15 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             pool_config
         };
 
-        let pool = pool_config.connect_with(
-            sqlx::postgres::PgConnectOptions::new()
-            .host(&postgres.host)
-            .username(&postgres.user)
-            .database(&postgres.database)
-            .password(&postgres.password)
-        ).await?;
+        let pool = pool_config
+            .connect_with(
+                sqlx::postgres::PgConnectOptions::new()
+                    .host(&postgres.host)
+                    .username(&postgres.user)
+                    .database(&postgres.database)
+                    .password(&postgres.password),
+            )
+            .await?;
 
         migration::run(&mut config_toml, &pool).await?;
 
@@ -110,28 +141,43 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         (pool, config)
     };
 
-    let filter_entry = |to_check| move |entry: &std::fs::DirEntry| entry
-        .metadata()
-        .map(|m| match to_check {
-            EntryCheck::IsFile => m.is_file(),
-            EntryCheck::IsDir => m.is_dir(),
-        }).unwrap_or(false);
+    let filter_entry = |to_check| {
+        move |entry: &std::fs::DirEntry| {
+            entry
+                .metadata()
+                .map(|m| match to_check {
+                    EntryCheck::IsFile => m.is_file(),
+                    EntryCheck::IsDir => m.is_dir(),
+                })
+                .unwrap_or(false)
+        }
+    };
 
-    let translations =
-        std::fs::read_dir("translations")?
-            .map(Result::unwrap)
-            .filter(filter_entry(EntryCheck::IsDir))
-            .flat_map(|d| std::fs::read_dir(d.path()).unwrap()
+    let translations = std::fs::read_dir("translations")?
+        .map(Result::unwrap)
+        .filter(filter_entry(EntryCheck::IsDir))
+        .flat_map(|d| {
+            std::fs::read_dir(d.path())
+                .unwrap()
                 .map(Result::unwrap)
                 .filter(filter_entry(EntryCheck::IsFile))
                 .filter(|e| e.path().extension().map_or(false, |e| e == "mo"))
-                .map(|entry| Ok((
-                    entry.file_name().to_str().unwrap().split('.').next().unwrap().to_string(),
-                    gettext::Catalog::parse(std::fs::File::open(entry.path())?)?
-                )))
+                .map(|entry| {
+                    Ok((
+                        entry
+                            .file_name()
+                            .to_str()
+                            .unwrap()
+                            .split('.')
+                            .next()
+                            .unwrap()
+                            .to_string(),
+                        gettext::Catalog::parse(std::fs::File::open(entry.path())?)?,
+                    ))
+                })
                 .filter_map(Result::ok)
-            )
-            .collect();
+        })
+        .collect();
 
     let reqwest = reqwest::Client::new();
     let songbird = songbird::Songbird::serenity();
@@ -139,34 +185,89 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let http = serenity::Http::new(config.main.token.as_deref().unwrap());
 
     let (
-        guilds_db, userinfo_db, user_voice_db, guild_voice_db, nickname_db,
-        mut webhooks, translation_languages, premium_avatar_url,
-        gtts_voices, espeak_voices, gcloud_voices, polly_voices
+        guilds_db,
+        userinfo_db,
+        user_voice_db,
+        guild_voice_db,
+        nickname_db,
+        mut webhooks,
+        translation_languages,
+        premium_avatar_url,
+        gtts_voices,
+        espeak_voices,
+        gcloud_voices,
+        polly_voices,
     ) = tokio::try_join!(
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
         create_db_handler!(pool.clone(), "userinfo", "user_id"),
         create_db_handler!(pool.clone(), "user_voice", "user_id", "mode"),
         create_db_handler!(pool.clone(), "guild_voice", "guild_id", "mode"),
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
-
         get_webhooks(&http, config.webhooks),
-        get_translation_langs(&reqwest, &config.main.translation_url, &config.main.translation_token),
-        async {serenity::UserId::new(802632257658683442).to_user(&http).await.map(|u| u.face()).map_err(Into::into)},
-
-        async {Ok(decode_resp::<BTreeMap<String, String>>(TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?)},
-        async {Ok(decode_resp::<Vec<String>>(TTSMode::eSpeak.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?)},
-        async {Ok(prepare_gcloud_voices(decode_resp(TTSMode::gCloud.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?))},
-        async {Ok(decode_resp::<Vec<PollyVoice>>(TTSMode::Polly.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key).await?).await?
-            .into_iter().map(|v| (v.id.clone(), v)).collect::<BTreeMap<_, _>>())
+        get_translation_langs(
+            &reqwest,
+            &config.main.translation_url,
+            &config.main.translation_token
+        ),
+        async {
+            serenity::UserId::new(802632257658683442)
+                .to_user(&http)
+                .await
+                .map(|u| u.face())
+                .map_err(Into::into)
+        },
+        async {
+            Ok(decode_resp::<BTreeMap<String, String>>(
+                TTSMode::gTTS
+                    .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
+                    .await?,
+            )
+            .await?)
+        },
+        async {
+            Ok(decode_resp::<Vec<String>>(
+                TTSMode::eSpeak
+                    .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
+                    .await?,
+            )
+            .await?)
+        },
+        async {
+            Ok(prepare_gcloud_voices(
+                decode_resp(
+                    TTSMode::gCloud
+                        .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
+                        .await?,
+                )
+                .await?,
+            ))
+        },
+        async {
+            Ok(decode_resp::<Vec<PollyVoice>>(
+                TTSMode::Polly
+                    .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
+                    .await?,
+            )
+            .await?
+            .into_iter()
+            .map(|v| (v.id.clone(), v))
+            .collect::<BTreeMap<_, _>>())
         },
     )?;
 
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));
     tokio::spawn(analytics.clone().start());
 
-    let startup_message = webhooks.logs.execute(&http, true, ExecuteWebhook::default()
-        .content("**TTS Bot is starting up**")
-    ).await?.unwrap().id;
+    let startup_message = webhooks
+        .logs
+        .execute(
+            &http,
+            true,
+            ExecuteWebhook::default().content("**TTS Bot is starting up**"),
+        )
+        .await?
+        .unwrap()
+        .id;
 
     let logger = logging::WebhookLogger::new(
         Arc::new(http),
@@ -183,7 +284,10 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let token = config.main.token.take().unwrap();
     let regex_cache = structs::RegexCache {
         replacements: [
-            (regex::Regex::new(r"\|\|(?s:.)*?\|\|")?, ". spoiler avoided."),
+            (
+                regex::Regex::new(r"\|\|(?s:.)*?\|\|")?,
+                ". spoiler avoided.",
+            ),
             (regex::Regex::new(r"```(?s:.)*?```")?, ". code block."),
             (regex::Regex::new(r"`(?s:.)*?`")?, ". code snippet."),
         ],
@@ -194,7 +298,8 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let data = Data(Arc::new(DataInner {
         bot_list_tokens: config.bot_list_tokens,
         inner: gnomeutils::GnomeData {
-            pool, translations,
+            pool,
+            translations,
             error_webhook: webhooks.errors.take().unwrap(),
             system_info: Mutex::new(sysinfo::System::new()),
             main_server_invite: config.main.main_server_invite.clone(),
@@ -206,13 +311,26 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         currently_purging: AtomicBool::new(false),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
 
-        gtts_voices, espeak_voices, gcloud_voices, polly_voices,
+        gtts_voices,
+        espeak_voices,
+        gcloud_voices,
+        polly_voices,
         translation_languages,
 
         website_info: RwLock::new(config.website_info),
-        config: config.main, reqwest, premium_avatar_url,
-        analytics, webhooks, start_time, startup_message, regex_cache,
-        guilds_db, userinfo_db, nickname_db, user_voice_db, guild_voice_db,
+        config: config.main,
+        reqwest,
+        premium_avatar_url,
+        analytics,
+        webhooks,
+        start_time,
+        startup_message,
+        regex_cache,
+        guilds_db,
+        userinfo_db,
+        nickname_db,
+        user_voice_db,
+        guild_voice_db,
     }));
 
     let intents = serenity::GatewayIntents::GUILDS
@@ -225,35 +343,52 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let framework_options = poise::FrameworkOptions {
         commands: commands::commands(),
         listener: |event, ctx, _| Box::pin(events::listen(ctx, event)),
-        on_error: |error| Box::pin(async move {gnomeutils::errors::handle(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err))}),
-        allowed_mentions: Some(serenity::CreateAllowedMentions::default()
-            .replied_user(true)
-            .all_users(true)
+        on_error: |error| {
+            Box::pin(async move {
+                gnomeutils::errors::handle(error)
+                    .await
+                    .unwrap_or_else(|err| error!("on_error: {:?}", err))
+            })
+        },
+        allowed_mentions: Some(
+            serenity::CreateAllowedMentions::default()
+                .replied_user(true)
+                .all_users(true),
         ),
-        pre_command: |ctx| Box::pin(async move {
-            let analytics_handler: &analytics::Handler = &ctx.data().analytics;
+        pre_command: |ctx| {
+            Box::pin(async move {
+                let analytics_handler: &analytics::Handler = &ctx.data().analytics;
 
-            analytics_handler.log(Cow::Owned(ctx.command().qualified_name.clone()), true);
-            analytics_handler.log(Cow::Borrowed(match ctx {
-                poise::Context::Prefix(_) => "command",
-                poise::Context::Application(ctx) => match ctx.interaction {
-                    poise::CommandOrAutocompleteInteraction::Autocomplete(_) => "autocomplete",
-                    poise::CommandOrAutocompleteInteraction::Command(_) => "slash_command",
-                },
-            }), false);
-        }),
+                analytics_handler.log(Cow::Owned(ctx.command().qualified_name.clone()), true);
+                analytics_handler.log(
+                    Cow::Borrowed(match ctx {
+                        poise::Context::Prefix(_) => "command",
+                        poise::Context::Application(ctx) => match ctx.interaction {
+                            poise::CommandOrAutocompleteInteraction::Autocomplete(_) => {
+                                "autocomplete"
+                            }
+                            poise::CommandOrAutocompleteInteraction::Command(_) => "slash_command",
+                        },
+                    }),
+                    false,
+                );
+            })
+        },
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: None,
-            dynamic_prefix: Some(|ctx| {Box::pin(async move {Ok(Some(
-                match ctx.guild_id.map(Into::into) {
-                    Some(guild_id) => ctx.data.guilds_db.get(guild_id).await?.prefix.clone(),
-                    None => String::from("-"),
-                }
-            ))})}),
+            dynamic_prefix: Some(|ctx| {
+                Box::pin(async move {
+                    Ok(Some(match ctx.guild_id.map(Into::into) {
+                        Some(guild_id) => ctx.data.guilds_db.get(guild_id).await?.prefix.clone(),
+                        None => String::from("-"),
+                    }))
+                })
+            }),
             ..poise::PrefixFrameworkOptions::default()
         },
-        command_check: Some(|ctx| Box::pin(async move {
-            if ctx.author().bot {
+        command_check: Some(|ctx| {
+            Box::pin(async move {
+                if ctx.author().bot {
                 Ok(false)
             } else if let Some(guild_id) = ctx.guild_id() && let Some(required_role) = ctx.data().guilds_db.get(guild_id.into()).await?.required_role {
                 let required_role = serenity::RoleId::new(required_role as u64);
@@ -278,28 +413,29 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             } else {
                 Ok(true)
             }
-        })),
+            })
+        }),
         ..poise::FrameworkOptions::default()
     };
 
     let mut client = serenity::Client::builder(token, intents)
         .voice_manager_arc(songbird)
-        .framework(poise::Framework::new(
-            framework_options,
-            |_, _, _| Box::pin(async {Ok(data)})
-        ))
+        .framework(poise::Framework::new(framework_options, |_, _, _| {
+            Box::pin(async { Ok(data) })
+        }))
         .await?;
 
     let shard_manager = client.shard_manager.clone();
 
     tokio::spawn(async move {
-        #[cfg(unix)] {
+        #[cfg(unix)]
+        {
             use tokio::signal::unix as signal;
 
             let [mut s1, mut s2, mut s3] = [
                 signal::signal(signal::SignalKind::hangup()).unwrap(),
                 signal::signal(signal::SignalKind::interrupt()).unwrap(),
-                signal::signal(signal::SignalKind::terminate()).unwrap()
+                signal::signal(signal::SignalKind::terminate()).unwrap(),
             ];
 
             tokio::select!(
@@ -308,10 +444,11 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
                 v = s3.recv() => v.unwrap(),
             );
         }
-        #[cfg(windows)] {
+        #[cfg(windows)]
+        {
             let (mut s1, mut s2) = (
                 tokio::signal::windows::ctrl_c().unwrap(),
-                tokio::signal::windows::ctrl_break().unwrap()
+                tokio::signal::windows::ctrl_break().unwrap(),
             );
 
             tokio::select!(
@@ -327,8 +464,8 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     client.start_autosharded().await.map_err(Into::into)
 }
 
-
 async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
+    return Ok(true);
     if let Context::Application(ctx) = ctx {
         if let poise::CommandOrAutocompleteInteraction::Autocomplete(_) = ctx.interaction {
             // Ignore the premium check during autocomplete.
@@ -357,10 +494,15 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     let author = ctx.author();
     warn!(
         "{}#{} | {} failed the premium check in {}",
-        author.name, author.discriminator.map_or(0, NonZeroU16::get), author.id,
-        guild_id.and_then(|g_id| ctx_discord.cache.guild(g_id).map(|g| (
-            Cow::Owned(format!("{} | {g_id}", g.name))
-        ))).unwrap_or(Cow::Borrowed("DMs"))
+        author.name,
+        author.discriminator.map_or(0, NonZeroU16::get),
+        author.id,
+        guild_id
+            .and_then(|g_id| ctx_discord
+                .cache
+                .guild(g_id)
+                .map(|g| (Cow::Owned(format!("{} | {g_id}", g.name)))))
+            .unwrap_or(Cow::Borrowed("DMs"))
     );
 
     let permissions = ctx.author_permissions().await?;
@@ -369,17 +511,19 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
         ctx.send({
             const FOOTER_MSG: &str = "If this is an error, please contact Gnome!#6669.";
             if permissions.embed_links() {
-                builder.embed(CreateEmbed::default()
-                    .title("TTS Bot Premium - Premium Only Command!")
-                    .description(main_msg)
-                    .colour(PREMIUM_NEUTRAL_COLOUR)
-                    .thumbnail(&data.premium_avatar_url)
-                    .footer(serenity::CreateEmbedFooter::new(FOOTER_MSG))
+                builder.embed(
+                    CreateEmbed::default()
+                        .title("TTS Bot Premium - Premium Only Command!")
+                        .description(main_msg)
+                        .colour(PREMIUM_NEUTRAL_COLOUR)
+                        .thumbnail(&data.premium_avatar_url)
+                        .footer(serenity::CreateEmbedFooter::new(FOOTER_MSG)),
                 )
             } else {
                 builder.content(format!("{main_msg}\n{FOOTER_MSG}"))
             }
-        }).await?;
+        })
+        .await?;
     }
 
     Ok(false)

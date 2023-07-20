@@ -16,7 +16,7 @@
 
 use std::io::Write;
 
-use sqlx::{Row, Executor, Connection as _};
+use sqlx::{Connection as _, Executor, Row};
 
 use gnomeutils::OptionTryUnwrap;
 
@@ -25,30 +25,57 @@ use crate::structs::{Result, TTSMode};
 
 type Transaction<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
 
-async fn migrate_single_to_modes(transaction: &mut Transaction<'_>, table: &str, new_table: &str, old_column: &str, id_column: &str) -> Result<()> {
-    let insert_query_mode = format!("INSERT INTO {new_table}({id_column}, mode, voice) VALUES ($1, $2, $3)");
-    let insert_query_voice = format!("
+async fn migrate_single_to_modes(
+    transaction: &mut Transaction<'_>,
+    table: &str,
+    new_table: &str,
+    old_column: &str,
+    id_column: &str,
+) -> Result<()> {
+    let insert_query_mode =
+        format!("INSERT INTO {new_table}({id_column}, mode, voice) VALUES ($1, $2, $3)");
+    let insert_query_voice = format!(
+        "
         INSERT INTO {table}({id_column}, voice_mode) VALUES ($1, $2)
         ON CONFLICT ({id_column}) DO UPDATE SET voice_mode = EXCLUDED.voice_mode
-    ");
+    "
+    );
 
     let mut delete_voice = false;
-    for row in transaction.fetch_all(&*format!("SELECT * FROM {table}")).await? { 
+    for row in transaction
+        .fetch_all(&*format!("SELECT * FROM {table}"))
+        .await?
+    {
         if let Ok(voice) = row.try_get::<Option<String>, _>(old_column) {
             delete_voice = true;
             if let Some(voice) = voice {
                 let column_id: i64 = row.get(id_column);
 
-                transaction.execute(sqlx::query(&insert_query_voice).bind(column_id).bind(TTSMode::gTTS)).await?;
-                transaction.execute(sqlx::query(&insert_query_mode).bind(column_id).bind(TTSMode::gTTS).bind(voice)).await?;
+                transaction
+                    .execute(
+                        sqlx::query(&insert_query_voice)
+                            .bind(column_id)
+                            .bind(TTSMode::gTTS),
+                    )
+                    .await?;
+                transaction
+                    .execute(
+                        sqlx::query(&insert_query_mode)
+                            .bind(column_id)
+                            .bind(TTSMode::gTTS)
+                            .bind(voice),
+                    )
+                    .await?;
             }
         } else {
-            break
+            break;
         }
-    };
+    }
 
     if delete_voice {
-        transaction.execute(&*format!("ALTER TABLE {table} DROP COLUMN {old_column}")).await?;
+        transaction
+            .execute(&*format!("ALTER TABLE {table} DROP COLUMN {old_column}"))
+            .await?;
     };
 
     Ok(())
@@ -67,15 +94,24 @@ async fn migrate_speaking_rate_to_mode(transaction: &mut Transaction<'_>) -> Res
 
             if (speaking_rate - 1.0).abs() > f32::EPSILON {
                 let user_id: i64 = row.get("user_id");
-                transaction.execute(sqlx::query(insert_query).bind(user_id).bind(TTSMode::gCloud).bind(speaking_rate)).await?;
+                transaction
+                    .execute(
+                        sqlx::query(insert_query)
+                            .bind(user_id)
+                            .bind(TTSMode::gCloud)
+                            .bind(speaking_rate),
+                    )
+                    .await?;
             }
         } else {
-            break
+            break;
         }
-    };
+    }
 
     if delete_column {
-        transaction.execute("ALTER TABLE userinfo DROP COLUMN speaking_rate").await?;
+        transaction
+            .execute("ALTER TABLE userinfo DROP COLUMN speaking_rate")
+            .await?;
     };
 
     Ok(())
@@ -83,14 +119,20 @@ async fn migrate_speaking_rate_to_mode(transaction: &mut Transaction<'_>) -> Res
 
 // I'll use a proper framework for this one day
 pub async fn run(config: &mut toml::Value, pool: &sqlx::PgPool) -> Result<()> {
-    let starting_conf = config.clone();    
+    let starting_conf = config.clone();
     let mut config_clone = config.clone();
 
-    *config = pool.acquire().await?.transaction(move |transaction| Box::pin(async move {
-        let main_config = config_clone["Main"].as_table_mut().try_unwrap()?;
-        _run(main_config, transaction).await?;
-        Ok::<_, anyhow::Error>(config_clone)
-    })).await?;
+    *config = pool
+        .acquire()
+        .await?
+        .transaction(move |transaction| {
+            Box::pin(async move {
+                let main_config = config_clone["Main"].as_table_mut().try_unwrap()?;
+                _run(main_config, transaction).await?;
+                Ok::<_, anyhow::Error>(config_clone)
+            })
+        })
+        .await?;
 
     if &starting_conf != config {
         let mut config_file = std::fs::File::create("config.toml")?;
@@ -100,12 +142,18 @@ pub async fn run(config: &mut toml::Value, pool: &sqlx::PgPool) -> Result<()> {
     Ok(())
 }
 
-async fn _run(main_config: &mut toml::value::Table, transaction: &mut Transaction<'_>) -> Result<()> {
+async fn _run(
+    main_config: &mut toml::value::Table,
+    transaction: &mut Transaction<'_>,
+) -> Result<()> {
     if main_config.get("setup").is_none() {
         transaction.execute(DB_SETUP_QUERY).await?;
         main_config.insert("setup".into(), true.into());
     } else if main_config.get("translation_url").is_none() {
-        main_config.insert("translation_url".into(), "https://api-free.deepl.com/v2".into());
+        main_config.insert(
+            "translation_url".into(),
+            "https://api-free.deepl.com/v2".into(),
+        );
     }
 
     transaction.execute("
@@ -175,7 +223,14 @@ async fn _run(main_config: &mut toml::value::Table, transaction: &mut Transactio
     ").await?;
 
     migrate_single_to_modes(transaction, "userinfo", "user_voice", "voice", "user_id").await?;
-    migrate_single_to_modes(transaction, "guilds", "guild_voice", "default_voice", "guild_id").await?;
+    migrate_single_to_modes(
+        transaction,
+        "guilds",
+        "guild_voice",
+        "default_voice",
+        "guild_id",
+    )
+    .await?;
     migrate_speaking_rate_to_mode(transaction).await?;
     Ok(())
 }
