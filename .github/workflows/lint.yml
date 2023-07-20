@@ -16,7 +16,7 @@ jobs:
         id: toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           components: clippy
           profile: minimal
           override: true
@@ -28,7 +28,7 @@ jobs:
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: -- -D clippy::all -D warnings
+          args: +nightly -- -D clippy::all -D warnings
 
   rustfmt:
     name: Format
@@ -47,4 +47,4 @@ jobs:
           override: true
 
       - name: Run cargo fmt
-        run: cargo fmt --all -- --check
+        run: cargo +nightly fmt --all -- --check

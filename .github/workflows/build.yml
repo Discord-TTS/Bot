@@ -8,7 +8,7 @@ jobs:
     name: Build
     strategy:
       matrix:
-        rust-version: ['1.65', 'nightly']
+        rust-version: ['nightly']
     runs-on: ubuntu-latest
     steps:
       - name: Repository Checkout
