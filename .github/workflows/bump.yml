@@ -23,18 +23,18 @@ jobs:
       - name: Install Toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           profile: minimal
           override: true
 
       - name: Install cargo-bump
-        run: cargo install cargo-bump
+        run: cargo +nightly install cargo-bump
 
       - name: Bump Cargo version
-        run: cargo-bump bump ${{ github.event.inputs.version }}
+        run: cargo-bump +nightly bump ${{ github.event.inputs.version }}
 
       - name: Bump Cargo.lock
-        run: cargo build
+        run: cargo +nightly build
 
       - name: Get latest version
         id: get_version
