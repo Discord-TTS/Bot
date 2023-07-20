@@ -21,6 +21,7 @@ pub async fn listen(framework_ctx: FrameworkContext<'_>, event: &Event) -> Resul
     let data = framework_ctx.user_data;
 
     match event {
+        #[allow(clippy::large_futures)]
         Event::Message { ctx, new_message } => message(framework_ctx, ctx, new_message).await,
         Event::Ready {
             ctx,

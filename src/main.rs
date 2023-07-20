@@ -347,7 +347,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             Box::pin(async move {
                 gnomeutils::errors::handle(error)
                     .await
-                    .unwrap_or_else(|err| error!("on_error: {:?}", err))
+                    .unwrap_or_else(|err| error!("on_error: {:?}", err));
             })
         },
         allowed_mentions: Some(
@@ -464,6 +464,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     client.start_autosharded().await.map_err(Into::into)
 }
 
+#[allow(unreachable_code, unused)]
 async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     return Ok(true);
     if let Context::Application(ctx) = ctx {

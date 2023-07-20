@@ -46,6 +46,7 @@ async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>
 }
 
 /// Joins the voice channel you're in!
+#[allow(clippy::too_many_lines)]
 #[poise::command(
     category = "Main Commands",
     guild_only,

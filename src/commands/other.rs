@@ -194,6 +194,7 @@ pub async fn tts_speak(ctx: ApplicationContext<'_>, message: serenity::Message) 
 }
 
 /// Shows various different stats
+#[allow(clippy::too_many_lines)]
 #[poise::command(
     category = "Extra Commands",
     prefix_command,
