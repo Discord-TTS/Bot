@@ -26,6 +26,7 @@ pub const OPTION_SEPERATORS: [&str; 4] = [
 
 pub const DM_WELCOME_MESSAGE: &str = "
 **All messages after this will be sent to a private channel where we can assist you.**
+**DO NOT SEND PERSONAL INFORMATION TO ANY DISCORD BOT, BOT DEVELOPERS CAN SEE THE MESSAGES.**
 Please keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day repeat your message.
 There are some basic rules if you want to get help though:
 `1.` Ask your question, don't just ask for help
