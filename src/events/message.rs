@@ -1,13 +1,16 @@
 use std::{borrow::Cow, num::NonZeroU16};
 
-use gnomeutils::{require, OptionTryUnwrap, serenity::{CreateMessage, ExecuteWebhook, Mentionable, CreateEmbed, CreateEmbedFooter}};
-use poise::serenity_prelude as serenity;
 use tracing::info;
+
+use poise::serenity_prelude as serenity;
+use self::serenity::{CreateMessage, ExecuteWebhook, Mentionable, CreateEmbed, CreateEmbedFooter};
 
 use crate::structs::{FrameworkContext, Data, Result, JoinVCToken, TTSMode};
 use crate::funcs::{run_checks, clean_msg, self, random_footer, dm_generic};
 use crate::constants::DM_WELCOME_MESSAGE;
-use crate::traits::{SongbirdManagerExt};
+use crate::traits::SongbirdManagerExt;
+use crate::opt_ext::OptionTryUnwrap;
+use crate::{require, errors};
 
 pub async fn message(framework_ctx: FrameworkContext<'_>, ctx: &serenity::Context, new_message: &serenity::Message) -> Result<()> {
     tokio::try_join!(
@@ -128,7 +131,7 @@ async fn process_tts_msg(
     }), false);
 
     let guild = ctx.cache.guild(guild_id).try_unwrap()?;
-    let (blank_name, blank_value, blank_inline) = gnomeutils::errors::blank_field();
+    let (blank_name, blank_value, blank_inline) = errors::blank_field();
 
     let extra_fields = [
         ("Guild Name", Cow::Owned(guild.name.clone()), true),
@@ -144,7 +147,7 @@ async fn process_tts_msg(
     let icon_url = message.author.face();
     let data = data.clone();
 
-    gnomeutils::errors::handle_track(
+    errors::handle_track(
         ctx.clone(), shard_manager, data, extra_fields,
         author_name, icon_url,
         &track_handle

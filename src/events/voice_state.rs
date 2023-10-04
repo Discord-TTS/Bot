@@ -1,6 +1,6 @@
-use gnomeutils::OptionTryUnwrap;
 use poise::serenity_prelude as serenity;
 
+use crate::opt_ext::OptionTryUnwrap;
 use crate::structs::{Data, Result};
 
 

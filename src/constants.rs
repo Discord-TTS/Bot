@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub const RED: u32 = 0xff0000;
 pub const FREE_NEUTRAL_COLOUR: u32 = 0x3498db;
 pub const PREMIUM_NEUTRAL_COLOUR: u32 = 0xcaa652;
 

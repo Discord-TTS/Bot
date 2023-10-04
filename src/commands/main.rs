@@ -19,10 +19,10 @@ use songbird::error::JoinError;
 use sqlx::Row;
 
 use poise::{CreateReply, serenity_prelude::{self as serenity, builder::*}};
-use gnomeutils::{PoiseContextExt as _, require, require_guild};
 
 use crate::structs::{Context, Result, CommandResult, TTSMode, JoinVCToken, Command};
 use crate::traits::{SongbirdManagerExt, PoiseContextExt};
+use crate::{require, require_guild};
 use crate::funcs::random_footer;
 
 async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>) -> Result<bool> {
@@ -58,14 +58,13 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         return Ok(())
     }
 
-    let ctx_discord = ctx.discord();
     let guild_id = ctx.guild_id().unwrap();
     let (bot_id, bot_face) = {
-        let current_user = ctx_discord.cache.current_user();
+        let current_user = ctx.cache().current_user();
         (current_user.id, current_user.face())
     };
 
-    let bot_member = guild_id.member(ctx_discord, bot_id).await?;
+    let bot_member = guild_id.member(ctx, bot_id).await?;
     if let Some(communication_disabled_until) = bot_member.communication_disabled_until {
         if communication_disabled_until > serenity::Timestamp::now() {
             return ctx.send_error(
@@ -76,12 +75,12 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     }
 
     let author = ctx.author();
-    let member = guild_id.member(ctx_discord, author.id).await?;
-    let channel = author_vc.to_channel(ctx_discord).await?.guild().unwrap();
+    let member = guild_id.member(ctx, author.id).await?;
+    let channel = author_vc.to_channel(ctx).await?.guild().unwrap();
 
     let missing_permissions =
         (serenity::Permissions::VIEW_CHANNEL | serenity::Permissions::CONNECT | serenity::Permissions::SPEAK) -
-        channel.permissions_for_user(ctx_discord, bot_id)?;
+        channel.permissions_for_user(ctx, bot_id)?;
 
     if !missing_permissions.is_empty() {
         return ctx.send_error(
@@ -201,7 +200,7 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
         match ctx {
             poise::Context::Prefix(ctx) => {
                 // Prefixed command, just add a thumbsup reaction
-                ctx.msg.react(ctx.discord, '👍').await?;
+                ctx.msg.react(ctx.serenity_context(), '👍').await?;
             }
             poise::Context::Application(_) => {
                 // Slash command, no message to react to, just say thumbsup
@@ -235,7 +234,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
 
     let linked_guilds: i64 = sqlx::query("SELECT count(*) FROM guilds WHERE premium_user = $1")
         .bind(author_id)
-        .fetch_one(&data.inner.pool)
+        .fetch_one(&data.pool)
         .await?.get("count");
 
     let error_msg = match data.fetch_patreon_info(author.id).await? {
@@ -277,7 +276,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
 
     ctx.say(ctx.gettext("Done! This server is now premium!")).await?;
 
-    let guild = ctx.discord().cache.guild(guild_id);
+    let guild = ctx.cache().guild(guild_id);
     let guild_name = guild.as_ref().map_or("<Unknown>", |g| g.name.as_str());
 
     tracing::info!(

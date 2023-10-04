@@ -18,8 +18,7 @@ use std::io::Write;
 
 use sqlx::{Row, Executor, Connection as _};
 
-use gnomeutils::OptionTryUnwrap;
-
+use crate::opt_ext::OptionTryUnwrap;
 use crate::constants::DB_SETUP_QUERY;
 use crate::structs::{Result, TTSMode};
 

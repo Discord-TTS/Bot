@@ -51,7 +51,7 @@ Ask questions by either responding here or asking on the support server!",
     ).await {
         Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => return Ok(()),
         Err(err) => return Err(anyhow::Error::from(err)),
-        Result::Ok(_) => (),
+        Result::Ok(()) => (),
     }
 
     info!("Added OFS role to {}", owner_tag);

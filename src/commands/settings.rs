@@ -19,15 +19,15 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use anyhow::bail;
-use gnomeutils::serenity::ComponentInteractionDataKind;
-use poise::serenity_prelude::{self as serenity, Mentionable, builder::*};
-use gnomeutils::{require, require_guild, OptionGettext as _, PoiseContextExt as _};
+use poise::serenity_prelude as serenity;
+use self::serenity::{Mentionable, builder::*, ComponentInteractionDataKind};
 
-use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, PollyVoice, TTSModeChoice, Command, SpeakingRateInfo};
+use crate::opt_ext::OptionGettext;
+use crate::structs::{Context, Result, Error, TTSMode, Data, CommandResult, ApplicationContext, TTSModeChoice, Command, SpeakingRateInfo};
 use crate::constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR};
 use crate::traits::PoiseContextExt;
 use crate::funcs::{random_footer, confirm_dialog, current_user_id};
-use crate::database;
+use crate::{database, require, require_guild};
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
     if mode == TTSMode::gCloud {
@@ -208,7 +208,7 @@ impl<'a> MenuPaginator<'a> {
             .title(self.ctx
                 .gettext("{bot_user} Voices | Mode: `{mode}`")
                 .replace("{mode}", self.mode.into())
-                .replace("{bot_user}", &self.ctx.discord().cache.current_user().name)
+                .replace("{bot_user}", &self.ctx.cache().current_user().name)
             )
             .description(self.ctx.gettext("**Currently Supported Voice**\n{page}").replace("{page}", page))
             .field(self.ctx.gettext("Current voice used"), &self.current_voice, false)
@@ -239,7 +239,7 @@ impl<'a> MenuPaginator<'a> {
     }
 
     async fn edit_message(&self, message: &mut serenity::Message, disable: bool) -> serenity::Result<()> {
-        message.edit(self.ctx.discord(), EditMessage::default()
+        message.edit(self.ctx, EditMessage::default()
             .embed(self.create_page(&self.pages[self.index]))
             .components(vec![self.create_action_row(disable)])
         ).await
@@ -247,12 +247,12 @@ impl<'a> MenuPaginator<'a> {
 
 
     pub async fn start(mut self) -> serenity::Result<()> {
-        let ctx_discord = self.ctx.discord();
         let mut message = self.create_message().await?;
+        let serenity_context = self.ctx.serenity_context();
 
         loop {
             let builder = message
-                .await_component_interaction(&ctx_discord.shard)
+                .await_component_interaction(&serenity_context.shard)
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(self.ctx.author().id);
 
@@ -268,7 +268,7 @@ impl<'a> MenuPaginator<'a> {
                 },
                 "⏹️" => {
                     self.edit_message(&mut message, true).await?;
-                    return interaction.defer(&ctx_discord.http).await
+                    return interaction.defer(&serenity_context.http).await
                 },
                 "▶️" => {
                     self.index += 1;
@@ -280,7 +280,7 @@ impl<'a> MenuPaginator<'a> {
                 },
                 _ => unreachable!()
             };
-            interaction.defer(&ctx_discord.http).await?;
+            interaction.defer(&serenity_context.http).await?;
         }
     }
 }
@@ -296,31 +296,31 @@ async fn voice_autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec
 
     let (mut i1, mut i2, mut i3, mut i4);
     let voices: &mut dyn Iterator<Item=_> = match mode {
-        TTSMode::gTTS => {i1 = ctx.data.gtts_voices.iter().map(clone_tuple_items).map(|(value, name)| poise::AutocompleteChoice {name, value}); &mut i1},
+        TTSMode::gTTS => {i1 = ctx.data.gtts_voices.iter().map(clone_tuple_items).map(|(value, name)| poise::AutocompleteChoice::new_with_value(name, value)); &mut i1},
         TTSMode::eSpeak => {i2 = ctx.data.espeak_voices.iter().cloned().map(poise::AutocompleteChoice::from); &mut i2},
         TTSMode::Polly => {i3 =
-            ctx.data.polly_voices.values().map(|voice| poise::AutocompleteChoice{
-                name: format!("{} - {} ({})", voice.name, voice.language_name, voice.gender),
-                value: voice.id.clone()
-            });
+            ctx.data.polly_voices.values().map(|voice| poise::AutocompleteChoice::new_with_value(
+                format!("{} - {} ({})", voice.name, voice.language_name, voice.gender),
+                voice.id.clone()
+            ));
         &mut i3}
         TTSMode::gCloud => {i4 =
             ctx.data.gcloud_voices.iter().flat_map(|(language, variants)| {
                 variants.iter().map(move |(variant, gender)| {
-                    poise::AutocompleteChoice {
-                        name: format!("{language} {variant} ({gender})"),
-                        value: format!("{language} {variant}")
-                    }
+                    poise::AutocompleteChoice::new_with_value(
+                        format!("{language} {variant} ({gender})"),
+                        format!("{language} {variant}")
+                    )
                 })
             });
         &mut i4}
     };
 
     let mut filtered_voices: Vec<_> = voices
-        .filter(|choice| choice.name.starts_with(searching))
+        .filter(|choice| choice.label.starts_with(searching))
         .collect();
 
-    filtered_voices.sort_by_key(|choice| strsim::levenshtein(&choice.name, searching));
+    filtered_voices.sort_by_key(|choice| strsim::levenshtein(&choice.label, searching));
     filtered_voices
 }
 
@@ -329,10 +329,10 @@ async fn translation_languages_autocomplete(ctx: ApplicationContext<'_>, searchi
     let mut filtered_languages = ctx.data.translation_languages.iter()
         .filter(|(_, name)| name.starts_with(searching))
         .map(|(value, name)| (value.clone(), name.clone()))
-        .map(|(value, name)| poise::AutocompleteChoice {name, value})
+        .map(|(value, name)| poise::AutocompleteChoice::new_with_value(name, value))
         .collect::<Vec<_>>();
 
-    filtered_languages.sort_by_key(|choice| strsim::levenshtein(&choice.name, searching));
+    filtered_languages.sort_by_key(|choice| strsim::levenshtein(&choice.label, searching));
     filtered_languages
 }
 
@@ -498,7 +498,7 @@ fn check_prefix<'a>(ctx: &'a Context<'_>, prefix: &str) -> Result<(), &'a str> {
 /// Changes a setting!
 #[poise::command(category="Settings", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
 pub async fn set(ctx: Context<'_>, ) -> CommandResult {
-    gnomeutils::help::command(ctx, Some("set"), ctx.neutral_colour().await).await
+    super::help::command(ctx, Some("set")).await
 }
 
 /// Owner only: used to block a user from dms
@@ -617,8 +617,8 @@ pub async fn required_role(
     ctx: Context<'_>,
     #[description="The required role for all bot usage"] required_role: Option<serenity::Role>,
 ) -> CommandResult {
-    let ctx_discord = ctx.discord();
     let guild_id = ctx.guild_id().unwrap();
+    let cache = ctx.cache();
     let data = ctx.data();
 
     let currently_required_role = data.guilds_db
@@ -630,7 +630,7 @@ pub async fn required_role(
         );
 
     let response = {
-        let current_user = ctx_discord.cache.current_user();
+        let current_user = cache.current_user();
         if required_role.is_some() {Some(
             if let Some(currently_required_role) = currently_required_role {(
                 ctx.gettext("Are you sure you want to change the required role?"),
@@ -655,7 +655,7 @@ pub async fn required_role(
     if require!(confirm_dialog(ctx, question, ctx.gettext("Yes, I'm sure.").into(), negative).await?, Ok(())) {
         ctx.data().guilds_db.set_one(guild_id.into(), "required_role", &required_role.as_ref().map(|r| r.id.get() as i64)).await?;
         ctx.say({
-            let current_user = ctx_discord.cache.current_user();
+            let current_user = cache.current_user();
             if let Some(required_role) = required_role {
                 ctx.gettext("{bot_name} now requires {required_role} to use.").replace("{required_role}", &required_role.mention().to_string()).replace("{bot_name}", &current_user.name)
             } else {
@@ -905,11 +905,10 @@ pub async fn nick(
     #[description="The nickname to set, leave blank to reset"] #[rest] nickname: Option<String>
 ) -> CommandResult {
     let author = ctx.author();
-    let ctx_discord = ctx.discord();
     let guild_id = ctx.guild_id().unwrap();
     let user = user.map_or(Cow::Borrowed(author), Cow::Owned);
 
-    if author.id != user.id && !guild_id.member(ctx_discord, author).await?.permissions(ctx_discord)?.administrator() {
+    if author.id != user.id && !guild_id.member(ctx, author).await?.permissions(ctx)?.administrator() {
         ctx.say(ctx.gettext("**Error**: You need admin to set other people's nicknames!")).await?;
         return Ok(())
     }
@@ -963,9 +962,8 @@ pub async fn setup(
     channel: Option<serenity::GuildChannel>
 ) -> CommandResult {
     let data = ctx.data();
+    let cache = ctx.cache();
     let author = ctx.author();
-    let ctx_discord = ctx.discord();
-    let cache = &ctx_discord.cache;
     let guild_id = ctx.guild_id().unwrap();
 
     let (bot_user_id, bot_user_name, bot_user_face) = {
@@ -975,11 +973,11 @@ pub async fn setup(
 
     #[allow(clippy::manual_let_else)] // false positive
     let (bot_member, channel) = {
-        let bot_member = guild_id.member(ctx_discord, bot_user_id).await?;
+        let bot_member = guild_id.member(ctx, bot_user_id).await?;
         let channel = if let Some(channel) = channel {
             channel
         } else {
-            let author_member = guild_id.member(ctx_discord, author).await?;
+            let author_member = guild_id.member(ctx, author).await?;
 
             let mut text_channels: Vec<_> = {
                 let guild = require_guild!(ctx);
@@ -1017,13 +1015,13 @@ pub async fn setup(
             ).await?;
 
             let interaction = reply.message().await?
-                .await_component_interaction(&ctx_discord.shard)
+                .await_component_interaction(&ctx.serenity_context().shard)
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(ctx.author().id)
                 .await;
 
             if let Some(interaction) = interaction {
-                interaction.defer(&ctx_discord.http).await?;
+                interaction.defer(&ctx).await?;
 
                 let ComponentInteractionDataKind::StringSelect { values } = &interaction.data.kind else {bail!("Expected a string value")};
                 let selected_id = serenity::ChannelId(values[0].parse().unwrap());
@@ -1062,7 +1060,7 @@ Just do `/join` and start talking!
             ctx.gettext("No").into()
         ).await?.unwrap_or(false)
     {
-        data.config.announcements_channel.follow(ctx_discord, channel.id).await?;
+        data.config.announcements_channel.follow(ctx, channel.id).await?;
         tracing::info!("Set up announcements channel in {}", guild_id);
     };
 
@@ -1136,11 +1134,10 @@ pub async fn voice(
 pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
     let author = ctx.author();
-    let cache = &ctx.discord().cache;
     let neutral_colour = ctx.neutral_colour().await;
 
     let (embed_title, client_id) = {
-        let current_user = cache.current_user();
+        let current_user = ctx.cache().current_user();
         (
             ctx.gettext("{} Translation Languages").replace("{}", &current_user.name),
             current_user.id
@@ -1169,9 +1166,10 @@ pub async fn voices(
     ctx: Context<'_>,
     #[description="The mode to see the voices for, leave blank for current"] mode: Option<TTSModeChoice>
 ) -> CommandResult {
-    let author = ctx.author();
     let data = ctx.data();
-
+    let cache = ctx.cache();
+    let author = ctx.author();
+    
     let mode = match mode {
         Some(mode) => TTSMode::from(mode),
         None => data.parse_user_or_guild(author.id, ctx.guild_id()).await?.1
@@ -1180,7 +1178,7 @@ pub async fn voices(
     let voices = {
         let random_footer = || random_footer(
             &data.config.main_server_invite,
-            ctx.discord().cache.current_user().id,
+            cache.current_user().id,
             ctx.current_catalog(),
         );
 
@@ -1198,7 +1196,6 @@ pub async fn voices(
         }
     };
 
-    let cache = &ctx.discord().cache;
     let user_voice_row = data.user_voice_db.get((author.id.into(), mode)).await?;
 
     let (embed_title, client_id) = {
@@ -1243,9 +1240,9 @@ pub async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>
         _ => &data.polly_voices[TTSMode::Polly.default_voice()]
     };
 
-    let mut lang_to_voices: HashMap<&String, Vec<&PollyVoice>> = HashMap::new();
+    let mut lang_to_voices: HashMap<_, Vec<_>> = HashMap::new();
     for voice in data.polly_voices.values() {
-        lang_to_voices.entry(&voice.language_name).or_insert_with(Vec::new).push(voice);
+        lang_to_voices.entry(&voice.language_name).or_default().push(voice);
     }
 
     let pages = lang_to_voices.into_values().map(|voices| {

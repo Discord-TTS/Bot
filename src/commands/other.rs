@@ -20,8 +20,8 @@ use sysinfo::{SystemExt, ProcessExt};
 use num_format::{Locale, ToFormattedString};
 
 use poise::{CreateReply, serenity_prelude::{self as serenity, builder::*, Mentionable as _}};
-use gnomeutils::{PoiseContextExt as _, OptionTryUnwrap as _};
 
+use crate::opt_ext::OptionTryUnwrap;
 use crate::constants::OPTION_SEPERATORS;
 use crate::traits::PoiseContextExt as _;
 use crate::funcs::{fetch_audio, prepare_url};
@@ -37,7 +37,7 @@ fn cmp_float(a: &f64, b: &f64) -> Ordering {
 pub async fn uptime(ctx: Context<'_>,) -> CommandResult {
     let timestamp = ctx.data().start_time.duration_since(std::time::UNIX_EPOCH)?.as_secs();
     let current_user_mention = {
-        let current_user = ctx.discord().cache.current_user();
+        let current_user = ctx.cache().current_user();
         current_user.mention().to_string()
     };
 
@@ -63,7 +63,7 @@ pub async fn tts(
             if let Some(guild) = ctx.guild() {(
                 guild.id,
                 guild.voice_states.get(&ctx.author().id).and_then(|vc| vc.channel_id),
-                guild.voice_states.get(&ctx.discord().cache.current_user().id).and_then(|vc| vc.channel_id)
+                guild.voice_states.get(&ctx.cache().current_user().id).and_then(|vc| vc.channel_id)
             )} else {
                 return Ok(false)
             }
@@ -131,16 +131,16 @@ pub async fn tts_speak(ctx: ApplicationContext<'_>, message: serenity::Message) 
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES | EMBED_LINKS")]
 pub async fn botstats(ctx: Context<'_>,) -> CommandResult {
     let data = ctx.data();
-    let ctx_discord = ctx.discord();
-    let bot_user_id = ctx_discord.cache.current_user().id;
+    let cache = ctx.cache();
+    let bot_user_id = cache.current_user().id;
 
     let start_time = std::time::SystemTime::now();
     let [sep1, sep2, sep3, ..] = OPTION_SEPERATORS;
 
-    let guild_ids = ctx_discord.cache.guilds();
+    let guild_ids = cache.guilds();
     let (total_guild_count, total_voice_clients, total_members) = {
         let guilds: Vec<_> = guild_ids.iter()
-            .filter_map(|id| ctx_discord.cache.guild(id))
+            .filter_map(|id| cache.guild(id))
             .collect();
 
         (
@@ -175,9 +175,9 @@ With the songbird scheduler stats of
         }
     };
 
-    let shard_count = ctx_discord.cache.shard_count();
+    let shard_count = cache.shard_count();
     let ram_usage = {
-        let mut system_info = data.inner.system_info.lock();
+        let mut system_info = data.system_info.lock();
         system_info.refresh_specifics(sysinfo::RefreshKind::new()
             .with_cpu(sysinfo::CpuRefreshKind::new().with_cpu_usage())
             .with_processes(sysinfo::ProcessRefreshKind::new())
@@ -190,7 +190,7 @@ With the songbird scheduler stats of
 
     let neutral_colour = ctx.neutral_colour().await;
     let (embed_title, embed_thumbnail) = {
-        let current_user = ctx_discord.cache.current_user();
+        let current_user = cache.current_user();
 
         let title = ctx.gettext("{bot_name}: Freshly rewritten in Rust!").replace("{bot_name}", &current_user.name);
         let thumbnail = current_user.face();
@@ -274,7 +274,7 @@ pub async fn ping(ctx: Context<'_>,) -> CommandResult {
 #[allow(unused_variables)]
 pub async fn suggest(ctx: Context<'_>, #[rest] suggestion: String) -> CommandResult {
     let (bot_name, face) = {
-        let user = ctx.discord().cache.current_user();
+        let user = ctx.cache().current_user();
         (user.name.clone(), user.face())
     };
 
@@ -289,9 +289,9 @@ pub async fn suggest(ctx: Context<'_>, #[rest] suggestion: String) -> CommandRes
 /// Sends the instructions to invite TTS Bot and join the support server!
 #[poise::command(category="Extra Commands", prefix_command, slash_command, required_bot_permissions="SEND_MESSAGES")]
 pub async fn invite(ctx: Context<'_>,) -> CommandResult {
-    let ctx_discord = ctx.discord();
+    let cache = ctx.cache();
     let config = &ctx.data().config;
-    let bot_mention = ctx_discord.cache.current_user().id.mention().to_string();
+    let bot_mention = cache.current_user().id.mention().to_string();
 
     let invite_channel = config.invite_channel;
     ctx.say(
@@ -301,7 +301,7 @@ pub async fn invite(ctx: Context<'_>,) -> CommandResult {
                 .replace("{channel_mention}", &invite_channel.mention().to_string())
                 .replace("{bot_mention}", &bot_mention)
         } else {
-            ctx_discord.cache.guild_channel(invite_channel).map(|c| ctx
+            cache.guild_channel(invite_channel).map(|c| ctx
                 .gettext("Join {server_invite} and look in #{channel_name} to invite {bot_mention}")
                 .replace("{channel_name}", &c.name)
                 .replace("{bot_mention}", &bot_mention)

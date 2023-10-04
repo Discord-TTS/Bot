@@ -22,11 +22,11 @@ use itertools::Itertools as _;
 use rand::Rng as _;
 
 use poise::serenity_prelude as serenity;
-use gnomeutils::{OptionGettext, OptionTryUnwrap};
 use serenity::{json::prelude as json, builder::*};
 
-use crate::database::GuildRow;
 use crate::structs::{Context, Data, Error, LastToXsaidTracker, TTSMode, GoogleGender, GoogleVoice, Result, TTSServiceError, RegexCache};
+use crate::opt_ext::{OptionGettext, OptionTryUnwrap};
+use crate::database::GuildRow;
 use crate::require;
 
 pub fn current_user_id(cache: &serenity::Cache) -> serenity::UserId {
@@ -490,12 +490,11 @@ pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, ne
     let reply = ctx.send(poise::CreateReply::default()
         .content(prompt)
         .ephemeral(true)
-        .components(components(positive.clone(), negative.clone(), false))
+        .components(components(positive, negative, false))
     ).await?;
 
-    let ctx_discord = ctx.discord();
     let interaction = reply.message().await?
-        .await_component_interaction(&ctx_discord.shard)
+        .await_component_interaction(&ctx.serenity_context().shard)
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(ctx.author().id)
         .await;
@@ -503,7 +502,7 @@ pub async fn confirm_dialog(ctx: Context<'_>, prompt: &str, positive: String, ne
     reply.delete(ctx).await?;
 
     if let Some(interaction) = interaction {
-        interaction.defer(&ctx_discord.http).await?;
+        interaction.defer(&ctx).await?;
         match &*interaction.data.custom_id {
             "True" => Ok(Some(true)),
             "False" => Ok(Some(false)),

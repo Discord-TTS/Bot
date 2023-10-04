@@ -1,10 +1,9 @@
 use std::sync::{atomic::Ordering, Arc};
 
-use gnomeutils::Looper;
 use poise::serenity_prelude as serenity;
-use serenity::builder::*;
+use self::serenity::builder::*;
 
-use crate::{structs::{FrameworkContext, Result}, funcs::generate_status, constants::FREE_NEUTRAL_COLOUR, web_updater};
+use crate::{structs::{FrameworkContext, Result}, funcs::generate_status, constants::FREE_NEUTRAL_COLOUR, web_updater, bot_list_updater::BotListUpdater, looper::Looper};
 
 #[allow(clippy::explicit_auto_deref)]
 pub async fn ready(framework_ctx: FrameworkContext<'_>, ctx: &serenity::Context, data_about_bot: &serenity::Ready) -> Result<()> {
@@ -12,7 +11,7 @@ pub async fn ready(framework_ctx: FrameworkContext<'_>, ctx: &serenity::Context,
 
     let user_name = &data_about_bot.user.name;
     let last_shard = (ctx.shard_id.0 + 1) == ctx.cache.shard_count();
-    let status = generate_status(&*framework_ctx.shard_manager.lock().await.runners.lock().await);
+    let status = generate_status(&*framework_ctx.shard_manager.runners.lock().await);
 
     data.webhooks.logs.edit_message(&ctx.http, data.startup_message, serenity::EditWebhookMessage::default()
         .content("")
@@ -29,7 +28,7 @@ pub async fn ready(framework_ctx: FrameworkContext<'_>, ctx: &serenity::Context,
 
     if last_shard && !data.fully_started.load(Ordering::SeqCst) {
         data.fully_started.store(true, Ordering::SeqCst);
-        let stats_updater = Arc::new(gnomeutils::BotListUpdater::new(
+        let stats_updater = Arc::new(BotListUpdater::new(
             data.reqwest.clone(), ctx.cache.clone(), data.bot_list_tokens.clone()
         ));
 
@@ -37,8 +36,8 @@ pub async fn ready(framework_ctx: FrameworkContext<'_>, ctx: &serenity::Context,
             let web_updater = Arc::new(web_updater::Updater {
                 patreon_service: data.config.patreon_service.clone(),
                 reqwest: data.reqwest.clone(),
-                pool: data.inner.pool.clone(),
                 cache: ctx.cache.clone(),
+                pool: data.pool.clone(),
                 config: website_info,
             });
 

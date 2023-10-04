@@ -31,20 +31,28 @@ use sysinfo::SystemExt;
 use parking_lot::{RwLock, Mutex};
 use tracing::{error, warn};
 
-use gnomeutils::{analytics, logging, Looper, require, OptionTryUnwrap, PoiseContextExt, require_guild};
 use poise::serenity_prelude::{self as serenity, Mentionable as _, builder::*};
 
+mod bot_list_updater;
 mod web_updater;
+mod analytics;
 mod migration;
 mod constants;
 mod database;
 mod commands;
 mod structs;
+mod opt_ext;
+mod logging;
+mod looper;
+mod errors;
 mod traits;
 mod macros;
 mod events;
 mod funcs;
 
+use looper::Looper;
+use traits::PoiseContextExt;
+use opt_ext::OptionTryUnwrap;
 use constants::PREMIUM_NEUTRAL_COLOUR;
 use funcs::{prepare_gcloud_voices, get_translation_langs, decode_resp};
 use structs::{TTSMode, Config, Context, Data, Result, PostgresConfig, PollyVoice, WebhookConfigRaw, WebhookConfig, FailurePoint, DataInner};
@@ -192,14 +200,12 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     };
 
     let data = Data(Arc::new(DataInner {
+        pool, translations,
         bot_list_tokens: config.bot_list_tokens,
-        inner: gnomeutils::GnomeData {
-            pool, translations,
-            error_webhook: webhooks.errors.take().unwrap(),
-            system_info: Mutex::new(sysinfo::System::new()),
-            main_server_invite: config.main.main_server_invite.clone(),
-        },
-
+        error_webhook: webhooks.errors.take().unwrap(),
+        system_info: Mutex::new(sysinfo::System::new()),
+        main_server_invite: config.main.main_server_invite.clone(),
+        
         songbird: songbird.clone(),
         fully_started: AtomicBool::new(false),
         join_vc_tokens: dashmap::DashMap::new(),
@@ -224,8 +230,8 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
     let framework_options = poise::FrameworkOptions {
         commands: commands::commands(),
-        listener: |event, ctx, _| Box::pin(events::listen(ctx, event)),
-        on_error: |error| Box::pin(async move {gnomeutils::errors::handle(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err))}),
+        event_handler: |event, ctx, _| Box::pin(events::listen(ctx, event)),
+        on_error: |error| Box::pin(async move {errors::handle(error).await.unwrap_or_else(|err| error!("on_error: {:?}", err))}),
         allowed_mentions: Some(serenity::CreateAllowedMentions::default()
             .replied_user(true)
             .all_users(true)
@@ -321,7 +327,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         }
 
         warn!("Recieved control C and shutting down.");
-        shard_manager.lock().await.shutdown_all().await;
+        shard_manager.shutdown_all().await;
     });
 
     client.start_autosharded().await.map_err(Into::into)
@@ -336,9 +342,9 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
         }
     }
 
-    let guild_id = ctx.guild_id();
-    let ctx_discord = ctx.discord();
     let data = ctx.data();
+    let guild_id = ctx.guild_id();
+    let serenity_ctx = ctx.serenity_context();
 
     let main_msg =
         match data.premium_check(guild_id).await? {
@@ -346,7 +352,7 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
             Some(FailurePoint::Guild) => Cow::Borrowed("Hey, this is a premium command so it must be run in a server!"),
             Some(FailurePoint::PremiumUser) => Cow::Borrowed("Hey, this server isn't premium, please purchase TTS Bot Premium via Patreon! (`/donate`)"),
             Some(FailurePoint::NotSubscribed(premium_user_id)) => {
-                let premium_user = premium_user_id.to_user(ctx_discord).await?;
+                let premium_user = premium_user_id.to_user(serenity_ctx).await?;
                 Cow::Owned(format!(concat!(
                     "Hey, this server has a premium user setup, however they are not longer a patreon! ",
                     "Please ask {}#{} to renew their membership."
@@ -358,7 +364,7 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     warn!(
         "{}#{} | {} failed the premium check in {}",
         author.name, author.discriminator.map_or(0, NonZeroU16::get), author.id,
-        guild_id.and_then(|g_id| ctx_discord.cache.guild(g_id).map(|g| (
+        guild_id.and_then(|g_id| serenity_ctx.cache.guild(g_id).map(|g| (
             Cow::Owned(format!("{} | {g_id}", g.name))
         ))).unwrap_or(Cow::Borrowed("DMs"))
     );

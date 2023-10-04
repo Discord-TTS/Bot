@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
+use std::{borrow::Cow, collections::{BTreeMap, HashMap}, sync::Arc};
 
 use parking_lot::RwLock;
 use strum_macros::IntoStaticStr;
@@ -16,7 +16,7 @@ pub struct Config {
     #[serde(rename="Main")] pub main: MainConfig,
     #[serde(rename="Webhook-Info")] pub webhooks: WebhookConfigRaw,
     #[serde(rename="Website-Info")] pub website_info: Option<WebsiteInfo>,
-    #[serde(rename="Bot-List-Tokens")] #[serde(default)] pub bot_list_tokens: gnomeutils::BotListTokens,
+    #[serde(rename="Bot-List-Tokens")] #[serde(default)] pub bot_list_tokens: BotListTokens,
 }
 
 #[derive(serde::Deserialize)]
@@ -63,6 +63,13 @@ pub struct WebhookConfigRaw {
     pub dm_logs: reqwest::Url,
 }
 
+#[derive(serde::Deserialize, Clone, Default)]
+pub struct BotListTokens {
+    pub top_gg: Option<String>,
+    pub discord_bots_gg: Option<String>,
+    pub bots_on_discord: Option<String>,
+}
+
 pub struct WebhookConfig {
     pub logs: serenity::Webhook,
     pub servers: serenity::Webhook,
@@ -102,11 +109,6 @@ pub struct RegexCache {
 #[derive(Clone)]
 pub struct Data(pub Arc<DataInner>);
 
-impl AsRef<gnomeutils::GnomeData> for Data {
-    fn as_ref(&self) -> &gnomeutils::GnomeData {
-        &self.inner
-    }
-}
 
 impl std::ops::Deref for Data {
     type Target = DataInner;
@@ -123,23 +125,27 @@ pub struct DataInner {
     pub nickname_db: database::Handler<[i64; 2], database::NicknameRow>,
     pub user_voice_db: database::Handler<(i64, TTSMode), database::UserVoiceRow>,
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRow>,
-
+    
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
+    pub system_info: parking_lot::Mutex<sysinfo::System>,
     pub currently_purging: std::sync::atomic::AtomicBool,
+    pub translations: HashMap<String, gettext::Catalog>,
     pub fully_started: std::sync::atomic::AtomicBool,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub website_info: RwLock<Option<WebsiteInfo>>,
     pub startup_message: serenity::MessageId,
     pub start_time: std::time::SystemTime,
     pub songbird: Arc<songbird::Songbird>,
+    pub error_webhook: serenity::Webhook,
+    pub bot_list_tokens: BotListTokens,
     pub premium_avatar_url: String,
+    pub main_server_invite: String,
     pub reqwest: reqwest::Client,
     pub regex_cache: RegexCache,
     pub webhooks: WebhookConfig,
     pub config: MainConfig,
-
-    pub inner: gnomeutils::GnomeData,
-    pub bot_list_tokens: gnomeutils::BotListTokens,
+    pub pool: sqlx::PgPool,
+    
 
     pub espeak_voices: Vec<String>,
     pub gtts_voices: BTreeMap<String, String>,
@@ -157,7 +163,7 @@ impl std::fmt::Debug for Data {
 
 impl Data {
     pub fn default_catalog(&self) -> Option<&gettext::Catalog> {
-        self.inner.translations.get("en-US")
+        self.translations.get("en-US")
     }
 
     pub async fn speaking_rate(&self, user_id: serenity::UserId, mode: TTSMode) -> Result<Cow<'static, str>> {

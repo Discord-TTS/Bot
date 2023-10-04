@@ -14,6 +14,7 @@ regex = "1"
 toml = "0.7"
 rand = "0.8"
 anyhow = "1"
+sha2 = "0.10"
 strfmt = "0.2"
 indexmap = "2"
 tracing = "0.1"
@@ -51,11 +52,6 @@ features = ["rt-multi-thread", "signal", "parking_lot"]
 [dependencies.dashmap]
 version = "5"
 default-features = false
-
-[dependencies.gnomeutils]
-git = "https://github.com/GnomedDev/GnomeUtils"
-features = ["error_handling", "help_command", "analytics", "i18n", "bot_list", "logging", "songbird"]
-branch = "personal"
 
 [dependencies.serenity_feature_only]
 git = "https://github.com/serenity-rs/serenity"

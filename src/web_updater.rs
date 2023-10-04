@@ -1,9 +1,13 @@
 use std::{sync::Arc, collections::{HashMap, HashSet}};
 
-use gnomeutils::serenity::{self as serenity, json::prelude as json};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
-use crate::{Result, structs::{TTSMode, WebsiteInfo}, funcs::decode_resp};
+use crate::{
+    Result,
+    funcs::decode_resp,
+    structs::{TTSMode, WebsiteInfo},
+    serenity::{self as serenity, json::prelude as json}
+};
 
 
 #[allow(dead_code, clippy::match_same_arms)]
@@ -40,7 +44,7 @@ pub struct Updater {
 }
 
 #[serenity::async_trait]
-impl gnomeutils::Looper for Updater {
+impl crate::Looper for Updater {
     const NAME: &'static str = "WebUpdater";
     const MILLIS: u64 = 1000 * 60 * 60;
 

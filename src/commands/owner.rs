@@ -14,14 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
 use std::num::NonZeroU16;
 use std::sync::atomic::Ordering::SeqCst;
 
 use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
-use gnomeutils::OptionTryUnwrap;
 use self::serenity::builder::*;
 
 use crate::structs::{Context, CommandResult, PrefixContext, TTSModeChoice, Command};
+use crate::opt_ext::OptionTryUnwrap;
 use crate::funcs::dm_generic;
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
@@ -33,11 +34,11 @@ pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
 pub async fn dm(ctx: PrefixContext<'_>, todm: serenity::User, #[rest] message: String) -> CommandResult {
     let attachment_url = ctx.msg.attachments.first().map(|a| a.url.clone());
     let (content, embed) = dm_generic(
-        ctx.discord, &ctx.msg.author, todm.id, todm.tag(),
+        ctx.serenity_context(), &ctx.msg.author, todm.id, todm.tag(),
         attachment_url, message
     ).await?;
 
-    ctx.msg.channel_id.send_message(&ctx.discord.http, CreateMessage::default()
+    ctx.msg.channel_id.send_message(&ctx.serenity_context(), CreateMessage::default()
         .content(content)
         .add_embed(CreateEmbed::from(embed))
     ).await.map(drop).map_err(Into::into)
@@ -45,8 +46,8 @@ pub async fn dm(ctx: PrefixContext<'_>, todm: serenity::User, #[rest] message: S
 
 #[poise::command(prefix_command, hide_in_help, owners_only)]
 pub async fn close(ctx: Context<'_>) -> CommandResult {
-    ctx.say(format!("Shutting down {} shards!", ctx.discord().cache.shard_count())).await?;
-    ctx.framework().shard_manager().lock().await.shutdown_all().await;
+    ctx.say(format!("Shutting down {} shards!", ctx.cache().shard_count())).await?;
+    ctx.framework().shard_manager().shutdown_all().await;
 
     Ok(())
 }
@@ -120,15 +121,15 @@ pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandRes
         return ctx.say("Done!").await.map(drop).map_err(Into::into)
     }
 
-    let ctx_discord = ctx.discord();
-    let mut setup_guilds = std::collections::HashSet::with_capacity(ctx_discord.cache.guild_count());
+    let cache = ctx.cache();
+    let mut setup_guilds = HashSet::with_capacity(cache.guild_count());
 
-    let mut stream = sqlx::query_as::<_, HasGuildId>("SELECT guild_id from guilds WHERE channel != 0").fetch(&data.inner.pool);
+    let mut stream = sqlx::query_as::<_, HasGuildId>("SELECT guild_id from guilds WHERE channel != 0").fetch(&data.pool);
     while let Some(item) = stream.try_next().await? {
         setup_guilds.insert(std::num::NonZeroU64::new(item.guild_id as u64).try_unwrap()?);
     }
 
-    let to_leave: Vec<_> = ctx_discord.cache.guilds().into_iter().filter(|g| !setup_guilds.contains(&g.0)).collect();
+    let to_leave: Vec<_> = cache.guilds().into_iter().filter(|g| !setup_guilds.contains(&g.0)).collect();
     let to_leave_count = to_leave.len();
 
     if mode == PurgeGuildsMode::Run {
@@ -136,7 +137,7 @@ pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandRes
 
         data.currently_purging.store(true, SeqCst);
         for guild in to_leave {
-            guild.leave(ctx_discord).await?;
+            guild.leave(ctx).await?;
 
             if !data.currently_purging.load(SeqCst) {
                 return msg.edit(ctx, poise::CreateReply::default().content("Aborted!")).await.map(drop).map_err(Into::into)
@@ -152,9 +153,8 @@ pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandRes
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
-    let ctx_discord = ctx.discord();
-    let http = &ctx_discord.http;
-    let cache = &ctx_discord.cache;
+    let http = &ctx.http();
+    let cache = &ctx.cache();
 
     let support_guild_id = data.config.main_server;
     let support_guild_members = support_guild_id.members(http, None, None).await?;
@@ -218,10 +218,9 @@ pub async fn _info(ctx: Context<'_>) -> CommandResult {
     let guild_id_db: i64 = guild_id.into();
 
     let data = ctx.data();
-    let ctx_discord = ctx.discord();
     let author_id = ctx.author().id.into();
 
-    let shard_id = ctx_discord.shard_id;
+    let shard_id = ctx.serenity_context().shard_id;
     let user_row = data.userinfo_db.get(author_id).await?;
     let guild_row = data.guilds_db.get(guild_id_db).await?;
     let nick_row = data.nickname_db.get([guild_id_db, author_id]).await?;
