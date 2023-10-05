@@ -45,7 +45,9 @@ pub async fn uptime(ctx: Context<'_>,) -> CommandResult {
         .gettext("{user_mention} has been up since: <t:{timestamp}:R>")
         .replace("{user_mention}", &current_user_mention)
         .replace("{timestamp}", &timestamp.to_string())
-    ).await.map(drop).map_err(Into::into)
+    ).await?;
+
+    Ok(())
 }
 
 /// Generates TTS and sends it in the current text channel!
@@ -80,7 +82,8 @@ pub async fn tts(
     };
 
     if is_unnecessary_command_invoke.await? {
-        ctx.say(ctx.gettext("You don't need to include the `/tts` for messages to be said!")).await.map(drop).map_err(Into::into)
+        ctx.say(ctx.gettext("You don't need to include the `/tts` for messages to be said!")).await?;
+        Ok(())
     } else {
         _tts(ctx, ctx.author(), &message).await
     }
@@ -113,7 +116,9 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
     ctx.send(CreateReply::default()
         .content(ctx.gettext("Generated some TTS!"))
         .attachment(attachment)
-    ).await.map(drop).map_err(Into::into)
+    ).await?;
+
+    Ok(())
 }
 
 #[poise::command(category="Extra Commands", hide_in_help, context_menu_command="Speak with their voice!")]
@@ -227,7 +232,9 @@ and can be used by {total_members} people!")
             .replace("{shard_count}", &shard_count.to_string())
             .replace("{ram_usage}", &format!("{ram_usage:.1}"))
             .replace("{scheduler_stats}", &scheduler_stats)
-    ))).await.map(drop).map_err(Into::into)
+    ))).await?;
+
+    Ok(())
 }
 
 /// Shows the current setup channel!
@@ -252,7 +259,9 @@ pub async fn premium(ctx: Context<'_>,) -> CommandResult {
     ctx.say(ctx.gettext("
 To support the development and hosting of TTS Bot and get access to TTS Bot Premium, including more modes (`/set mode`), many more voices (`/set voice`), and extra options such as TTS translation, see:
 https://www.patreon.com/Gnome_the_Bot_Maker
-    ")).await.map(drop).map_err(Into::into)
+    ")).await?;
+
+    Ok(())
 }
 
 /// Gets current ping to discord!
@@ -283,7 +292,8 @@ pub async fn suggest(ctx: Context<'_>, #[rest] suggestion: String) -> CommandRes
         .author(CreateEmbedAuthor::new(bot_name).icon_url(face))
         .title("`/suggest` has been removed due to spam and misuse.")
         .description("If you want to suggest a new feature, use `/invite` and ask us in the support server!")
-    )).await.map(drop).map_err(Into::into)
+    )).await?;
+    Ok(())
 }
 
 /// Sends the instructions to invite TTS Bot and join the support server!
@@ -308,7 +318,8 @@ pub async fn invite(ctx: Context<'_>,) -> CommandResult {
                 .replace("{server_invite}", &config.main_server_invite)
             ).try_unwrap()?
         }
-    ).await.map(drop).map_err(Into::into)
+    ).await?;
+    Ok(())
 }
 
 pub fn commands() -> [Command; 10] {

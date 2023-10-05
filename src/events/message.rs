@@ -304,5 +304,7 @@ async fn process_support_response(
     channel.send_message(ctx, CreateMessage::default()
         .content(content)
         .embed(CreateEmbed::from(embed))
-    ).await.map(drop).map_err(Into::into)
+    ).await?;
+
+    Ok(())
 }

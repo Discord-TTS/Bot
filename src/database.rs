@@ -143,7 +143,8 @@ where
 
     async fn _get(pool: &sqlx::PgPool, key: CacheKey, select: &'static str) -> Result<Option<Arc<RowT>>> {
         let query = key.bind_query_as(sqlx::query_as(select));
-        query.fetch_optional(pool).await.map(|r| r.map(Arc::new)).map_err(Into::into)
+        let row = query.fetch_optional(pool).await?;
+        Ok(row.map(Arc::new))
     }
 
     pub async fn get(&self, identifier: CacheKey) -> Result<Arc<RowT>> {

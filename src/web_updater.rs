@@ -115,7 +115,8 @@ impl crate::Looper for Updater {
             .header(CONTENT_TYPE, "application/json")
             .body(json::to_string(&stats)?)
             .send().await?
-            .error_for_status()
-            .map(drop).map_err(Into::into)
-        }
+            .error_for_status()?;
+        
+        Ok(())
+    }
 }

@@ -179,7 +179,9 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{speaking_rate}", &speaking_rate)
             .replace("{speaking_rate_kind}", speaking_rate_kind),
         false)
-    )).await.map(drop).map_err(Into::into)
+    )).await?;
+
+    Ok(())
 }
 
 
@@ -523,7 +525,9 @@ async fn generic_bool_command(ctx: Context<'_>, key: &'static str, value: Option
     let resp = ctx.gettext(resp).replace("{}", to_enabled(ctx.current_catalog(), value));
 
     ctx.data().guilds_db.set_one(ctx.guild_id().unwrap().into(), key, &value).await?;
-    ctx.say(resp).await.map(drop).map_err(Into::into)
+    ctx.say(resp).await?;
+
+    Ok(())
 }
 
 macro_rules! create_bool_command {
@@ -664,7 +668,9 @@ pub async fn required_role(
         }).await
     } else {
         ctx.say(ctx.gettext("Cancelled!")).await
-    }.map(drop).map_err(Into::into)
+    }?;
+
+    Ok(())
 }
 
 /// Changes the required prefix for TTS.
@@ -682,11 +688,12 @@ async fn required_prefix(
 ) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     if let Some(prefix) = tts_prefix.as_deref() && let Err(err) = check_prefix(&ctx, prefix) {
-        return ctx.say(err).await.map(drop).map_err(Into::into);
+        ctx.say(err).await?;
+    } else {
+        ctx.data().guilds_db.set_one(guild_id.into(), "required_prefix", &tts_prefix).await?;
+        ctx.say(ctx.gettext("The required prefix for TTS is now: {}").replace("{}", tts_prefix.as_deref().unwrap_or("`None`"))).await?;
     }
 
-    ctx.data().guilds_db.set_one(guild_id.into(), "required_prefix", &tts_prefix).await?;
-    ctx.say(ctx.gettext("The required prefix for TTS is now: {}").replace("{}", tts_prefix.as_deref().unwrap_or("`None`"))).await?;
     Ok(())
 }
 
@@ -778,7 +785,8 @@ pub async fn translation_lang(
         String::from(ctx.gettext("Invalid translation language, do `/translation_languages`"))
     };
 
-    ctx.say(to_say).await.map(drop).map_err(Into::into)
+    ctx.say(to_say).await?;
+    Ok(())
 }
 
 
@@ -992,9 +1000,11 @@ pub async fn setup(
             };
 
             if text_channels.is_empty() {
-                return ctx.say(ctx.gettext("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!")).await.map(drop).map_err(Into::into);
+                ctx.say(ctx.gettext("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!")).await?;
+                return Ok(())
             } else if text_channels.len() >= (25 * 5) {
-                return ctx.say(ctx.gettext("**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`")).await.map(drop).map_err(Into::into);
+                ctx.say(ctx.gettext("**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`")).await?;
+                return Ok(())
             };
 
             text_channels.sort_by(|f, s| Ord::cmp(&f.position, &s.position));
@@ -1152,7 +1162,9 @@ pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
         .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite, client_id, ctx.current_catalog()
         )))
-    )).await.map(drop).map_err(Into::into)
+    )).await?;
+
+    Ok(())
 }
 
 /// Lists all the voices that TTS bot accepts for the current mode

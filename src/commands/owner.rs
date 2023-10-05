@@ -41,7 +41,9 @@ pub async fn dm(ctx: PrefixContext<'_>, todm: serenity::User, #[rest] message: S
     ctx.msg.channel_id.send_message(&ctx.serenity_context(), CreateMessage::default()
         .content(content)
         .add_embed(CreateEmbed::from(embed))
-    ).await.map(drop).map_err(Into::into)
+    ).await?;
+
+    Ok(())
 }
 
 #[poise::command(prefix_command, hide_in_help, owners_only)]
@@ -118,7 +120,8 @@ pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandRes
     let data = ctx.data();
     if mode == PurgeGuildsMode::Abort {
         data.currently_purging.store(false, SeqCst);
-        return ctx.say("Done!").await.map(drop).map_err(Into::into)
+        ctx.say("Done!").await?;
+        return Ok(());
     }
 
     let cache = ctx.cache();
@@ -140,14 +143,17 @@ pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandRes
             guild.leave(ctx).await?;
 
             if !data.currently_purging.load(SeqCst) {
-                return msg.edit(ctx, poise::CreateReply::default().content("Aborted!")).await.map(drop).map_err(Into::into)
+                msg.edit(ctx, poise::CreateReply::default().content("Aborted!")).await?;
+                return Ok(());
             }
         }
 
-        msg.edit(ctx, poise::CreateReply::default().content("Done! Left {to_leave_count} guilds!")).await.map(drop)
+        msg.edit(ctx, poise::CreateReply::default().content("Done! Left {to_leave_count} guilds!")).await?;
     } else {
-        ctx.say(format!("Would purge {to_leave_count} guilds!")).await.map(drop)
-    }.map_err(Into::into)
+        ctx.say(format!("Would purge {to_leave_count} guilds!")).await?;
+    }
+
+    Ok(())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
@@ -240,7 +246,8 @@ Nickname Data: `{nick_row:?}`
 User Voice Data: `{user_voice_row:?}`
 Guild Voice Data: `{guild_voice_row:?}`
 "))
-    )).await.map(drop).map_err(Into::into)
+    )).await?;
+    Ok(())
 }
 
 /// Force leaves the voice channel in the current server to bypass buggy states

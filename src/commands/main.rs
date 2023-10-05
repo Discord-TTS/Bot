@@ -67,10 +67,12 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let bot_member = guild_id.member(ctx, bot_id).await?;
     if let Some(communication_disabled_until) = bot_member.communication_disabled_until {
         if communication_disabled_until > serenity::Timestamp::now() {
-            return ctx.send_error(
+            ctx.send_error(
                 ctx.gettext("I am timed out"),
                 Some(ctx.gettext("ask a moderator to remove the timeout"))
-            ).await.map(drop).map_err(Into::into)
+            ).await?;
+
+            return Ok(())
         }
     }
 
@@ -83,13 +85,15 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         channel.permissions_for_user(ctx, bot_id)?;
 
     if !missing_permissions.is_empty() {
-        return ctx.send_error(
+        ctx.send_error(
             ctx.gettext("I do not have permissions to TTS in your voice channel"),
             Some(&ctx
                 .gettext("please ask an administrator to give me: {missing_permissions}")
                 .replace("{missing_permissions}", &missing_permissions.get_permission_names().join(", "))
             )
-        ).await.map(drop).map_err(Into::into)
+        ).await?;
+
+        return Ok(())
     }
 
     let data = ctx.data();
@@ -117,7 +121,8 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 ctx.send_error(
                     ctx.gettext("a timeout occurred while joining your voice channel"),
                     Some(ctx.gettext("wait a few seconds and try again"))
-                ).await.map(drop).map_err(Into::into)
+                ).await?;
+                Ok(())
             } else {
                 Err(err.into())
             }
@@ -134,7 +139,8 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite, bot_id, ctx.current_catalog()
         )))
-    )).await.map(drop).map_err(Into::into)
+    )).await?;
+    Ok(())
 }
 
 /// Leaves voice channel TTS Bot is in!
@@ -226,7 +232,8 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
 
     if data.premium_check(Some(guild_id)).await?.is_none() {
-        return ctx.say(ctx.gettext("Hey, this server is already premium!")).await.map(drop).map_err(Into::into)
+        ctx.say(ctx.gettext("Hey, this server is already premium!")).await?;
+        return Ok(())
     }
 
     let author = ctx.author();
@@ -253,7 +260,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     };
 
     if let Some(error_msg) = error_msg {
-        return ctx.send(CreateReply::default().embed(CreateEmbed::default()
+        ctx.send(CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .description(error_msg)
             .thumbnail(&data.premium_avatar_url)
@@ -267,7 +274,9 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
                 concat.push_str(line2);
                 concat
             }))
-        )).await.map(drop).map_err(Into::into)
+        )).await?;
+
+        return Ok(())
     }
 
     data.userinfo_db.create_row(author_id).await?;
