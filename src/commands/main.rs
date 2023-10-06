@@ -33,10 +33,10 @@ async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>
     if setup_id == channel_id.get() as i64 || author_vc == Some(channel_id) {
         Ok(true)
     } else {
-        ctx.send_error(
-            ctx.gettext("you ran this command in the wrong channel"),
-            Some(ctx.gettext("do `/channel` get the channel that has been setup"))
-        ).await?;
+        let msg = ctx.gettext("You ran this command in the wrong channel, please move to <#{channel_id}>.")
+            .replace("{channel_id}", &setup_id.to_string());
+
+        ctx.send_error(msg).await?;
         Ok(false)
     }
 }
@@ -50,8 +50,7 @@ async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
     let author_vc = require!(ctx.author_vc(), ctx.send_error(
-        ctx.gettext("you need to be in a voice channel to make me join your voice channel"),
-        Some(ctx.gettext("join a voice channel and try again")),
+        ctx.gettext("I cannot join your voice channel unless you are in one!").to_owned()
     ).await.map(drop));
 
     if !channel_check(&ctx, Some(author_vc)).await? {
@@ -67,11 +66,8 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let bot_member = guild_id.member(ctx, bot_id).await?;
     if let Some(communication_disabled_until) = bot_member.communication_disabled_until {
         if communication_disabled_until > serenity::Timestamp::now() {
-            ctx.send_error(
-                ctx.gettext("I am timed out"),
-                Some(ctx.gettext("ask a moderator to remove the timeout"))
-            ).await?;
-
+            let msg = ctx.gettext("I am timed out, please ask a moderator to remove the timeout");
+            ctx.send_error(msg.to_owned()).await?;
             return Ok(())
         }
     }
@@ -85,14 +81,10 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         channel.permissions_for_user(ctx, bot_id)?;
 
     if !missing_permissions.is_empty() {
-        ctx.send_error(
-            ctx.gettext("I do not have permissions to TTS in your voice channel"),
-            Some(&ctx
-                .gettext("please ask an administrator to give me: {missing_permissions}")
-                .replace("{missing_permissions}", &missing_permissions.get_permission_names().join(", "))
-            )
-        ).await?;
+        let msg = ctx.gettext("I do not have permission to TTS in your voice channel, please ask a server administrator to give me: {missing_permissions}")
+            .replace("{missing_permissions}", &missing_permissions.get_permission_names().join(", "));
 
+        ctx.send_error(msg).await?;
         return Ok(())
     }
 
@@ -118,10 +110,8 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
         if let Err(err) = join_vc_result {
             return if let JoinError::TimedOut = err {
-                ctx.send_error(
-                    ctx.gettext("a timeout occurred while joining your voice channel"),
-                    Some(ctx.gettext("wait a few seconds and try again"))
-                ).await?;
+                let msg = ctx.gettext("I failed to join your voice channel, please check I have the right permissions and try again!");
+                ctx.send_error(msg.to_owned()).await?;
                 Ok(())
             } else {
                 Err(err.into())

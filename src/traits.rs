@@ -13,7 +13,7 @@ pub trait PoiseContextExt {
     fn gettext<'a>(&'a self, translate: &'a str) -> &'a str;
 
     fn current_catalog(&self) -> Option<&gettext::Catalog>;
-    async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>>;
+    async fn send_error(&self, error_message: String) -> Result<Option<poise::ReplyHandle<'_>>>;
     
     async fn neutral_colour(&self) -> u32;
     fn author_vc(&self) -> Option<serenity::ChannelId>;
@@ -76,7 +76,7 @@ impl PoiseContextExt for Context<'_> {
         }
     }
 
-    async fn send_error(&self, error: &str, fix: Option<&str>) -> Result<Option<poise::ReplyHandle<'_>>> {
+    async fn send_error(&self, error_message: String) -> Result<Option<poise::ReplyHandle<'_>>> {
         let author = self.author();
         let serenity_ctx = self.serenity_context();
 
@@ -114,10 +114,7 @@ impl PoiseContextExt for Context<'_> {
                 .colour(constants::RED)
                 .title("An Error Occurred!")
                 .author(serenity::CreateEmbedAuthor::new(name).icon_url(avatar_url))
-                .description(format!(
-                    "Sorry but {}, to fix this, please {error}!",
-                    fix.unwrap_or("get in contact with us via the support server"),
-                ))
+                .description(error_message)
                 .footer(serenity::CreateEmbedFooter::new(format!(
                     "Support Server: {}", self.data().main_server_invite
                 )))

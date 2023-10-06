@@ -260,30 +260,37 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         },
         command_check: Some(|ctx| Box::pin(async move {
             if ctx.author().bot {
-                Ok(false)
-            } else if let Some(guild_id) = ctx.guild_id() && let Some(required_role) = ctx.data().guilds_db.get(guild_id.into()).await?.required_role {
-                let required_role = serenity::RoleId::new(required_role as u64);
-                let member = ctx.author_member().await.try_unwrap()?;
+                return Ok(false)
+            };
+            
+            let Some(guild_id) = ctx.guild_id() else {
+                return Ok(true)
+            };
 
-                let is_admin = || {
-                    let guild = require_guild!(ctx, Ok(false));
-                    let channel = guild.channels.get(&ctx.channel_id()).try_unwrap()?;
+            let Some(required_role) = ctx.data().guilds_db.get(guild_id.into()).await?.required_role else {
+                return Ok(true)
+            };
 
-                    let permissions = guild.user_permissions_in(channel, &member);
-                    Ok(permissions.administrator())
-                };
+            let required_role = serenity::RoleId::new(required_role as u64);
+            let member = ctx.author_member().await.try_unwrap()?;
 
-                if member.roles.contains(&required_role) || is_admin()? {
-                    Ok(true)
-                } else {
-                    ctx.send_error(
-                        "you do not have the required role to use this command",
-                        Some(&format!("ask a server admin for {}", required_role.mention()))
-                    ).await.map(|_| false).map_err(Into::into)
-                }
-            } else {
-                Ok(true)
-            }
+            let is_admin = || {
+                let guild = require_guild!(ctx, Ok(false));
+                let channel = guild.channels.get(&ctx.channel_id()).try_unwrap()?;
+
+                let permissions = guild.user_permissions_in(channel, &member);
+                Ok(permissions.administrator())
+            };
+
+            if member.roles.contains(&required_role) || is_admin()? {
+                return Ok(true)
+            };
+        
+            let msg = ctx.gettext("You do not have the required role to use this bot, ask a server administrator for {}.")
+                .replace("{}", &required_role.mention().to_string());
+
+            ctx.send_error(msg).await?;
+            Ok(false)
         })),
         ..poise::FrameworkOptions::default()
     };
