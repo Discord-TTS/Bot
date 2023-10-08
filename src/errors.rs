@@ -141,7 +141,7 @@ pub async fn handle_unexpected<'a>(
                     .label("View Traceback")
                     .style(serenity::ButtonStyle::Danger)
             ])])
-        ).await?.unwrap();
+        ).await?.try_unwrap()?;
 
         let ErrorRow{message_id} = sqlx::query_as("
             INSERT INTO errors(traceback_hash, traceback, message_id)
@@ -237,7 +237,7 @@ async fn handle_cooldown(ctx: Context<'_>, remaining_cooldown: std::time::Durati
             error_message.delete(ctx_discord).await?;
 
             let bot_user_id = ctx_discord.cache.current_user().id;
-            let channel = error_message.channel(ctx_discord).await?.guild().unwrap();
+            let channel = error_message.channel(ctx_discord).await?.guild().try_unwrap()?;
 
             if channel.permissions_for_user(ctx_discord, bot_user_id)?.manage_messages() {
                 ctx.msg.delete(ctx_discord).await?;
@@ -263,7 +263,7 @@ async fn handle_argparse(ctx: Context<'_>, error: Box<dyn std::error::Error + Se
         ctx.gettext("I cannot understand your message")
     };
 
-    let reason = reason.replace("{}", &input.unwrap());
+    let reason = reason.replace("{}", &input.try_unwrap()?);
     let fix = ctx
         .gettext("please check out `/help {command}`")
         .replace("{command}", &ctx.command().qualified_name);
