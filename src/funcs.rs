@@ -31,8 +31,8 @@ use crate::{
     opt_ext::{OptionGettext, OptionTryUnwrap},
     require,
     structs::{
-        Context, Data, Error, GoogleGender, GoogleVoice, LastToXsaidTracker, RegexCache, Result,
-        TTSMode, TTSServiceError,
+        Context, Error, GoogleGender, GoogleVoice, LastToXsaidTracker, RegexCache, Result, TTSMode,
+        TTSServiceError,
     },
 };
 
@@ -134,8 +134,8 @@ pub fn prepare_url(
 #[allow(clippy::similar_names)]
 pub async fn get_translation_langs(
     reqwest: &reqwest::Client,
-    url: &reqwest::Url,
-    token: &str,
+    url: Option<&reqwest::Url>,
+    token: Option<&str>,
 ) -> Result<BTreeMap<String, String>> {
     #[derive(serde::Deserialize)]
     pub struct DeeplVoice<'a> {
@@ -148,6 +148,10 @@ pub async fn get_translation_langs(
         #[serde(rename = "type")]
         kind: &'static str,
     }
+
+    let (Some(url), Some(token)) = (url, token) else {
+        return Ok(BTreeMap::new());
+    };
 
     let request = DeeplVoiceRequest { kind: "target" };
 
@@ -510,7 +514,13 @@ pub fn clean_msg(
     content
 }
 
-pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<Option<String>> {
+pub async fn translate(
+    reqwest: &reqwest::Client,
+    translation_url: &reqwest::Url,
+    translation_token: &str,
+    content: &str,
+    target_lang: &str,
+) -> Result<Option<String>> {
     #[derive(serde::Deserialize)]
     pub struct DeeplTranslateResponse<'a> {
         #[serde(borrow)]
@@ -536,13 +546,12 @@ pub async fn translate(content: &str, target_lang: &str, data: &Data) -> Result<
         preserve_formatting: 1,
     };
 
-    let mut resp = data
-        .reqwest
-        .get(format!("{}/translate", data.config.translation_url))
+    let mut resp = reqwest
+        .get(format!("{translation_url}/translate"))
         .query(&request)
         .header(
             "Authorization",
-            format!("DeepL-Auth-Key {}", data.config.translation_token),
+            format!("DeepL-Auth-Key {translation_token}"),
         )
         .send()
         .await?

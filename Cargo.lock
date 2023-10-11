@@ -1493,9 +1493,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "ordered-float"
-version = "2.10.0"
+version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7940cf2ca942593318d07fcf2596cdca60a85c9e7fab408a5e21a4f9dcd40d87"
+checksum = "68f19d67e5a2795c94e73e0bb1cc1a7edeb2e28efd39e2e1c9b7a40c1108b11c"
 dependencies = [
  "num-traits 0.2.17",
 ]
@@ -2161,7 +2161,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.11.6"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#a0c102f9acfd8d7184650815e06e0301954cb9e7"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#171e1b72ab56d134d60a2238fa18e53132987610"
 dependencies = [
  "arrayvec",
  "async-trait",
@@ -2192,7 +2192,7 @@ dependencies = [
 [[package]]
 name = "serenity-voice-model"
 version = "0.1.1"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#a0c102f9acfd8d7184650815e06e0301954cb9e7"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#171e1b72ab56d134d60a2238fa18e53132987610"
 dependencies = [
  "bitflags 2.4.0",
  "enum_primitive",

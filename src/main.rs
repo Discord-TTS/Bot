@@ -209,8 +209,8 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         get_webhooks(&http, config.webhooks),
         get_translation_langs(
             &reqwest,
-            &config.main.translation_url,
-            &config.main.translation_token
+            config.main.translation_url.as_ref(),
+            config.main.translation_token.as_deref()
         ),
         async {
             serenity::UserId::new(802632257658683442)
