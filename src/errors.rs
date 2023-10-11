@@ -333,26 +333,31 @@ async fn handle_argparse(
     error: Box<dyn std::error::Error + Send + Sync>,
     input: Option<String>,
 ) -> Result<(), Error> {
-    let reason = if error.is::<serenity::MemberParseError>() {
-        ctx.gettext("I cannot find the member: `{}`")
-    } else if error.is::<serenity::GuildParseError>() {
-        ctx.gettext("I cannot find the server: `{}`")
-    } else if error.is::<serenity::GuildChannelParseError>() {
-        ctx.gettext("I cannot find the channel: `{}`")
-    } else if error.is::<std::num::ParseIntError>() {
-        ctx.gettext("I cannot convert `{}` to a number")
-    } else if error.is::<std::str::ParseBoolError>() {
-        ctx.gettext("I cannot convert `{}` to True/False")
+    let reason = if let Some(input) = input {
+        let reason = if error.is::<serenity::MemberParseError>() {
+            ctx.gettext("I cannot find the member: `{}`")
+        } else if error.is::<serenity::GuildParseError>() {
+            ctx.gettext("I cannot find the server: `{}`")
+        } else if error.is::<serenity::GuildChannelParseError>() {
+            ctx.gettext("I cannot find the channel: `{}`")
+        } else if error.is::<std::num::ParseIntError>() {
+            ctx.gettext("I cannot convert `{}` to a number")
+        } else if error.is::<std::str::ParseBoolError>() {
+            ctx.gettext("I cannot convert `{}` to True/False")
+        } else {
+            ctx.gettext("I cannot understand your message")
+        };
+
+        Cow::Owned(reason.replace("{}", &input))
     } else {
-        ctx.gettext("I cannot understand your message")
+        Cow::Borrowed(ctx.gettext("You missed an argument to the command"))
     };
 
-    let reason = reason.replace("{}", &input.try_unwrap()?);
     let fix = ctx
         .gettext("please check out `/help {command}`")
         .replace("{command}", &ctx.command().qualified_name);
 
-    ctx.send_error(format!("{reason} {fix}")).await?;
+    ctx.send_error(format!("{reason}, {fix}")).await?;
     Ok(())
 }
 
