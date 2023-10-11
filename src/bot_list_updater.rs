@@ -1,11 +1,14 @@
 use std::sync::Arc;
 
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue};
+use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
+use self::serenity::{
+    json::prelude::{json, to_vec},
+    UserId,
+};
 use poise::serenity_prelude as serenity;
-use self::serenity::{UserId, json::prelude::{json, to_vec}};
 
-use crate::{Result, require, structs::BotListTokens};
+use crate::{require, structs::BotListTokens, Result};
 
 pub struct BotListUpdater {
     cache: Arc<serenity::cache::Cache>,
@@ -21,48 +24,66 @@ struct BotListReq {
 
 impl BotListUpdater {
     #[must_use]
-    pub fn new(reqwest: reqwest::Client, cache: Arc<serenity::cache::Cache>, tokens: BotListTokens) -> Self {
-        Self {cache, reqwest, tokens}
+    pub fn new(
+        reqwest: reqwest::Client,
+        cache: Arc<serenity::cache::Cache>,
+        tokens: BotListTokens,
+    ) -> Self {
+        Self {
+            cache,
+            reqwest,
+            tokens,
+        }
     }
 
-
-    fn top_gg_data(&self, bot_id: UserId, guild_count: usize, shard_count: u32) -> Option<BotListReq> {
-        self.tokens.top_gg.as_deref().map(|token| {
-            BotListReq {
-                url: format!("https://top.gg/api/bots/{bot_id}/stats"),
-                token: HeaderValue::from_str(token).unwrap(),
-                body: to_vec(&json!({
-                    "server_count": guild_count,
-                    "shard_count": shard_count,
-                })).unwrap(),
-            }
+    fn top_gg_data(
+        &self,
+        bot_id: UserId,
+        guild_count: usize,
+        shard_count: u32,
+    ) -> Option<BotListReq> {
+        self.tokens.top_gg.as_deref().map(|token| BotListReq {
+            url: format!("https://top.gg/api/bots/{bot_id}/stats"),
+            token: HeaderValue::from_str(token).unwrap(),
+            body: to_vec(&json!({
+                "server_count": guild_count,
+                "shard_count": shard_count,
+            }))
+            .unwrap(),
         })
     }
 
-    fn discord_bots_gg_data(&self, bot_id: UserId, guild_count: usize, shard_count: u32) -> Option<BotListReq> {
-        self.tokens.discord_bots_gg.as_deref().map(|token| {
-            BotListReq {
+    fn discord_bots_gg_data(
+        &self,
+        bot_id: UserId,
+        guild_count: usize,
+        shard_count: u32,
+    ) -> Option<BotListReq> {
+        self.tokens
+            .discord_bots_gg
+            .as_deref()
+            .map(|token| BotListReq {
                 url: format!("https://discord.bots.gg/api/v1/bots/{bot_id}/stats"),
                 token: HeaderValue::from_str(token).unwrap(),
                 body: to_vec(&json!({
                     "guildCount": guild_count,
                     "shardCount": shard_count,
-                })).unwrap(),
-            }
-        })
+                }))
+                .unwrap(),
+            })
     }
 
     fn bots_on_discord_data(&self, bot_id: UserId, guild_count: usize) -> Option<BotListReq> {
-        self.tokens.bots_on_discord.as_deref().map(|token| {
-            BotListReq {
+        self.tokens
+            .bots_on_discord
+            .as_deref()
+            .map(|token| BotListReq {
                 url: format!("https://bots.ondiscord.xyz/bot-api/bots/{bot_id}/guilds"),
                 body: to_vec(&json!({"guildCount": guild_count})).unwrap(),
                 token: HeaderValue::from_str(token).unwrap(),
-            }
-        })
+            })
     }
 }
-
 
 #[serenity::async_trait]
 impl crate::Looper for BotListUpdater {
@@ -71,15 +92,13 @@ impl crate::Looper for BotListUpdater {
 
     async fn loop_func(&self) -> Result<()> {
         let perform = |req| async move {
-            if let Some(BotListReq{url, body, token}) = req {
+            if let Some(BotListReq { url, body, token }) = req {
                 let headers = reqwest::header::HeaderMap::from_iter([
                     (AUTHORIZATION, token),
-                    (CONTENT_TYPE, HeaderValue::from_static("application/json"))
+                    (CONTENT_TYPE, HeaderValue::from_static("application/json")),
                 ]);
 
-                let request = self.reqwest.post(url)
-                    .body(body)
-                    .headers(headers);
+                let request = self.reqwest.post(url).body(body).headers(headers);
 
                 let err = require!(match request.send().await {
                     Ok(resp) => resp.error_for_status().err(),

@@ -22,7 +22,7 @@ pub const OPTION_SEPERATORS: [&str; 4] = [
     ":small_orange_diamond:",
     ":small_blue_diamond:",
     ":small_red_triangle:",
-    ":star:"
+    ":star:",
 ];
 
 pub const DM_WELCOME_MESSAGE: &str = "

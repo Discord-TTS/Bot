@@ -18,13 +18,14 @@ use std::fmt::Write;
 
 use indexmap::IndexMap;
 
-use poise::serenity_prelude as serenity;
 use self::serenity::CreateEmbed;
+use poise::serenity_prelude as serenity;
 
-use crate::structs::{Context, Command, CommandResult, ApplicationContext};
-use crate::traits::PoiseContextExt;
-use crate::require;
-
+use crate::{
+    require,
+    structs::{ApplicationContext, Command, CommandResult, Context},
+    traits::PoiseContextExt,
+};
 
 enum HelpCommandMode<'a> {
     Root,
@@ -38,7 +39,10 @@ fn get_command_mapping(commands: &[Command]) -> IndexMap<&str, Vec<&Command>> {
     for command in commands {
         if !command.hide_in_help {
             let category = command.category.as_deref().unwrap_or("Uncategoried");
-            mapping.entry(category).or_insert_with(Vec::new).push(command);
+            mapping
+                .entry(category)
+                .or_insert_with(Vec::new)
+                .push(command);
         }
     }
 
@@ -49,11 +53,11 @@ fn format_params(buf: &mut String, command: &Command) {
     for p in &command.parameters {
         let name = p.name.as_deref().unwrap_or("unnamed");
         if p.required {
-            write!(buf, " <{name}>")
+            write!(buf, " <{name}>").unwrap();
         } else {
-            write!(buf, " [{name}]")
-        }.unwrap();
-    };
+            write!(buf, " [{name}]").unwrap();
+        }
+    }
 }
 
 fn show_group_description(group: &IndexMap<&str, Vec<&Command>>) -> String {
@@ -65,11 +69,10 @@ fn show_group_description(group: &IndexMap<&str, Vec<&Command>>) -> String {
             format_params(&mut buf, c);
             writeln!(buf, "`: {}", c.description.as_ref().unwrap()).unwrap();
         }
-    };
+    }
 
     buf
 }
-
 
 #[allow(clippy::unused_async)]
 pub async fn autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<String> {
@@ -78,7 +81,7 @@ pub async fn autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<S
 
         for command in commands {
             if command.owners_only || command.hide_in_help {
-                continue
+                continue;
             }
 
             if command.subcommands.is_empty() {
@@ -98,15 +101,18 @@ pub async fn autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<S
     result
 }
 
-
-/// Shows TTS Bot's commands and descriptions of them 
+/// Shows TTS Bot's commands and descriptions of them
 #[poise::command(
-    prefix_command, slash_command,
+    prefix_command,
+    slash_command,
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 async fn help(
     ctx: Context<'_>,
-    #[rest] #[description="The command to get help with"] #[autocomplete="autocomplete"] command: Option<String>
+    #[rest]
+    #[description = "The command to get help with"]
+    #[autocomplete = "autocomplete"]
+    command: Option<String>,
 ) -> CommandResult {
     command_func(ctx, command.as_deref()).await
 }
@@ -122,26 +128,42 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
             let mut subcommand_iterator = command.split(' ');
 
             let top_level_command = subcommand_iterator.next().unwrap();
-            let (mut command_obj, _, _) = require!(poise::find_command(commands, top_level_command, true, &mut Vec::new()), {
-                ctx.say(ctx.gettext("No command called {} found!").replace("{}", top_level_command)).await?;
-                Ok(())
-            });
+            let (mut command_obj, _, _) = require!(
+                poise::find_command(commands, top_level_command, true, &mut Vec::new()),
+                {
+                    let msg = ctx
+                        .gettext("No command called {} found!")
+                        .replace("{}", top_level_command);
+
+                    ctx.say(msg).await?;
+                    Ok(())
+                }
+            );
 
             remaining_args = subcommand_iterator.collect();
             if !remaining_args.is_empty() {
-                (command_obj, _, _) = require!(poise::find_command(&command_obj.subcommands, &remaining_args, true, &mut Vec::new()), {
-                    ctx.say(ctx
-                        .gettext("The group {group_name} does not have a subcommand called {subcommand_name}!")
-                        .replace("{subcommand_name}", &remaining_args).replace("{group_name}", &command_obj.name)
-                    ).await?;
+                (command_obj, _, _) = require!(
+                    poise::find_command(
+                        &command_obj.subcommands,
+                        &remaining_args,
+                        true,
+                        &mut Vec::new()
+                    ),
+                    {
+                        let msg = ctx
+                            .gettext("The group {group_name} does not have a subcommand called {subcommand_name}!")
+                            .replace("{subcommand_name}", &remaining_args).replace("{group_name}", &command_obj.name);
 
-                    Ok(())
-                });
+                        ctx.say(msg).await?;
+                        Ok(())
+                    }
+                );
             };
 
             if command_obj.owners_only && !framework_options.owners.contains(&ctx.author().id) {
-                ctx.say(ctx.gettext("This command is only available to the bot owner!")).await?;
-                return Ok(())
+                ctx.say(ctx.gettext("This command is only available to the bot owner!"))
+                    .await?;
+                return Ok(());
             }
 
             if command_obj.subcommands.is_empty() {
@@ -153,16 +175,25 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
     };
 
     let neutral_colour = ctx.neutral_colour().await;
-    ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
-        .title(ctx.gettext("{command_name} Help!").replace("{command_name}", &match &mode {
-            HelpCommandMode::Root => ctx.serenity_context().cache.current_user().name.clone(),
-            HelpCommandMode::Group(c) | HelpCommandMode::Command(c) => format!("`{}`", c.qualified_name)
-        }))
+    let embed = CreateEmbed::default()
+        .title(ctx.gettext("{command_name} Help!").replace(
+            "{command_name}",
+            &match &mode {
+                HelpCommandMode::Root => ctx.serenity_context().cache.current_user().name.clone(),
+                HelpCommandMode::Group(c) | HelpCommandMode::Command(c) => {
+                    format!("`{}`", c.qualified_name)
+                }
+            },
+        ))
         .description(match &mode {
             HelpCommandMode::Root => show_group_description(&get_command_mapping(commands)),
             HelpCommandMode::Command(command_obj) => {
-                let mut msg = format!("{}\n```/{}",
-                    command_obj.description.as_deref().unwrap_or_else(|| ctx.gettext("Command description not found!")),
+                let mut msg = format!(
+                    "{}\n```/{}",
+                    command_obj
+                        .description
+                        .as_deref()
+                        .unwrap_or_else(|| ctx.gettext("Command description not found!")),
                     command_obj.qualified_name
                 );
 
@@ -173,32 +204,40 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                     msg.push_str(ctx.gettext("__**Parameter Descriptions**__\n"));
                     command_obj.parameters.iter().for_each(|p| {
                         let name = p.name.as_deref().unwrap_or_else(|| ctx.gettext("unnamed"));
-                        let description = p.description.as_deref().unwrap_or_else(|| ctx.gettext("no description"));
+                        let description = p
+                            .description
+                            .as_deref()
+                            .unwrap_or_else(|| ctx.gettext("no description"));
                         writeln!(msg, "`{name}`: {description}").unwrap();
-                    }
-                    );
+                    });
                 };
 
                 msg
-            },
+            }
             HelpCommandMode::Group(group) => show_group_description(&{
                 let mut map = IndexMap::new();
-                map.insert(group.qualified_name.as_ref(), group.subcommands.iter().collect());
+                map.insert(
+                    group.qualified_name.as_ref(),
+                    group.subcommands.iter().collect(),
+                );
                 map
             }),
         })
         .colour(neutral_colour)
-        .author(serenity::CreateEmbedAuthor::new(ctx.author().name.clone()).icon_url(ctx.author().face()))
+        .author(
+            serenity::CreateEmbedAuthor::new(ctx.author().name.clone())
+                .icon_url(ctx.author().face()),
+        )
         .footer(serenity::CreateEmbedFooter::new(match mode {
             HelpCommandMode::Group(c) => ctx
                 .gettext("Use `/help {command_name} [command]` for more info on a command")
                 .replace("{command_name}", &c.qualified_name),
-            HelpCommandMode::Command(_) |HelpCommandMode::Root => ctx
+            HelpCommandMode::Command(_) | HelpCommandMode::Root => ctx
                 .gettext("Use `/help [command]` for more info on a command")
-                .to_string()
-        }))
-    )).await?;
+                .to_string(),
+        }));
 
+    ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())
 }
 

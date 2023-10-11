@@ -2,17 +2,24 @@ use std::{borrow::Cow, num::NonZeroU16};
 
 use tracing::info;
 
+use self::serenity::{CreateEmbed, CreateEmbedFooter, CreateMessage, ExecuteWebhook, Mentionable};
 use poise::serenity_prelude as serenity;
-use self::serenity::{CreateMessage, ExecuteWebhook, Mentionable, CreateEmbed, CreateEmbedFooter};
 
-use crate::structs::{FrameworkContext, Data, Result, JoinVCToken, TTSMode};
-use crate::funcs::{run_checks, clean_msg, self, random_footer, dm_generic};
-use crate::constants::DM_WELCOME_MESSAGE;
-use crate::traits::SongbirdManagerExt;
-use crate::opt_ext::OptionTryUnwrap;
-use crate::{require, errors};
+use crate::{
+    constants::DM_WELCOME_MESSAGE,
+    errors,
+    funcs::{self, clean_msg, dm_generic, random_footer, run_checks},
+    opt_ext::OptionTryUnwrap,
+    require,
+    structs::{Data, FrameworkContext, JoinVCToken, Result, TTSMode},
+    traits::SongbirdManagerExt,
+};
 
-pub async fn message(framework_ctx: FrameworkContext<'_>, ctx: &serenity::Context, new_message: &serenity::Message) -> Result<()> {
+pub async fn message(
+    framework_ctx: FrameworkContext<'_>,
+    ctx: &serenity::Context,
+    new_message: &serenity::Message,
+) -> Result<()> {
     tokio::try_join!(
         process_tts_msg(ctx, new_message, &framework_ctx),
         process_support_dm(ctx, new_message, framework_ctx.user_data),
@@ -22,7 +29,6 @@ pub async fn message(framework_ctx: FrameworkContext<'_>, ctx: &serenity::Contex
     Ok(())
 }
 
-#[allow(clippy::too_many_lines)]
 async fn process_tts_msg(
     ctx: &serenity::Context,
     message: &serenity::Message,
@@ -38,16 +44,20 @@ async fn process_tts_msg(
     let (voice, mode) = {
         if let Some(channel_id) = to_autojoin {
             let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-            match data.songbird.join_vc(join_vc_lock.lock().await, channel_id).await {
+            match data
+                .songbird
+                .join_vc(join_vc_lock.lock().await, channel_id)
+                .await
+            {
                 Ok(call) => call,
                 Err(songbird::error::JoinError::TimedOut) => return Ok(()),
                 Err(err) => return Err(err.into()),
             };
         }
 
-        let is_ephemeral = message.flags.map_or(false, |f|
+        let is_ephemeral = message.flags.map_or(false, |f| {
             f.contains(serenity::model::channel::MessageFlags::EPHEMERAL)
-        );
+        });
 
         let m;
         let member_nick = match &message.member {
@@ -55,17 +65,31 @@ async fn process_tts_msg(
             None if message.webhook_id.is_none() && !is_ephemeral => {
                 m = guild_id.member(ctx, message.author.id).await?;
                 m.nick.as_deref()
-            },
-            None => None
+            }
+            None => None,
         };
 
-        let (voice, mode) = data.parse_user_or_guild(message.author.id, Some(guild_id)).await?;
-        let nickname_row = data.nickname_db.get([guild_id.into(), message.author.id.into()]).await?;
+        let (voice, mode) = data
+            .parse_user_or_guild(message.author.id, Some(guild_id))
+            .await?;
+        let nickname_row = data
+            .nickname_db
+            .get([guild_id.into(), message.author.id.into()])
+            .await?;
 
         content = clean_msg(
-            &content, &message.author, &ctx.cache, guild_id, member_nick, &message.attachments, &voice,
-            guild_row.xsaid, guild_row.repeated_chars as usize, nickname_row.name.as_deref(),
-            &data.regex_cache, &data.last_to_xsaid_tracker
+            &content,
+            &message.author,
+            &ctx.cache,
+            guild_id,
+            member_nick,
+            &message.attachments,
+            &voice,
+            guild_row.xsaid,
+            guild_row.repeated_chars as usize,
+            nickname_row.name.as_deref(),
+            &data.regex_cache,
+            &data.last_to_xsaid_tracker,
         );
 
         (voice, mode)
@@ -73,15 +97,20 @@ async fn process_tts_msg(
 
     if let Some(target_lang) = guild_row.target_lang.as_deref() {
         if guild_row.to_translate && data.premium_check(Some(guild_id)).await?.is_none() {
-            content = funcs::translate(&content, target_lang, data).await?.unwrap_or(content);
+            content = funcs::translate(&content, target_lang, data)
+                .await?
+                .unwrap_or(content);
         };
     }
 
     let speaking_rate = data.speaking_rate(message.author.id, mode).await?;
     let url = funcs::prepare_url(
         data.config.tts_service.clone(),
-        &content, &voice, mode,
-        &speaking_rate, &guild_row.msg_length.to_string()
+        &content,
+        &voice,
+        mode,
+        &speaking_rate,
+        &guild_row.msg_length.to_string(),
     );
 
     let call_lock = if let Some(call) = data.songbird.get(guild_id) {
@@ -91,44 +120,65 @@ async fn process_tts_msg(
         // this is usually if the bot restarted but the bot is still in the vc from the last boot.
         let voice_channel_id = {
             let guild = ctx.cache.guild(guild_id).try_unwrap()?;
-            guild.voice_states.get(&message.author.id).and_then(|vs| vs.channel_id).try_unwrap()?
+            guild
+                .voice_states
+                .get(&message.author.id)
+                .and_then(|vs| vs.channel_id)
+                .try_unwrap()?
         };
 
         let join_vc_lock = JoinVCToken::acquire(data, guild_id);
-        match data.songbird.join_vc(join_vc_lock.lock().await, voice_channel_id).await {
+        match data
+            .songbird
+            .join_vc(join_vc_lock.lock().await, voice_channel_id)
+            .await
+        {
             Ok(call) => call,
             Err(songbird::error::JoinError::TimedOut) => return Ok(()),
-            Err(err) => return Err(err.into())
+            Err(err) => return Err(err.into()),
         }
     };
 
     // Pre-fetch the audio to handle max_length errors
-    let audio = require!(funcs::fetch_audio(
-        &data.reqwest,
-        url.clone(),
-        data.config.tts_service_auth_key.as_deref()
-    ).await?, Ok(()));
+    let audio = require!(
+        funcs::fetch_audio(
+            &data.reqwest,
+            url.clone(),
+            data.config.tts_service_auth_key.as_deref()
+        )
+        .await?,
+        Ok(())
+    );
 
-    let hint = audio.headers().get(reqwest::header::CONTENT_TYPE).map(|ct| {
-        let mut hint = songbird::input::core::probe::Hint::new();
-        hint.mime_type(ct.to_str()?);
-        Ok::<_, anyhow::Error>(hint)
-    }).transpose()?;
+    let hint = audio
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .map(|ct| {
+            let mut hint = songbird::input::core::probe::Hint::new();
+            hint.mime_type(ct.to_str()?);
+            Ok::<_, anyhow::Error>(hint)
+        })
+        .transpose()?;
 
     let input = Box::new(std::io::Cursor::new(audio.bytes().await?));
-    let wrapped_audio = songbird::input::LiveInput::Raw(songbird::input::AudioStream{input, hint});
+    let wrapped_audio =
+        songbird::input::LiveInput::Raw(songbird::input::AudioStream { input, hint });
 
     let track_handle = {
         let mut call = call_lock.lock().await;
-        call.enqueue_input(songbird::input::Input::Live(wrapped_audio, None)).await
+        call.enqueue_input(songbird::input::Input::Live(wrapped_audio, None))
+            .await
     };
 
-    data.analytics.log(Cow::Borrowed(match mode {
-        TTSMode::gTTS => "gTTS_tts",
-        TTSMode::eSpeak => "eSpeak_tts",
-        TTSMode::gCloud => "gCloud_tts",
-        TTSMode::Polly => "Polly_tts",
-    }), false);
+    data.analytics.log(
+        Cow::Borrowed(match mode {
+            TTSMode::gTTS => "gTTS_tts",
+            TTSMode::eSpeak => "eSpeak_tts",
+            TTSMode::gCloud => "gCloud_tts",
+            TTSMode::Polly => "Polly_tts",
+        }),
+        false,
+    );
 
     let guild = ctx.cache.guild(guild_id).try_unwrap()?;
     let (blank_name, blank_value, blank_inline) = errors::blank_field();
@@ -137,7 +187,11 @@ async fn process_tts_msg(
         ("Guild Name", Cow::Owned(guild.name.clone()), true),
         ("Guild ID", Cow::Owned(guild.id.to_string()), true),
         (blank_name, blank_value, blank_inline),
-        ("Message length", Cow::Owned(content.len().to_string()), true),
+        (
+            "Message length",
+            Cow::Owned(content.len().to_string()),
+            true,
+        ),
         ("Voice", voice, true),
         ("Mode", Cow::Owned(mode.to_string()), true),
     ];
@@ -148,10 +202,15 @@ async fn process_tts_msg(
     let data = data.clone();
 
     errors::handle_track(
-        ctx.clone(), shard_manager, data, extra_fields,
-        author_name, icon_url,
-        &track_handle
-    ).map_err(Into::into)
+        ctx.clone(),
+        shard_manager,
+        data,
+        extra_fields,
+        author_name,
+        icon_url,
+        &track_handle,
+    )
+    .map_err(Into::into)
 }
 
 async fn process_mention_msg(
@@ -172,7 +231,9 @@ async fn process_mention_msg(
     prefix = prefix.replace(['`', '\\'], "");
 
     if permissions.send_messages() {
-        channel.say(ctx, format!("Current prefix for this server is: {prefix}")).await?;
+        channel
+            .say(ctx, format!("Current prefix for this server is: {prefix}"))
+            .await?;
     } else {
         let msg = {
             let guild = ctx.cache.guild(guild_id);
@@ -181,8 +242,13 @@ async fn process_mention_msg(
             format!("My prefix for `{guild_name}` is {prefix} however I do not have permission to send messages so I cannot respond to your commands!")
         };
 
-        match message.author.direct_message(ctx, CreateMessage::default().content(msg)).await {
-            Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
+        match message
+            .author
+            .direct_message(ctx, CreateMessage::default().content(msg))
+            .await
+        {
+            Err(serenity::Error::Http(error))
+                if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
             Err(error) => return Err(anyhow::Error::from(error)),
             _ => {}
         }
@@ -197,9 +263,11 @@ async fn process_support_dm(
     data: &Data,
 ) -> Result<()> {
     let channel = match message.channel(ctx).await? {
-        serenity::Channel::Guild(channel) => return process_support_response(ctx, message, data, channel).await,
+        serenity::Channel::Guild(channel) => {
+            return process_support_response(ctx, message, data, channel).await
+        }
         serenity::Channel::Private(channel) => channel,
-        _ => return Ok(())
+        _ => return Ok(()),
     };
 
     if message.author.bot || message.content.starts_with('-') {
@@ -217,7 +285,9 @@ async fn process_support_dm(
                 let current_user = ctx.cache.current_user();
                 format!(
                     "Join {} and look in {} to invite <@{}>!",
-                    data.config.main_server_invite, data.config.invite_channel.mention(), current_user.id
+                    data.config.main_server_invite,
+                    data.config.invite_channel.mention(),
+                    current_user.id
                 )
             };
 
@@ -229,36 +299,62 @@ async fn process_support_dm(
 
             let mut attachments = Vec::new();
             for attachment in &message.attachments {
-                let attachment_builder = serenity::CreateAttachment::url(&ctx.http, &attachment.url).await?;
+                let attachment_builder =
+                    serenity::CreateAttachment::url(&ctx.http, &attachment.url).await?;
                 attachments.push(attachment_builder);
             }
 
-            data.webhooks.dm_logs.execute(&ctx, false, ExecuteWebhook::default()
-                .files(attachments)
-                .content(&message.content)
-                .username(webhook_username)
-                .avatar_url(message.author.face())
-                .embeds(message.embeds.iter().cloned().map(Into::into).collect())
-            ).await?;
+            data.webhooks
+                .dm_logs
+                .execute(
+                    &ctx,
+                    false,
+                    ExecuteWebhook::default()
+                        .files(attachments)
+                        .content(&message.content)
+                        .username(webhook_username)
+                        .avatar_url(message.author.face())
+                        .embeds(message.embeds.iter().cloned().map(Into::into).collect()),
+                )
+                .await?;
         }
     } else {
         let (client_id, title) = {
             let current_user = ctx.cache.current_user();
-            (current_user.id, format!("Welcome to {} Support DMs!", current_user.name))
+            (
+                current_user.id,
+                format!("Welcome to {} Support DMs!", current_user.name),
+            )
         };
 
-        let welcome_msg = channel.send_message(&ctx.http, CreateMessage::default().embed(CreateEmbed::default()
-            .title(title)
-            .description(DM_WELCOME_MESSAGE)
-            .footer(CreateEmbedFooter::new(random_footer(&data.config.main_server_invite, client_id, data.default_catalog())))
-        )).await?;
+        let welcome_msg = channel
+            .send_message(
+                &ctx.http,
+                CreateMessage::default().embed(
+                    CreateEmbed::default()
+                        .title(title)
+                        .description(DM_WELCOME_MESSAGE)
+                        .footer(CreateEmbedFooter::new(random_footer(
+                            &data.config.main_server_invite,
+                            client_id,
+                            data.default_catalog(),
+                        ))),
+                ),
+            )
+            .await?;
 
-        data.userinfo_db.set_one(message.author.id.into(), "dm_welcomed", &true).await?;
+        data.userinfo_db
+            .set_one(message.author.id.into(), "dm_welcomed", &true)
+            .await?;
         if channel.pins(&ctx.http).await?.len() < 50 {
             welcome_msg.pin(ctx).await?;
         }
 
-        info!("{}#{} just got the 'Welcome to support DMs' message", message.author.name, message.author.discriminator.map_or(0, NonZeroU16::get));
+        info!(
+            "{}#{} just got the 'Welcome to support DMs' message",
+            message.author.name,
+            message.author.discriminator.map_or(0, NonZeroU16::get)
+        );
     };
 
     Ok(())
@@ -268,7 +364,7 @@ async fn process_support_response(
     ctx: &serenity::Context,
     message: &serenity::Message,
     data: &Data,
-    channel: serenity::GuildChannel
+    channel: serenity::GuildChannel,
 ) -> Result<()> {
     let reference = require!(&message.message_reference, Ok(()));
     if data.webhooks.dm_logs.channel_id.try_unwrap()? != channel.id {
@@ -286,7 +382,12 @@ async fn process_support_response(
     }
 
     let (target, target_tag) = {
-        let re_match = require!(data.regex_cache.id_in_brackets.captures(&resolved_author_name), Ok(()));
+        let re_match = require!(
+            data.regex_cache
+                .id_in_brackets
+                .captures(&resolved_author_name),
+            Ok(())
+        );
 
         let target: serenity::UserId = require!(re_match.get(1), Ok(())).as_str().parse()?;
         let target_tag = target.to_user(ctx).await?.tag();
@@ -297,14 +398,23 @@ async fn process_support_response(
     let attachment_url = message.attachments.first().map(|a| a.url.clone());
 
     let (content, embed) = dm_generic(
-        ctx, &message.author, target, target_tag,
-        attachment_url, message.content.clone()
-    ).await?;
+        ctx,
+        &message.author,
+        target,
+        target_tag,
+        attachment_url,
+        message.content.clone(),
+    )
+    .await?;
 
-    channel.send_message(ctx, CreateMessage::default()
-        .content(content)
-        .embed(CreateEmbed::from(embed))
-    ).await?;
+    channel
+        .send_message(
+            ctx,
+            CreateMessage::default()
+                .content(content)
+                .embed(CreateEmbed::from(embed)),
+        )
+        .await?;
 
     Ok(())
 }

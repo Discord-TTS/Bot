@@ -8,7 +8,7 @@ use poise::serenity_prelude as serenity;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum EventType {
     Normal,
-    Command
+    Command,
 }
 
 impl From<bool> for EventType {
@@ -21,10 +21,9 @@ impl From<bool> for EventType {
     }
 }
 
-
 pub struct Handler {
     log_buffer: DashMap<(Cow<'static, str>, EventType), i32>,
-    pool: sqlx::PgPool
+    pool: sqlx::PgPool,
 }
 
 impl Handler {
@@ -32,7 +31,7 @@ impl Handler {
     pub fn new(pool: sqlx::PgPool) -> Self {
         Self {
             pool,
-            log_buffer: DashMap::new()
+            log_buffer: DashMap::new(),
         }
     }
 
@@ -54,23 +53,29 @@ impl crate::Looper for Handler {
         self.log_buffer.clear();
 
         let mut conn = self.pool.acquire().await?;
-        conn.transaction(move |transaction| Box::pin(async {
-            for ((event, kind), count) in log_buffer {
-                let query = sqlx::query("
+        conn.transaction(move |transaction| {
+            Box::pin(async {
+                for ((event, kind), count) in log_buffer {
+                    let query = sqlx::query(
+                        "
                     INSERT INTO analytics(event, is_command, count)
                     VALUES($1, $2, $3)
                     ON CONFLICT ON CONSTRAINT analytics_pkey
                     DO UPDATE SET count = analytics.count + EXCLUDED.count
-                ;");
+                ;",
+                    );
 
-                query
-                    .bind(event)
-                    .bind(kind == EventType::Command)
-                    .bind(count)
-                    .execute(&mut **transaction).await?;
-            }
+                    query
+                        .bind(event)
+                        .bind(kind == EventType::Command)
+                        .bind(count)
+                        .execute(&mut **transaction)
+                        .await?;
+                }
 
-            Ok(())
-        })).await
+                Ok(())
+            })
+        })
+        .await
     }
 }

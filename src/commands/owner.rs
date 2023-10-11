@@ -14,62 +14,96 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
-use std::num::NonZeroU16;
-use std::sync::atomic::Ordering::SeqCst;
+use std::{collections::HashSet, num::NonZeroU16, sync::atomic::Ordering::SeqCst};
 
-use poise::{serenity_prelude as serenity, futures_util::TryStreamExt};
 use self::serenity::builder::*;
+use poise::{futures_util::TryStreamExt, serenity_prelude as serenity};
 
-use crate::structs::{Context, CommandResult, PrefixContext, TTSModeChoice, Command};
-use crate::opt_ext::OptionTryUnwrap;
-use crate::funcs::dm_generic;
+use crate::{
+    funcs::dm_generic,
+    structs::{Command, CommandResult, Context, PrefixContext, TTSModeChoice},
+};
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
-    poise::samples::register_application_commands(ctx, global).await.map_err(Into::into)
+    poise::samples::register_application_commands(ctx, global).await?;
+    Ok(())
 }
 
 #[poise::command(prefix_command, hide_in_help, owners_only)]
-pub async fn dm(ctx: PrefixContext<'_>, todm: serenity::User, #[rest] message: String) -> CommandResult {
+pub async fn dm(
+    ctx: PrefixContext<'_>,
+    todm: serenity::User,
+    #[rest] message: String,
+) -> CommandResult {
     let attachment_url = ctx.msg.attachments.first().map(|a| a.url.clone());
     let (content, embed) = dm_generic(
-        ctx.serenity_context(), &ctx.msg.author, todm.id, todm.tag(),
-        attachment_url, message
-    ).await?;
+        ctx.serenity_context(),
+        &ctx.msg.author,
+        todm.id,
+        todm.tag(),
+        attachment_url,
+        message,
+    )
+    .await?;
 
-    ctx.msg.channel_id.send_message(&ctx.serenity_context(), CreateMessage::default()
-        .content(content)
-        .add_embed(CreateEmbed::from(embed))
-    ).await?;
+    ctx.msg
+        .channel_id
+        .send_message(
+            &ctx.serenity_context(),
+            CreateMessage::default()
+                .content(content)
+                .add_embed(CreateEmbed::from(embed)),
+        )
+        .await?;
 
     Ok(())
 }
 
 #[poise::command(prefix_command, hide_in_help, owners_only)]
 pub async fn close(ctx: Context<'_>) -> CommandResult {
-    ctx.say(format!("Shutting down {} shards!", ctx.cache().shard_count())).await?;
+    ctx.say(format!(
+        "Shutting down {} shards!",
+        ctx.cache().shard_count()
+    ))
+    .await?;
     ctx.framework().shard_manager().shutdown_all().await;
 
     Ok(())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn add_premium(ctx: Context<'_>, guild: serenity::Guild, user: serenity::User) -> CommandResult {
+pub async fn add_premium(
+    ctx: Context<'_>,
+    guild: serenity::Guild,
+    user: serenity::User,
+) -> CommandResult {
     let data = ctx.data();
     let user_id = user.id.into();
 
     data.userinfo_db.create_row(user_id).await?;
-    data.guilds_db.set_one(guild.id.into(), "premium_user", &user_id).await?;
+    data.guilds_db
+        .set_one(guild.id.into(), "premium_user", &user_id)
+        .await?;
 
     ctx.say(format!(
         "Linked <@{}> ({}#{} | {}) to {}",
-        user.id, user.name, user.discriminator.map_or(0, NonZeroU16::get), user.id, guild.name
-    )).await?;
+        user.id,
+        user.name,
+        user.discriminator.map_or(0, NonZeroU16::get),
+        user.id,
+        guild.name
+    ))
+    .await?;
     Ok(())
 }
 
-#[poise::command(prefix_command, owners_only, hide_in_help, subcommands("guild", "user", "guild_voice", "user_voice"))]
+#[poise::command(
+    prefix_command,
+    owners_only,
+    hide_in_help,
+    subcommands("guild", "user", "guild_voice", "user_voice")
+)]
 pub async fn remove_cache(ctx: Context<'_>) -> CommandResult {
     ctx.say("Please run a subcommand!").await?;
     Ok(())
@@ -91,14 +125,18 @@ pub async fn user(ctx: Context<'_>, user: i64) -> CommandResult {
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn guild_voice(ctx: Context<'_>, guild: i64, mode: TTSModeChoice) -> CommandResult {
-    ctx.data().guild_voice_db.invalidate_cache(&(guild, mode.into()));
+    ctx.data()
+        .guild_voice_db
+        .invalidate_cache(&(guild, mode.into()));
     ctx.say("Done!").await?;
     Ok(())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeChoice) -> CommandResult {
-    ctx.data().user_voice_db.invalidate_cache(&(user, mode.into()));
+    ctx.data()
+        .user_voice_db
+        .invalidate_cache(&(user, mode.into()));
     ctx.say("Done!").await?;
     Ok(())
 }
@@ -114,7 +152,7 @@ pub enum PurgeGuildsMode {
 pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandResult {
     #[derive(sqlx::FromRow)]
     struct HasGuildId {
-        guild_id: i64
+        guild_id: i64,
     }
 
     let data = ctx.data();
@@ -127,14 +165,21 @@ pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandRes
     let cache = ctx.cache();
     let mut setup_guilds = HashSet::with_capacity(cache.guild_count());
 
-    let mut stream = sqlx::query_as::<_, HasGuildId>("SELECT guild_id from guilds WHERE channel != 0").fetch(&data.pool);
+    let mut stream =
+        sqlx::query_as::<_, HasGuildId>("SELECT guild_id from guilds WHERE channel != 0")
+            .fetch(&data.pool);
+
     while let Some(item) = stream.try_next().await? {
-        setup_guilds.insert(std::num::NonZeroU64::new(item.guild_id as u64).try_unwrap()?);
+        setup_guilds.insert(item.guild_id as u64);
     }
 
-    let to_leave: Vec<_> = cache.guilds().into_iter().filter(|g| !setup_guilds.contains(&g.0)).collect();
-    let to_leave_count = to_leave.len();
+    let to_leave: Vec<_> = cache
+        .guilds()
+        .into_iter()
+        .filter(|g| !setup_guilds.contains(&g.get()))
+        .collect();
 
+    let to_leave_count = to_leave.len();
     if mode == PurgeGuildsMode::Run {
         let msg = ctx.say(format!("Leaving {to_leave_count} guilds!")).await?;
 
@@ -143,14 +188,20 @@ pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandRes
             guild.leave(ctx).await?;
 
             if !data.currently_purging.load(SeqCst) {
-                msg.edit(ctx, poise::CreateReply::default().content("Aborted!")).await?;
+                msg.edit(ctx, poise::CreateReply::default().content("Aborted!"))
+                    .await?;
                 return Ok(());
             }
         }
 
-        msg.edit(ctx, poise::CreateReply::default().content("Done! Left {to_leave_count} guilds!")).await?;
+        msg.edit(
+            ctx,
+            poise::CreateReply::default().content("Done! Left {to_leave_count} guilds!"),
+        )
+        .await?;
     } else {
-        ctx.say(format!("Would purge {to_leave_count} guilds!")).await?;
+        ctx.say(format!("Would purge {to_leave_count} guilds!"))
+            .await?;
     }
 
     Ok(())
@@ -165,50 +216,54 @@ pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
     let support_guild_id = data.config.main_server;
     let support_guild_members = support_guild_id.members(http, None, None).await?;
 
-    let all_guild_owners = cache.guilds().iter()
+    let all_guild_owners = cache
+        .guilds()
+        .iter()
         .filter_map(|id| cache.guild(id).map(|g| g.owner_id))
         .collect::<Vec<_>>();
 
-    let current_ofs_members = support_guild_members.iter()
+    let current_ofs_members = support_guild_members
+        .iter()
         .filter(|m| m.roles.contains(&data.config.ofs_role))
         .map(|m| m.user.id)
         .collect::<Vec<_>>();
 
-    let should_not_be_ofs_members = current_ofs_members.iter().filter(|ofs_member| !all_guild_owners.contains(ofs_member));
-    let should_be_ofs_members = all_guild_owners.iter().filter(|owner|
-        (!current_ofs_members.contains(owner)) &&
-        support_guild_members.iter().any(|m| m.user.id == **owner)
-    );
+    let should_not_be_ofs_members = current_ofs_members
+        .iter()
+        .filter(|ofs_member| !all_guild_owners.contains(ofs_member));
+    let should_be_ofs_members = all_guild_owners.iter().filter(|owner| {
+        (!current_ofs_members.contains(owner))
+            && support_guild_members.iter().any(|m| m.user.id == **owner)
+    });
 
     let mut added_role = 0;
     for member in should_be_ofs_members {
         added_role += 1;
-        http.add_member_role(
-            support_guild_id,
-            *member,
-            data.config.ofs_role,
-            None
-        ).await?;
+        http.add_member_role(support_guild_id, *member, data.config.ofs_role, None)
+            .await?;
     }
 
     let mut removed_role = 0;
     for member in should_not_be_ofs_members {
         removed_role += 1;
-        http.remove_member_role(
-            support_guild_id,
-            *member,
-            data.config.ofs_role,
-            None
-        ).await?;
+        http.remove_member_role(support_guild_id, *member, data.config.ofs_role, None)
+            .await?;
     }
 
-    ctx.say(format!("Done! Removed {removed_role} members and added {added_role} members!")).await?;
+    ctx.say(format!(
+        "Done! Removed {removed_role} members and added {added_role} members!"
+    ))
+    .await?;
     Ok(())
 }
 
-
 /// Debug commands for the bot
-#[poise::command(prefix_command, slash_command, guild_only, subcommands("info", "leave"))]
+#[poise::command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    subcommands("info", "leave")
+)]
 pub async fn debug(ctx: Context<'_>) -> CommandResult {
     _info(ctx).await
 }
@@ -230,13 +285,21 @@ pub async fn _info(ctx: Context<'_>) -> CommandResult {
     let user_row = data.userinfo_db.get(author_id).await?;
     let guild_row = data.guilds_db.get(guild_id_db).await?;
     let nick_row = data.nickname_db.get([guild_id_db, author_id]).await?;
-    let guild_voice_row = data.guild_voice_db.get((guild_id_db, guild_row.voice_mode)).await?;
-    let user_voice_row = data.user_voice_db.get((author_id, user_row.voice_mode.unwrap_or_default())).await?;
+    let guild_voice_row = data
+        .guild_voice_db
+        .get((guild_id_db, guild_row.voice_mode))
+        .await?;
+
+    let user_voice_row = data
+        .user_voice_db
+        .get((author_id, user_row.voice_mode.unwrap_or_default()))
+        .await?;
 
     let voice_client = data.songbird.get(guild_id);
-    ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
+    let embed = CreateEmbed::default()
         .title("TTS Bot Debug Info")
-        .description(format!("
+        .description(format!(
+            "
 Shard ID: `{shard_id}`
 Voice Client: `{voice_client:?}`
 
@@ -245,8 +308,10 @@ User Data: `{user_row:?}`
 Nickname Data: `{nick_row:?}`
 User Voice Data: `{user_voice_row:?}`
 Guild Voice Data: `{guild_voice_row:?}`
-"))
-    )).await?;
+"
+        ));
+
+    ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())
 }
 
@@ -254,9 +319,22 @@ Guild Voice Data: `{guild_voice_row:?}`
 #[poise::command(prefix_command, guild_only, hide_in_help)]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
-    ctx.data().songbird.remove(guild_id).await.map_err(Into::into)
+    ctx.data()
+        .songbird
+        .remove(guild_id)
+        .await
+        .map_err(Into::into)
 }
 
 pub fn commands() -> [Command; 8] {
-    [dm(), close(), debug(), register(), add_premium(), remove_cache(), refresh_ofs(), purge_guilds()]
+    [
+        dm(),
+        close(),
+        debug(),
+        register(),
+        add_premium(),
+        remove_cache(),
+        refresh_ofs(),
+        purge_guilds(),
+    ]
 }

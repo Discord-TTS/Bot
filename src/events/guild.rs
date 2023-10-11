@@ -6,13 +6,25 @@ use serenity::builder::*;
 
 use crate::{serenity, Data, Result};
 
-pub async fn guild_create(ctx: &serenity::Context, data: &Data, guild: &serenity::Guild, is_new: Option<bool>) -> Result<()> {
-    if !is_new.unwrap() {return Ok(())};
+pub async fn guild_create(
+    ctx: &serenity::Context,
+    data: &Data,
+    guild: &serenity::Guild,
+    is_new: Option<bool>,
+) -> Result<()> {
+    if !is_new.unwrap() {
+        return Ok(());
+    };
 
     // Send to servers channel and DM owner the welcome message
-    data.webhooks.servers.execute(&ctx.http, false, ExecuteWebhook::default()
-        .content(format!("Just joined {}!", &guild.name))
-    ).await?;
+    data.webhooks
+        .servers
+        .execute(
+            &ctx.http,
+            false,
+            ExecuteWebhook::default().content(format!("Just joined {}!", &guild.name)),
+        )
+        .await?;
 
     let (owner_tag, owner_face) = {
         let owner = guild.owner_id.to_user(&ctx).await?;
@@ -43,13 +55,21 @@ Ask questions by either responding here or asking on the support server!",
         _ => {}
     }
 
-    match ctx.http.add_member_role(
-        data.config.main_server,
-        guild.owner_id,
-        data.config.ofs_role,
-        None
-    ).await {
-        Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) => return Ok(()),
+    match ctx
+        .http
+        .add_member_role(
+            data.config.main_server,
+            guild.owner_id,
+            data.config.ofs_role,
+            None,
+        )
+        .await
+    {
+        Err(serenity::Error::Http(error))
+            if error.status_code() == Some(serenity::StatusCode::NOT_FOUND) =>
+        {
+            return Ok(())
+        }
         Err(err) => return Err(anyhow::Error::from(err)),
         Result::Ok(()) => (),
     }
@@ -59,49 +79,81 @@ Ask questions by either responding here or asking on the support server!",
     Ok(())
 }
 
-pub async fn guild_delete(ctx: &serenity::Context, data: &Data, incomplete: &serenity::UnavailableGuild, full: Option<&serenity::Guild>) -> Result<()> {
+pub async fn guild_delete(
+    ctx: &serenity::Context,
+    data: &Data,
+    incomplete: &serenity::UnavailableGuild,
+    full: Option<&serenity::Guild>,
+) -> Result<()> {
     data.guilds_db.delete(incomplete.id.into()).await?;
     if let Some(guild) = full {
         if data.currently_purging.load(Ordering::SeqCst) {
             return Ok(());
         }
 
-        if data.config.main_server.members(&ctx.http, None, None).await?.into_iter()
+        if data
+            .config
+            .main_server
+            .members(&ctx.http, None, None)
+            .await?
+            .into_iter()
             .filter(|m| m.roles.contains(&data.config.ofs_role))
             .any(|m| m.user.id == guild.owner_id)
         {
-            ctx.http.remove_member_role(
-                data.config.main_server,
-                guild.owner_id,
-                data.config.ofs_role,
-                None
-            ).await?;
+            ctx.http
+                .remove_member_role(
+                    data.config.main_server,
+                    guild.owner_id,
+                    data.config.ofs_role,
+                    None,
+                )
+                .await?;
         }
 
-        data.webhooks.servers.execute(&ctx.http, false, ExecuteWebhook::default().content(format!(
-            "Just got kicked from {}. I'm now in {} servers",
-            guild.name, ctx.cache.guilds().len()
-        ))).await?;
+        data.webhooks
+            .servers
+            .execute(
+                &ctx.http,
+                false,
+                ExecuteWebhook::default().content(format!(
+                    "Just got kicked from {}. I'm now in {} servers",
+                    guild.name,
+                    ctx.cache.guilds().len()
+                )),
+            )
+            .await?;
     };
 
     Ok(())
-
 }
 
-pub async fn guild_member_addition(ctx: &serenity::Context, data: &Data, member: &serenity::Member) -> Result<()> {
-    if
-        member.guild_id != data.config.main_server &&
-        ctx.cache.guilds().into_iter().find_map(|id| ctx.cache.guild(id).map(|g| g.owner_id == member.user.id)).unwrap_or(false)
+pub async fn guild_member_addition(
+    ctx: &serenity::Context,
+    data: &Data,
+    member: &serenity::Member,
+) -> Result<()> {
+    if member.guild_id != data.config.main_server
+        && ctx
+            .cache
+            .guilds()
+            .into_iter()
+            .find_map(|id| ctx.cache.guild(id).map(|g| g.owner_id == member.user.id))
+            .unwrap_or(false)
     {
-        match ctx.http.add_member_role(
-            data.config.main_server,
-            member.user.id,
-            data.config.ofs_role,
-            None
-        ).await {
+        match ctx
+            .http
+            .add_member_role(
+                data.config.main_server,
+                member.user.id,
+                data.config.ofs_role,
+                None,
+            )
+            .await
+        {
             // Unknown member
-            Err(serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(err))) if err.error.code == 10007 => {},
-            r => r?
+            Err(serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(err)))
+                if err.error.code == 10007 => {}
+            r => r?,
         }
     }
 

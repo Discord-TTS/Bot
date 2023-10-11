@@ -16,9 +16,10 @@
 
 #[macro_export]
 macro_rules! async_try {
-    ($inner:block) => {async {$inner}.await};
+    ($inner:block) => {
+        async { $inner }.await
+    };
 }
-
 
 #[macro_export]
 macro_rules! into_static_display {
@@ -52,7 +53,11 @@ macro_rules! require_guild {
     };
     ($ctx:expr, $ret:expr) => {
         $crate::require!($ctx.guild(), {
-            ::tracing::warn!("Guild {} not cached in {} command!", $ctx.guild_id().unwrap(), $ctx.command().qualified_name);
+            ::tracing::warn!(
+                "Guild {} not cached in {} command!",
+                $ctx.guild_id().unwrap(),
+                $ctx.command().qualified_name
+            );
             $ret
         })
     };

@@ -21,8 +21,12 @@ impl<T> OptionTryUnwrap<T> for Option<T> {
             Some(v) => Ok(v),
             None => Err({
                 let location = std::panic::Location::caller();
-                anyhow::anyhow!("Unexpected None value on line {} in {}", location.line(), location.file())
-            })
+                anyhow::anyhow!(
+                    "Unexpected None value on line {} in {}",
+                    location.line(),
+                    location.file()
+                )
+            }),
         }
     }
 }

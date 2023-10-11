@@ -2,11 +2,13 @@ use std::sync::Arc;
 
 use poise::serenity_prelude as serenity;
 
-use crate::opt_ext::{OptionTryUnwrap, OptionGettext};
-use crate::{require_guild, constants};
-use crate::structs::{Result, JoinVCToken, Context, TTSMode};
-use crate::constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR};
-
+use crate::{
+    constants,
+    constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR},
+    opt_ext::{OptionGettext, OptionTryUnwrap},
+    require_guild,
+    structs::{Context, JoinVCToken, Result, TTSMode},
+};
 
 #[serenity::async_trait]
 pub trait PoiseContextExt {
@@ -14,7 +16,7 @@ pub trait PoiseContextExt {
 
     fn current_catalog(&self) -> Option<&gettext::Catalog>;
     async fn send_error(&self, error_message: String) -> Result<Option<poise::ReplyHandle<'_>>>;
-    
+
     async fn neutral_colour(&self) -> u32;
     fn author_vc(&self) -> Option<serenity::ChannelId>;
     async fn author_permissions(&self) -> Result<serenity::Permissions>;
@@ -32,8 +34,11 @@ impl PoiseContextExt for Context<'_> {
     async fn neutral_colour(&self) -> u32 {
         if let Some(guild_id) = self.guild_id() {
             let row = self.data().guilds_db.get(guild_id.get() as i64).await;
-            if row.map(|row| row.voice_mode).map_or(false, TTSMode::is_premium) {
-                return PREMIUM_NEUTRAL_COLOUR
+            if row
+                .map(|row| row.voice_mode)
+                .map_or(false, TTSMode::is_premium)
+            {
+                return PREMIUM_NEUTRAL_COLOUR;
             }
         }
 
@@ -47,11 +52,14 @@ impl PoiseContextExt for Context<'_> {
     fn current_catalog(&self) -> Option<&gettext::Catalog> {
         if let poise::Context::Application(ctx) = self {
             if let poise::CommandOrAutocompleteInteraction::Command(interaction) = ctx.interaction {
-                return ctx.data.translations.get(match interaction.locale.as_str() {
-                    "ko" => "ko-KR",
-                    "pt-BR" => "pt",
-                    l => l
-                })
+                return ctx
+                    .data
+                    .translations
+                    .get(match interaction.locale.as_str() {
+                        "ko" => "ko-KR",
+                        "pt-BR" => "pt",
+                        l => l,
+                    });
             }
         };
 
@@ -67,12 +75,11 @@ impl PoiseContextExt for Context<'_> {
 
                 Ok(guild.user_permissions_in(&channel, &member))
             }
-            _ => {
-                Ok(((serenity::Permissions::from_bits_truncate(0b111_1100_1000_0000_0000_0111_1111_1000_0100_0000)
-                    | serenity::Permissions::SEND_MESSAGES)
-                    - serenity::Permissions::SEND_TTS_MESSAGES)
-                    - serenity::Permissions::MANAGE_MESSAGES)
-            }
+            _ => Ok(((serenity::Permissions::from_bits_truncate(
+                0b111_1100_1000_0000_0000_0111_1111_1000_0100_0000,
+            ) | serenity::Permissions::SEND_MESSAGES)
+                - serenity::Permissions::SEND_TTS_MESSAGES)
+                - serenity::Permissions::MANAGE_MESSAGES),
         }
     }
 
@@ -83,7 +90,8 @@ impl PoiseContextExt for Context<'_> {
         let m;
         let (name, avatar_url) = match self.channel_id().to_channel(serenity_ctx).await? {
             serenity::Channel::Guild(channel) => {
-                let permissions = channel.permissions_for_user(serenity_ctx, serenity_ctx.cache.current_user().id)?;
+                let permissions = channel
+                    .permissions_for_user(serenity_ctx, serenity_ctx.cache.current_user().id)?;
 
                 if !permissions.send_messages() {
                     return Ok(None);
@@ -93,14 +101,14 @@ impl PoiseContextExt for Context<'_> {
                     return self.send(poise::CreateReply::default()
                         .ephemeral(true)
                         .content("An Error Occurred! Please give me embed links permissions so I can tell you more!")
-                    ).await.map(Some).map_err(Into::into)
+                    ).await.map(Some).map_err(Into::into);
                 };
 
                 match channel.guild_id.member(serenity_ctx, author.id).await {
                     Ok(member) => {
                         m = member;
                         (m.display_name(), m.face())
-                    },
+                    }
                     Err(_) => (author.name.as_str(), author.face()),
                 }
             }
@@ -108,20 +116,24 @@ impl PoiseContextExt for Context<'_> {
             _ => unreachable!(),
         };
 
-        match self.send(poise::CreateReply::default()
-            .ephemeral(true)
-            .embed(serenity::CreateEmbed::default()
-                .colour(constants::RED)
-                .title("An Error Occurred!")
-                .author(serenity::CreateEmbedAuthor::new(name).icon_url(avatar_url))
-                .description(error_message)
-                .footer(serenity::CreateEmbedFooter::new(format!(
-                    "Support Server: {}", self.data().main_server_invite
-                )))
+        match self
+            .send(
+                poise::CreateReply::default().ephemeral(true).embed(
+                    serenity::CreateEmbed::default()
+                        .colour(constants::RED)
+                        .title("An Error Occurred!")
+                        .author(serenity::CreateEmbedAuthor::new(name).icon_url(avatar_url))
+                        .description(error_message)
+                        .footer(serenity::CreateEmbedFooter::new(format!(
+                            "Support Server: {}",
+                            self.data().main_server_invite
+                        ))),
+                ),
             )
-        ).await {
+            .await
+        {
             Ok(handle) => Ok(Some(handle)),
-            Err(_) => Ok(None)
+            Err(_) => Ok(None),
         }
     }
 }
