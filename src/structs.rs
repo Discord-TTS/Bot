@@ -414,7 +414,7 @@ impl From<TTSModeChoice> for TTSMode {
 }
 
 #[derive(serde::Deserialize)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct GoogleVoice {
     pub name: String,
     #[serde(default)]

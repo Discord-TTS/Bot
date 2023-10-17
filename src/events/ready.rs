@@ -1,9 +1,8 @@
 use std::{
     collections::HashMap,
+    fmt::Write,
     sync::{atomic::Ordering, Arc},
 };
-
-use itertools::Itertools;
 
 use self::serenity::builder::*;
 use poise::serenity_prelude as serenity;
@@ -17,13 +16,27 @@ use crate::{
 };
 
 fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
-    let mut status: Vec<_> = shards
-        .iter()
-        .map(|(id, shard)| (id, format!("Shard {id}: `{}`", shard.stage)))
-        .collect();
+    let mut shards: Vec<_> = shards.iter().collect();
+    shards.sort_by_key(|(id, _)| *id);
 
-    status.sort_unstable_by_key(|(id, _)| *id);
-    status.into_iter().map(|(_, status)| status).join("\n")
+    let mut run_start = 0;
+    let mut last_stage = None;
+    let mut status = String::with_capacity(shards.len());
+
+    for (i, (id, info)) in shards.iter().enumerate() {
+        if Some(info.stage) == last_stage && i != (shards.len() - 1) {
+            continue;
+        }
+
+        if let Some(last_stage) = last_stage {
+            writeln!(status, "Shards {run_start}-{id}: {last_stage}").unwrap();
+        }
+
+        last_stage = Some(info.stage);
+        run_start = id.0;
+    }
+
+    status
 }
 
 pub async fn ready(
@@ -33,8 +46,9 @@ pub async fn ready(
 ) -> Result<()> {
     let data = framework_ctx.user_data;
 
+    let shard_count = ctx.cache.shard_count();
     let user_name = &data_about_bot.user.name;
-    let last_shard = (ctx.shard_id.0 + 1) == ctx.cache.shard_count();
+    let last_shard = (ctx.shard_id.0 + 1) == shard_count;
     let status = generate_status(&*framework_ctx.shard_manager.runners.lock().await);
 
     data.webhooks
@@ -42,9 +56,8 @@ pub async fn ready(
         .edit_message(
             &ctx.http,
             data.startup_message,
-            serenity::EditWebhookMessage::default()
-                .content("")
-                .embeds(vec![CreateEmbed::default()
+            serenity::EditWebhookMessage::default().content("").embed(
+                CreateEmbed::default()
                     .description(status)
                     .colour(FREE_NEUTRAL_COLOUR)
                     .title(if last_shard {
@@ -53,8 +66,9 @@ pub async fn ready(
                             data.start_time.elapsed().unwrap().as_secs()
                         )
                     } else {
-                        format!("{user_name} is starting up!")
-                    })]),
+                        format!("{user_name} is starting up {shard_count} shards!")
+                    }),
+            ),
         )
         .await?;
 
