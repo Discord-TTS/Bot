@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use dashmap::DashMap;
 
@@ -110,7 +110,6 @@ pub struct Handler<
 > {
     pool: sqlx::PgPool,
     cache: DashMap<CacheKey, Arc<RowT>>,
-    query_cache: DashMap<&'static str, &'static str>,
 
     default_row: Arc<RowT>,
     single_insert: &'static str,
@@ -133,7 +132,6 @@ where
     ) -> Result<Self> {
         Ok(Self {
             cache: DashMap::new(),
-            query_cache: DashMap::new(),
             default_row: Self::_get(&pool, CacheKey::default(), select)
                 .await?
                 .expect("Default row not in table!"),
@@ -177,24 +175,21 @@ where
         Ok(())
     }
 
-    pub async fn set_one<'a>(
+    pub async fn set_one<Val>(
         &self,
         identifier: CacheKey,
         key: &'static str,
-        value: impl sqlx::Type<sqlx::Postgres> + sqlx::Encode<'a, sqlx::Postgres> + Sync + Send + 'a,
-    ) -> Result<()> {
-        let query_raw = *self.query_cache.entry(key).or_insert_with(|| {
-            Box::leak(Box::new(
-                strfmt::strfmt(
-                    self.single_insert,
-                    &HashMap::from_iter([(String::from("key"), key)]),
-                )
-                .unwrap(),
-            ))
-        });
+        value: Val,
+    ) -> Result<()>
+    where
+        for<'a> Val: sqlx::Encode<'a, sqlx::Postgres>,
+        Val: sqlx::Type<sqlx::Postgres>,
+        Val: Sync + Send,
+    {
+        let query_raw = self.single_insert.replace("{key}", key);
 
         identifier
-            .bind_query(sqlx::query(query_raw))
+            .bind_query(sqlx::query(&query_raw))
             .bind(value)
             .execute(&self.pool)
             .await?;
@@ -229,16 +224,12 @@ macro_rules! create_db_handler {
             const_format::formatcp!("SELECT * FROM {TABLE_NAME} WHERE {ID_NAME} = $1"),
             const_format::formatcp!("DELETE FROM {TABLE_NAME} WHERE {ID_NAME} = $1"),
             const_format::formatcp!(
-                "
-                INSERT INTO {TABLE_NAME}({ID_NAME}) VALUES ($1)
-                ON CONFLICT ({ID_NAME}) DO NOTHING
-            "
+                "INSERT INTO {TABLE_NAME}({ID_NAME}) VALUES ($1)
+                ON CONFLICT ({ID_NAME}) DO NOTHING"
             ),
             const_format::formatcp!(
-                "
-                INSERT INTO {TABLE_NAME}({ID_NAME}, {{key}}) VALUES ($1, $2)
-                ON CONFLICT ({ID_NAME}) DO UPDATE SET {{key}} = $2
-            "
+                "INSERT INTO {TABLE_NAME}({ID_NAME}, {{key}}) VALUES ($1, $2)
+                ON CONFLICT ({ID_NAME}) DO UPDATE SET {{key}} = $2"
             ),
         )
     }};
@@ -256,16 +247,12 @@ macro_rules! create_db_handler {
                 "DELETE FROM {TABLE_NAME} WHERE {ID_NAME1} = $1 AND {ID_NAME2} = $2"
             ),
             const_format::formatcp!(
-                "
-                INSERT INTO {TABLE_NAME}({ID_NAME1}, {ID_NAME2}) VALUES ($1, $2)
-                ON CONFLICT ({ID_NAME1}, {ID_NAME2}) DO NOTHING
-            "
+                "INSERT INTO {TABLE_NAME}({ID_NAME1}, {ID_NAME2}) VALUES ($1, $2)
+                ON CONFLICT ({ID_NAME1}, {ID_NAME2}) DO NOTHING"
             ),
             const_format::formatcp!(
-                "
-                INSERT INTO {TABLE_NAME}({ID_NAME1}, {ID_NAME2}, {{key}}) VALUES ($1, $2, $3)
-                ON CONFLICT ({ID_NAME1}, {ID_NAME2}) DO UPDATE SET {{key}} = $3
-            "
+                "INSERT INTO {TABLE_NAME}({ID_NAME1}, {ID_NAME2}, {{key}}) VALUES ($1, $2, $3)
+                ON CONFLICT ({ID_NAME1}, {ID_NAME2}) DO UPDATE SET {{key}} = $3"
             ),
         )
     }};
