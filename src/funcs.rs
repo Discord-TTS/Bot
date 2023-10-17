@@ -131,7 +131,6 @@ pub fn prepare_url(
     tts_service
 }
 
-#[allow(clippy::similar_names)]
 pub async fn get_translation_langs(
     reqwest: &reqwest::Client,
     url: Option<&reqwest::Url>,
@@ -189,11 +188,11 @@ pub fn prepare_gcloud_voices(
             .map(|(_, variant)| variant);
 
         if let Some(variant) = variant {
-            let [language] = gvoice.languageCodes;
+            let [language] = gvoice.language_codes;
             cleaned_map
                 .entry(language)
                 .or_insert_with(BTreeMap::new)
-                .insert(String::from(variant), gvoice.ssmlGender);
+                .insert(String::from(variant), gvoice.ssml_gender);
         }
     }
 
@@ -278,7 +277,6 @@ fn remove_repeated_chars(content: &str, limit: usize) -> String {
         .collect()
 }
 
-#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 pub async fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,

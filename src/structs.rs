@@ -413,13 +413,13 @@ impl From<TTSModeChoice> for TTSMode {
     }
 }
 
-#[allow(non_snake_case)]
 #[derive(serde::Deserialize)]
+#[serde(rename_all="camelCase")]
 pub struct GoogleVoice {
     pub name: String,
     #[serde(default)]
-    pub ssmlGender: GoogleGender,
-    pub languageCodes: [String; 1],
+    pub ssml_gender: GoogleGender,
+    pub language_codes: [String; 1],
 }
 
 #[derive(serde::Deserialize)]

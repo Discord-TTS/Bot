@@ -12,7 +12,6 @@ use crate::{
     web_updater,
 };
 
-#[allow(clippy::explicit_auto_deref)]
 pub async fn ready(
     framework_ctx: FrameworkContext<'_>,
     ctx: &serenity::Context,

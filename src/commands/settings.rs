@@ -188,7 +188,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{to_translate}", &guild_row.flags.to_translate().to_string())
             .replace("{target_lang}", target_lang),
         false)
-        .field("**User Specific**", #[allow(clippy::redundant_closure_for_method_calls)] &ctx.gettext("
+        .field("**User Specific**", &ctx.gettext("
 {sep3} Voice: `{user_voice}`
 {sep3} Voice Mode: `{voice_mode}`
 {sep3} Nickname: `{nickname}`
@@ -196,7 +196,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         ")
             .replace("{sep3}", sep3)
             .replace("{user_voice}", &user_voice)
-            .replace("{voice_mode}", user_mode.map_or(none_str, |m| m.into()))
+            .replace("{voice_mode}", user_mode.map_or(none_str, #[allow(clippy::redundant_closure_for_method_calls)] |m| m.into()))
             .replace("{nickname}", nickname)
             .replace("{speaking_rate}", &speaking_rate)
             .replace("{speaking_rate_kind}", speaking_rate_kind),
@@ -1274,7 +1274,6 @@ pub async fn setup(
         )
     };
 
-    #[allow(clippy::manual_let_else)] // false positive
     let (bot_member, channel) = {
         let bot_member = guild_id.member(ctx, bot_user_id).await?;
         let channel = if let Some(channel) = channel {
