@@ -60,7 +60,6 @@ pub async fn handle_unexpected<'a>(
 
     let traceback = format!("{error:?}");
     let traceback_hash = hash(traceback.as_bytes());
-    let mut conn = data.pool.acquire().await?;
 
     if let Some(ErrorRowWithOccurrences {
         message_id,
@@ -71,7 +70,7 @@ pub async fn handle_unexpected<'a>(
         RETURNING message_id, occurrences",
     )
     .bind(traceback_hash.clone())
-    .fetch_optional(&mut *conn)
+    .fetch_optional(&data.pool)
     .await?
     {
         let message_id = serenity::MessageId::new(message_id as u64);
@@ -182,7 +181,7 @@ pub async fn handle_unexpected<'a>(
         .bind(traceback_hash)
         .bind(traceback)
         .bind(message.id.get() as i64)
-        .fetch_one(&mut *conn)
+        .fetch_one(&data.pool)
         .await?;
 
         if message.id.get() != (message_id as u64) {
