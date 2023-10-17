@@ -103,7 +103,7 @@ pub async fn tts(
 
         if author_voice_cid.is_some() && author_voice_cid == bot_voice_cid {
             let setup_channel = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
-            if setup_channel as u64 == ctx.channel_id().get() {
+            if setup_channel == Some(ctx.channel_id()) {
                 return Ok(true);
             }
         }
@@ -323,27 +323,21 @@ and can be used by {total_members} people!",
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn channel(ctx: Context<'_>) -> CommandResult {
-    let channel = ctx
-        .data()
-        .guilds_db
-        .get(ctx.guild_id().unwrap().into())
-        .await?
-        .channel;
+    let guild_id = ctx.guild_id().unwrap();
+    let guild_row = ctx.data().guilds_db.get(guild_id.into()).await?;
 
-    if channel as u64 == ctx.channel_id().get() {
-        ctx.say(ctx.gettext("You are in the setup channel already!"))
-            .await?;
-    } else if channel == 0 {
-        ctx.say(ctx.gettext("The channel hasn't been setup, do `/setup #textchannel`"))
-            .await?;
-    } else {
-        ctx.say(
+    let msg = if let Some(channel) = guild_row.channel {
+        if channel == ctx.channel_id() {
+            String::from(ctx.gettext("You are in the setup channel already!"))
+        } else {
             ctx.gettext("The current setup channel is: <#{channel}>")
-                .replace("{channel}", &channel.to_string()),
-        )
-        .await?;
-    }
+                .replace("{channel}", &channel.to_string())
+        }
+    } else {
+        String::from(ctx.gettext("The channel hasn't been setup, do `/setup #textchannel`"))
+    };
 
+    ctx.say(msg).await?;
     Ok(())
 }
 

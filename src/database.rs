@@ -18,13 +18,14 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 
+pub use crate::database_models::*;
 use crate::structs::{Result, TTSMode};
 
 type PgArguments<'a> = <sqlx::Postgres as sqlx::database::HasArguments<'a>>::Arguments;
 type QueryAs<'a, R> = sqlx::query::QueryAs<'a, sqlx::Postgres, R, PgArguments<'a>>;
 type Query<'a> = sqlx::query::Query<'a, sqlx::Postgres, PgArguments<'a>>;
 
-pub trait CacheKeyTrait {
+pub trait CacheKeyTrait: std::cmp::Eq + std::hash::Hash {
     fn bind_query(self, query: Query<'_>) -> Query<'_>;
     fn bind_query_as<R>(self, query: QueryAs<'_, R>) -> QueryAs<'_, R>;
 }
@@ -56,62 +57,14 @@ impl CacheKeyTrait for (i64, TTSMode) {
     }
 }
 
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, sqlx::FromRow)]
-pub struct GuildRow {
-    pub channel: i64,
-    pub premium_user: Option<i64>,
-    pub required_role: Option<i64>,
-    pub xsaid: bool,
-    pub auto_join: bool,
-    pub bot_ignore: bool,
-    pub to_translate: bool,
-    pub require_voice: bool,
-    pub audience_ignore: bool,
-    pub msg_length: i16,
-    pub repeated_chars: i16,
-    pub prefix: String,
-    pub target_lang: Option<String>,
-    pub required_prefix: Option<String>,
-    pub voice_mode: TTSMode,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-pub struct UserRow {
-    pub dm_blocked: bool,
-    pub dm_welcomed: bool,
-    pub voice_mode: Option<TTSMode>,
-    pub premium_voice_mode: Option<TTSMode>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-pub struct GuildVoiceRow {
-    pub guild_id: i64,
-    pub mode: TTSMode,
-    pub voice: String,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-pub struct UserVoiceRow {
-    pub user_id: i64,
-    pub mode: TTSMode,
-    pub voice: Option<String>,
-    pub speaking_rate: Option<f32>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-pub struct NicknameRow {
-    pub name: Option<String>,
-}
-
 pub struct Handler<
-    CacheKey: CacheKeyTrait + std::cmp::Eq + std::hash::Hash,
-    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>,
+    CacheKey: CacheKeyTrait,
+    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Compact,
 > {
     pool: sqlx::PgPool,
-    cache: DashMap<CacheKey, Arc<RowT>>,
+    cache: DashMap<CacheKey, Arc<RowT::Compacted>>,
 
-    default_row: Arc<RowT>,
+    default_row: Arc<RowT::Compacted>,
     single_insert: &'static str,
     create_row: &'static str,
     select: &'static str,
@@ -120,8 +73,8 @@ pub struct Handler<
 
 impl<CacheKey, RowT> Handler<CacheKey, RowT>
 where
-    CacheKey: CacheKeyTrait + std::cmp::Eq + std::hash::Hash + Sync + Send + Copy + Default,
-    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Sync + Send + Unpin,
+    CacheKey: CacheKeyTrait + Sync + Send + Copy + Default,
+    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Compact + Sync + Send + Unpin,
 {
     pub async fn new(
         pool: sqlx::PgPool,
@@ -147,13 +100,13 @@ where
         pool: &sqlx::PgPool,
         key: CacheKey,
         select: &'static str,
-    ) -> Result<Option<Arc<RowT>>> {
+    ) -> Result<Option<Arc<RowT::Compacted>>> {
         let query = key.bind_query_as(sqlx::query_as(select));
-        let row = query.fetch_optional(pool).await?;
-        Ok(row.map(Arc::new))
+        let row: Option<RowT> = query.fetch_optional(pool).await?;
+        Ok(row.map(Compact::compact).map(Arc::new))
     }
 
-    pub async fn get(&self, identifier: CacheKey) -> Result<Arc<RowT>> {
+    pub async fn get(&self, identifier: CacheKey) -> Result<Arc<RowT::Compacted>> {
         if let Some(row) = self.cache.get(&identifier) {
             return Ok(row.clone());
         }

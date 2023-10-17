@@ -127,11 +127,11 @@ impl std::ops::Deref for Data {
 
 pub struct DataInner {
     pub analytics: Arc<analytics::Handler>,
-    pub guilds_db: database::Handler<i64, database::GuildRow>,
-    pub userinfo_db: database::Handler<i64, database::UserRow>,
-    pub nickname_db: database::Handler<[i64; 2], database::NicknameRow>,
-    pub user_voice_db: database::Handler<(i64, TTSMode), database::UserVoiceRow>,
-    pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRow>,
+    pub guilds_db: database::Handler<i64, database::GuildRowRaw>,
+    pub userinfo_db: database::Handler<i64, database::UserRowRaw>,
+    pub nickname_db: database::Handler<[i64; 2], database::NicknameRowRaw>,
+    pub user_voice_db: database::Handler<(i64, TTSMode), database::UserVoiceRowRaw>,
+    pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRowRaw>,
 
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
     pub system_info: parking_lot::Mutex<sysinfo::System>,
@@ -225,8 +225,7 @@ impl Data {
         };
 
         let guild_row = self.guilds_db.get(guild_id.get() as i64).await?;
-        if let Some(raw_user_id) = guild_row.premium_user {
-            let patreon_user_id = serenity::UserId::new(raw_user_id as u64);
+        if let Some(patreon_user_id) = guild_row.premium_user {
             if self.fetch_patreon_info(patreon_user_id).await?.is_some() {
                 Ok(None)
             } else {
@@ -284,15 +283,15 @@ impl Data {
         let user_voice_row = self.user_voice_db.get((author_id.into(), mode)).await?;
         let voice =
             // Get user voice for user mode
-            if user_voice_row.user_id != 0 {
-                user_voice_row.voice.clone().map(Cow::Owned)
+            if user_voice_row.user_id.is_some() {
+                user_voice_row.voice.map(|v| Cow::Owned(v.as_str().to_owned()))
             } else if let Some(guild_id) = guild_id {
                 // Get default server voice for user mode
                 let guild_voice_row = self.guild_voice_db.get((guild_id.into(), mode)).await?;
-                if guild_voice_row.guild_id == 0 {
-                    None
+                if guild_voice_row.guild_id.is_some() {
+                    Some(Cow::Owned(guild_voice_row.voice.as_str().to_owned()))
                 } else {
-                    Some(Cow::Owned(guild_voice_row.voice.clone()))
+                    None
                 }
             } else {
                 None

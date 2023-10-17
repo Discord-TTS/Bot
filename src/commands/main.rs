@@ -34,17 +34,20 @@ async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>
     let guild_id = ctx.guild_id().unwrap();
     let setup_id = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
 
-    let channel_id = ctx.channel_id();
-    if setup_id == channel_id.get() as i64 || author_vc == Some(channel_id) {
-        Ok(true)
-    } else {
-        let msg = ctx
-            .gettext("You ran this command in the wrong channel, please move to <#{channel_id}>.")
-            .replace("{channel_id}", &setup_id.to_string());
-
-        ctx.send_error(msg).await?;
-        Ok(false)
+    let channel_id = Some(ctx.channel_id());
+    if setup_id == channel_id || author_vc == channel_id {
+        return Ok(true);
     }
+
+    let msg = if let Some(setup_id) = setup_id {
+        ctx.gettext("You ran this command in the wrong channel, please move to <#{channel_id}>.")
+            .replace("{channel_id}", &setup_id.to_string())
+    } else {
+        String::from(ctx.gettext("You haven't setup the bot, please run /setup!"))
+    };
+
+    ctx.send_error(msg).await?;
+    Ok(false)
 }
 
 /// Joins the voice channel you're in!

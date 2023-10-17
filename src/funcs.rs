@@ -285,7 +285,7 @@ pub async fn run_checks(
     guild_row: &GuildRow,
 ) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
     let guild_id = require!(message.guild_id, Ok(None));
-    if guild_row.channel as u64 != message.channel_id.get() {
+    if guild_row.channel != Some(message.channel_id) {
         // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
         // checking if the message's channel_id is the author's voice channel_id
         let guild = require!(message.guild(&ctx.cache), Ok(None));
@@ -301,10 +301,7 @@ pub async fn run_checks(
 
     if let Some(required_role) = guild_row.required_role {
         let message_member = require!(message.member.as_ref(), Ok(None));
-        if !message_member
-            .roles
-            .contains(&serenity::RoleId::new(required_role as u64))
-        {
+        if !message_member.roles.contains(&required_role) {
             let member = guild_id.member(ctx, message.author.id).await?;
             let channel = require!(message.channel_id.to_channel(ctx).await?.guild(), Ok(None));
 
@@ -334,14 +331,14 @@ pub async fn run_checks(
     content = content.to_lowercase();
 
     if let Some(required_prefix) = &guild_row.required_prefix {
-        if let Some(stripped_content) = content.strip_prefix(required_prefix) {
+        if let Some(stripped_content) = content.strip_prefix(required_prefix.as_str()) {
             content = String::from(stripped_content);
         } else {
             return Ok(None);
         }
     }
 
-    if content.starts_with(&guild_row.prefix) {
+    if content.starts_with(guild_row.prefix.as_str()) {
         return Ok(None);
     }
 
@@ -351,30 +348,30 @@ pub async fn run_checks(
 
     let mut to_autojoin = None;
     if message.author.bot {
-        if guild_row.bot_ignore || bot_voice_state.is_none() {
+        if guild_row.flags.bot_ignore() || bot_voice_state.is_none() {
             return Ok(None); // Is bot
         }
     } else {
         // If the bot is in vc
         if let Some(vc) = bot_voice_state {
             // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
-            if guild_row.require_voice && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
+            if guild_row.flags.require_voice() && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
                 return Ok(None); // Wrong vc
             }
         // Else if the user is in the vc and autojoin is on
-        } else if let Some(voice_state) = voice_state && guild_row.auto_join {
+        } else if let Some(voice_state) = voice_state && guild_row.flags.auto_join() {
             to_autojoin = Some(voice_state.channel_id.try_unwrap()?);
         } else {
             return Ok(None); // Bot not in vc
         };
 
-        if guild_row.require_voice {
+        if guild_row.flags.require_voice() {
             let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
             let channel = guild.channels.get(&voice_channel).try_unwrap()?;
 
             if channel.kind == serenity::ChannelType::Stage
                 && voice_state.map_or(false, |vs| vs.suppress)
-                && guild_row.audience_ignore
+                && guild_row.flags.audience_ignore()
             {
                 return Ok(None); // Is audience
             }

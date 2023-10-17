@@ -57,6 +57,7 @@ mod bot_list_updater;
 mod commands;
 mod constants;
 mod database;
+mod database_models;
 mod errors;
 mod events;
 mod funcs;
@@ -378,8 +379,11 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             prefix: None,
             dynamic_prefix: Some(|ctx| {
                 Box::pin(async move {
-                    Ok(Some(match ctx.guild_id.map(Into::into) {
-                        Some(guild_id) => ctx.data.guilds_db.get(guild_id).await?.prefix.clone(),
+                    Ok(Some(match ctx.guild_id {
+                        Some(guild_id) => {
+                            let row = ctx.data.guilds_db.get(guild_id.into()).await?;
+                            String::from(row.prefix.as_str())
+                        }
                         None => String::from("-"),
                     }))
                 })
@@ -406,7 +410,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
                     return Ok(true);
                 };
 
-                let required_role = serenity::RoleId::new(required_role as u64);
                 let member = ctx.author_member().await.try_unwrap()?;
 
                 let is_admin = || {

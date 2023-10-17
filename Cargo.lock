@@ -490,9 +490,10 @@ name = "discord_tts_bot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrayvec",
+ "bitflags 2.4.1",
  "const_format",
  "dashmap",
- "generic-array",
  "gettext",
  "indexmap 2.0.2",
  "itertools",
@@ -500,6 +501,7 @@ dependencies = [
  "num-format",
  "once_cell",
  "parking_lot",
+ "paste",
  "poise",
  "rand",
  "regex",
