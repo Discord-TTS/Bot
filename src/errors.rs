@@ -310,11 +310,9 @@ async fn handle_cooldown(
             error_message.delete(ctx_discord).await?;
 
             let bot_user_id = ctx_discord.cache.current_user().id;
-            let channel = error_message
-                .channel(ctx_discord)
-                .await?
-                .guild()
-                .try_unwrap()?;
+            let Some(channel) = error_message.channel(ctx_discord).await?.guild() else {
+                return Ok(());
+            };
 
             if channel
                 .permissions_for_user(ctx_discord, bot_user_id)?
