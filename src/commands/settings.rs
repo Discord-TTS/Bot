@@ -24,7 +24,7 @@ use poise::serenity_prelude as serenity;
 use crate::{
     constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR},
     database,
-    funcs::{confirm_dialog, current_user_id, random_footer},
+    funcs::{confirm_dialog, random_footer},
     opt_ext::OptionGettext,
     require, require_guild,
     structs::{
@@ -1386,7 +1386,10 @@ Just do `/join` and start talking!
                 )
                 .footer(CreateEmbedFooter::new(random_footer(
                     &data.config.main_server_invite,
-                    current_user_id(cache),
+                    {
+                        let current_user = cache.current_user();
+                        current_user.id
+                    },
                     ctx.current_catalog(),
                 )))
                 .author(CreateEmbedAuthor::new(&author.name).icon_url(author.face())),

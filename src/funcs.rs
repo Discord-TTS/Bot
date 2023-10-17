@@ -14,11 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap},
-    fmt::Write,
-};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Write};
 
 use itertools::Itertools as _;
 use rand::Rng as _;
@@ -36,22 +32,8 @@ use crate::{
     },
 };
 
-pub fn current_user_id(cache: &serenity::Cache) -> serenity::UserId {
-    cache.current_user().id
-}
-
 pub async fn decode_resp<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Result<T> {
     json::from_slice(&mut resp.bytes().await?.to_vec()).map_err(Into::into)
-}
-
-pub fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
-    let mut status: Vec<_> = shards
-        .iter()
-        .map(|(id, shard)| (id, format!("Shard {id}: `{}`", shard.stage)))
-        .collect();
-
-    status.sort_unstable_by_key(|(id, _)| *id);
-    status.into_iter().map(|(_, status)| status).join("\n")
 }
 
 pub async fn dm_generic(

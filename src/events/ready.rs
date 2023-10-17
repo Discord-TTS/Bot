@@ -1,4 +1,9 @@
-use std::sync::{atomic::Ordering, Arc};
+use std::{
+    collections::HashMap,
+    sync::{atomic::Ordering, Arc},
+};
+
+use itertools::Itertools;
 
 use self::serenity::builder::*;
 use poise::serenity_prelude as serenity;
@@ -6,11 +11,20 @@ use poise::serenity_prelude as serenity;
 use crate::{
     bot_list_updater::BotListUpdater,
     constants::FREE_NEUTRAL_COLOUR,
-    funcs::generate_status,
     looper::Looper,
     structs::{FrameworkContext, Result},
     web_updater,
 };
+
+fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
+    let mut status: Vec<_> = shards
+        .iter()
+        .map(|(id, shard)| (id, format!("Shard {id}: `{}`", shard.stage)))
+        .collect();
+
+    status.sort_unstable_by_key(|(id, _)| *id);
+    status.into_iter().map(|(_, status)| status).join("\n")
+}
 
 pub async fn ready(
     framework_ctx: FrameworkContext<'_>,
