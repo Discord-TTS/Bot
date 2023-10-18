@@ -5,14 +5,6 @@ WORKDIR /bot
 
 RUN apt-get update && apt-get install -y cmake && apt-get clean
 
-# This is a dummy build to get the dependencies cached.
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && \
-    echo "// dummy file" > src/lib.rs && \
-    cargo build --release && \
-    rm -r src
-
-# This is the actual build, copy in the rest of the sources
 COPY . .
 RUN cargo build --release
 
