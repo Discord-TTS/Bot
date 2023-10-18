@@ -11,7 +11,7 @@ panic = "abort"
 [dependencies]
 serde = "1"
 regex = "1"
-toml = "0.7"
+toml = "0.8"
 rand = "0.8"
 anyhow = "1"
 sha2 = "0.10"
