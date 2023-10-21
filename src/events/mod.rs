@@ -21,7 +21,9 @@ pub async fn listen(framework_ctx: FrameworkContext<'_>, event: &Event) -> Resul
     let data = framework_ctx.user_data;
 
     match event {
-        Event::Message { ctx, new_message } => message(framework_ctx, ctx, new_message).await,
+        Event::Message { ctx, new_message } => {
+            Box::pin(message(framework_ctx, ctx, new_message)).await
+        }
         Event::GuildCreate { ctx, guild, is_new } => guild_create(ctx, data, guild, *is_new).await,
         Event::Ready {
             ctx,
