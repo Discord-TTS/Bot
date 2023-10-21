@@ -1,0 +1,51 @@
+name: Lint
+
+on:
+  workflow_call:
+
+jobs:
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: clippy
+          profile: minimal
+          override: true
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run clippy
+        run: cargo clippy --all -- -D clippy::all -D warnings
+        # uses: actions-rs/clippy-check@v1
+        # with:
+        #   token: ${{ secrets.GITHUB_TOKEN }}
+        #   args: -- -D clippy::all -D warnings
+
+  rustfmt:
+    name: Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+          profile: minimal
+          override: true
+
+      - name: Run cargo fmt
+        run: cargo fmt --all -- --check

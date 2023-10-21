@@ -1,0 +1,39 @@
+name: Main Workflow
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    name: Build
+    strategy:
+      matrix:
+        rust-version: ['nightly']
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust-version }}
+          profile: minimal
+          override: true
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v1
+
+      - name: Build Binary
+        run: cargo +nightly build --locked
+
+      - name: Build Release Binary
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        run: cargo +nightly build --release --locked
+
+      - name: Run Unit Tests
+        run: cargo +nightly test
+
+      - name: Run Release Unit Tests
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        run: cargo +nightly test --release --locked
