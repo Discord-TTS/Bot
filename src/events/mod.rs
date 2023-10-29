@@ -1,11 +1,13 @@
 #![allow(clippy::module_name_repetitions)]
 
+mod channel;
 mod guild;
 mod message;
 mod other;
 mod ready;
 mod voice_state;
 
+use channel::*;
 use guild::*;
 use message::*;
 use other::*;
@@ -38,6 +40,11 @@ pub async fn listen(framework_ctx: FrameworkContext<'_>, event: &Event) -> Resul
         Event::VoiceStateUpdate { ctx, old, new } => {
             voice_state_update(ctx, data, old.as_ref(), new).await
         }
+        Event::ChannelDelete {
+            ctx: _,
+            channel,
+            messages: _,
+        } => channel_delete(data, channel).await,
         Event::InteractionCreate { ctx, interaction } => {
             interaction_create(framework_ctx, ctx, interaction).await
         }
