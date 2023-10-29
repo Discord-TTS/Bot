@@ -25,8 +25,8 @@ use crate::{
 };
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> CommandResult {
-    poise::samples::register_application_commands(ctx, global).await?;
+pub async fn register(ctx: Context<'_>) -> CommandResult {
+    poise::samples::register_application_commands(ctx, true).await?;
     Ok(())
 }
 
