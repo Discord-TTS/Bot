@@ -68,7 +68,6 @@ pub struct WebsiteInfo {
 pub struct WebhookConfigRaw {
     pub logs: reqwest::Url,
     pub errors: reqwest::Url,
-    pub servers: reqwest::Url,
     pub dm_logs: reqwest::Url,
 }
 
@@ -81,7 +80,6 @@ pub struct BotListTokens {
 
 pub struct WebhookConfig {
     pub logs: serenity::Webhook,
-    pub servers: serenity::Webhook,
     pub dm_logs: serenity::Webhook,
     pub errors: Option<serenity::Webhook>,
 }

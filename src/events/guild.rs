@@ -16,16 +16,6 @@ pub async fn guild_create(
         return Ok(());
     };
 
-    // Send to servers channel and DM owner the welcome message
-    data.webhooks
-        .servers
-        .execute(
-            &ctx.http,
-            false,
-            ExecuteWebhook::default().content(format!("Just joined {}!", &guild.name)),
-        )
-        .await?;
-
     let (owner_tag, owner_face) = {
         let owner = guild.owner_id.to_user(&ctx).await?;
         (owner.tag(), owner.face())
@@ -86,43 +76,30 @@ pub async fn guild_delete(
     full: Option<&serenity::Guild>,
 ) -> Result<()> {
     data.guilds_db.delete(incomplete.id.into()).await?;
-    if let Some(guild) = full {
-        if data.currently_purging.load(Ordering::SeqCst) {
-            return Ok(());
-        }
 
-        if data
-            .config
-            .main_server
-            .members(&ctx.http, None, None)
-            .await?
-            .into_iter()
-            .filter(|m| m.roles.contains(&data.config.ofs_role))
-            .any(|m| m.user.id == guild.owner_id)
-        {
-            ctx.http
-                .remove_member_role(
-                    data.config.main_server,
-                    guild.owner_id,
-                    data.config.ofs_role,
-                    None,
-                )
-                .await?;
-        }
+    let Some(guild) = full else { return Ok(()) };
+    if data.currently_purging.load(Ordering::SeqCst) {
+        return Ok(());
+    }
 
-        data.webhooks
-            .servers
-            .execute(
-                &ctx.http,
-                false,
-                ExecuteWebhook::default().content(format!(
-                    "Just got kicked from {}. I'm now in {} servers",
-                    guild.name,
-                    ctx.cache.guilds().len()
-                )),
+    if data
+        .config
+        .main_server
+        .members(&ctx.http, None, None)
+        .await?
+        .into_iter()
+        .filter(|m| m.roles.contains(&data.config.ofs_role))
+        .any(|m| m.user.id == guild.owner_id)
+    {
+        ctx.http
+            .remove_member_role(
+                data.config.main_server,
+                guild.owner_id,
+                data.config.ofs_role,
+                None,
             )
             .await?;
-    };
+    }
 
     Ok(())
 }
