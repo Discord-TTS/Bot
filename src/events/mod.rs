@@ -2,6 +2,7 @@
 
 mod channel;
 mod guild;
+mod member;
 mod message;
 mod other;
 mod ready;
@@ -9,6 +10,7 @@ mod voice_state;
 
 use channel::*;
 use guild::*;
+use member::*;
 use message::*;
 use other::*;
 use ready::*;
@@ -37,6 +39,12 @@ pub async fn listen(framework_ctx: FrameworkContext<'_>, event: &Event) -> Resul
         Event::GuildMemberAddition { ctx, new_member } => {
             guild_member_addition(ctx, data, new_member).await
         }
+        Event::GuildMemberRemoval {
+            ctx,
+            guild_id,
+            user,
+            member_data_if_available: _,
+        } => guild_member_removal(ctx, data, *guild_id, user).await,
         Event::VoiceStateUpdate { ctx, old, new } => {
             voice_state_update(ctx, data, old.as_ref(), new).await
         }

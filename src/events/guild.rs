@@ -28,13 +28,13 @@ pub async fn guild_create(
 Hello! Someone invited me to your server `{}`!
 TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
 
-**Most commands need to be done on your server, such as `-setup` and `-join`**
+**Most commands need to be done on your server, such as `/setup` and `/join`**
 
-I need someone with the administrator permission to do `-setup #channel`
-You can then do `-join` in that channel and I will join your voice channel!
+I need someone with the administrator permission to do `/setup #channel`
+You can then do `/join` in that channel and I will join your voice channel!
 Then, you can just type normal messages and I will say them, like magic!
 
-You can view all the commands with `-help`
+You can view all the commands with `/help`
 Ask questions by either responding here or asking on the support server!",
         guild.name))
         .footer(CreateEmbedFooter::new(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
@@ -99,39 +99,6 @@ pub async fn guild_delete(
                 None,
             )
             .await?;
-    }
-
-    Ok(())
-}
-
-pub async fn guild_member_addition(
-    ctx: &serenity::Context,
-    data: &Data,
-    member: &serenity::Member,
-) -> Result<()> {
-    if member.guild_id != data.config.main_server
-        && ctx
-            .cache
-            .guilds()
-            .into_iter()
-            .find_map(|id| ctx.cache.guild(id).map(|g| g.owner_id == member.user.id))
-            .unwrap_or(false)
-    {
-        match ctx
-            .http
-            .add_member_role(
-                data.config.main_server,
-                member.user.id,
-                data.config.ofs_role,
-                None,
-            )
-            .await
-        {
-            // Unknown member
-            Err(serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(err)))
-                if err.error.code == 10007 => {}
-            r => r?,
-        }
     }
 
     Ok(())

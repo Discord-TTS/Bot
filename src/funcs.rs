@@ -27,7 +27,7 @@ use crate::{
     opt_ext::{OptionGettext, OptionTryUnwrap},
     require,
     structs::{
-        Context, Error, GoogleGender, GoogleVoice, LastToXsaidTracker, RegexCache, Result, TTSMode,
+        Context, GoogleGender, GoogleVoice, LastToXsaidTracker, RegexCache, Result, TTSMode,
         TTSServiceError,
     },
 };
@@ -335,11 +335,15 @@ pub async fn run_checks(
         // If the bot is in vc
         if let Some(vc) = bot_voice_state {
             // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
-            if guild_row.flags.require_voice() && vc.channel_id != voice_state.and_then(|vs| vs.channel_id) {
+            if guild_row.flags.require_voice()
+                && vc.channel_id != voice_state.and_then(|vs| vs.channel_id)
+            {
                 return Ok(None); // Wrong vc
             }
         // Else if the user is in the vc and autojoin is on
-        } else if let Some(voice_state) = voice_state && guild_row.flags.auto_join() {
+        } else if let Some(voice_state) = voice_state
+            && guild_row.flags.auto_join()
+        {
             to_autojoin = Some(voice_state.channel_id.try_unwrap()?);
         } else {
             return Ok(None); // Bot not in vc
@@ -547,46 +551,32 @@ pub async fn translate(
     Ok(None)
 }
 
-pub async fn confirm_dialog(
-    ctx: Context<'_>,
-    prompt: &str,
-    positive: String,
-    negative: String,
-) -> Result<Option<bool>, Error> {
-    fn components(positive: String, negative: String, disabled: bool) -> Vec<CreateActionRow> {
-        vec![CreateActionRow::Buttons(vec![
-            CreateButton::new("True")
-                .style(serenity::ButtonStyle::Success)
-                .disabled(disabled)
-                .label(positive),
-            CreateButton::new("False")
-                .style(serenity::ButtonStyle::Danger)
-                .disabled(disabled)
-                .label(negative),
-        ])]
-    }
+pub fn confirm_dialog_components(positive: String, negative: String) -> Vec<CreateActionRow> {
+    vec![CreateActionRow::Buttons(vec![
+        CreateButton::new("True")
+            .style(serenity::ButtonStyle::Success)
+            .label(positive),
+        CreateButton::new("False")
+            .style(serenity::ButtonStyle::Danger)
+            .label(negative),
+    ])]
+}
 
-    let reply = ctx
-        .send(
-            poise::CreateReply::default()
-                .content(prompt)
-                .ephemeral(true)
-                .components(components(positive, negative, false)),
-        )
-        .await?;
-
-    let interaction = reply
-        .message()
-        .await?
-        .await_component_interaction(&ctx.serenity_context().shard)
+pub async fn confirm_dialog_wait(
+    ctx: &serenity::Context,
+    message: &serenity::Message,
+    author_id: serenity::UserId,
+) -> Result<Option<bool>> {
+    let interaction = message
+        .await_component_interaction(&ctx.shard)
         .timeout(std::time::Duration::from_secs(60 * 5))
-        .author_id(ctx.author().id)
+        .author_id(author_id)
         .await;
 
-    reply.delete(ctx).await?;
+    message.delete(ctx).await?;
 
     if let Some(interaction) = interaction {
-        interaction.defer(&ctx).await?;
+        interaction.defer(ctx).await?;
         match &*interaction.data.custom_id {
             "True" => Ok(Some(true)),
             "False" => Ok(Some(false)),
@@ -595,4 +585,21 @@ pub async fn confirm_dialog(
     } else {
         Ok(None)
     }
+}
+
+pub async fn confirm_dialog(
+    ctx: Context<'_>,
+    prompt: &str,
+    positive: String,
+    negative: String,
+) -> Result<Option<bool>> {
+    let builder = poise::CreateReply::default()
+        .content(prompt)
+        .ephemeral(true)
+        .components(confirm_dialog_components(positive, negative));
+
+    let reply = ctx.send(builder).await?;
+    let message = reply.message().await?;
+
+    confirm_dialog_wait(ctx.serenity_context(), &message, ctx.author().id).await
 }
