@@ -8,7 +8,7 @@ use parking_lot::RwLock;
 use serde::Deserialize as _;
 use strum_macros::IntoStaticStr;
 
-use poise::serenity_prelude::{self as serenity, json::prelude as json};
+use poise::serenity_prelude::{self as serenity, json};
 use tracing::warn;
 
 use crate::{analytics, database, into_static_display};
@@ -194,17 +194,16 @@ impl Data {
         if let Some(mut url) = self.config.patreon_service.clone() {
             url.set_path(&format!("/members/{user_id}"));
 
-            let mut resp = self
+            let resp = self
                 .reqwest
                 .get(url)
                 .send()
                 .await?
                 .error_for_status()?
                 .bytes()
-                .await?
-                .to_vec();
+                .await?;
 
-            json::from_slice(&mut resp).map_err(Into::into)
+            json::from_slice(&resp).map_err(Into::into)
         } else {
             // Return fake PatreonInfo if `patreon_service` has not been set to simplify self-hosting.
             Ok(Some(PatreonInfo {

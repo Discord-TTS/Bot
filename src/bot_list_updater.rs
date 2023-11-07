@@ -3,7 +3,7 @@ use std::sync::Arc;
 use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
 use self::serenity::{
-    json::prelude::{json, to_vec},
+    json::{json, to_vec},
     UserId,
 };
 use poise::serenity_prelude as serenity;

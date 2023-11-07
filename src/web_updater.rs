@@ -7,7 +7,7 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
     funcs::decode_resp,
-    serenity::{self as serenity, json::prelude as json},
+    serenity::{self as serenity, json},
     structs::{TTSMode, WebsiteInfo},
     Result,
 };

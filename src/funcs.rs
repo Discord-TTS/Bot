@@ -20,7 +20,7 @@ use itertools::Itertools as _;
 use rand::Rng as _;
 
 use poise::serenity_prelude as serenity;
-use serenity::{builder::*, json::prelude as json};
+use serenity::{builder::*, json};
 
 use crate::{
     database::GuildRow,
@@ -33,7 +33,7 @@ use crate::{
 };
 
 pub async fn decode_resp<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Result<T> {
-    json::from_slice(&mut resp.bytes().await?.to_vec()).map_err(Into::into)
+    json::from_slice(&resp.bytes().await?).map_err(Into::into)
 }
 
 pub async fn dm_generic(
@@ -119,9 +119,9 @@ pub async fn get_translation_langs(
     token: Option<&str>,
 ) -> Result<BTreeMap<String, String>> {
     #[derive(serde::Deserialize)]
-    pub struct DeeplVoice<'a> {
+    pub struct DeeplVoice {
         pub name: String,
-        pub language: &'a str,
+        pub language: String,
     }
 
     #[derive(serde::Serialize)]
@@ -134,20 +134,17 @@ pub async fn get_translation_langs(
         return Ok(BTreeMap::new());
     };
 
-    let request = DeeplVoiceRequest { kind: "target" };
-
-    let mut resp = reqwest
+    let resp = reqwest
         .get(format!("{url}/languages"))
-        .query(&request)
+        .query(&DeeplVoiceRequest { kind: "target" })
         .header("Authorization", format!("DeepL-Auth-Key {token}"))
         .send()
         .await?
         .error_for_status()?
         .bytes()
-        .await?
-        .to_vec();
+        .await?;
 
-    let languages: Vec<DeeplVoice<'_>> = json::from_slice(&mut resp)?;
+    let languages: Vec<DeeplVoice> = json::from_slice(&resp)?;
 
     Ok(languages
         .into_iter()
@@ -503,15 +500,14 @@ pub async fn translate(
     target_lang: &str,
 ) -> Result<Option<String>> {
     #[derive(serde::Deserialize)]
-    pub struct DeeplTranslateResponse<'a> {
-        #[serde(borrow)]
-        pub translations: Vec<DeeplTranslation<'a>>,
+    pub struct DeeplTranslateResponse {
+        pub translations: Vec<DeeplTranslation>,
     }
 
     #[derive(serde::Deserialize)]
-    pub struct DeeplTranslation<'a> {
+    pub struct DeeplTranslation {
         pub text: String,
-        pub detected_source_language: &'a str,
+        pub detected_source_language: String,
     }
 
     #[derive(serde::Serialize)]
@@ -527,7 +523,7 @@ pub async fn translate(
         preserve_formatting: 1,
     };
 
-    let mut resp = reqwest
+    let resp = reqwest
         .get(format!("{translation_url}/translate"))
         .query(&request)
         .header(
@@ -538,10 +534,9 @@ pub async fn translate(
         .await?
         .error_for_status()?
         .bytes()
-        .await?
-        .to_vec();
+        .await?;
 
-    let response: DeeplTranslateResponse<'_> = json::from_slice(&mut resp)?;
+    let response: DeeplTranslateResponse = json::from_slice(&resp)?;
     if let Some(translation) = response.translations.into_iter().next() {
         if translation.detected_source_language != target_lang {
             return Ok(Some(translation.text));
