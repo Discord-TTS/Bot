@@ -95,10 +95,11 @@ async fn process_tts_msg(
         (voice, mode)
     };
 
-    if let Some(target_lang) = guild_row.target_lang.as_deref() &&
-        let Some(translation_url) = &data.config.translation_url &&
-        let Some(translation_token) = &data.config.translation_token &&
-        guild_row.flags.to_translate() && data.premium_check(Some(guild_id)).await?.is_none()
+    if let Some(target_lang) = guild_row.target_lang.as_deref()
+        && let Some(translation_url) = &data.config.translation_url
+        && let Some(translation_token) = &data.config.translation_token
+        && guild_row.flags.to_translate()
+        && data.premium_check(Some(guild_id)).await?.is_none()
     {
         content = funcs::translate(
             &data.reqwest,

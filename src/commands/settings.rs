@@ -467,7 +467,10 @@ where
     RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Compact + Send + Sync + Unpin,
 {
     let data = ctx.data();
-    if let Some(mode) = mode && mode.is_premium() && data.premium_check(Some(guild_id)).await?.is_some() {
+    if let Some(mode) = mode
+        && mode.is_premium()
+        && data.premium_check(Some(guild_id)).await?.is_some()
+    {
         ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
@@ -490,14 +493,17 @@ where
 
         general_db.set_one(identifier, key, &mode).await?;
         Ok(Some(match mode {
-            Some(mode) => Cow::Owned(match target {
-                Target::Guild => ctx.gettext("Changed the server TTS Mode to: {mode}"),
-                Target::User => ctx.gettext("Changed your TTS Mode to: {mode}")
-            }.replace("{mode}", mode.into())),
+            Some(mode) => Cow::Owned(
+                match target {
+                    Target::Guild => ctx.gettext("Changed the server TTS Mode to: {mode}"),
+                    Target::User => ctx.gettext("Changed your TTS Mode to: {mode}"),
+                }
+                .replace("{mode}", mode.into()),
+            ),
             None => Cow::Borrowed(match target {
                 Target::Guild => ctx.gettext("Reset the server mode"),
-                Target::User => ctx.gettext("Reset your mode")
-            })
+                Target::User => ctx.gettext("Reset your mode"),
+            }),
         }))
     }
 }
@@ -850,11 +856,20 @@ async fn required_prefix(
     #[description = "The required prefix for TTS"] tts_prefix: Option<String>,
 ) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
-    if let Some(prefix) = tts_prefix.as_deref() && let Err(err) = check_prefix(&ctx, prefix) {
+    if let Some(prefix) = tts_prefix.as_deref()
+        && let Err(err) = check_prefix(&ctx, prefix)
+    {
         ctx.say(err).await?;
     } else {
-        ctx.data().guilds_db.set_one(guild_id.into(), "required_prefix", &tts_prefix).await?;
-        ctx.say(ctx.gettext("The required prefix for TTS is now: {}").replace("{}", tts_prefix.as_deref().unwrap_or("`None`"))).await?;
+        ctx.data()
+            .guilds_db
+            .set_one(guild_id.into(), "required_prefix", &tts_prefix)
+            .await?;
+        ctx.say(
+            ctx.gettext("The required prefix for TTS is now: {}")
+                .replace("{}", tts_prefix.as_deref().unwrap_or("`None`")),
+        )
+        .await?;
     }
 
     Ok(())
@@ -1397,17 +1412,39 @@ Just do `/join` and start talking!
     )
     .await?;
 
-    if let poise::Context::Application(_) = ctx &&
-        require_guild!(ctx).user_permissions_in(&channel, &bot_member).manage_webhooks() &&
-        confirm_dialog(ctx,
-            ctx.gettext("Would you like to set up TTS Bot update announcements for the setup channel?"),
-            ctx.gettext("Yes").into(),
-            ctx.gettext("No").into()
-        ).await?.unwrap_or(false)
-    {
-        data.config.announcements_channel.follow(ctx, channel.id).await?;
-        tracing::info!("Set up announcements channel in {}", guild_id);
+    let poise::Context::Application(_) = ctx else {
+        return Ok(());
     };
+
+    if !require_guild!(ctx)
+        .user_permissions_in(&channel, &bot_member)
+        .manage_webhooks()
+    {
+        return Ok(());
+    };
+
+    let Some(confirmed) = confirm_dialog(
+        ctx,
+        ctx.gettext("Would you like to set up TTS Bot update announcements for the setup channel?"),
+        ctx.gettext("Yes").into(),
+        ctx.gettext("No").into(),
+    )
+    .await?
+    else {
+        return Ok(());
+    };
+
+    let reply = if confirmed {
+        let announcements = data.config.announcements_channel;
+        announcements.follow(ctx, channel.id).await?;
+
+        ctx.gettext("Set up update announcements in this channel!")
+    } else {
+        ctx.gettext("Okay, didn't set up update announcements.")
+    };
+
+    ctx.send(poise::CreateReply::new().content(reply).ephemeral(true))
+        .await?;
 
     Ok(())
 }

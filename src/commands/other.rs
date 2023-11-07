@@ -230,23 +230,30 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
     #[allow(clippy::cast_precision_loss)]
     let scheduler_stats = {
         let scheduler = &*songbird::driver::DEFAULT_SCHEDULER;
-        if let Ok(stats) = scheduler.worker_thread_stats().await && !stats.is_empty() {
+        if let Ok(stats) = scheduler.worker_thread_stats().await
+            && !stats.is_empty()
+        {
             const NANOS_PER_MILLI: f64 = 1_000_000.0;
-            let compute_time_iter = stats.iter().map(|s| (s.last_compute_cost_ns() as f64) / NANOS_PER_MILLI);
+            let compute_time_iter = stats
+                .iter()
+                .map(|s| (s.last_compute_cost_ns() as f64) / NANOS_PER_MILLI);
 
             // Unwraps are safe due to !stats.is_empty()
             let min = compute_time_iter.clone().min_by(cmp_float).try_unwrap()?;
             let max = compute_time_iter.clone().max_by(cmp_float).try_unwrap()?;
             let avg = compute_time_iter.sum::<f64>() / (stats.len() as f64);
 
-            let mixer_use = (scheduler.live_tasks() as f64 / scheduler.total_tasks() as f64) * 100.0;
+            let mixer_use =
+                (scheduler.live_tasks() as f64 / scheduler.total_tasks() as f64) * 100.0;
 
-            Cow::Owned(format!("
+            Cow::Owned(format!(
+                "
 With the songbird scheduler stats of
 {sep3} Minimum compute cost: {min}
 {sep3} Average compute cost: {avg}
 {sep3} Maximum compute cost: {max}
-{sep3} Mixer usage percentage: {mixer_use:.2}%"))
+{sep3} Mixer usage percentage: {mixer_use:.2}%"
+            ))
         } else {
             Cow::Borrowed("")
         }

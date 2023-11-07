@@ -268,11 +268,20 @@ impl Data {
             mode = TTSMode::default();
 
             if user_row.voice_mode.map_or(false, TTSMode::is_premium) {
-                warn!("User ID {author_id}'s normal voice mode is set to a premium mode! Resetting.");
-                self.userinfo_db.set_one(author_id.into(), "voice_mode", mode).await?;
-            } else if let Some(guild_id) = guild_id && let Some(guild_row) = guild_row && guild_row.voice_mode.is_premium() {
+                warn!(
+                    "User ID {author_id}'s normal voice mode is set to a premium mode! Resetting."
+                );
+                self.userinfo_db
+                    .set_one(author_id.into(), "voice_mode", mode)
+                    .await?;
+            } else if let Some(guild_id) = guild_id
+                && let Some(guild_row) = guild_row
+                && guild_row.voice_mode.is_premium()
+            {
                 warn!("Guild ID {guild_id}'s voice mode is set to a premium mode without being premium! Resetting.");
-                self.guilds_db.set_one(guild_id.into(), "voice_mode", mode).await?;
+                self.guilds_db
+                    .set_one(guild_id.into(), "voice_mode", mode)
+                    .await?;
             } else {
                 warn!("Guild {guild_id:?} - User {author_id} has a mode set to premium without being premium!");
             }

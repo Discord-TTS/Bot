@@ -573,8 +573,6 @@ pub async fn confirm_dialog_wait(
         .author_id(author_id)
         .await;
 
-    message.delete(ctx).await?;
-
     if let Some(interaction) = interaction {
         interaction.defer(ctx).await?;
         match &*interaction.data.custom_id {
