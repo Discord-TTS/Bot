@@ -55,11 +55,11 @@ version = "5"
 default-features = false
 
 [dependencies.serenity_feature_only]
-git = "https://github.com/serenity-rs/serenity"
+git = "https://github.com/GnomedDev/serenity"
 features = ["unstable_discord_api"]
 default-features = false
 package = "serenity"
-branch = "next"
+branch = "no-imagehash"
 
 [dependencies.poise]
 git = "https://github.com/serenity-rs/poise"
@@ -72,4 +72,7 @@ features = ["builtin-queue"]
 branch = "next"
 
 [patch.crates-io]
-serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next" }
+serenity = { git = "https://github.com/GnomedDev/serenity", branch = "no-imagehash" }
+
+[patch."https://github.com/serenity-rs/serenity"]
+serenity = { git = "https://github.com/GnomedDev/serenity", branch = "no-imagehash" }
