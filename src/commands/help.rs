@@ -76,9 +76,7 @@ fn show_group_description(group: &IndexMap<&str, Vec<&Command>>) -> String {
 
 #[allow(clippy::unused_async)]
 pub async fn autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<String> {
-    fn flatten_commands(commands: &[Command], searching: &str) -> Vec<String> {
-        let mut result = Vec::new();
-
+    fn flatten_commands(result: &mut Vec<String>, commands: &[Command], searching: &str) {
         for command in commands {
             if command.owners_only || command.hide_in_help {
                 continue;
@@ -89,14 +87,16 @@ pub async fn autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<S
                     result.push(command.qualified_name.clone());
                 }
             } else {
-                result.extend(flatten_commands(&command.subcommands, searching));
+                flatten_commands(result, &command.subcommands, searching);
             }
         }
-
-        result
     }
 
-    let mut result: Vec<String> = flatten_commands(&ctx.framework.options().commands, searching);
+    let commands = &ctx.framework.options().commands;
+    let mut result = Vec::with_capacity(commands.len());
+
+    flatten_commands(&mut result, commands, searching);
+
     result.sort_by_key(|a| strsim::levenshtein(a, searching));
     result
 }
