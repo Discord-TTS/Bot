@@ -73,7 +73,9 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         .get([guild_id.into(), author_id.into()])
         .await?;
 
-    let channel_mention = if let Some(channel) = guild_row.channel {
+    let channel_mention = if let Some(channel) = guild_row.channel
+        && require_guild!(ctx).channels.contains_key(&channel)
+    {
         Cow::Owned(channel.mention().to_string())
     } else {
         Cow::Borrowed(none_str)

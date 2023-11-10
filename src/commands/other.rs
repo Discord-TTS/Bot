@@ -28,6 +28,7 @@ use crate::{
     constants::OPTION_SEPERATORS,
     funcs::{fetch_audio, prepare_url},
     opt_ext::OptionTryUnwrap,
+    require_guild,
     structs::{ApplicationContext, Command, CommandResult, Context, TTSMode},
     traits::PoiseContextExt as _,
 };
@@ -333,7 +334,9 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let guild_row = ctx.data().guilds_db.get(guild_id.into()).await?;
 
-    let msg = if let Some(channel) = guild_row.channel {
+    let msg = if let Some(channel) = guild_row.channel
+        && require_guild!(ctx).channels.contains_key(&channel)
+    {
         if channel == ctx.channel_id() {
             String::from(ctx.gettext("You are in the setup channel already!"))
         } else {

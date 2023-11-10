@@ -39,7 +39,11 @@ async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>
         return Ok(true);
     }
 
-    let msg = if let Some(setup_id) = setup_id {
+    let msg = if let Some(setup_id) = setup_id
+        && require_guild!(ctx, Ok(false))
+            .channels
+            .contains_key(&setup_id)
+    {
         ctx.gettext("You ran this command in the wrong channel, please move to <#{channel_id}>.")
             .replace("{channel_id}", &setup_id.to_string())
     } else {
