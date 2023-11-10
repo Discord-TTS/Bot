@@ -56,7 +56,7 @@ default-features = false
 
 [dependencies.serenity_feature_only]
 git = "https://github.com/serenity-rs/serenity"
-features = ["unstable_discord_api", "simd-json"]
+features = ["unstable_discord_api"]
 default-features = false
 package = "serenity"
 branch = "next"
@@ -68,7 +68,7 @@ branch = "serenity-next"
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
-features = ["builtin-queue", "simd-json"]
+features = ["builtin-queue"]
 branch = "next"
 
 [patch.crates-io]
