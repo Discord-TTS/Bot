@@ -522,7 +522,7 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     if permissions.send_messages() {
         let builder = poise::CreateReply::default();
         ctx.send({
-            const FOOTER_MSG: &str = "If this is an error, please contact Gnome!#6669.";
+            const FOOTER_MSG: &str = "If this is an error, please contact GnomedDev.";
             if permissions.embed_links() {
                 let embed = CreateEmbed::default()
                     .title("TTS Bot Premium - Premium Only Command!")

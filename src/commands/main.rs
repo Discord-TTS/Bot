@@ -300,7 +300,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
             .colour(crate::constants::PREMIUM_NEUTRAL_COLOUR)
             .footer(CreateEmbedFooter::new({
                 let line1 = ctx.gettext("If you have just subscribed, please wait for up to an hour for the member list to update!\n");
-                let line2 = ctx.gettext("If this is incorrect, and you have waited an hour, please contact Gnome!#6669.");
+                let line2 = ctx.gettext("If this is incorrect, and you have waited an hour, please contact GnomedDev.");
 
                 let mut concat = String::with_capacity(line1.len() + line2.len());
                 concat.push_str(line1);
