@@ -346,10 +346,6 @@ async fn voice_autocomplete(
     ctx: ApplicationContext<'_>,
     searching: &str,
 ) -> Vec<poise::AutocompleteChoice<String>> {
-    fn clone_tuple_items<K: Clone, V: Clone>(t: (&K, &V)) -> (K, V) {
-        (t.0.clone(), t.1.clone())
-    }
-
     let Ok((_, mode)) = ctx
         .data
         .parse_user_or_guild(ctx.interaction.user().id, ctx.interaction.guild_id())
@@ -358,20 +354,19 @@ async fn voice_autocomplete(
         return Vec::new();
     };
 
+    let data = ctx.data;
     let (mut i1, mut i2, mut i3, mut i4);
     let voices: &mut dyn Iterator<Item = _> = match mode {
         TTSMode::gTTS => {
-            i1 = ctx
-                .data
+            i1 = data
                 .gtts_voices
                 .iter()
-                .map(clone_tuple_items)
+                .map(|(k, v)| (k.clone(), v.clone()))
                 .map(|(value, name)| poise::AutocompleteChoice::new_with_value(name, value));
             &mut i1
         }
         TTSMode::eSpeak => {
-            i2 = ctx
-                .data
+            i2 = data
                 .espeak_voices
                 .iter()
                 .cloned()
@@ -379,7 +374,7 @@ async fn voice_autocomplete(
             &mut i2
         }
         TTSMode::Polly => {
-            i3 = ctx.data.polly_voices.values().map(|voice| {
+            i3 = data.polly_voices.values().map(|voice| {
                 poise::AutocompleteChoice::new_with_value(
                     format!(
                         "{} - {} ({})",
@@ -391,28 +386,26 @@ async fn voice_autocomplete(
             &mut i3
         }
         TTSMode::gCloud => {
-            i4 = ctx
-                .data
-                .gcloud_voices
-                .iter()
-                .flat_map(|(language, variants)| {
-                    variants.iter().map(move |(variant, gender)| {
-                        poise::AutocompleteChoice::new_with_value(
-                            format!("{language} {variant} ({gender})"),
-                            format!("{language} {variant}"),
-                        )
-                    })
-                });
+            i4 = data.gcloud_voices.iter().flat_map(|(language, variants)| {
+                variants.iter().map(move |(variant, gender)| {
+                    poise::AutocompleteChoice::new_with_value(
+                        format!("{language} {variant} ({gender})"),
+                        format!("{language} {variant}"),
+                    )
+                })
+            });
             &mut i4
         }
     };
 
-    let mut filtered_voices: Vec<_> = voices
-        .filter(|choice| choice.label.starts_with(searching))
+    let searching_lower = searching.to_lowercase();
+    let mut voices: Vec<_> = voices
+        .map(|choice| (choice.label.to_lowercase(), choice))
         .collect();
 
-    filtered_voices.sort_by_key(|choice| strsim::levenshtein(&choice.label, searching));
-    filtered_voices
+    voices.sort_by_cached_key(|(label, _)| strsim::levenshtein(label, &searching_lower));
+    voices.sort_by_key(|(label, _)| !label.contains(&searching_lower));
+    voices.into_iter().map(|(_, choice)| choice).collect()
 }
 
 #[allow(clippy::unused_async)]
