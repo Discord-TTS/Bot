@@ -500,7 +500,6 @@ dependencies = [
  "itertools",
  "linkify",
  "num-format",
- "once_cell",
  "parking_lot",
  "paste",
  "poise",
