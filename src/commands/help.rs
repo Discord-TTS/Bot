@@ -65,9 +65,12 @@ fn show_group_description(group: &IndexMap<&str, Vec<&Command>>) -> String {
     for (category, commands) in group {
         writeln!(buf, "**__{category}__**").unwrap();
         for c in commands {
-            write!(buf, "`/{}", c.qualified_name).unwrap();
+            let name = &c.qualified_name;
+            let description = c.description.as_deref().unwrap_or("no description");
+
+            write!(buf, "`/{name}").unwrap();
             format_params(&mut buf, c);
-            writeln!(buf, "`: {}", c.description.as_ref().unwrap()).unwrap();
+            writeln!(buf, "`: {description}").unwrap();
         }
     }
 
