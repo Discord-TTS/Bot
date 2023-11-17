@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, num::NonZeroU16, sync::atomic::Ordering::SeqCst};
+use std::{borrow::Cow, collections::HashSet, num::NonZeroU16, sync::atomic::Ordering::SeqCst};
 
 use self::serenity::builder::*;
-use poise::{futures_util::TryStreamExt, serenity_prelude as serenity};
+use num_format::{Locale, ToFormattedString};
+use poise::{futures_util::TryStreamExt, serenity_prelude as serenity, CreateReply};
 
 use crate::{
     funcs::dm_generic,
@@ -326,7 +327,33 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         .map_err(Into::into)
 }
 
-pub fn commands() -> [Command; 8] {
+#[poise::command(prefix_command, owners_only)]
+pub async fn cache_info(ctx: Context<'_>) -> CommandResult {
+    let mut embed = CreateEmbed::default().title("Cache Statistics");
+    for cache in ctx.cache().get_statistics() {
+        let size = (cache.size / 1000).to_formatted_string(&Locale::en);
+        let (count, size_per) = if cache.count == 0 {
+            (Cow::Borrowed("0"), Cow::Borrowed("N/A"))
+        } else {
+            let count = cache.count.to_formatted_string(&Locale::en);
+            let mut size_per = (cache.size / cache.count).to_formatted_string(&Locale::en);
+            size_per.push('b');
+
+            (Cow::Owned(count), Cow::Owned(size_per))
+        };
+
+        embed = embed.field(
+            cache.name,
+            format!("Size: `{size}kb`\nCount: `{count}`\nSize per model: `{size_per}`"),
+            false,
+        );
+    }
+
+    ctx.send(CreateReply::default().embed(embed)).await?;
+    Ok(())
+}
+
+pub fn commands() -> [Command; 9] {
     [
         dm(),
         close(),
@@ -336,5 +363,6 @@ pub fn commands() -> [Command; 8] {
         remove_cache(),
         refresh_ofs(),
         purge_guilds(),
+        cache_info(),
     ]
 }
