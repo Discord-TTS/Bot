@@ -10,7 +10,6 @@ use crate::{
     structs::{Context, JoinVCToken, Result, TTSMode},
 };
 
-#[serenity::async_trait]
 pub trait PoiseContextExt {
     fn gettext<'a>(&'a self, translate: &'a str) -> &'a str;
 
@@ -22,7 +21,6 @@ pub trait PoiseContextExt {
     async fn author_permissions(&self) -> Result<serenity::Permissions>;
 }
 
-#[serenity::async_trait]
 impl PoiseContextExt for Context<'_> {
     fn author_vc(&self) -> Option<serenity::ChannelId> {
         require_guild!(self, None)
@@ -138,7 +136,6 @@ impl PoiseContextExt for Context<'_> {
     }
 }
 
-#[serenity::async_trait]
 pub trait SongbirdManagerExt {
     async fn join_vc(
         &self,
@@ -147,7 +144,6 @@ pub trait SongbirdManagerExt {
     ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>, songbird::error::JoinError>;
 }
 
-#[serenity::async_trait]
 impl SongbirdManagerExt for songbird::Songbird {
     async fn join_vc(
         &self,

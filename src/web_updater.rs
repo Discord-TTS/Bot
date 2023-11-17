@@ -43,7 +43,6 @@ pub struct Updater {
     pub pool: sqlx::PgPool,
 }
 
-#[serenity::async_trait]
 impl crate::Looper for Updater {
     const NAME: &'static str = "WebUpdater";
     const MILLIS: u64 = 1000 * 60 * 60;

@@ -85,7 +85,6 @@ impl BotListUpdater {
     }
 }
 
-#[serenity::async_trait]
 impl crate::Looper for BotListUpdater {
     const NAME: &'static str = "Bot List Updater";
     const MILLIS: u64 = 1000 * 60 * 60;

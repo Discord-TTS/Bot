@@ -4,7 +4,7 @@ use anyhow::Result;
 use itertools::Itertools as _;
 use parking_lot::Mutex;
 
-use poise::serenity_prelude::{async_trait, ExecuteWebhook, Http, Webhook};
+use poise::serenity_prelude::{ExecuteWebhook, Http, Webhook};
 
 type LogMessage = (&'static str, String);
 
@@ -60,7 +60,6 @@ impl WebhookLogger {
     }
 }
 
-#[async_trait]
 impl crate::looper::Looper for WebhookLogger {
     const NAME: &'static str = "Logging";
     const MILLIS: u64 = 1100;

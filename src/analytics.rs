@@ -3,8 +3,6 @@ use std::borrow::Cow;
 use dashmap::DashMap;
 use sqlx::Connection;
 
-use poise::serenity_prelude as serenity;
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum EventType {
     Normal,
@@ -43,7 +41,6 @@ impl Handler {
     }
 }
 
-#[serenity::async_trait]
 impl crate::Looper for Handler {
     const NAME: &'static str = "Analytics";
     const MILLIS: u64 = 5000;

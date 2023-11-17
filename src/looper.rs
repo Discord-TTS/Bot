@@ -1,4 +1,3 @@
-#[poise::serenity_prelude::async_trait]
 pub trait Looper {
     const NAME: &'static str;
     const MILLIS: u64;
