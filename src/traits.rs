@@ -65,20 +65,26 @@ impl PoiseContextExt for Context<'_> {
     }
 
     async fn author_permissions(&self) -> Result<serenity::Permissions> {
-        let ctx_discord = self.serenity_context();
-        match ctx_discord.cache.channel(self.channel_id()).try_unwrap()? {
-            serenity::Channel::Guild(channel) => {
-                let member = channel.guild_id.member(ctx_discord, self.author()).await?;
-                let guild = channel.guild(&ctx_discord.cache).try_unwrap()?;
-
-                Ok(guild.user_permissions_in(&channel, &member))
-            }
-            _ => Ok(((serenity::Permissions::from_bits_truncate(
+        // Handle non-guild call first, to allow try_unwrap calls to be safe.
+        if self.guild_id().is_none() {
+            return Ok(((serenity::Permissions::from_bits_truncate(
                 0b111_1100_1000_0000_0000_0111_1111_1000_0100_0000,
             ) | serenity::Permissions::SEND_MESSAGES)
                 - serenity::Permissions::SEND_TTS_MESSAGES)
-                - serenity::Permissions::MANAGE_MESSAGES),
+                - serenity::Permissions::MANAGE_MESSAGES);
         }
+
+        // Accesses guild cache and is asynchronous, must be called first.
+        let member = self.author_member().await.try_unwrap()?;
+
+        // Accesses guild cache, but the member above was cloned out, so safe.
+        let guild = self.guild().try_unwrap()?;
+
+        // Does not access cache, but relies on above guild cache reference.
+        let channel = guild.channels.get(&self.channel_id()).try_unwrap()?;
+
+        // Does not access cache.
+        Ok(guild.user_permissions_in(channel, &member))
     }
 
     async fn send_error(&self, error_message: String) -> Result<Option<poise::ReplyHandle<'_>>> {

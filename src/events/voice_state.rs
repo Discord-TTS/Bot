@@ -29,7 +29,7 @@ pub async fn voice_state_update(
 
     let channel_members = ctx
         .cache
-        .guild_channel(old.channel_id.try_unwrap()?)
+        .channel(old.channel_id.try_unwrap()?)
         .try_unwrap()?
         .members(&ctx.cache)?;
 

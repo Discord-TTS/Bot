@@ -23,7 +23,7 @@ linkify = "0.10"
 strsim = "0.10"
 sysinfo = "0.29"
 num-format = "0.4"
-itertools = "0.11"
+itertools = "0.12"
 parking_lot = "0.12"
 const_format = "0.2"
 strum_macros = "0.25"
@@ -73,6 +73,8 @@ branch = "next"
 
 [patch.crates-io]
 serenity = { git = "https://github.com/GnomedDev/serenity", branch = "typesize" }
+serenity-voice-model = { git = "https://github.com/GnomedDev/serenity", branch = "typesize" }
 
 [patch."https://github.com/serenity-rs/serenity"]
 serenity = { git = "https://github.com/GnomedDev/serenity", branch = "typesize" }
+serenity-voice-model = { git = "https://github.com/GnomedDev/serenity", branch = "typesize" }

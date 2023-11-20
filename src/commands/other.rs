@@ -434,7 +434,7 @@ pub async fn invite(ctx: Context<'_>) -> CommandResult {
             .replace("{bot_mention}", &bot_mention)
     } else {
         cache
-            .guild_channel(invite_channel)
+            .channel(invite_channel)
             .map(|c| {
                 ctx.gettext(
                     "Join {server_invite} and look in #{channel_name} to invite {bot_mention}",
