@@ -14,14 +14,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, collections::HashSet, num::NonZeroU16, sync::atomic::Ordering::SeqCst};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    num::NonZeroU16,
+    sync::atomic::Ordering::SeqCst,
+};
 
 use self::serenity::builder::*;
 use num_format::{Locale, ToFormattedString};
 use poise::{futures_util::TryStreamExt, serenity_prelude as serenity, CreateReply};
+use rand::{rngs::ThreadRng, Rng};
+use typesize::TypeSize;
 
 use crate::{
     funcs::dm_generic,
+    opt_ext::OptionTryUnwrap,
     structs::{Command, CommandResult, Context, PrefixContext, TTSModeChoice},
 };
 
@@ -327,27 +335,95 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         .map_err(Into::into)
 }
 
+fn choose_random<'a, T>(rng: &mut ThreadRng, container: &'a [T]) -> &'a T {
+    let index = rng.gen_range(0..container.len());
+    &container[index]
+}
+
+fn choose_random_map<'a, K: std::hash::Hash + Eq, V>(
+    rng: &mut ThreadRng,
+    map: &'a HashMap<K, V>,
+) -> Option<&'a V> {
+    map.get(map.keys().nth(rng.gen_range(0..map.len()))?)
+}
+
+fn random_guild<'a>(
+    rng: &mut ThreadRng,
+    cache: &'a serenity::Cache,
+) -> Option<serenity::GuildRef<'a>> {
+    cache.guild(choose_random(rng, &cache.guilds()))
+}
+
 #[poise::command(prefix_command, owners_only)]
-pub async fn cache_info(ctx: Context<'_>) -> CommandResult {
-    let mut embed = CreateEmbed::default().title("Cache Statistics");
-    for cache in ctx.cache().get_statistics() {
-        let size = (cache.size / 1000).to_formatted_string(&Locale::en);
-        let (count, size_per) = if cache.count == 0 {
-            (Cow::Borrowed("0"), Cow::Borrowed("N/A"))
-        } else {
-            let count = cache.count.to_formatted_string(&Locale::en);
-            let mut size_per = (cache.size / cache.count).to_formatted_string(&Locale::en);
-            size_per.push('b');
-
-            (Cow::Owned(count), Cow::Owned(size_per))
-        };
-
-        embed = embed.field(
-            cache.name,
-            format!("Size: `{size}kb`\nCount: `{count}`\nSize per model: `{size_per}`"),
-            false,
-        );
+pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult {
+    struct Field {
+        name: String,
+        size: usize,
+        value: String,
+        is_collection: bool,
     }
+
+    let serenity_cache = ctx.cache();
+    let cache_stats = {
+        let mut rng = rand::thread_rng();
+        match kind.as_deref() {
+            Some("guild") => random_guild(&mut rng, serenity_cache)
+                .try_unwrap()?
+                .get_size_details(),
+            Some("channel") => {
+                let guild = random_guild(&mut rng, serenity_cache).try_unwrap()?;
+                choose_random_map(&mut rng, &guild.channels)
+                    .try_unwrap()?
+                    .get_size_details()
+            }
+            Some("role") => {
+                let guild = random_guild(&mut rng, serenity_cache).try_unwrap()?;
+                choose_random_map(&mut rng, &guild.roles)
+                    .try_unwrap()?
+                    .get_size_details()
+            }
+            _ => serenity_cache.get_size_details(),
+        }
+    };
+
+    let mut fields = Vec::new();
+    for field in cache_stats {
+        let name = format!("`{}`", field.name);
+        let size = field.size.to_formatted_string(&Locale::en);
+        if let Some(count) = field.collection_items {
+            let (count, size_per) = if count == 0 {
+                (Cow::Borrowed("0"), Cow::Borrowed("N/A"))
+            } else {
+                let count_fmt = count.to_formatted_string(&Locale::en);
+                let mut size_per = (field.size / count).to_formatted_string(&Locale::en);
+                size_per.push('b');
+
+                (Cow::Owned(count_fmt), Cow::Owned(size_per))
+            };
+
+            fields.push(Field {
+                name,
+                size: field.size,
+                is_collection: true,
+                value: format!("Size: `{size}b`\nCount: `{count}`\nSize per model: `{size_per}`"),
+            });
+        } else {
+            fields.push(Field {
+                name,
+                size: field.size,
+                is_collection: false,
+                value: format!("Size: `{size}b`"),
+            });
+        };
+    }
+
+    fields.sort_by_key(|field| field.size);
+    fields.sort_by_key(|field| field.is_collection);
+    fields.reverse();
+
+    let embed = CreateEmbed::default()
+        .title("Cache Statistics")
+        .fields(fields.into_iter().map(|f| (f.name, f.value, true)));
 
     ctx.send(CreateReply::default().embed(embed)).await?;
     Ok(())
