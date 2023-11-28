@@ -347,10 +347,10 @@ impl<'a> MenuPaginator<'a> {
 async fn voice_autocomplete(
     ctx: ApplicationContext<'_>,
     searching: &str,
-) -> Vec<poise::AutocompleteChoice<String>> {
+) -> Vec<serenity::AutocompleteChoice> {
     let Ok((_, mode)) = ctx
         .data
-        .parse_user_or_guild(ctx.interaction.user().id, ctx.interaction.guild_id())
+        .parse_user_or_guild(ctx.interaction.user.id, ctx.interaction.guild_id)
         .await
     else {
         return Vec::new();
@@ -360,11 +360,7 @@ async fn voice_autocomplete(
     let (mut i1, mut i2, mut i3, mut i4);
     let voices: &mut dyn Iterator<Item = _> = match mode {
         TTSMode::gTTS => {
-            i1 = data
-                .gtts_voices
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .map(|(value, name)| poise::AutocompleteChoice::new_with_value(name, value));
+            i1 = data.gtts_voices.iter().map(|(k, v)| (k.clone(), v.clone()));
             &mut i1
         }
         TTSMode::eSpeak => {
@@ -372,12 +368,12 @@ async fn voice_autocomplete(
                 .espeak_voices
                 .iter()
                 .cloned()
-                .map(poise::AutocompleteChoice::from);
+                .map(|voice| (voice.clone(), voice));
             &mut i2
         }
         TTSMode::Polly => {
             i3 = data.polly_voices.values().map(|voice| {
-                poise::AutocompleteChoice::new_with_value(
+                (
                     format!(
                         "{} - {} ({})",
                         voice.name, voice.language_name, voice.gender
@@ -390,7 +386,7 @@ async fn voice_autocomplete(
         TTSMode::gCloud => {
             i4 = data.gcloud_voices.iter().flat_map(|(language, variants)| {
                 variants.iter().map(move |(variant, gender)| {
-                    poise::AutocompleteChoice::new_with_value(
+                    (
                         format!("{language} {variant} ({gender})"),
                         format!("{language} {variant}"),
                     )
@@ -402,30 +398,34 @@ async fn voice_autocomplete(
 
     let searching_lower = searching.to_lowercase();
     let mut voices: Vec<_> = voices
-        .map(|choice| (choice.label.to_lowercase(), choice))
+        .map(|(label, value)| (label.to_lowercase(), value))
         .collect();
 
     voices.sort_by_cached_key(|(label, _)| strsim::levenshtein(label, &searching_lower));
     voices.sort_by_key(|(label, _)| !label.contains(&searching_lower));
-    voices.into_iter().map(|(_, choice)| choice).collect()
+    voices
+        .into_iter()
+        .map(|(label, value)| serenity::AutocompleteChoice::new(label, value))
+        .collect()
 }
 
 #[allow(clippy::unused_async)]
 async fn translation_languages_autocomplete(
     ctx: ApplicationContext<'_>,
     searching: &str,
-) -> Vec<poise::AutocompleteChoice<String>> {
+) -> impl Iterator<Item = serenity::AutocompleteChoice> {
     let mut filtered_languages = ctx
         .data
         .translation_languages
         .iter()
         .filter(|(_, name)| name.starts_with(searching))
         .map(|(value, name)| (value.clone(), name.clone()))
-        .map(|(value, name)| poise::AutocompleteChoice::new_with_value(name, value))
         .collect::<Vec<_>>();
 
-    filtered_languages.sort_by_key(|choice| strsim::levenshtein(&choice.label, searching));
+    filtered_languages.sort_by_key(|(label, _)| strsim::levenshtein(label, searching));
     filtered_languages
+        .into_iter()
+        .map(|(label, value)| serenity::AutocompleteChoice::new(label, value))
 }
 
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
@@ -1438,7 +1438,7 @@ Just do `/join` and start talking!
         ctx.gettext("Okay, didn't set up update announcements.")
     };
 
-    ctx.send(poise::CreateReply::new().content(reply).ephemeral(true))
+    ctx.send(poise::CreateReply::default().content(reply).ephemeral(true))
         .await?;
 
     Ok(())

@@ -466,6 +466,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
         }
 
         poise::FrameworkError::EventHandler {
+            ctx,
             error,
             event,
             framework,
@@ -477,27 +478,27 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             }
 
             match event {
-                Event::Message { ctx, new_message } => {
+                Event::Message { new_message } => {
                     handle_message(ctx, framework, new_message, Err(error)).await?;
                 }
-                Event::GuildMemberAddition { ctx, new_member } => {
+                Event::GuildMemberAddition { new_member } => {
                     handle_member(ctx, framework, new_member, Err(error)).await?;
                 }
-                Event::GuildCreate { ctx, guild, .. } => {
+                Event::GuildCreate { guild, .. } => {
                     handle_guild("GuildCreate", ctx, framework, Some(guild), Err(error)).await?;
                 }
-                Event::GuildDelete { ctx, full, .. } => {
+                Event::GuildDelete { full, .. } => {
                     handle_guild("GuildDelete", ctx, framework, full.as_ref(), Err(error)).await?;
                 }
-                Event::VoiceStateUpdate { ctx, .. } => {
+                Event::VoiceStateUpdate { .. } => {
                     handle_unexpected_default(ctx, framework, "VoiceStateUpdate", Err(error))
                         .await?;
                 }
-                Event::InteractionCreate { ctx, .. } => {
+                Event::InteractionCreate { .. } => {
                     handle_unexpected_default(ctx, framework, "InteractionCreate", Err(error))
                         .await?;
                 }
-                Event::Ready { ctx, .. } => {
+                Event::Ready { .. } => {
                     handle_unexpected_default(ctx, framework, "Ready", Err(error)).await?;
                 }
                 _ => {

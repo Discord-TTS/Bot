@@ -51,7 +51,7 @@ fn get_command_mapping(commands: &[Command]) -> IndexMap<&str, Vec<&Command>> {
 
 fn format_params(buf: &mut String, command: &Command) {
     for p in &command.parameters {
-        let name = p.name.as_deref().unwrap_or("unnamed");
+        let name = &p.name;
         if p.required {
             write!(buf, " <{name}>").unwrap();
         } else {
@@ -206,7 +206,7 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                 if !command_obj.parameters.is_empty() {
                     msg.push_str(ctx.gettext("__**Parameter Descriptions**__\n"));
                     command_obj.parameters.iter().for_each(|p| {
-                        let name = p.name.as_deref().unwrap_or_else(|| ctx.gettext("unnamed"));
+                        let name = &p.name;
                         let description = p
                             .description
                             .as_deref()

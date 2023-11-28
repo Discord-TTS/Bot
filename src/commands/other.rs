@@ -192,7 +192,7 @@ pub async fn tts_speak_as(
     context_menu_command = "Speak with your voice!"
 )]
 pub async fn tts_speak(ctx: ApplicationContext<'_>, message: serenity::Message) -> CommandResult {
-    _tts(ctx.into(), ctx.interaction.user(), &message.content).await
+    _tts(ctx.into(), &ctx.interaction.user, &message.content).await
 }
 
 /// Shows various different stats

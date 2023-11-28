@@ -49,16 +49,13 @@ impl PoiseContextExt for Context<'_> {
 
     fn current_catalog(&self) -> Option<&gettext::Catalog> {
         if let poise::Context::Application(ctx) = self {
-            if let poise::CommandOrAutocompleteInteraction::Command(interaction) = ctx.interaction {
-                return ctx
-                    .data
-                    .translations
-                    .get(match interaction.locale.as_str() {
-                        "ko" => "ko-KR",
-                        "pt-BR" => "pt",
-                        l => l,
-                    });
-            }
+            ctx.data
+                .translations
+                .get(match ctx.interaction.locale.as_str() {
+                    "ko" => "ko-KR",
+                    "pt-BR" => "pt",
+                    l => l,
+                });
         };
 
         None

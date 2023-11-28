@@ -342,7 +342,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
     let framework_options = poise::FrameworkOptions {
         commands: commands::commands(),
-        event_handler: |event, ctx, _| Box::pin(events::listen(ctx, event)),
+        event_handler: |ctx, event, fw_ctx, _| Box::pin(events::listen(ctx, event, fw_ctx)),
         on_error: |error| {
             Box::pin(async move {
                 let res = errors::handle(error).await;
@@ -362,11 +362,9 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
                 analytics_handler.log(
                     Cow::Borrowed(match ctx {
                         poise::Context::Prefix(_) => "command",
-                        poise::Context::Application(ctx) => match ctx.interaction {
-                            poise::CommandOrAutocompleteInteraction::Autocomplete(_) => {
-                                "autocomplete"
-                            }
-                            poise::CommandOrAutocompleteInteraction::Command(_) => "slash_command",
+                        poise::Context::Application(ctx) => match ctx.interaction_type {
+                            poise::CommandInteractionType::Autocomplete => "autocomplete",
+                            poise::CommandInteractionType::Command => "slash_command",
                         },
                     }),
                     false,
@@ -480,7 +478,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
 async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     if let Context::Application(ctx) = ctx {
-        if let poise::CommandOrAutocompleteInteraction::Autocomplete(_) = ctx.interaction {
+        if ctx.interaction_type == poise::CommandInteractionType::Autocomplete {
             // Ignore the premium check during autocomplete.
             return Ok(true);
         }
