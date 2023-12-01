@@ -11,10 +11,10 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
 
-use std::{borrow::Cow, cmp::Ordering};
-
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use std::{borrow::Cow, cmp::Ordering};
+
 use anyhow::Error;
 use num_format::{Locale, ToFormattedString};
 use sysinfo::{ProcessExt, SystemExt};
@@ -391,30 +391,6 @@ pub async fn ping(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-/// Suggests a new feature!
-#[poise::command(
-    category = "Extra Commands",
-    prefix_command,
-    slash_command,
-    ephemeral,
-    required_bot_permissions = "SEND_MESSAGES"
-)]
-#[allow(unused_variables)]
-pub async fn suggest(ctx: Context<'_>, #[rest] suggestion: String) -> CommandResult {
-    let (bot_name, face) = {
-        let user = ctx.cache().current_user();
-        (user.name.clone(), user.face())
-    };
-
-    ctx.send(CreateReply::default().embed(CreateEmbed::default()
-        .colour(ctx.neutral_colour().await)
-        .author(CreateEmbedAuthor::new(bot_name).icon_url(face))
-        .title("`/suggest` has been removed due to spam and misuse.")
-        .description("If you want to suggest a new feature, use `/invite` and ask us in the support server!")
-    )).await?;
-    Ok(())
-}
-
 /// Sends the instructions to invite TTS Bot and join the support server!
 #[poise::command(
     category = "Extra Commands",
@@ -449,7 +425,7 @@ pub async fn invite(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-pub fn commands() -> [Command; 10] {
+pub fn commands() -> [Command; 9] {
     [
         tts(),
         uptime(),
@@ -457,7 +433,6 @@ pub fn commands() -> [Command; 10] {
         channel(),
         premium(),
         ping(),
-        suggest(),
         invite(),
         tts_speak(),
         tts_speak_as(),
