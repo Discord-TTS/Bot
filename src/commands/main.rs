@@ -14,20 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, num::NonZeroU16};
-
 use songbird::error::JoinError;
-use sqlx::Row;
 
-use poise::{
-    serenity_prelude::{self as serenity, builder::*},
-    CreateReply,
-};
+use poise::serenity_prelude::{self as serenity, builder::*};
 
 use crate::{
     funcs::random_footer,
     require, require_guild,
-    structs::{Command, CommandResult, Context, JoinVCToken, Result, TTSMode},
+    structs::{Command, CommandResult, Context, JoinVCToken, Result},
     traits::{PoiseContextExt, SongbirdManagerExt},
 };
 
@@ -252,97 +246,6 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-/// Activates a server for TTS Bot Premium!
-#[poise::command(
-    category = "Main Commands",
-    guild_only,
-    prefix_command,
-    slash_command,
-    aliases("activate"),
-    required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
-)]
-pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
-    let guild_id = ctx.guild_id().unwrap();
-    let data = ctx.data();
-
-    if data.premium_check(Some(guild_id)).await?.is_none() {
-        ctx.say(ctx.gettext("Hey, this server is already premium!"))
-            .await?;
-        return Ok(());
-    }
-
-    let author = ctx.author();
-    let author_id = ctx.author().id.get() as i64;
-
-    let linked_guilds: i64 = sqlx::query("SELECT count(*) FROM guilds WHERE premium_user = $1")
-        .bind(author_id)
-        .fetch_one(&data.pool)
-        .await?
-        .get("count");
-
-    let error_msg = match data.fetch_patreon_info(author.id).await? {
-        Some(tier) => {
-            if linked_guilds as u8 >= tier.entitled_servers {
-                Some(Cow::Owned(ctx
-                    .gettext("Hey, you already have {server_count} servers linked, you are only subscribed to the {entitled_servers} tier!")
-                    .replace("{entitled_servers}", &tier.entitled_servers.to_string())
-                    .replace("{server_count}", &linked_guilds.to_string())
-                ))
-            } else {
-                None
-            }
-        }
-        None => Some(Cow::Borrowed(
-            ctx.gettext("Hey, I don't think you are subscribed on Patreon!"),
-        )),
-    };
-
-    if let Some(error_msg) = error_msg {
-        ctx.send(CreateReply::default().embed(CreateEmbed::default()
-            .title("TTS Bot Premium")
-            .description(error_msg)
-            .thumbnail(&data.premium_avatar_url)
-            .colour(crate::constants::PREMIUM_NEUTRAL_COLOUR)
-            .footer(CreateEmbedFooter::new({
-                let line1 = ctx.gettext("If you have just subscribed, please wait for up to an hour for the member list to update!\n");
-                let line2 = ctx.gettext("If this is incorrect, and you have waited an hour, please contact GnomedDev.");
-
-                let mut concat = String::with_capacity(line1.len() + line2.len());
-                concat.push_str(line1);
-                concat.push_str(line2);
-                concat
-            }))
-        )).await?;
-
-        return Ok(());
-    }
-
-    data.userinfo_db.create_row(author_id).await?;
-    data.guilds_db
-        .set_one(guild_id.into(), "premium_user", &author_id)
-        .await?;
-    data.guilds_db
-        .set_one(guild_id.into(), "voice_mode", &TTSMode::gCloud)
-        .await?;
-
-    ctx.say(ctx.gettext("Done! This server is now premium!"))
-        .await?;
-
-    let guild = ctx.cache().guild(guild_id);
-    let guild_name = guild.as_ref().map_or("<Unknown>", |g| g.name.as_str());
-
-    tracing::info!(
-        "{}#{} | {} linked premium to {} | {}, they had {} linked servers",
-        author.name,
-        author.discriminator.map_or(0, NonZeroU16::get),
-        author.id,
-        guild_name,
-        guild_id,
-        linked_guilds
-    );
-    Ok(())
-}
-
-pub fn commands() -> [Command; 4] {
-    [join(), leave(), clear(), premium_activate()]
+pub fn commands() -> [Command; 3] {
+    [join(), leave(), clear()]
 }

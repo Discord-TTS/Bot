@@ -194,15 +194,8 @@ impl Data {
         if let Some(mut url) = self.config.patreon_service.clone() {
             url.set_path(&format!("/members/{user_id}"));
 
-            let resp = self
-                .reqwest
-                .get(url)
-                .send()
-                .await?
-                .error_for_status()?
-                .bytes()
-                .await?;
-
+            let req = self.reqwest.get(url);
+            let resp = req.send().await?.error_for_status()?.bytes().await?;
             json::from_slice(&resp).map_err(Into::into)
         } else {
             // Return fake PatreonInfo if `patreon_service` has not been set to simplify self-hosting.

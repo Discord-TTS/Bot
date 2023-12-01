@@ -14,6 +14,7 @@ pub trait PoiseContextExt {
     fn gettext<'a>(&'a self, translate: &'a str) -> &'a str;
 
     fn current_catalog(&self) -> Option<&gettext::Catalog>;
+    async fn send_ephemeral(&self, message: impl Into<String>) -> Result<poise::ReplyHandle<'_>>;
     async fn send_error(&self, error_message: String) -> Result<Option<poise::ReplyHandle<'_>>>;
 
     async fn neutral_colour(&self) -> u32;
@@ -82,6 +83,12 @@ impl PoiseContextExt for Context<'_> {
 
         // Does not access cache.
         Ok(guild.user_permissions_in(channel, &member))
+    }
+
+    async fn send_ephemeral(&self, message: impl Into<String>) -> Result<poise::ReplyHandle<'_>> {
+        let reply = poise::CreateReply::default().content(message);
+        let handle = self.send(reply).await?;
+        Ok(handle)
     }
 
     async fn send_error(&self, error_message: String) -> Result<Option<poise::ReplyHandle<'_>>> {

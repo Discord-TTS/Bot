@@ -147,7 +147,7 @@ where
             .execute(&self.pool)
             .await?;
 
-        self.cache.remove(&identifier);
+        self.invalidate_cache(&identifier);
         Ok(())
     }
 
@@ -157,7 +157,7 @@ where
             .execute(&self.pool)
             .await?;
 
-        self.cache.remove(&identifier);
+        self.invalidate_cache(&identifier);
         Ok(())
     }
 

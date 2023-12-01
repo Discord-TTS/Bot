@@ -20,6 +20,7 @@ mod help;
 mod main;
 mod other;
 mod owner;
+mod premium;
 mod settings;
 
 pub fn commands() -> Vec<Command> {
@@ -27,6 +28,7 @@ pub fn commands() -> Vec<Command> {
         .into_iter()
         .chain(other::commands())
         .chain(settings::commands())
+        .chain(premium::commands())
         .chain(owner::commands())
         .chain(help::commands())
         .collect()

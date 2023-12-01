@@ -542,6 +542,7 @@ dependencies = [
  "bitflags 2.4.1",
  "const_format",
  "dashmap",
+ "futures-util",
  "gettext",
  "indexmap",
  "itertools 0.12.0",

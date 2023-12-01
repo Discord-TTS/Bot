@@ -17,7 +17,6 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
-    num::NonZeroU16,
     sync::atomic::Ordering::SeqCst,
 };
 
@@ -81,36 +80,11 @@ pub async fn close(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-#[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn add_premium(
-    ctx: Context<'_>,
-    guild: serenity::Guild,
-    user: serenity::User,
-) -> CommandResult {
-    let data = ctx.data();
-    let user_id = user.id.into();
-
-    data.userinfo_db.create_row(user_id).await?;
-    data.guilds_db
-        .set_one(guild.id.into(), "premium_user", &user_id)
-        .await?;
-
-    ctx.say(format!(
-        "Linked <@{}> ({}#{} | {}) to {}",
-        user.id,
-        user.name,
-        user.discriminator.map_or(0, NonZeroU16::get),
-        user.id,
-        guild.name
-    ))
-    .await?;
-    Ok(())
-}
-
 #[poise::command(
     prefix_command,
     owners_only,
     hide_in_help,
+    aliases("invalidate_cache", "delete_cache"),
     subcommands("guild", "user", "guild_voice", "user_voice")
 )]
 pub async fn remove_cache(ctx: Context<'_>) -> CommandResult {
@@ -429,13 +403,12 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
     Ok(())
 }
 
-pub fn commands() -> [Command; 9] {
+pub fn commands() -> [Command; 8] {
     [
         dm(),
         close(),
         debug(),
         register(),
-        add_premium(),
         remove_cache(),
         refresh_ofs(),
         purge_guilds(),

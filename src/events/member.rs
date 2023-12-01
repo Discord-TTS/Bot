@@ -3,7 +3,7 @@ use reqwest::StatusCode;
 
 use crate::{
     constants::PREMIUM_NEUTRAL_COLOUR,
-    funcs::{confirm_dialog_components, confirm_dialog_wait},
+    funcs::{confirm_dialog_components, confirm_dialog_wait, remove_premium},
     Data, Result,
 };
 
@@ -41,12 +41,6 @@ pub async fn guild_member_addition(
     }
 
     Ok(())
-}
-
-async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<()> {
-    data.guilds_db
-        .set_one(guild_id.into(), "premium_user", None::<i64>)
-        .await
 }
 
 fn create_premium_notice() -> serenity::CreateMessage {

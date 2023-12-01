@@ -27,13 +27,22 @@ use crate::{
     opt_ext::{OptionGettext, OptionTryUnwrap},
     require,
     structs::{
-        Context, GoogleGender, GoogleVoice, LastToXsaidTracker, RegexCache, Result, TTSMode,
+        Context, Data, GoogleGender, GoogleVoice, LastToXsaidTracker, RegexCache, Result, TTSMode,
         TTSServiceError,
     },
 };
 
 pub async fn decode_resp<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Result<T> {
     json::from_slice(&resp.bytes().await?).map_err(Into::into)
+}
+
+pub async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<()> {
+    data.guilds_db
+        .set_one(guild_id.into(), "premium_user", None::<i64>)
+        .await?;
+    data.guilds_db
+        .set_one(guild_id.into(), "voice_mode", None::<TTSMode>)
+        .await
 }
 
 pub async fn dm_generic(
