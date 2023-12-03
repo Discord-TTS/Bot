@@ -4,16 +4,16 @@ use std::{
     sync::Arc,
 };
 
+pub use anyhow::{Error, Result};
 use parking_lot::RwLock;
 use serde::Deserialize as _;
 use strum_macros::IntoStaticStr;
+use tracing::warn;
+use typesize::derive::TypeSize;
 
 use poise::serenity_prelude::{self as serenity, json};
-use tracing::warn;
 
 use crate::{analytics, database, into_static_display};
-
-pub use anyhow::{Error, Result};
 
 #[derive(serde::Deserialize)]
 pub struct Config {
@@ -320,7 +320,7 @@ impl SpeakingRateInfo {
     }
 }
 
-#[derive(IntoStaticStr, sqlx::Type, Debug, Default, Hash, PartialEq, Eq, Copy, Clone)]
+#[derive(IntoStaticStr, sqlx::Type, TypeSize, Debug, Default, Hash, PartialEq, Eq, Copy, Clone)]
 #[allow(non_camel_case_types)]
 #[sqlx(rename_all = "lowercase")]
 #[sqlx(type_name = "ttsmode")]

@@ -30,7 +30,7 @@ strum_macros = "0.25"
 arrayvec = "0.7.4"
 bitflags = "2.4.1"
 paste = "1.0.14"
-typesize = "0.1.2"
+typesize = { version = "0.1.2", features = ["arrayvec"] }
 futures-util = { version = "0.3.29", default-features = false }
 
 [dependencies.symphonia]
@@ -70,3 +70,6 @@ branch = "current"
 [dependencies.songbird]
 version = "0.4"
 features = ["builtin-queue"]
+
+[patch.crates-io]
+typesize = { git = "https://github.com/GnomedDev/typesize" }

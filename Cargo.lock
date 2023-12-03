@@ -488,7 +488,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
 dependencies = [
  "cfg-if",
- "hashbrown",
+ "hashbrown 0.14.3",
  "lock_api",
  "once_cell",
  "parking_lot_core",
@@ -503,9 +503,9 @@ checksum = "7e962a19be5cfc3f3bf6dd8f61eb50107f356ad6270fbb3ed41476571db78be5"
 
 [[package]]
 name = "deranged"
-version = "0.3.9"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f32d04922c60427da6f9fef14d042d9edddef64cb9d4ce0d64d0685fbeb1fd3"
+checksum = "8eb30d70a07a3b04884d2677f06bec33509dc67ca60d92949e5535352d3191dc"
 dependencies = [
  "powerfmt",
  "serde",
@@ -946,6 +946,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "halfbrown"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5681137554ddff44396e5f149892c769d45301dd9aa19c51602a89ee214cb0ec"
+dependencies = [
+ "arrayvec",
+ "hashbrown 0.13.2",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
+dependencies = [
+ "ahash",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -961,7 +980,7 @@ version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8094feaf31ff591f651a2664fb9cfd92bba7a60ce3197265e9482ebe753c8f7"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.14.3",
 ]
 
 [[package]]
@@ -1130,7 +1149,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
 dependencies = [
  "equivalent",
- "hashbrown",
+ "hashbrown 0.14.3",
 ]
 
 [[package]]
@@ -3142,12 +3161,13 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "typesize"
 version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46638a7bcd4104adbb21b558651f24bdc6a26366a0476099076d0771b864561b"
+source = "git+https://github.com/GnomedDev/typesize#eb3cc6d5020a117c1377a159e2d6f03f010db34a"
 dependencies = [
+ "arrayvec",
  "chrono",
  "dashmap",
- "hashbrown",
+ "halfbrown",
+ "hashbrown 0.14.3",
  "mini-moka",
  "parking_lot",
  "secrecy",
@@ -3160,8 +3180,7 @@ dependencies = [
 [[package]]
 name = "typesize-derive"
 version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b122284365ba8497be951b9a21491f70c9688eb6fddc582931a0703f6a00ece"
+source = "git+https://github.com/GnomedDev/typesize#eb3cc6d5020a117c1377a159e2d6f03f010db34a"
 dependencies = [
  "proc-macro2",
  "quote",

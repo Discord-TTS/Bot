@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{hash::Hash, sync::Arc};
 
 use dashmap::DashMap;
+use typesize::TypeSize;
 
 pub use crate::database_models::*;
 use crate::structs::{Result, TTSMode};
@@ -25,7 +26,7 @@ type PgArguments<'a> = <sqlx::Postgres as sqlx::database::HasArguments<'a>>::Arg
 type QueryAs<'a, R> = sqlx::query::QueryAs<'a, sqlx::Postgres, R, PgArguments<'a>>;
 type Query<'a> = sqlx::query::Query<'a, sqlx::Postgres, PgArguments<'a>>;
 
-pub trait CacheKeyTrait: std::cmp::Eq + std::hash::Hash {
+pub trait CacheKeyTrait: std::cmp::Eq + Hash {
     fn bind_query(self, query: Query<'_>) -> Query<'_>;
     fn bind_query_as<R>(self, query: QueryAs<'_, R>) -> QueryAs<'_, R>;
 }
@@ -57,12 +58,11 @@ impl CacheKeyTrait for (i64, TTSMode) {
     }
 }
 
-pub struct Handler<
-    CacheKey: CacheKeyTrait,
-    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Compact,
-> {
+type OwnedArc<T> = typesize::ptr::SizableArc<T, typesize::ptr::Owned>;
+
+pub struct Handler<CacheKey, RowT: Compact> {
     pool: sqlx::PgPool,
-    cache: DashMap<CacheKey, Arc<RowT::Compacted>>,
+    cache: DashMap<CacheKey, OwnedArc<RowT::Compacted>>,
 
     default_row: Arc<RowT::Compacted>,
     single_insert: &'static str,
@@ -74,7 +74,7 @@ pub struct Handler<
 impl<CacheKey, RowT> Handler<CacheKey, RowT>
 where
     CacheKey: CacheKeyTrait + Sync + Send + Copy + Default,
-    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Compact + Sync + Send + Unpin,
+    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Compact + Send + Unpin,
 {
     pub async fn new(
         pool: sqlx::PgPool,
@@ -115,7 +115,7 @@ where
             .await?
             .unwrap_or_else(|| self.default_row.clone());
 
-        self.cache.insert(identifier, row.clone());
+        self.cache.insert(identifier, row.clone().into());
         Ok(row)
     }
 
@@ -163,6 +163,23 @@ where
 
     pub fn invalidate_cache(&self, identifier: &CacheKey) {
         self.cache.remove(identifier);
+    }
+}
+
+impl<CacheKey: Eq + Hash + TypeSize, RowT: Compact> TypeSize for Handler<CacheKey, RowT>
+where
+    RowT::Compacted: TypeSize,
+{
+    fn extra_size(&self) -> usize {
+        self.cache.extra_size()
+    }
+
+    fn get_collection_item_count(&self) -> Option<usize> {
+        self.cache.get_collection_item_count()
+    }
+
+    fn get_size_details(&self) -> Vec<typesize::Field> {
+        self.cache.get_size_details()
     }
 }
 

@@ -17,6 +17,7 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
+    hash::Hash,
     sync::atomic::Ordering::SeqCst,
 };
 
@@ -27,6 +28,8 @@ use rand::{rngs::ThreadRng, Rng};
 use typesize::TypeSize;
 
 use crate::{
+    database,
+    database_models::Compact,
     funcs::dm_generic,
     opt_ext::OptionTryUnwrap,
     structs::{Command, CommandResult, Context, PrefixContext, TTSModeChoice},
@@ -314,7 +317,7 @@ fn choose_random<'a, T>(rng: &mut ThreadRng, container: &'a [T]) -> &'a T {
     &container[index]
 }
 
-fn choose_random_map<'a, K: std::hash::Hash + Eq, V>(
+fn choose_random_map<'a, K: Hash + Eq, V>(
     rng: &mut ThreadRng,
     map: &'a HashMap<K, V>,
 ) -> Option<&'a V> {
@@ -328,6 +331,22 @@ fn random_guild<'a>(
     cache.guild(choose_random(rng, &cache.guilds()))
 }
 
+fn get_db_info<CacheKey, RowT>(
+    name: &'static str,
+    handler: &database::Handler<CacheKey, RowT>,
+) -> typesize::Field
+where
+    CacheKey: Eq + Hash + TypeSize,
+    RowT::Compacted: TypeSize,
+    RowT: Compact,
+{
+    typesize::Field {
+        name,
+        size: handler.get_size(),
+        collection_items: handler.get_collection_item_count(),
+    }
+}
+
 #[poise::command(prefix_command, owners_only)]
 pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult {
     struct Field {
@@ -339,25 +358,45 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
 
     let serenity_cache = ctx.cache();
     let cache_stats = {
+        let data = ctx.data();
         let mut rng = rand::thread_rng();
         match kind.as_deref() {
-            Some("guild") => random_guild(&mut rng, serenity_cache)
-                .try_unwrap()?
-                .get_size_details(),
+            Some("db") => Some(vec![
+                get_db_info("guild db", &data.guilds_db),
+                get_db_info("userinfo db", &data.userinfo_db),
+                get_db_info("nickname db", &data.nickname_db),
+                get_db_info("user voice db", &data.user_voice_db),
+                get_db_info("guild voice db", &data.guild_voice_db),
+            ]),
+            Some("guild") => Some(
+                random_guild(&mut rng, serenity_cache)
+                    .try_unwrap()?
+                    .get_size_details(),
+            ),
             Some("channel") => {
                 let guild = random_guild(&mut rng, serenity_cache).try_unwrap()?;
-                choose_random_map(&mut rng, &guild.channels)
-                    .try_unwrap()?
-                    .get_size_details()
+                Some(
+                    choose_random_map(&mut rng, &guild.channels)
+                        .try_unwrap()?
+                        .get_size_details(),
+                )
             }
             Some("role") => {
                 let guild = random_guild(&mut rng, serenity_cache).try_unwrap()?;
-                choose_random_map(&mut rng, &guild.roles)
-                    .try_unwrap()?
-                    .get_size_details()
+                Some(
+                    choose_random_map(&mut rng, &guild.roles)
+                        .try_unwrap()?
+                        .get_size_details(),
+                )
             }
-            _ => serenity_cache.get_size_details(),
+            Some(_) => None,
+            None => Some(serenity_cache.get_size_details()),
         }
+    };
+
+    let Some(cache_stats) = cache_stats else {
+        ctx.say("Unknown cache!").await?;
+        return Ok(());
     };
 
     let mut fields = Vec::new();

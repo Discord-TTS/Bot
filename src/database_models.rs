@@ -1,4 +1,5 @@
 use arrayvec::ArrayString;
+use typesize::derive::TypeSize;
 
 use poise::serenity_prelude::{ChannelId, GuildId, RoleId, UserId};
 
@@ -30,9 +31,11 @@ macro_rules! named_bitflags {
     (pub struct $name:ident: $flag_size:ident {
         $(const $flag_name:ident = $flag_value:expr;)*
     }) => {
+        #[derive(TypeSize)]
+        pub struct $name($flag_size);
+
         bitflags::bitflags! {
-            #[derive(Debug)]
-            pub struct $name: $flag_size {
+            impl $name: $flag_size {
                 $(const $flag_name = $flag_value;)*
             }
         }
@@ -44,6 +47,15 @@ macro_rules! named_bitflags {
                         self.contains(Self::$flag_name)
                     }
                 )*
+            }
+        }
+
+        impl std::fmt::Debug for $name {
+            fn fmt(&self, mut f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, concat!(stringify!($name), "("))?;
+                bitflags::parser::to_writer(self, &mut f)?;
+                write!(f, ")")?;
+                Ok(())
             }
         }
     };
@@ -85,7 +97,7 @@ named_bitflags! {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, TypeSize)]
 pub struct GuildRow {
     pub flags: GuildRowFlags,
     pub channel: Option<ChannelId>,
@@ -144,7 +156,7 @@ named_bitflags! {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, TypeSize)]
 pub struct UserRow {
     pub flags: UserRowFlags,
     pub voice_mode: Option<TTSMode>,
@@ -173,7 +185,7 @@ pub struct GuildVoiceRowRaw {
     pub voice: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, TypeSize)]
 
 pub struct GuildVoiceRow {
     pub guild_id: Option<GuildId>,
@@ -200,7 +212,7 @@ pub struct UserVoiceRowRaw {
     pub speaking_rate: Option<f32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, TypeSize)]
 pub struct UserVoiceRow {
     pub user_id: Option<UserId>,
     pub mode: TTSMode,
@@ -222,7 +234,7 @@ impl Compact for UserVoiceRowRaw {
     }
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, TypeSize, sqlx::FromRow)]
 pub struct NicknameRow {
     pub name: Option<String>,
 }
