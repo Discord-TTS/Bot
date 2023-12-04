@@ -360,7 +360,7 @@ async fn voice_autocomplete(
     let (mut i1, mut i2, mut i3, mut i4);
     let voices: &mut dyn Iterator<Item = _> = match mode {
         TTSMode::gTTS => {
-            i1 = data.gtts_voices.iter().map(|(k, v)| (k.clone(), v.clone()));
+            i1 = data.gtts_voices.iter().map(|(k, v)| (v.clone(), k.clone()));
             &mut i1
         }
         TTSMode::eSpeak => {
@@ -398,14 +398,14 @@ async fn voice_autocomplete(
 
     let searching_lower = searching.to_lowercase();
     let mut voices: Vec<_> = voices
-        .map(|(label, value)| (label.to_lowercase(), value))
+        .map(|(label, value)| (label.to_lowercase(), label, value))
         .collect();
 
-    voices.sort_by_cached_key(|(label, _)| strsim::levenshtein(label, &searching_lower));
-    voices.sort_by_key(|(label, _)| !label.contains(&searching_lower));
+    voices.sort_by_cached_key(|(l_lower, _, _)| strsim::levenshtein(l_lower, &searching_lower));
+    voices.sort_by_key(|(l_lower, _, _)| !l_lower.contains(&searching_lower));
     voices
         .into_iter()
-        .map(|(label, value)| serenity::AutocompleteChoice::new(label, value))
+        .map(|(_, label, value)| serenity::AutocompleteChoice::new(label, value))
         .collect()
 }
 
