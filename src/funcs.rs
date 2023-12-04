@@ -41,7 +41,7 @@ pub async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<
         .set_one(guild_id.into(), "premium_user", None::<i64>)
         .await?;
     data.guilds_db
-        .set_one(guild_id.into(), "voice_mode", None::<TTSMode>)
+        .set_one(guild_id.into(), "voice_mode", TTSMode::default())
         .await
 }
 

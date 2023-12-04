@@ -38,11 +38,9 @@ pub async fn listen(
         Event::GuildMemberAddition { new_member } => {
             guild_member_addition(ctx, data, new_member).await
         }
-        Event::GuildMemberRemoval {
-            guild_id,
-            user,
-            member_data_if_available: _,
-        } => guild_member_removal(ctx, data, *guild_id, user).await,
+        Event::GuildMemberRemoval { guild_id, user, .. } => {
+            guild_member_removal(ctx, data, *guild_id, user).await
+        }
         Event::VoiceStateUpdate { old, new } => {
             voice_state_update(ctx, data, old.as_ref(), new).await
         }
