@@ -471,7 +471,11 @@ pub fn clean_msg(
             .unwrap();
         }
 
-        let said_name = nickname.unwrap_or_else(|| member_nick.unwrap_or(&user.name));
+        let said_name = nickname
+            .or(member_nick)
+            .or(user.global_name.as_deref())
+            .unwrap_or(&user.name);
+
         content = match attachments_to_format(attachments) {
             Some(file_format) if content.is_empty() => format!("{said_name} sent {file_format}"),
             Some(file_format) => format!("{said_name} sent {file_format} and said {content}"),
