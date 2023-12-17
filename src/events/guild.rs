@@ -75,6 +75,10 @@ pub async fn guild_delete(
     incomplete: &serenity::UnavailableGuild,
     full: Option<&serenity::Guild>,
 ) -> Result<()> {
+    if incomplete.unavailable {
+        return Ok(());
+    }
+
     data.guilds_db.delete(incomplete.id.into()).await?;
 
     let Some(guild) = full else { return Ok(()) };
