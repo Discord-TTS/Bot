@@ -182,7 +182,7 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
         .title(ctx.gettext("{command_name} Help!").replace(
             "{command_name}",
             &match &mode {
-                HelpCommandMode::Root => ctx.serenity_context().cache.current_user().name.clone(),
+                HelpCommandMode::Root => ctx.cache().current_user().name.to_string(),
                 HelpCommandMode::Group(c) | HelpCommandMode::Command(c) => {
                     format!("`{}`", c.qualified_name)
                 }

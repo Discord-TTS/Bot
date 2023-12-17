@@ -75,13 +75,11 @@ pub async fn handle_unexpected<'a>(
     {
         let message_id = serenity::MessageId::new(message_id as u64);
 
-        let mut message = error_webhook
-            .get_message(&ctx.http, None, message_id)
-            .await?;
-        let mut embed = message.embeds.remove(0);
+        let message = error_webhook.get_message(&ctx, None, message_id).await?;
+        let mut embed = message.embeds.into_vec().remove(0);
 
         embed.footer.as_mut().try_unwrap()?.text =
-            format!("This error has occurred {occurrences} times!");
+            format!("This error has occurred {occurrences} times!").into();
 
         let builder = serenity::EditWebhookMessage::default().embeds(vec![embed.into()]);
         error_webhook.edit_message(ctx, message_id, builder).await?;
@@ -117,7 +115,7 @@ pub async fn handle_unexpected<'a>(
             ("Event", Cow::Borrowed(event), true),
             (
                 "Bot User",
-                Cow::Owned(ctx.cache.current_user().name.clone()),
+                Cow::Owned(ctx.cache.current_user().name.to_string()),
                 true,
             ),
             blank_field(),
@@ -216,7 +214,7 @@ pub async fn handle_message(
 
     let mut extra_fields = Vec::with_capacity(3);
     if let Some(guild_id) = message.guild_id {
-        if let Some(guild_name) = ctx.cache.guild(guild_id).map(|g| g.name.clone()) {
+        if let Some(guild_name) = ctx.cache.guild(guild_id).map(|g| g.name.to_string()) {
             extra_fields.push(("Guild", Cow::Owned(guild_name), true));
         }
 
@@ -234,7 +232,7 @@ pub async fn handle_message(
         "MessageCreate",
         error,
         extra_fields,
-        Some(message.author.name.clone()),
+        Some(message.author.name.to_string()),
         Some(message.author.face()),
     )
     .await
@@ -281,7 +279,7 @@ pub async fn handle_guild(
         name,
         error,
         [],
-        guild.as_ref().map(|g| g.name.clone()),
+        guild.as_ref().map(|g| g.name.to_string()),
         guild.and_then(serenity::Guild::icon_url),
     )
     .await
@@ -400,7 +398,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
 
             if let Some(guild) = ctx.guild() {
                 extra_fields.extend([
-                    ("Guild", Cow::Owned(guild.name.clone()), true),
+                    ("Guild", Cow::Owned(guild.name.to_string()), true),
                     ("Guild ID", Cow::Owned(guild.id.to_string()), true),
                     blank_field(),
                 ]);
@@ -412,7 +410,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
                 "command",
                 error,
                 extra_fields,
-                Some(author.name.clone()),
+                Some(author.name.to_string()),
                 Some(author.face()),
             )
             .await?;

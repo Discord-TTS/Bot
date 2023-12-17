@@ -231,7 +231,7 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
 
     #[allow(clippy::cast_precision_loss)]
     let scheduler_stats = {
-        let scheduler = &*songbird::driver::DEFAULT_SCHEDULER;
+        let scheduler = songbird::driver::get_default_scheduler();
         if let Ok(stats) = scheduler.worker_thread_stats().await
             && !stats.is_empty()
         {

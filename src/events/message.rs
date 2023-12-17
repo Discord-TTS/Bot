@@ -193,7 +193,7 @@ async fn process_tts_msg(
     let (blank_name, blank_value, blank_inline) = errors::blank_field();
 
     let extra_fields = [
-        ("Guild Name", Cow::Owned(guild.name.clone()), true),
+        ("Guild Name", Cow::Owned(guild.name.to_string()), true),
         ("Guild ID", Cow::Owned(guild.id.to_string()), true),
         (blank_name, blank_value, blank_inline),
         (
@@ -215,7 +215,7 @@ async fn process_tts_msg(
         shard_manager,
         data,
         extra_fields,
-        author_name,
+        author_name.into_string(),
         icon_url,
         &track_handle,
     )
@@ -228,7 +228,12 @@ async fn process_mention_msg(
     data: &Data,
 ) -> Result<()> {
     let bot_user = ctx.cache.current_user().id;
-    if ![format!("<@{bot_user}>"), format!("<@!{bot_user}>")].contains(&message.content) {
+    if ![
+        format!("<@{bot_user}>").into(),
+        format!("<@!{bot_user}>").into(),
+    ]
+    .contains(&message.content)
+    {
         return Ok(());
     };
 
@@ -320,7 +325,7 @@ async fn process_support_dm(
                     false,
                     ExecuteWebhook::default()
                         .files(attachments)
-                        .content(&message.content)
+                        .content(message.content.to_string())
                         .username(webhook_username)
                         .avatar_url(message.author.face())
                         .embeds(message.embeds.iter().cloned().map(Into::into).collect()),
@@ -412,7 +417,7 @@ async fn process_support_response(
         target,
         target_tag,
         attachment_url,
-        message.content.clone(),
+        message.content.to_string(),
     )
     .await?;
 

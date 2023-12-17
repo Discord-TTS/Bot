@@ -265,7 +265,7 @@ impl<'a> MenuPaginator<'a> {
             .map(|emoji| {
                 CreateButton::new(emoji)
                     .style(serenity::ButtonStyle::Primary)
-                    .emoji(serenity::ReactionType::Unicode(String::from(emoji)))
+                    .emoji(serenity::ReactionType::Unicode(String::from(emoji).into()))
                     .disabled(
                         disabled
                             || (["⏮️", "◀"].contains(&emoji) && self.index == 0)
@@ -1402,7 +1402,7 @@ Just do `/join` and start talking!
                     },
                     ctx.current_catalog(),
                 )))
-                .author(CreateEmbedAuthor::new(&author.name).icon_url(author.face())),
+                .author(CreateEmbedAuthor::new(author.name.to_string()).icon_url(author.face())),
         ),
     )
     .await?;

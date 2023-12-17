@@ -57,19 +57,20 @@ version = "5"
 default-features = false
 
 [dependencies.serenity_feature_only]
+git = "https://github.com/serenity-rs/serenity"
 features = ["unstable_discord_api", "typesize"]
 default-features = false
 package = "serenity"
 version = "0.12.0"
+branch = "next"
 
 [dependencies.poise]
 git = "https://github.com/serenity-rs/poise"
 features = ["cache"]
-branch = "current"
+branch = "serenity-next"
 
 [dependencies.songbird]
-version = "0.4"
+git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
-
-[patch.crates-io]
-typesize = { git = "https://github.com/GnomedDev/typesize" }
+branch = "serenity-next"
+version = "0.4"

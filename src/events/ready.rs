@@ -48,7 +48,7 @@ pub async fn ready(
 
     let shard_count = ctx.cache.shard_count();
     let user_name = &data_about_bot.user.name;
-    let last_shard = (ctx.shard_id.0 + 1) == shard_count;
+    let last_shard = (ctx.shard_id.0 + 1) == shard_count.get();
     let status = generate_status(&*framework_ctx.shard_manager.runners.lock().await);
 
     data.webhooks

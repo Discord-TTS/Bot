@@ -50,7 +50,7 @@ pub async fn dm_generic(
     author: &serenity::User,
     target: serenity::UserId,
     mut target_tag: String,
-    attachment_url: Option<String>,
+    attachment_url: Option<impl Into<String>>,
     message: String,
 ) -> Result<(String, serenity::Embed)> {
     let dm_channel = target.create_dm_channel(ctx).await?;

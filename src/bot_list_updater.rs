@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{num::NonZeroU16, sync::Arc};
 
 use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
@@ -40,7 +40,7 @@ impl BotListUpdater {
         &self,
         bot_id: UserId,
         guild_count: usize,
-        shard_count: u32,
+        shard_count: NonZeroU16,
     ) -> Option<BotListReq> {
         self.tokens.top_gg.as_deref().map(|token| BotListReq {
             url: format!("https://top.gg/api/bots/{bot_id}/stats"),
@@ -57,7 +57,7 @@ impl BotListUpdater {
         &self,
         bot_id: UserId,
         guild_count: usize,
-        shard_count: u32,
+        shard_count: NonZeroU16,
     ) -> Option<BotListReq> {
         self.tokens
             .discord_bots_gg
