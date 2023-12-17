@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering;
 
+use reqwest::StatusCode;
 use tracing::info;
 
 use serenity::builder::*;
@@ -86,24 +87,33 @@ pub async fn guild_delete(
         return Ok(());
     }
 
-    if data
-        .config
-        .main_server
-        .members(&ctx.http, None, None)
-        .await?
+    let owner_of_other_server = ctx
+        .cache
+        .guilds()
         .into_iter()
-        .filter(|m| m.roles.contains(&data.config.ofs_role))
-        .any(|m| m.user.id == guild.owner_id)
-    {
-        ctx.http
-            .remove_member_role(
-                data.config.main_server,
-                guild.owner_id,
-                data.config.ofs_role,
-                None,
-            )
-            .await?;
+        .filter_map(|g| ctx.cache.guild(g))
+        .any(|g| g.owner_id == guild.owner_id);
+
+    if owner_of_other_server {
+        return Ok(());
     }
 
-    Ok(())
+    match ctx
+        .http
+        .remove_member_role(
+            data.config.main_server,
+            guild.owner_id,
+            data.config.ofs_role,
+            None,
+        )
+        .await
+    {
+        Ok(()) => Ok(()),
+        Err(serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(err)))
+            if err.status_code == StatusCode::NOT_FOUND =>
+        {
+            Ok(())
+        }
+        Err(err) => Err(err.into()),
+    }
 }
