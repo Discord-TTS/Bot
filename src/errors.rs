@@ -2,7 +2,6 @@ use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Error, Result};
 use sha2::Digest;
-use sysinfo::SystemExt;
 use tracing::error;
 
 use poise::serenity_prelude as serenity;
@@ -101,12 +100,11 @@ pub async fn handle_unexpected<'a>(
             let mut system = data.system_info.lock();
             system.refresh_specifics(
                 sysinfo::RefreshKind::new()
-                    .with_cpu(sysinfo::CpuRefreshKind::new().with_cpu_usage())
-                    .with_memory(),
+                    .with_memory(sysinfo::MemoryRefreshKind::new().with_ram()),
             );
 
             (
-                system.load_average().five.to_string(),
+                sysinfo::System::load_average().five.to_string(),
                 (system.used_memory() / 1024).to_string(),
             )
         };

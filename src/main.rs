@@ -47,7 +47,6 @@ use std::{
 
 use anyhow::Ok;
 use parking_lot::{Mutex, RwLock};
-use sysinfo::SystemExt;
 use tracing::{error, warn};
 
 use poise::serenity_prelude::{self as serenity, builder::*, Mentionable as _};

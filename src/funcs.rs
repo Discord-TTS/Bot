@@ -299,16 +299,21 @@ pub async fn run_checks(
         }
     }
 
-    let mut content = serenity::content_safe(
-        &ctx.cache,
-        &message.content,
-        &serenity::ContentSafeOptions::default()
-            .clean_here(false)
-            .clean_everyone(false)
-            .show_discriminator(false)
-            .display_as_member_from(guild_id),
-        &message.mentions,
-    );
+    let mut content = {
+        let Some(guild) = ctx.cache.guild(guild_id) else {
+            return Ok(None);
+        };
+
+        serenity::content_safe(
+            &guild,
+            &message.content,
+            &serenity::ContentSafeOptions::default()
+                .clean_here(false)
+                .clean_everyone(false)
+                .show_discriminator(false),
+            &message.mentions,
+        )
+    };
 
     if content.len() >= 1500 {
         return Ok(None);

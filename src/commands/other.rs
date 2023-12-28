@@ -18,7 +18,6 @@ use std::{borrow::Cow, cmp::Ordering};
 
 use anyhow::Error;
 use num_format::{Locale, ToFormattedString};
-use sysinfo::{ProcessExt, SystemExt};
 
 use poise::{
     serenity_prelude::{self as serenity, builder::*, Mentionable as _},
@@ -36,7 +35,7 @@ use crate::{
 
 #[allow(clippy::trivially_copy_pass_by_ref)] // Required for generic type
 fn cmp_float(a: &f64, b: &f64) -> Ordering {
-    a.partial_cmp(b).unwrap_or(Ordering::Less)
+    a.total_cmp(b)
 }
 
 /// Shows how long TTS Bot has been online
