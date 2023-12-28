@@ -85,7 +85,7 @@ async fn process_tts_msg(
             member_nick,
             &message.attachments,
             &voice,
-            guild_row.flags.xsaid(),
+            guild_row.xsaid(),
             guild_row.repeated_chars as usize,
             nickname_row.name.as_deref(),
             &data.regex_cache,
@@ -98,7 +98,7 @@ async fn process_tts_msg(
     if let Some(target_lang) = guild_row.target_lang.as_deref()
         && let Some(translation_url) = &data.config.translation_url
         && let Some(translation_token) = &data.config.translation_token
-        && guild_row.flags.to_translate()
+        && guild_row.to_translate()
         && data.premium_check(Some(guild_id)).await?.is_none()
     {
         content = funcs::translate(
@@ -284,14 +284,14 @@ async fn process_support_dm(
         _ => return Ok(()),
     };
 
-    if message.author.bot || message.content.starts_with('-') {
+    if message.author.bot() || message.content.starts_with('-') {
         return Ok(());
     }
 
     data.analytics.log(Cow::Borrowed("dm"), false);
 
     let userinfo = data.userinfo_db.get(message.author.id.into()).await?;
-    if userinfo.flags.dm_welcomed() {
+    if userinfo.dm_welcomed() {
         let content = message.content.to_lowercase();
 
         if content.contains("discord.gg") {
@@ -308,7 +308,7 @@ async fn process_support_dm(
             channel.say(&ctx, content).await?;
         } else if content.as_str() == "help" {
             channel.say(&ctx, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
-        } else if !userinfo.flags.dm_blocked() {
+        } else if !userinfo.dm_blocked() {
             let webhook_username = format!("{} ({})", message.author.tag(), message.author.id);
 
             let mut attachments = Vec::new();

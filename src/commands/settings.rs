@@ -155,7 +155,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{sep1}", sep1)
             .replace("{prefix}", prefix)
             .replace("{channel_mention}", &channel_mention)
-            .replace("{autojoin}", &guild_row.flags.auto_join().to_string())
+            .replace("{autojoin}", &guild_row.auto_join().to_string())
             .replace("{role_mention}", required_role.as_deref().unwrap_or(none_str)),
         false)
         .field("**TTS Settings**", &ctx.gettext("
@@ -172,10 +172,10 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep2} Max Repeated Characters: `{repeated_chars}`
         ")
             .replace("{sep2}", sep2)
-            .replace("{xsaid}", &guild_row.flags.xsaid().to_string())
-            .replace("{bot_ignore}", &guild_row.flags.bot_ignore().to_string())
-            .replace("{audience_ignore}", &guild_row.flags.audience_ignore().to_string())
-            .replace("{require_voice}", &guild_row.flags.require_voice().to_string())
+            .replace("{xsaid}", &guild_row.xsaid().to_string())
+            .replace("{bot_ignore}", &guild_row.bot_ignore().to_string())
+            .replace("{audience_ignore}", &guild_row.audience_ignore().to_string())
+            .replace("{require_voice}", &guild_row.require_voice().to_string())
             .replace("{required_prefix}", guild_row.required_prefix.as_deref().unwrap_or(none_str))
             .replace("{guild_mode}", guild_mode.into())
             .replace("{default_voice}", &default_voice)
@@ -187,7 +187,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep4} Translation Language: `{target_lang}`
         ")
             .replace("{sep4}", sep4)
-            .replace("{to_translate}", &guild_row.flags.to_translate().to_string())
+            .replace("{to_translate}", &guild_row.to_translate().to_string())
             .replace("{target_lang}", target_lang),
         false)
         .field("**User Specific**", &ctx.gettext("
@@ -976,7 +976,7 @@ pub async fn translation_lang(
             let mut to_say = ctx
                 .gettext("The target translation language is now: `{}`")
                 .replace("{}", &target_lang);
-            if !data.guilds_db.get(guild_id).await?.flags.to_translate() {
+            if !data.guilds_db.get(guild_id).await?.to_translate() {
                 to_say.push_str(
                     ctx.gettext("\nYou may want to enable translation with `/set translation on`"),
                 );

@@ -1,8 +1,7 @@
 use std::{borrow::Cow, fmt::Write as _};
 
-use futures_util::{stream::BoxStream, StreamExt as _};
-
 use poise::{
+    futures_util::{stream::BoxStream, StreamExt as _},
     serenity_prelude::{self as serenity, builder::*},
     CreateReply,
 };

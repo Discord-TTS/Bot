@@ -387,7 +387,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         },
         command_check: Some(|ctx| {
             Box::pin(async move {
-                if ctx.author().bot {
+                if ctx.author().bot() {
                     return Ok(false);
                 };
 

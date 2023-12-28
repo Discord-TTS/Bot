@@ -307,7 +307,7 @@ pub async fn run_checks(
         serenity::content_safe(
             &guild,
             &message.content,
-            &serenity::ContentSafeOptions::default()
+            serenity::ContentSafeOptions::default()
                 .clean_here(false)
                 .clean_everyone(false)
                 .show_discriminator(false),
@@ -338,35 +338,35 @@ pub async fn run_checks(
     let bot_voice_state = guild.voice_states.get(&ctx.cache.current_user().id);
 
     let mut to_autojoin = None;
-    if message.author.bot {
-        if guild_row.flags.bot_ignore() || bot_voice_state.is_none() {
+    if message.author.bot() {
+        if guild_row.bot_ignore() || bot_voice_state.is_none() {
             return Ok(None); // Is bot
         }
     } else {
         // If the bot is in vc
         if let Some(vc) = bot_voice_state {
             // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
-            if guild_row.flags.require_voice()
+            if guild_row.require_voice()
                 && vc.channel_id != voice_state.and_then(|vs| vs.channel_id)
             {
                 return Ok(None); // Wrong vc
             }
         // Else if the user is in the vc and autojoin is on
         } else if let Some(voice_state) = voice_state
-            && guild_row.flags.auto_join()
+            && guild_row.auto_join()
         {
             to_autojoin = Some(voice_state.channel_id.try_unwrap()?);
         } else {
             return Ok(None); // Bot not in vc
         };
 
-        if guild_row.flags.require_voice() {
+        if guild_row.require_voice() {
             let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
             let channel = guild.channels.get(&voice_channel).try_unwrap()?;
 
             if channel.kind == serenity::ChannelType::Stage
-                && voice_state.map_or(false, |vs| vs.suppress)
-                && guild_row.flags.audience_ignore()
+                && voice_state.map_or(false, serenity::VoiceState::suppress)
+                && guild_row.audience_ignore()
             {
                 return Ok(None); // Is audience
             }
@@ -456,7 +456,7 @@ pub fn clean_msg(
                     guild.voice_states.values()
                         .filter(|vs| vs.channel_id.map_or(false, |vc| vc == voice_channel_id))
                         .filter_map(|vs| guild.members.get(&vs.user_id))
-                        .filter(|member| !member.user.bot)
+                        .filter(|member| !member.user.bot())
                         .count() > 2)
                         })
                 })

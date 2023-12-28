@@ -39,7 +39,7 @@ pub async fn voice_state_update(
     }
 
     // All the users in the vc are now bots
-    if channel_members.into_iter().any(|m| !m.user.bot) {
+    if channel_members.into_iter().any(|m| !m.user.bot()) {
         return Ok(());
     };
 

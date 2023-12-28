@@ -19,48 +19,6 @@ fn truncate_convert<const MAX_SIZE: usize>(
     ArrayString::from(&s).expect("Truncate to shrink to below the max size!")
 }
 
-macro_rules! set_flag_if {
-    ($flags:ident, $flag:path, $value:expr) => {
-        if ($value) {
-            $flags |= $flag;
-        }
-    };
-}
-
-macro_rules! named_bitflags {
-    (pub struct $name:ident: $flag_size:ident {
-        $(const $flag_name:ident = $flag_value:expr;)*
-    }) => {
-        #[derive(TypeSize)]
-        pub struct $name($flag_size);
-
-        bitflags::bitflags! {
-            impl $name: $flag_size {
-                $(const $flag_name = $flag_value;)*
-            }
-        }
-
-        impl $name {
-            paste::paste! {
-                $(
-                    pub fn [<$flag_name:lower>](&self) -> bool {
-                        self.contains(Self::$flag_name)
-                    }
-                )*
-            }
-        }
-
-        impl std::fmt::Debug for $name {
-            fn fmt(&self, mut f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, concat!(stringify!($name), "("))?;
-                bitflags::parser::to_writer(self, &mut f)?;
-                write!(f, ")")?;
-                Ok(())
-            }
-        }
-    };
-}
-
 pub trait Compact {
     type Compacted;
     fn compact(self) -> Self::Compacted;
@@ -86,23 +44,18 @@ pub struct GuildRowRaw {
     pub voice_mode: TTSMode,
 }
 
-named_bitflags! {
-    pub struct GuildRowFlags: u8 {
-        const XSAID =           0b000001;
-        const AUTO_JOIN =       0b000010;
-        const BOT_IGNORE =      0b000100;
-        const TO_TRANSLATE =    0b001000;
-        const REQUIRE_VOICE =   0b010000;
-        const AUDIENCE_IGNORE = 0b100000;
-    }
-}
-
-#[derive(Debug, TypeSize)]
+#[bool_to_bitflags::bool_to_bitflags(owning_setters)]
+#[derive(Debug, typesize::derive::TypeSize)]
 pub struct GuildRow {
-    pub flags: GuildRowFlags,
     pub channel: Option<ChannelId>,
     pub premium_user: Option<UserId>,
     pub required_role: Option<RoleId>,
+    pub xsaid: bool,
+    pub auto_join: bool,
+    pub bot_ignore: bool,
+    pub to_translate: bool,
+    pub require_voice: bool,
+    pub audience_ignore: bool,
     pub msg_length: u16,
     pub repeated_chars: u16,
     pub prefix: ArrayString<8>,
@@ -114,16 +67,8 @@ pub struct GuildRow {
 impl Compact for GuildRowRaw {
     type Compacted = GuildRow;
     fn compact(self) -> Self::Compacted {
-        let mut flags = GuildRowFlags::empty();
-        set_flag_if!(flags, GuildRowFlags::XSAID, self.xsaid);
-        set_flag_if!(flags, GuildRowFlags::AUTO_JOIN, self.auto_join);
-        set_flag_if!(flags, GuildRowFlags::BOT_IGNORE, self.bot_ignore);
-        set_flag_if!(flags, GuildRowFlags::TO_TRANSLATE, self.to_translate);
-        set_flag_if!(flags, GuildRowFlags::REQUIRE_VOICE, self.require_voice);
-        set_flag_if!(flags, GuildRowFlags::AUDIENCE_IGNORE, self.audience_ignore);
-
         Self::Compacted {
-            flags,
+            __generated_flags: GuildRowGeneratedFlags::empty(),
             channel: (self.channel != 0).then(|| ChannelId::new(self.channel as u64)),
             premium_user: self.premium_user.map(|id| UserId::new(id as u64)),
             required_role: self.required_role.map(|id| RoleId::new(id as u64)),
@@ -138,6 +83,12 @@ impl Compact for GuildRowRaw {
                 .map(|t| truncate_convert(t, "guild.required_prefix")),
             voice_mode: self.voice_mode,
         }
+        .set_xsaid(self.xsaid)
+        .set_auto_join(self.auto_join)
+        .set_bot_ignore(self.bot_ignore)
+        .set_to_translate(self.to_translate)
+        .set_require_voice(self.require_voice)
+        .set_audience_ignore(self.audience_ignore)
     }
 }
 
@@ -149,16 +100,11 @@ pub struct UserRowRaw {
     pub premium_voice_mode: Option<TTSMode>,
 }
 
-named_bitflags! {
-    pub struct UserRowFlags: u8 {
-        const DM_BLOCKED =  0b01;
-        const DM_WELCOMED = 0b10;
-    }
-}
-
-#[derive(Debug, TypeSize)]
+#[bool_to_bitflags::bool_to_bitflags(owning_setters)]
+#[derive(Debug, typesize::derive::TypeSize)]
 pub struct UserRow {
-    pub flags: UserRowFlags,
+    pub dm_blocked: bool,
+    pub dm_welcomed: bool,
     pub voice_mode: Option<TTSMode>,
     pub premium_voice_mode: Option<TTSMode>,
 }
@@ -166,15 +112,13 @@ pub struct UserRow {
 impl Compact for UserRowRaw {
     type Compacted = UserRow;
     fn compact(self) -> Self::Compacted {
-        let mut flags = UserRowFlags::empty();
-        set_flag_if!(flags, UserRowFlags::DM_BLOCKED, self.dm_blocked);
-        set_flag_if!(flags, UserRowFlags::DM_WELCOMED, self.dm_welcomed);
-
         Self::Compacted {
-            flags,
             voice_mode: self.voice_mode,
             premium_voice_mode: self.premium_voice_mode,
+            __generated_flags: UserRowGeneratedFlags::empty(),
         }
+        .set_dm_blocked(self.dm_blocked)
+        .set_dm_welcomed(self.dm_welcomed)
     }
 }
 
