@@ -14,24 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    hash::Hash,
-    sync::atomic::Ordering::SeqCst,
-};
+use std::{borrow::Cow, collections::HashSet, hash::Hash, sync::atomic::Ordering::SeqCst};
 
 use self::serenity::builder::*;
 use num_format::{Locale, ToFormattedString};
 use poise::{futures_util::TryStreamExt, serenity_prelude as serenity, CreateReply};
-use rand::{rngs::ThreadRng, Rng};
 use typesize::TypeSize;
 
 use crate::{
     database,
     database_models::Compact,
     funcs::dm_generic,
-    opt_ext::OptionTryUnwrap,
     structs::{Command, CommandResult, Context, PrefixContext, TTSModeChoice},
 };
 
@@ -312,25 +305,6 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         .map_err(Into::into)
 }
 
-fn choose_random<'a, T>(rng: &mut ThreadRng, container: &'a [T]) -> &'a T {
-    let index = rng.gen_range(0..container.len());
-    &container[index]
-}
-
-fn choose_random_map<'a, K: Hash + Eq, V>(
-    rng: &mut ThreadRng,
-    map: &'a HashMap<K, V>,
-) -> Option<&'a V> {
-    map.get(map.keys().nth(rng.gen_range(0..map.len()))?)
-}
-
-fn random_guild<'a>(
-    rng: &mut ThreadRng,
-    cache: &'a serenity::Cache,
-) -> Option<serenity::GuildRef<'a>> {
-    cache.guild(choose_random(rng, &cache.guilds()))
-}
-
 fn get_db_info<CacheKey, RowT>(
     name: &'static str,
     handler: &database::Handler<CacheKey, RowT>,
@@ -347,6 +321,48 @@ where
     }
 }
 
+fn guild_iter(cache: &serenity::Cache) -> impl Iterator<Item = serenity::GuildRef<'_>> {
+    cache.guilds().into_iter().filter_map(|id| cache.guild(id))
+}
+
+fn details_iter<'a>(
+    iter: impl Iterator<Item = &'a (impl typesize::TypeSize + 'a)>,
+) -> Vec<Vec<typesize::Field>> {
+    iter.map(TypeSize::get_size_details).collect::<Vec<_>>()
+}
+
+fn average_details(iter: impl Iterator<Item = Vec<typesize::Field>>) -> Vec<typesize::Field> {
+    let mut i = 1;
+    let summed_details = iter.fold(Vec::new(), |mut avg_details, details| {
+        if avg_details.is_empty() {
+            return details;
+        }
+
+        // get_size_details should return the same amount of fields every time
+        assert_eq!(avg_details.len(), details.len());
+
+        i += 1;
+        for (avg, cur) in avg_details.iter_mut().zip(details) {
+            avg.size += cur.size;
+            if let Some(collection_items) = &mut avg.collection_items {
+                *collection_items += cur.collection_items.unwrap();
+            }
+        }
+
+        avg_details
+    });
+
+    let details = summed_details.into_iter().map(move |mut field| {
+        if let Some(collection_items) = &mut field.collection_items {
+            *collection_items /= i;
+        }
+        field.size /= i;
+        field
+    });
+
+    details.collect()
+}
+
 #[poise::command(prefix_command, owners_only)]
 pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult {
     struct Field {
@@ -359,7 +375,6 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
     let serenity_cache = ctx.cache();
     let cache_stats = {
         let data = ctx.data();
-        let mut rng = rand::thread_rng();
         match kind.as_deref() {
             Some("db") => Some(vec![
                 get_db_info("guild db", &data.guilds_db),
@@ -368,27 +383,15 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
                 get_db_info("user voice db", &data.user_voice_db),
                 get_db_info("guild voice db", &data.guild_voice_db),
             ]),
-            Some("guild") => Some(
-                random_guild(&mut rng, serenity_cache)
-                    .try_unwrap()?
-                    .get_size_details(),
-            ),
-            Some("channel") => {
-                let guild = random_guild(&mut rng, serenity_cache).try_unwrap()?;
-                Some(
-                    choose_random_map(&mut rng, &guild.channels)
-                        .try_unwrap()?
-                        .get_size_details(),
-                )
-            }
-            Some("role") => {
-                let guild = random_guild(&mut rng, serenity_cache).try_unwrap()?;
-                Some(
-                    choose_random_map(&mut rng, &guild.roles)
-                        .try_unwrap()?
-                        .get_size_details(),
-                )
-            }
+            Some("guild") => Some(average_details(
+                guild_iter(serenity_cache).map(|g| g.get_size_details()),
+            )),
+            Some("channel") => Some(average_details(
+                guild_iter(serenity_cache).flat_map(|g| details_iter(g.channels.values())),
+            )),
+            Some("role") => Some(average_details(
+                guild_iter(serenity_cache).flat_map(|g| details_iter(g.roles.values())),
+            )),
             Some(_) => None,
             None => Some(serenity_cache.get_size_details()),
         }
@@ -436,7 +439,7 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
 
     let embed = CreateEmbed::default()
         .title("Cache Statistics")
-        .fields(fields.into_iter().map(|f| (f.name, f.value, true)));
+        .fields(fields.into_iter().take(25).map(|f| (f.name, f.value, true)));
 
     ctx.send(CreateReply::default().embed(embed)).await?;
     Ok(())
