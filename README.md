@@ -5,7 +5,7 @@ Text to speech Discord Bot using Serenity, Songbird, and Poise
 ## Setup Guide:
 ### Easy (Public Bot):
 - Invite the bot with [this invite](https://bit.ly/TTSBotSlash)
-- Run -setup #text_channel_to_read_from
+- Run /set channel channel:#(the text channel you wish the bot to read messages from)
 - Run -join in that text channel, while being in a voice channel
 - Type normally in the setup text channel!
 
