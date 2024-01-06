@@ -264,7 +264,8 @@ With the songbird scheduler stats of
     let ram_usage = {
         let mut system_info = data.system_info.lock();
         system_info.refresh_specifics(
-            sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::new()),
+            sysinfo::RefreshKind::new()
+                .with_processes(sysinfo::ProcessRefreshKind::new().with_memory()),
         );
 
         let pid = sysinfo::get_current_pid().unwrap();
