@@ -40,7 +40,7 @@ pub async fn dm(
     todm: serenity::User,
     #[rest] message: String,
 ) -> CommandResult {
-    let attachment_url = ctx.msg.attachments.first().map(|a| a.url.clone());
+    let attachment_url = ctx.msg.attachments.first().map(|a| a.url.as_str());
     let (content, embed) = dm_generic(
         ctx.serenity_context(),
         &ctx.msg.author,

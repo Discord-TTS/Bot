@@ -235,7 +235,7 @@ impl<'a> MenuPaginator<'a> {
         }
     }
 
-    fn create_page(&self, page: &str) -> CreateEmbed {
+    fn create_page(&self, page: &str) -> CreateEmbed<'_> {
         let author = self.ctx.author();
 
         CreateEmbed::default()
@@ -255,11 +255,11 @@ impl<'a> MenuPaginator<'a> {
                 &self.current_voice,
                 false,
             )
-            .author(CreateEmbedAuthor::new(author.name.clone()).icon_url(author.face()))
+            .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face()))
             .footer(CreateEmbedFooter::new(self.footer.to_string()))
     }
 
-    fn create_action_row(&self, disabled: bool) -> serenity::CreateActionRow {
+    fn create_action_row(&self, disabled: bool) -> serenity::CreateActionRow<'_> {
         let buttons = ["⏮️", "◀", "⏹️", "▶️", "⏭️"]
             .into_iter()
             .map(|emoji| {
@@ -344,10 +344,10 @@ impl<'a> MenuPaginator<'a> {
     }
 }
 
-async fn voice_autocomplete(
-    ctx: ApplicationContext<'_>,
-    searching: &str,
-) -> Vec<serenity::AutocompleteChoice> {
+async fn voice_autocomplete<'a>(
+    ctx: ApplicationContext<'a>,
+    searching: &'a str,
+) -> Vec<serenity::AutocompleteChoice<'a>> {
     let Ok((_, mode)) = ctx
         .data
         .parse_user_or_guild(ctx.interaction.user.id, ctx.interaction.guild_id)
@@ -410,10 +410,10 @@ async fn voice_autocomplete(
 }
 
 #[allow(clippy::unused_async)]
-async fn translation_languages_autocomplete(
-    ctx: ApplicationContext<'_>,
-    searching: &str,
-) -> impl Iterator<Item = serenity::AutocompleteChoice> {
+async fn translation_languages_autocomplete<'a>(
+    ctx: ApplicationContext<'a>,
+    searching: &'a str,
+) -> impl Iterator<Item = serenity::AutocompleteChoice<'a>> {
     let mut filtered_languages = ctx
         .data
         .translation_languages
@@ -435,8 +435,8 @@ async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<boo
         confirm_dialog(
             ctx,
             ctx.gettext("What would you like to set this to?"),
-            ctx.gettext("True").into(),
-            ctx.gettext("False").into(),
+            ctx.gettext("True"),
+            ctx.gettext("False"),
         )
         .await
     }
@@ -800,13 +800,7 @@ pub async fn required_role(
     });
 
     if require!(
-        confirm_dialog(
-            ctx,
-            question,
-            ctx.gettext("Yes, I'm sure.").into(),
-            negative
-        )
-        .await?,
+        confirm_dialog(ctx, question, ctx.gettext("Yes, I'm sure."), negative).await?,
         Ok(())
     ) {
         ctx.data()
@@ -1331,7 +1325,7 @@ pub async fn setup(
                                                 .iter()
                                                 .map(|channel| {
                                                     CreateSelectMenuOption::new(
-                                                        channel.name.clone(),
+                                                        &*channel.name,
                                                         channel.id.to_string(),
                                                     )
                                                 })
@@ -1339,7 +1333,7 @@ pub async fn setup(
                                         },
                                     ))
                                 })
-                                .collect(),
+                                .collect::<Vec<_>>(),
                         ),
                 )
                 .await?;
@@ -1421,8 +1415,8 @@ Just do `/join` and start talking!
     let Some(confirmed) = confirm_dialog(
         ctx,
         ctx.gettext("Would you like to set up TTS Bot update announcements for the setup channel?"),
-        ctx.gettext("Yes").into(),
-        ctx.gettext("No").into(),
+        ctx.gettext("Yes"),
+        ctx.gettext("No"),
     )
     .await?
     else {
@@ -1550,7 +1544,7 @@ pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
                     format_languages(data.translation_languages.keys()),
                     false,
                 )
-                .author(CreateEmbedAuthor::new(author.name.clone()).icon_url(author.face()))
+                .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face()))
                 .footer(CreateEmbedFooter::new(random_footer(
                     &data.config.main_server_invite,
                     client_id,
@@ -1640,7 +1634,7 @@ pub async fn voices(
                     client_id,
                     ctx.current_catalog(),
                 )))
-                .author(CreateEmbedAuthor::new(author.name.clone()).icon_url(author.face()))
+                .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face()))
                 .field(ctx.gettext("Currently supported voices"), &voices, true)
                 .field(
                     ctx.gettext("Current voice used"),

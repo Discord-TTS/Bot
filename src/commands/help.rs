@@ -228,7 +228,7 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
         })
         .colour(neutral_colour)
         .author(
-            serenity::CreateEmbedAuthor::new(ctx.author().name.clone())
+            serenity::CreateEmbedAuthor::new(ctx.author().name.as_str())
                 .icon_url(ctx.author().face()),
         )
         .footer(serenity::CreateEmbedFooter::new(match mode {

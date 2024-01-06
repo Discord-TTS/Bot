@@ -11,7 +11,7 @@ async fn guild_call_channel_id(
         .lock()
         .await
         .current_channel()
-        .map(|c| c.0.into())
+        .map(|c| serenity::ChannelId::new(c.0.get()))
 }
 
 // Check if the channel the bot was in was deleted.

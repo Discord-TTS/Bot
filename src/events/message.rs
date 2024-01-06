@@ -325,10 +325,17 @@ async fn process_support_dm(
                     false,
                     ExecuteWebhook::default()
                         .files(attachments)
-                        .content(message.content.to_string())
+                        .content(message.content.as_str())
                         .username(webhook_username)
                         .avatar_url(message.author.face())
-                        .embeds(message.embeds.iter().cloned().map(Into::into).collect()),
+                        .embeds(
+                            message
+                                .embeds
+                                .iter()
+                                .cloned()
+                                .map(Into::into)
+                                .collect::<Vec<_>>(),
+                        ),
                 )
                 .await?;
         }
@@ -409,7 +416,7 @@ async fn process_support_response(
         (target, target_tag)
     };
 
-    let attachment_url = message.attachments.first().map(|a| a.url.clone());
+    let attachment_url = message.attachments.first().map(|a| a.url.as_str());
 
     let (content, embed) = dm_generic(
         ctx,

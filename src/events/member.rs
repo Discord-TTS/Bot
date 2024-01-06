@@ -45,7 +45,7 @@ pub async fn guild_member_addition(
     Ok(())
 }
 
-fn create_premium_notice() -> serenity::CreateMessage {
+fn create_premium_notice() -> serenity::CreateMessage<'static> {
     let embed = serenity::CreateEmbed::new()
         .colour(PREMIUM_NEUTRAL_COLOUR)
         .title("TTS Bot Premium - Important Message")
@@ -55,8 +55,8 @@ Do you want to remove that server from your assigned slots?",
         );
 
     let components = confirm_dialog_components(
-        String::from("Keep premium subscription assigned"),
-        String::from("Unassign premium subscription"),
+        "Keep premium subscription assigned",
+        "Unassign premium subscription",
     );
 
     serenity::CreateMessage::new()

@@ -157,7 +157,7 @@ pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
         .title("The premium servers you have activated:")
         .description(embed_desc)
         .colour(PREMIUM_NEUTRAL_COLOUR)
-        .author(CreateEmbedAuthor::new(author.name.clone()).icon_url(author.face()))
+        .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face()))
         .footer(CreateEmbedFooter::new(format!(
             "You have {remaining_guilds} server(s) remaining for premium activation"
         )));

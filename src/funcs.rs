@@ -45,12 +45,12 @@ pub async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<
         .await
 }
 
-pub async fn dm_generic(
-    ctx: &serenity::Context,
+pub async fn dm_generic<'ctx, 'a>(
+    ctx: &'ctx serenity::Context,
     author: &serenity::User,
     target: serenity::UserId,
     mut target_tag: String,
-    attachment_url: Option<impl Into<String>>,
+    attachment_url: Option<impl Into<Cow<'a, str>>>,
     message: String,
 ) -> Result<(String, serenity::Embed)> {
     let dm_channel = target.create_dm_channel(ctx).await?;
@@ -564,15 +564,18 @@ pub async fn translate(
     Ok(None)
 }
 
-pub fn confirm_dialog_components(positive: String, negative: String) -> Vec<CreateActionRow> {
-    vec![CreateActionRow::Buttons(vec![
+pub fn confirm_dialog_components<'ctx>(
+    positive: impl Into<Cow<'ctx, str>>,
+    negative: impl Into<Cow<'ctx, str>>,
+) -> Cow<'ctx, [CreateActionRow<'ctx>]> {
+    Cow::Owned(vec![CreateActionRow::Buttons(vec![
         CreateButton::new("True")
             .style(serenity::ButtonStyle::Success)
             .label(positive),
         CreateButton::new("False")
             .style(serenity::ButtonStyle::Danger)
             .label(negative),
-    ])]
+    ])])
 }
 
 pub async fn confirm_dialog_wait(
@@ -598,11 +601,11 @@ pub async fn confirm_dialog_wait(
     }
 }
 
-pub async fn confirm_dialog(
-    ctx: Context<'_>,
-    prompt: &str,
-    positive: String,
-    negative: String,
+pub async fn confirm_dialog<'ctx>(
+    ctx: Context<'ctx>,
+    prompt: &'ctx str,
+    positive: impl Into<Cow<'ctx, str>>,
+    negative: impl Into<Cow<'ctx, str>>,
 ) -> Result<Option<bool>> {
     let builder = poise::CreateReply::default()
         .content(prompt)

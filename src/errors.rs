@@ -141,7 +141,7 @@ pub async fn handle_unexpected<'a>(
                 value = Cow::Owned(format!("`{value}`"));
             };
 
-            embed = embed.field(title, &*value, inline);
+            embed = embed.field(title, value, inline);
         }
 
         if let Some(author_name) = author_name {

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use poise::serenity_prelude as serenity;
 
@@ -10,19 +10,25 @@ use crate::{
     structs::{Context, JoinVCToken, Result, TTSMode},
 };
 
-pub trait PoiseContextExt {
+pub trait PoiseContextExt<'ctx> {
     fn gettext<'a>(&'a self, translate: &'a str) -> &'a str;
 
     fn current_catalog(&self) -> Option<&gettext::Catalog>;
-    async fn send_ephemeral(&self, message: impl Into<String>) -> Result<poise::ReplyHandle<'_>>;
-    async fn send_error(&self, error_message: String) -> Result<Option<poise::ReplyHandle<'_>>>;
+    async fn send_error(
+        &'ctx self,
+        error_message: impl Into<Cow<'ctx, str>>,
+    ) -> Result<Option<poise::ReplyHandle<'ctx>>>;
+    async fn send_ephemeral(
+        &'ctx self,
+        message: impl Into<Cow<'ctx, str>>,
+    ) -> Result<poise::ReplyHandle<'ctx>>;
 
     async fn neutral_colour(&self) -> u32;
     fn author_vc(&self) -> Option<serenity::ChannelId>;
     async fn author_permissions(&self) -> Result<serenity::Permissions>;
 }
 
-impl PoiseContextExt for Context<'_> {
+impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
     fn author_vc(&self) -> Option<serenity::ChannelId> {
         require_guild!(self, None)
             .voice_states
@@ -85,17 +91,22 @@ impl PoiseContextExt for Context<'_> {
         Ok(guild.user_permissions_in(channel, &member))
     }
 
-    async fn send_ephemeral(&self, message: impl Into<String>) -> Result<poise::ReplyHandle<'_>> {
+    async fn send_ephemeral(
+        &'ctx self,
+        message: impl Into<Cow<'ctx, str>>,
+    ) -> Result<poise::ReplyHandle<'ctx>> {
         let reply = poise::CreateReply::default().content(message);
         let handle = self.send(reply).await?;
         Ok(handle)
     }
 
-    async fn send_error(&self, error_message: String) -> Result<Option<poise::ReplyHandle<'_>>> {
+    async fn send_error(
+        &'ctx self,
+        error_message: impl Into<Cow<'ctx, str>>,
+    ) -> Result<Option<poise::ReplyHandle<'ctx>>> {
         let author = self.author();
         let serenity_ctx = self.serenity_context();
 
-        let m;
         let (name, avatar_url) = match self.channel_id().to_channel(serenity_ctx).await? {
             serenity::Channel::Guild(channel) => {
                 let permissions = channel
@@ -114,13 +125,18 @@ impl PoiseContextExt for Context<'_> {
 
                 match channel.guild_id.member(serenity_ctx, author.id).await {
                     Ok(member) => {
-                        m = member;
-                        (m.display_name(), m.face())
+                        let face = member.face();
+                        let display_name = member
+                            .nick
+                            .or(member.user.global_name)
+                            .unwrap_or(member.user.name);
+
+                        (Cow::Owned(display_name.into_string()), face)
                     }
-                    Err(_) => (author.name.as_str(), author.face()),
+                    Err(_) => (Cow::Borrowed(&*author.name), author.face()),
                 }
             }
-            serenity::Channel::Private(_) => (author.name.as_str(), author.face()),
+            serenity::Channel::Private(_) => (Cow::Borrowed(&*author.name), author.face()),
             _ => unreachable!(),
         };
 
