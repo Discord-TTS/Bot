@@ -19,12 +19,6 @@ use crate::{
 const VIEW_TRACEBACK_CUSTOM_ID: &str = "error::traceback::view";
 
 #[derive(sqlx::FromRow)]
-struct ErrorRowWithOccurrences {
-    pub message_id: i64,
-    pub occurrences: i32,
-}
-
-#[derive(sqlx::FromRow)]
 struct ErrorRow {
     pub message_id: i64,
 }
@@ -45,149 +39,188 @@ fn hash(data: &[u8]) -> Vec<u8> {
     Vec::from(&*hasher.finalize())
 }
 
+fn truncate_error(error: &Error) -> String {
+    let mut long_err = error.to_string();
+
+    // Avoid char boundary panics with utf8 chars
+    let mut new_len = 256;
+    while !long_err.is_char_boundary(new_len) {
+        new_len -= 1;
+    }
+
+    long_err.truncate(new_len);
+    long_err
+}
+
+async fn fetch_update_occurrences(
+    ctx: &serenity::Context,
+    data: &Data,
+    error: &Error,
+) -> Result<Option<(String, Vec<u8>)>, Error> {
+    #[derive(sqlx::FromRow)]
+    struct ErrorRowWithOccurrences {
+        pub message_id: i64,
+        pub occurrences: i32,
+    }
+
+    let traceback = format!("{error:?}");
+    let traceback_hash = hash(traceback.as_bytes());
+
+    let query = "
+        UPDATE errors SET occurrences = occurrences + 1
+        WHERE traceback_hash = $1
+        RETURNING message_id, occurrences";
+
+    let Some(ErrorRowWithOccurrences {
+        message_id,
+        occurrences,
+    }) = sqlx::query_as(query)
+        .bind(traceback_hash.clone())
+        .fetch_optional(&data.pool)
+        .await?
+    else {
+        return Ok(Some((traceback, traceback_hash)));
+    };
+
+    let error_webhook = &data.error_webhook;
+    let message_id = serenity::MessageId::new(message_id as u64);
+
+    let message = error_webhook.get_message(&ctx, None, message_id).await?;
+    let mut embed = message.embeds.into_vec().remove(0);
+
+    embed.footer.as_mut().try_unwrap()?.text =
+        format!("This error has occurred {occurrences} times!").into();
+
+    let builder = serenity::EditWebhookMessage::default().embeds(vec![embed.into()]);
+    error_webhook.edit_message(ctx, message_id, builder).await?;
+
+    Ok(None)
+}
+
+async fn insert_traceback(
+    ctx: &serenity::Context,
+    data: &Data,
+    embed: serenity::CreateEmbed<'_>,
+    traceback: String,
+    traceback_hash: Vec<u8>,
+) -> Result<()> {
+    let button = CreateButton::new(VIEW_TRACEBACK_CUSTOM_ID)
+        .label("View Traceback")
+        .style(serenity::ButtonStyle::Danger);
+
+    let embeds = [embed];
+    let components = [CreateActionRow::Buttons(vec![button])];
+
+    let builder = serenity::ExecuteWebhook::default()
+        .embeds(embeds.as_slice())
+        .components(components.as_slice());
+
+    let message = data
+        .error_webhook
+        .execute(&ctx, true, builder)
+        .await?
+        .try_unwrap()?;
+
+    let ErrorRow {
+        message_id: db_message_id,
+    } = sqlx::query_as(
+        "INSERT INTO errors(traceback_hash, traceback, message_id)
+        VALUES($1, $2, $3)
+
+        ON CONFLICT (traceback_hash)
+        DO UPDATE SET occurrences = errors.occurrences + 1
+        RETURNING errors.message_id",
+    )
+    .bind(traceback_hash)
+    .bind(traceback)
+    .bind(message.id.get() as i64)
+    .fetch_one(&data.pool)
+    .await?;
+
+    if message.id != db_message_id as u64 {
+        data.error_webhook
+            .delete_message(&ctx, None, message.id)
+            .await?;
+    }
+
+    Ok(())
+}
+
 pub async fn handle_unexpected<'a>(
     ctx: &serenity::Context,
     poise_context: FrameworkContext<'_>,
     event: &'a str,
     error: Error,
+    // Split out logic if not reliant on this field, to prevent monomorphisation bloat
     extra_fields: impl IntoIterator<Item = (&str, Cow<'a, str>, bool)>,
     author_name: Option<String>,
     icon_url: Option<String>,
 ) -> Result<()> {
     let data = poise_context.user_data;
-    let error_webhook = &data.error_webhook;
-
-    let traceback = format!("{error:?}");
-    let traceback_hash = hash(traceback.as_bytes());
-
-    if let Some(ErrorRowWithOccurrences {
-        message_id,
-        occurrences,
-    }) = sqlx::query_as(
-        "UPDATE errors SET occurrences = occurrences + 1
-        WHERE traceback_hash = $1
-        RETURNING message_id, occurrences",
-    )
-    .bind(traceback_hash.clone())
-    .fetch_optional(&data.pool)
-    .await?
-    {
-        let message_id = serenity::MessageId::new(message_id as u64);
-
-        let message = error_webhook.get_message(&ctx, None, message_id).await?;
-        let mut embed = message.embeds.into_vec().remove(0);
-
-        embed.footer.as_mut().try_unwrap()?.text =
-            format!("This error has occurred {occurrences} times!").into();
-
-        let builder = serenity::EditWebhookMessage::default().embeds(vec![embed.into()]);
-        error_webhook.edit_message(ctx, message_id, builder).await?;
-    } else {
-        let short_error = {
-            let mut long_err = error.to_string();
-
-            // Avoid char boundary panics with utf8 chars
-            let mut new_len = 256;
-            while !long_err.is_char_boundary(new_len) {
-                new_len -= 1;
-            }
-
-            long_err.truncate(new_len);
-            long_err
-        };
-
-        let (cpu_usage, mem_usage) = {
-            let mut system = data.system_info.lock();
-            system.refresh_specifics(
-                sysinfo::RefreshKind::new()
-                    .with_memory(sysinfo::MemoryRefreshKind::new().with_ram()),
-            );
-
-            (
-                sysinfo::System::load_average().five.to_string(),
-                (system.used_memory() / 1024).to_string(),
-            )
-        };
-
-        let before_fields = [
-            ("Event", Cow::Borrowed(event), true),
-            (
-                "Bot User",
-                Cow::Owned(ctx.cache.current_user().name.to_string()),
-                true,
-            ),
-            blank_field(),
-        ];
-
-        let shards = poise_context.shard_manager.shards_instantiated().await;
-        let after_fields = [
-            ("CPU Usage (5 minutes)", Cow::Owned(cpu_usage), true),
-            ("System Memory Usage", Cow::Owned(mem_usage), true),
-            ("Shard Count", Cow::Owned(shards.len().to_string()), true),
-        ];
-
-        let footer = serenity::CreateEmbedFooter::new("This error has occurred 1 time!");
-        let mut embed = serenity::CreateEmbed::default()
-            .colour(constants::RED)
-            .title(short_error)
-            .footer(footer);
-
-        for (title, mut value, inline) in before_fields
-            .into_iter()
-            .chain(extra_fields)
-            .chain(after_fields)
-        {
-            if value != "\u{200B}" {
-                value = Cow::Owned(format!("`{value}`"));
-            };
-
-            embed = embed.field(title, value, inline);
-        }
-
-        if let Some(author_name) = author_name {
-            let mut author_builder = serenity::CreateEmbedAuthor::new(author_name);
-            if let Some(icon_url) = icon_url {
-                author_builder = author_builder.icon_url(icon_url);
-            }
-
-            embed = embed.author(author_builder);
-        }
-
-        let message = serenity::ExecuteWebhook::default()
-            .embeds(vec![embed])
-            .components(vec![CreateActionRow::Buttons(vec![CreateButton::new(
-                VIEW_TRACEBACK_CUSTOM_ID,
-            )
-            .label("View Traceback")
-            .style(serenity::ButtonStyle::Danger)])]);
-
-        let message = error_webhook
-            .execute(&ctx.http, true, message)
-            .await?
-            .try_unwrap()?;
-
-        let ErrorRow { message_id } = sqlx::query_as(
-            "INSERT INTO errors(traceback_hash, traceback, message_id)
-            VALUES($1, $2, $3)
-
-            ON CONFLICT (traceback_hash)
-            DO UPDATE SET occurrences = errors.occurrences + 1
-            RETURNING errors.message_id",
-        )
-        .bind(traceback_hash)
-        .bind(traceback)
-        .bind(message.id.get() as i64)
-        .fetch_one(&data.pool)
-        .await?;
-
-        if message.id.get() != (message_id as u64) {
-            error_webhook
-                .delete_message(&ctx.http, None, message.id)
-                .await?;
-        }
+    let Some((traceback, traceback_hash)) = fetch_update_occurrences(ctx, data, &error).await?
+    else {
+        return Ok(());
     };
 
-    Ok(())
+    let (cpu_usage, mem_usage) = {
+        let mut system = data.system_info.lock();
+        system.refresh_specifics(
+            sysinfo::RefreshKind::new().with_memory(sysinfo::MemoryRefreshKind::new().with_ram()),
+        );
+
+        (
+            sysinfo::System::load_average().five.to_string(),
+            (system.used_memory() / 1024).to_string(),
+        )
+    };
+
+    let before_fields = [
+        ("Event", Cow::Borrowed(event), true),
+        (
+            "Bot User",
+            Cow::Owned(ctx.cache.current_user().name.to_string()),
+            true,
+        ),
+        blank_field(),
+    ];
+
+    let shards = poise_context.shard_manager.shards_instantiated().await;
+    let after_fields = [
+        ("CPU Usage (5 minutes)", Cow::Owned(cpu_usage), true),
+        ("System Memory Usage", Cow::Owned(mem_usage), true),
+        ("Shard Count", Cow::Owned(shards.len().to_string()), true),
+    ];
+
+    let footer = serenity::CreateEmbedFooter::new("This error has occurred 1 time!");
+    let mut embed = serenity::CreateEmbed::default()
+        .colour(constants::RED)
+        .title(truncate_error(&error))
+        .footer(footer);
+
+    for (title, mut value, inline) in before_fields
+        .into_iter()
+        .chain(extra_fields)
+        .chain(after_fields)
+    {
+        if value != "\u{200B}" {
+            let value = value.to_mut();
+            value.insert(0, '`');
+            value.push('`');
+        };
+
+        embed = embed.field(title, value, inline);
+    }
+
+    if let Some(author_name) = author_name {
+        let mut author_builder = serenity::CreateEmbedAuthor::new(author_name);
+        if let Some(icon_url) = icon_url {
+            author_builder = author_builder.icon_url(icon_url);
+        }
+
+        embed = embed.author(author_builder);
+    }
+
+    insert_traceback(ctx, data, embed, traceback, traceback_hash).await
 }
 
 pub async fn handle_unexpected_default(
