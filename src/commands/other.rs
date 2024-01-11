@@ -212,7 +212,7 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
 
     let guild_ids = cache.guilds();
     let (total_guild_count, total_voice_clients, total_members) = {
-        let guilds: Vec<_> = guild_ids.iter().filter_map(|id| cache.guild(id)).collect();
+        let guilds: Vec<_> = guild_ids.iter().filter_map(|id| cache.guild(*id)).collect();
 
         (
             guilds.len(),

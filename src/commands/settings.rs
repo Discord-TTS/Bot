@@ -1190,7 +1190,7 @@ pub async fn nick(
 
     if author.id != user.id
         && !guild_id
-            .member(ctx, author)
+            .member(ctx, author.id)
             .await?
             .permissions(ctx)?
             .administrator()
@@ -1283,7 +1283,7 @@ pub async fn setup(
         let channel = if let Some(channel) = channel {
             channel
         } else {
-            let author_member = guild_id.member(ctx, author).await?;
+            let author_member = guild_id.member(ctx, author.id).await?;
 
             let mut text_channels: Vec<_> = {
                 let guild = require_guild!(ctx);

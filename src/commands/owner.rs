@@ -198,7 +198,7 @@ pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
     let all_guild_owners = cache
         .guilds()
         .iter()
-        .filter_map(|id| cache.guild(id).map(|g| g.owner_id))
+        .filter_map(|id| cache.guild(*id).map(|g| g.owner_id))
         .collect::<Vec<_>>();
 
     let current_ofs_members = support_guild_members

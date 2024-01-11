@@ -429,7 +429,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         ..poise::FrameworkOptions::default()
     };
 
-    let mut client = serenity::Client::builder(token, intents)
+    let mut client = serenity::Client::builder(&token, intents)
         .voice_manager::<songbird::Songbird>(songbird)
         .framework(poise::Framework::new(framework_options, |_, _, _| {
             Box::pin(async { Ok(data) })

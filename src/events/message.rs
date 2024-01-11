@@ -313,8 +313,12 @@ async fn process_support_dm(
 
             let mut attachments = Vec::new();
             for attachment in &message.attachments {
-                let attachment_builder =
-                    serenity::CreateAttachment::url(&ctx.http, &attachment.url).await?;
+                let attachment_builder = serenity::CreateAttachment::url(
+                    &ctx.http,
+                    attachment.url.as_str(),
+                    attachment.filename.to_string(),
+                )
+                .await?;
                 attachments.push(attachment_builder);
             }
 
