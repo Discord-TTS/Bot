@@ -227,16 +227,15 @@ async fn process_mention_msg(
     message: &serenity::Message,
     data: &Data,
 ) -> Result<()> {
-    let bot_user = ctx.cache.current_user().id;
-    if ![
-        format!("<@{bot_user}>").into(),
-        format!("<@!{bot_user}>").into(),
-    ]
-    .contains(&message.content)
-    {
+    let Some(bot_mention_regex) = data.regex_cache.bot_mention.get() else {
         return Ok(());
     };
 
+    if !bot_mention_regex.is_match(&message.content) {
+        return Ok(());
+    };
+
+    let bot_user = ctx.cache.current_user().id;
     let guild_id = require!(message.guild_id, Ok(()));
     let channel = message.channel(ctx).await?.guild().unwrap();
     let permissions = channel.permissions_for_user(ctx, bot_user)?;

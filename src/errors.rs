@@ -4,11 +4,12 @@ use anyhow::{Error, Result};
 use sha2::Digest;
 use tracing::error;
 
+use self::serenity::{
+    small_fixed_array::TruncatingInto, CreateActionRow, CreateButton, CreateInteractionResponse,
+    FullEvent as Event,
+};
 use poise::serenity_prelude as serenity;
 
-use self::serenity::{
-    CreateActionRow, CreateButton, CreateInteractionResponse, FullEvent as Event,
-};
 use crate::{
     constants, require,
     structs::{Data, FrameworkContext},
@@ -89,7 +90,7 @@ async fn fetch_update_occurrences(
     let mut embed = message.embeds.into_vec().remove(0);
 
     embed.footer.as_mut().try_unwrap()?.text =
-        format!("This error has occurred {occurrences} times!").into();
+        format!("This error has occurred {occurrences} times!").trunc_into();
 
     let builder = serenity::EditWebhookMessage::default().embeds(vec![embed.into()]);
     error_webhook.edit_message(ctx, message_id, builder).await?;

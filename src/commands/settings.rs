@@ -16,14 +16,17 @@
 
 use std::{borrow::Cow, collections::HashMap, fmt::Write};
 
-use self::serenity::{builder::*, ChannelId, ComponentInteractionDataKind, Mentionable};
 use anyhow::bail;
-use database::Compact;
+
+use self::serenity::{
+    builder::*, small_fixed_array::FixedString, ChannelId, ComponentInteractionDataKind,
+    Mentionable,
+};
 use poise::serenity_prelude as serenity;
 
 use crate::{
     constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR},
-    database,
+    database::{self, Compact},
     funcs::{confirm_dialog, random_footer},
     opt_ext::OptionGettext,
     require, require_guild,
@@ -265,7 +268,9 @@ impl<'a> MenuPaginator<'a> {
             .map(|emoji| {
                 CreateButton::new(emoji)
                     .style(serenity::ButtonStyle::Primary)
-                    .emoji(serenity::ReactionType::Unicode(String::from(emoji).into()))
+                    .emoji(serenity::ReactionType::Unicode(
+                        FixedString::from_str_trunc(emoji),
+                    ))
                     .disabled(
                         disabled
                             || (["⏮️", "◀"].contains(&emoji) && self.index == 0)

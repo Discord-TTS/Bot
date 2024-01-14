@@ -42,7 +42,7 @@ use std::{
     collections::BTreeMap,
     num::NonZeroU16,
     str::FromStr,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{atomic::AtomicBool, Arc, OnceLock},
 };
 
 use anyhow::Ok;
@@ -259,13 +259,10 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));
     tokio::spawn(analytics.clone().start());
 
+    let startup_builder = ExecuteWebhook::default().content("**TTS Bot is starting up**");
     let startup_message = webhooks
         .logs
-        .execute(
-            &http,
-            true,
-            ExecuteWebhook::default().content("**TTS Bot is starting up**"),
-        )
+        .execute(&http, true, startup_builder)
         .await?
         .unwrap()
         .id;
@@ -294,6 +291,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         ],
         id_in_brackets: regex::Regex::new(r"\((\d+)\)")?,
         emoji: regex::Regex::new(r"<(a?):([^<>]+):\d+>")?,
+        bot_mention: OnceLock::new(),
     };
 
     let data = Data(Arc::new(DataInner {
@@ -431,8 +429,15 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
     let mut client = serenity::Client::builder(&token, intents)
         .voice_manager::<songbird::Songbird>(songbird)
-        .framework(poise::Framework::new(framework_options, |_, _, _| {
-            Box::pin(async { Ok(data) })
+        .framework(poise::Framework::new(framework_options, |_, ready, _| {
+            Box::pin(async {
+                data.regex_cache
+                    .bot_mention
+                    .set(regex::Regex::new(&format!("<@!{}>", ready.user.id))?)
+                    .unwrap();
+
+                Ok(data)
+            })
         }))
         .await?;
 

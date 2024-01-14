@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 pub use anyhow::{Error, Result};
@@ -108,6 +108,7 @@ pub struct PatreonInfo {
 
 pub struct RegexCache {
     pub replacements: [(regex::Regex, &'static str); 3],
+    pub bot_mention: OnceLock<regex::Regex>,
     pub id_in_brackets: regex::Regex,
     pub emoji: regex::Regex,
 }
