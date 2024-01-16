@@ -72,7 +72,7 @@ impl crate::looper::Looper for WebhookLogger {
             let mut pre_chunked = String::new();
 
             for (target, log_message) in messages {
-                for line in log_message.trim().split('\n') {
+                for line in log_message.lines() {
                     writeln!(pre_chunked, "`[{target}]`: {line}")?;
                 }
             }
