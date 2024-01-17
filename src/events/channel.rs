@@ -1,6 +1,6 @@
 use poise::serenity_prelude as serenity;
 
-use crate::{Data, Result};
+use crate::{structs::FrameworkContext, Result};
 
 async fn guild_call_channel_id(
     songbird: &songbird::Songbird,
@@ -11,11 +11,16 @@ async fn guild_call_channel_id(
         .lock()
         .await
         .current_channel()
-        .map(|c| serenity::ChannelId::new(c.0.get()))
+        .map(|c| serenity::ChannelId::new(c.get()))
 }
 
 // Check if the channel the bot was in was deleted.
-pub async fn channel_delete(data: &Data, channel: &serenity::GuildChannel) -> Result<()> {
+pub async fn channel_delete(
+    framework_ctx: FrameworkContext<'_>,
+    channel: &serenity::GuildChannel,
+) -> Result<()> {
+    let data = framework_ctx.user_data();
+
     let call_channel_id = guild_call_channel_id(&data.songbird, channel.guild_id).await;
     if call_channel_id == Some(channel.id) {
         // Ignore errors from leaving the channel, probably already left.

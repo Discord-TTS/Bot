@@ -13,8 +13,7 @@ pub fn resume(data: &Data) {
 
 pub async fn interaction_create(
     framework_ctx: FrameworkContext<'_>,
-    ctx: &serenity::Context,
     interaction: &serenity::Interaction,
 ) -> Result<()> {
-    errors::interaction_create(ctx, interaction, framework_ctx).await
+    errors::interaction_create(framework_ctx, interaction).await
 }

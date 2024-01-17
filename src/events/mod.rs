@@ -21,35 +21,29 @@ use serenity::FullEvent as Event;
 
 use crate::structs::{FrameworkContext, Result};
 
-pub async fn listen(
-    ctx: &serenity::Context,
-    event: &Event,
-    framework_ctx: FrameworkContext<'_>,
-) -> Result<()> {
-    let data = framework_ctx.user_data;
-
+pub async fn listen(framework_ctx: FrameworkContext<'_>, event: &Event) -> Result<()> {
     match event {
-        Event::Message { new_message } => message(framework_ctx, ctx, new_message).await,
-        Event::GuildCreate { guild, is_new } => guild_create(ctx, data, guild, *is_new).await,
-        Event::Ready { data_about_bot } => ready(framework_ctx, ctx, data_about_bot).await,
+        Event::Message { new_message } => message(framework_ctx, new_message).await,
+        Event::GuildCreate { guild, is_new } => guild_create(framework_ctx, guild, *is_new).await,
+        Event::Ready { data_about_bot } => ready(framework_ctx, data_about_bot).await,
         Event::GuildDelete { incomplete, full } => {
-            guild_delete(ctx, data, incomplete, full.as_ref()).await
+            guild_delete(framework_ctx, incomplete, full.as_ref()).await
         }
         Event::GuildMemberAddition { new_member } => {
-            guild_member_addition(ctx, data, new_member).await
+            guild_member_addition(framework_ctx, new_member).await
         }
         Event::GuildMemberRemoval { guild_id, user, .. } => {
-            guild_member_removal(ctx, data, *guild_id, user).await
+            guild_member_removal(framework_ctx, *guild_id, user).await
         }
         Event::VoiceStateUpdate { old, new } => {
-            voice_state_update(ctx, data, old.as_ref(), new).await
+            voice_state_update(framework_ctx, old.as_ref(), new).await
         }
-        Event::ChannelDelete { channel, .. } => channel_delete(data, channel).await,
+        Event::ChannelDelete { channel, .. } => channel_delete(framework_ctx, channel).await,
         Event::InteractionCreate { interaction } => {
-            interaction_create(framework_ctx, ctx, interaction).await
+            interaction_create(framework_ctx, interaction).await
         }
         Event::Resume { .. } => {
-            resume(data);
+            resume(&framework_ctx.user_data());
             Ok(())
         }
         _ => Ok(()),

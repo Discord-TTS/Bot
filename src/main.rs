@@ -74,7 +74,7 @@ use funcs::{decode_resp, get_translation_langs, prepare_gcloud_voices};
 use looper::Looper;
 use opt_ext::OptionTryUnwrap;
 use structs::{
-    Config, Context, Data, DataInner, FailurePoint, PollyVoice, PostgresConfig, Result, TTSMode,
+    Config, Context, Data, FailurePoint, PollyVoice, PostgresConfig, Result, TTSMode,
     WebhookConfig, WebhookConfigRaw,
 };
 use traits::PoiseContextExt;
@@ -294,7 +294,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         bot_mention: OnceLock::new(),
     };
 
-    let data = Data(Arc::new(DataInner {
+    let data = Arc::new(Data {
         pool,
         translations,
         bot_list_tokens: config.bot_list_tokens,
@@ -328,7 +328,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         nickname_db,
         user_voice_db,
         guild_voice_db,
-    }));
+    });
 
     let intents = serenity::GatewayIntents::GUILDS
         | serenity::GatewayIntents::GUILD_MESSAGES
@@ -339,7 +339,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
     let framework_options = poise::FrameworkOptions {
         commands: commands::commands(),
-        event_handler: |ctx, event, fw_ctx, _| Box::pin(events::listen(ctx, event, fw_ctx)),
+        event_handler: |fw_ctx, event| Box::pin(events::listen(fw_ctx, event)),
         on_error: |error| {
             Box::pin(async move {
                 let res = errors::handle(error).await;
@@ -374,7 +374,8 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
                 Box::pin(async move {
                     Ok(Some(match ctx.guild_id {
                         Some(guild_id) => {
-                            let row = ctx.data.guilds_db.get(guild_id.into()).await?;
+                            let data = ctx.framework.user_data();
+                            let row = data.guilds_db.get(guild_id.into()).await?;
                             String::from(row.prefix.as_str())
                         }
                         None => String::from("-"),
@@ -428,16 +429,16 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     };
 
     let mut client = serenity::Client::builder(&token, intents)
+        .data(data as _)
         .voice_manager::<songbird::Songbird>(songbird)
-        .framework(poise::Framework::new(framework_options, |_, ready, _| {
-            Box::pin(async {
-                data.regex_cache
-                    .bot_mention
-                    .set(regex::Regex::new(&format!("<@!{}>", ready.user.id))?)
-                    .unwrap();
+        .framework(poise::Framework::new(framework_options, |ctx, ready, _| {
+            let data = ctx.data::<Data>();
+            data.regex_cache
+                .bot_mention
+                .set(regex::Regex::new(&format!("<@!{}>", ready.user.id)).unwrap())
+                .unwrap();
 
-                Ok(data)
-            })
+            Box::pin(std::future::ready(Ok(())))
         }))
         .await?;
 

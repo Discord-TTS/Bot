@@ -108,7 +108,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     if let Some(bot_vc) = data.songbird.get(guild_id) {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
-            if bot_channel_id.0.get() == author_vc.get() {
+            if bot_channel_id.get() == author_vc.get() {
                 ctx.say(ctx.gettext("I am already in your voice channel!"))
                     .await?;
                 return Ok(());
@@ -116,7 +116,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
             ctx.say(
                 ctx.gettext("I am already in <#{channel_id}>!")
-                    .replace("{channel_id}", &bot_channel_id.0.to_string()),
+                    .replace("{channel_id}", &bot_channel_id.to_string()),
             )
             .await?;
             return Ok(());
@@ -126,7 +126,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     {
         let _typing = ctx.defer_or_broadcast().await?;
 
-        let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+        let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
         let join_vc_result = data
             .songbird
             .join_vc(join_vc_lock.lock().await, author_vc)
@@ -191,7 +191,7 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
 
     if let Some(bot_vc) = bot_vc {
         if !channel_check(&ctx, author_vc).await? {
-        } else if author_vc.map_or(true, |author_vc| bot_vc.0.get() != author_vc.get()) {
+        } else if author_vc.map_or(true, |author_vc| bot_vc.get() != author_vc.get()) {
             ctx.say(ctx.gettext(
                 "Error: You need to be in the same voice channel as me to make me leave!",
             ))

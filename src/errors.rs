@@ -5,8 +5,8 @@ use sha2::Digest;
 use tracing::error;
 
 use self::serenity::{
-    small_fixed_array::TruncatingInto, CreateActionRow, CreateButton, CreateInteractionResponse,
-    FullEvent as Event,
+    small_fixed_array::{FixedString, TruncatingInto},
+    CreateActionRow, CreateButton, CreateInteractionResponse, FullEvent as Event,
 };
 use poise::serenity_prelude as serenity;
 
@@ -148,17 +148,18 @@ async fn insert_traceback(
 }
 
 pub async fn handle_unexpected<'a>(
-    ctx: &serenity::Context,
     poise_context: FrameworkContext<'_>,
     event: &'a str,
     error: Error,
     // Split out logic if not reliant on this field, to prevent monomorphisation bloat
     extra_fields: impl IntoIterator<Item = (&str, Cow<'a, str>, bool)>,
-    author_name: Option<String>,
-    icon_url: Option<String>,
+    author_name: Option<&str>,
+    icon_url: Option<&str>,
 ) -> Result<()> {
-    let data = poise_context.user_data;
-    let Some((traceback, traceback_hash)) = fetch_update_occurrences(ctx, data, &error).await?
+    let data = poise_context.user_data();
+    let ctx = poise_context.serenity_context;
+
+    let Some((traceback, traceback_hash)) = fetch_update_occurrences(ctx, &data, &error).await?
     else {
         return Ok(());
     };
@@ -221,28 +222,27 @@ pub async fn handle_unexpected<'a>(
         embed = embed.author(author_builder);
     }
 
-    insert_traceback(ctx, data, embed, traceback, traceback_hash).await
+    insert_traceback(ctx, &data, embed, traceback, traceback_hash).await
 }
 
 pub async fn handle_unexpected_default(
-    ctx: &serenity::Context,
     framework: FrameworkContext<'_>,
     name: &str,
     result: Result<()>,
 ) -> Result<()> {
     let error = require!(result.err(), Ok(()));
 
-    handle_unexpected(ctx, framework, name, error, [], None, None).await
+    handle_unexpected(framework, name, error, [], None, None).await
 }
 
 // Listener Handlers
 pub async fn handle_message(
-    ctx: &serenity::Context,
     poise_context: FrameworkContext<'_>,
     message: &serenity::Message,
     result: Result<impl Send + Sync>,
 ) -> Result<()> {
     let error = require!(result.err(), Ok(()));
+    let ctx = poise_context.serenity_context;
 
     let mut extra_fields = Vec::with_capacity(3);
     if let Some(guild_id) = message.guild_id {
@@ -259,19 +259,17 @@ pub async fn handle_message(
         true,
     ));
     handle_unexpected(
-        ctx,
         poise_context,
         "MessageCreate",
         error,
         extra_fields,
-        Some(message.author.name.to_string()),
-        Some(message.author.face()),
+        Some(&message.author.name),
+        Some(&message.author.face()),
     )
     .await
 }
 
 pub async fn handle_member(
-    ctx: &serenity::Context,
     framework: FrameworkContext<'_>,
     member: &serenity::Member,
     result: Result<(), impl Into<Error>>,
@@ -284,21 +282,11 @@ pub async fn handle_member(
         ("User ID", Cow::Owned(member.user.id.to_string()), true),
     ];
 
-    handle_unexpected(
-        ctx,
-        framework,
-        "GuildMemberAdd",
-        error,
-        extra_fields,
-        None,
-        None,
-    )
-    .await
+    handle_unexpected(framework, "GuildMemberAdd", error, extra_fields, None, None).await
 }
 
 pub async fn handle_guild(
     name: &str,
-    ctx: &serenity::Context,
     framework: FrameworkContext<'_>,
     guild: Option<&serenity::Guild>,
     result: Result<()>,
@@ -306,13 +294,12 @@ pub async fn handle_guild(
     let error = require!(result.err(), Ok(()));
 
     handle_unexpected(
-        ctx,
         framework,
         name,
         error,
         [],
-        guild.as_ref().map(|g| g.name.to_string()),
-        guild.and_then(serenity::Guild::icon_url),
+        guild.as_ref().map(|g| g.name.as_str()),
+        guild.and_then(serenity::Guild::icon_url).as_deref(),
     )
     .await
 }
@@ -437,13 +424,12 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             }
 
             handle_unexpected(
-                ctx.serenity_context(),
                 ctx.framework(),
                 "command",
                 error,
                 extra_fields,
-                Some(author.name.to_string()),
-                Some(author.face()),
+                Some(&author.name),
+                Some(&author.face()),
             )
             .await?;
 
@@ -496,7 +482,6 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
         }
 
         poise::FrameworkError::EventHandler {
-            ctx,
             error,
             event,
             framework,
@@ -509,27 +494,25 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
 
             match event {
                 Event::Message { new_message } => {
-                    handle_message(ctx, framework, new_message, Err(error)).await?;
+                    handle_message(framework, new_message, Err(error)).await?;
                 }
                 Event::GuildMemberAddition { new_member } => {
-                    handle_member(ctx, framework, new_member, Err(error)).await?;
+                    handle_member(framework, new_member, Err(error)).await?;
                 }
                 Event::GuildCreate { guild, .. } => {
-                    handle_guild("GuildCreate", ctx, framework, Some(guild), Err(error)).await?;
+                    handle_guild("GuildCreate", framework, Some(guild), Err(error)).await?;
                 }
                 Event::GuildDelete { full, .. } => {
-                    handle_guild("GuildDelete", ctx, framework, full.as_ref(), Err(error)).await?;
+                    handle_guild("GuildDelete", framework, full.as_ref(), Err(error)).await?;
                 }
                 Event::VoiceStateUpdate { .. } => {
-                    handle_unexpected_default(ctx, framework, "VoiceStateUpdate", Err(error))
-                        .await?;
+                    handle_unexpected_default(framework, "VoiceStateUpdate", Err(error)).await?;
                 }
                 Event::InteractionCreate { .. } => {
-                    handle_unexpected_default(ctx, framework, "InteractionCreate", Err(error))
-                        .await?;
+                    handle_unexpected_default(framework, "InteractionCreate", Err(error)).await?;
                 }
                 Event::Ready { .. } => {
-                    handle_unexpected_default(ctx, framework, "Ready", Err(error)).await?;
+                    handle_unexpected_default(framework, "Ready", Err(error)).await?;
                 }
                 _ => {
                     tracing::warn!("Unhandled {} error: {:?}", event.snake_case_name(), error);
@@ -542,7 +525,8 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
         | poise::FrameworkError::NotAnOwner { .. }
         | poise::FrameworkError::UnknownInteraction { .. }
         | poise::FrameworkError::SubcommandRequired { .. }
-        | poise::FrameworkError::UnknownCommand { .. } => {}
+        | poise::FrameworkError::UnknownCommand { .. }
+        | poise::FrameworkError::NonCommandMessage { .. } => {}
         poise::FrameworkError::GuildOnly { ctx, .. } => {
             let error = ctx
                 .gettext("`/{command_name}` cannot be used in private messages, please run this command in a server channel.")
@@ -559,13 +543,12 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
 }
 
 pub async fn interaction_create(
-    ctx: &serenity::Context,
-    interaction: &serenity::Interaction,
     framework: FrameworkContext<'_>,
+    interaction: &serenity::Interaction,
 ) -> Result<(), Error> {
     if let serenity::Interaction::Component(interaction) = interaction {
         if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
-            handle_traceback_button(ctx, framework.user_data, interaction).await?;
+            handle_traceback_button(framework, interaction).await?;
         };
     };
 
@@ -573,14 +556,13 @@ pub async fn interaction_create(
 }
 
 pub async fn handle_traceback_button(
-    ctx: &serenity::Context,
-    data: &Data,
+    framework: FrameworkContext<'_>,
     interaction: &serenity::ComponentInteraction,
 ) -> Result<(), Error> {
     let row: Option<TracebackRow> =
         sqlx::query_as("SELECT traceback FROM errors WHERE message_id = $1")
             .bind(interaction.message.id.get() as i64)
-            .fetch_optional(&data.pool)
+            .fetch_optional(&framework.user_data().pool)
             .await?;
 
     let mut response_data = serenity::CreateInteractionResponseMessage::default().ephemeral(true);
@@ -594,17 +576,19 @@ pub async fn handle_traceback_button(
     };
 
     interaction
-        .create_response(&ctx.http, CreateInteractionResponse::Message(response_data))
+        .create_response(
+            &framework.serenity_context,
+            CreateInteractionResponse::Message(response_data),
+        )
         .await?;
     Ok(())
 }
 
 struct TrackErrorHandler<Iter: IntoIterator<Item = (&'static str, Cow<'static, str>, bool)>> {
     ctx: serenity::Context,
-    data: Data,
     shard_manager: Arc<serenity::ShardManager>,
     extra_fields: Iter,
-    author_name: String,
+    author_name: FixedString<u8>,
     icon_url: String,
 }
 
@@ -619,17 +603,15 @@ where
                 // HACK: Cannot get reference to options from here, so has to be faked.
                 // This is fine because the options are not used in the error handler.
                 let framework_context = FrameworkContext {
-                    user_data: &self.data,
+                    serenity_context: &self.ctx,
                     shard_manager: &self.shard_manager,
-                    bot_id: self.ctx.cache.current_user().id,
                     options: &poise::FrameworkOptions::default(),
                 };
 
-                let author_name = Some(self.author_name.clone());
-                let icon_url = Some(self.icon_url.clone());
+                let author_name = Some(self.author_name.as_str());
+                let icon_url = Some(self.icon_url.as_str());
 
                 let result = handle_unexpected(
-                    &self.ctx,
                     framework_context,
                     "TrackError",
                     error.into(),
@@ -640,7 +622,7 @@ where
                 .await;
 
                 if let Err(err_err) = result {
-                    tracing::error!("Songbird unhandled track error: {}", err_err);
+                    tracing::error!("Songbird unhandled track error: {err_err}");
                 }
             }
         }
@@ -654,9 +636,8 @@ where
 pub fn handle_track<Iter>(
     ctx: serenity::Context,
     shard_manager: Arc<serenity::ShardManager>,
-    data: Data,
     extra_fields: Iter,
-    author_name: String,
+    author_name: FixedString<u8>,
     icon_url: String,
 
     track: &songbird::tracks::TrackHandle,
@@ -672,7 +653,6 @@ where
         songbird::Event::Track(songbird::TrackEvent::Error),
         TrackErrorHandler {
             ctx,
-            data,
             shard_manager,
             extra_fields,
             author_name,

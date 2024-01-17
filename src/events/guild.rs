@@ -5,11 +5,10 @@ use tracing::info;
 
 use serenity::builder::*;
 
-use crate::{serenity, Data, Result};
+use crate::{serenity, structs::FrameworkContext, Result};
 
 pub async fn guild_create(
-    ctx: &serenity::Context,
-    data: &Data,
+    framework_ctx: FrameworkContext<'_>,
     guild: &serenity::Guild,
     is_new: Option<bool>,
 ) -> Result<()> {
@@ -17,11 +16,13 @@ pub async fn guild_create(
         return Ok(());
     };
 
+    let ctx = framework_ctx.serenity_context;
     let (owner_tag, owner_face) = {
         let owner = guild.owner_id.to_user(&ctx).await?;
         (owner.tag(), owner.face())
     };
 
+    let data = framework_ctx.user_data();
     let dm_channel = guild.owner_id.create_dm_channel(&ctx).await?;
     match dm_channel.send_message(&ctx, serenity::CreateMessage::default().embed(CreateEmbed::default()
         .title(format!("Welcome to {}!", ctx.cache.current_user().name))
@@ -71,8 +72,7 @@ Ask questions by either responding here or asking on the support server!",
 }
 
 pub async fn guild_delete(
-    ctx: &serenity::Context,
-    data: &Data,
+    framework_ctx: FrameworkContext<'_>,
     incomplete: &serenity::UnavailableGuild,
     full: Option<&serenity::Guild>,
 ) -> Result<()> {
@@ -80,6 +80,7 @@ pub async fn guild_delete(
         return Ok(());
     }
 
+    let data = framework_ctx.user_data();
     data.guilds_db.delete(incomplete.id.into()).await?;
 
     let Some(guild) = full else { return Ok(()) };
@@ -87,6 +88,7 @@ pub async fn guild_delete(
         return Ok(());
     }
 
+    let ctx = framework_ctx.serenity_context;
     let owner_of_other_server = ctx
         .cache
         .guilds()

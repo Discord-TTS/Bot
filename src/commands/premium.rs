@@ -195,7 +195,7 @@ pub async fn premium_deactivate(ctx: Context<'_>) -> CommandResult {
         return Ok(());
     }
 
-    remove_premium(data, guild_id).await?;
+    remove_premium(&data, guild_id).await?;
 
     let msg = ctx.gettext("Deactivated premium from this server.");
     ctx.say(msg).await?;

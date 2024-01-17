@@ -113,18 +113,7 @@ pub struct RegexCache {
     pub emoji: regex::Regex,
 }
 
-#[derive(Clone)]
-pub struct Data(pub Arc<DataInner>);
-
-impl std::ops::Deref for Data {
-    type Target = DataInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-pub struct DataInner {
+pub struct Data {
     pub analytics: Arc<analytics::Handler>,
     pub guilds_db: database::Handler<i64, database::GuildRowRaw>,
     pub userinfo_db: database::Handler<i64, database::UserRowRaw>,

@@ -104,7 +104,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         if guild_voice_row.guild_id.is_none() {
             Cow::Borrowed(guild_mode.default_voice())
         } else {
-            format_voice(data, &guild_voice_row.voice, guild_mode)
+            format_voice(&data, &guild_voice_row.voice, guild_mode)
         }
     };
 
@@ -120,7 +120,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .voice
             .as_ref()
             .map_or(Cow::Borrowed(none_str), |voice| {
-                format_voice(data, voice, currently_set_voice_mode)
+                format_voice(&data, voice, currently_set_voice_mode)
             })
     };
 
@@ -353,15 +353,14 @@ async fn voice_autocomplete<'a>(
     ctx: ApplicationContext<'a>,
     searching: &'a str,
 ) -> Vec<serenity::AutocompleteChoice<'a>> {
-    let Ok((_, mode)) = ctx
-        .data
+    let data = ctx.data();
+    let Ok((_, mode)) = data
         .parse_user_or_guild(ctx.interaction.user.id, ctx.interaction.guild_id)
         .await
     else {
         return Vec::new();
     };
 
-    let data = ctx.data;
     let (mut i1, mut i2, mut i3, mut i4);
     let voices: &mut dyn Iterator<Item = _> = match mode {
         TTSMode::gTTS => {
@@ -420,7 +419,7 @@ async fn translation_languages_autocomplete<'a>(
     searching: &'a str,
 ) -> impl Iterator<Item = serenity::AutocompleteChoice<'a>> {
     let mut filtered_languages = ctx
-        .data
+        .data()
         .translation_languages
         .iter()
         .filter(|(_, name)| name.starts_with(searching))
@@ -529,11 +528,11 @@ where
     let data = ctx.data();
     let (_, mode) = data.parse_user_or_guild(author_id, Some(guild_id)).await?;
     Ok(if let Some(voice) = voice {
-        if check_valid_voice(data, &voice, mode) {
+        if check_valid_voice(&data, &voice, mode) {
             general_db.create_row(key).await?;
             voice_db.set_one((key, mode), "voice", &voice).await?;
 
-            let name = get_voice_name(data, &voice, mode).unwrap_or(&voice);
+            let name = get_voice_name(&data, &voice, mode).unwrap_or(&voice);
             Cow::Owned(
                 match target {
                     Target::Guild => ctx.gettext("Changed the server voice to: {voice}"),

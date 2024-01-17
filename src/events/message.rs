@@ -17,24 +17,23 @@ use crate::{
 
 pub async fn message(
     framework_ctx: FrameworkContext<'_>,
-    ctx: &serenity::Context,
     new_message: &serenity::Message,
 ) -> Result<()> {
     tokio::try_join!(
-        process_tts_msg(ctx, new_message, &framework_ctx),
-        process_support_dm(ctx, new_message, framework_ctx.user_data),
-        process_mention_msg(ctx, new_message, framework_ctx.user_data),
+        process_tts_msg(framework_ctx, new_message),
+        process_support_dm(framework_ctx, new_message),
+        process_mention_msg(framework_ctx, new_message),
     )?;
 
     Ok(())
 }
 
 async fn process_tts_msg(
-    ctx: &serenity::Context,
+    framework_ctx: FrameworkContext<'_>,
     message: &serenity::Message,
-    framework_ctx: &FrameworkContext<'_>,
 ) -> Result<()> {
-    let data = framework_ctx.user_data;
+    let data = framework_ctx.user_data();
+    let ctx = framework_ctx.serenity_context;
 
     let guild_id = require!(message.guild_id, Ok(()));
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
@@ -43,7 +42,7 @@ async fn process_tts_msg(
 
     let (voice, mode) = {
         if let Some(channel_id) = to_autojoin {
-            let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+            let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
             match data
                 .songbird
                 .join_vc(join_vc_lock.lock().await, channel_id)
@@ -136,7 +135,7 @@ async fn process_tts_msg(
                 .try_unwrap()?
         };
 
-        let join_vc_lock = JoinVCToken::acquire(data, guild_id);
+        let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
         match data
             .songbird
             .join_vc(join_vc_lock.lock().await, voice_channel_id)
@@ -208,14 +207,12 @@ async fn process_tts_msg(
     let shard_manager = framework_ctx.shard_manager.clone();
     let author_name = message.author.name.clone();
     let icon_url = message.author.face();
-    let data = data.clone();
 
     errors::handle_track(
         ctx.clone(),
         shard_manager,
-        data,
         extra_fields,
-        author_name.into_string(),
+        author_name,
         icon_url,
         &track_handle,
     )
@@ -223,10 +220,10 @@ async fn process_tts_msg(
 }
 
 async fn process_mention_msg(
-    ctx: &serenity::Context,
+    framework_ctx: FrameworkContext<'_>,
     message: &serenity::Message,
-    data: &Data,
 ) -> Result<()> {
+    let data = framework_ctx.user_data();
     let Some(bot_mention_regex) = data.regex_cache.bot_mention.get() else {
         return Ok(());
     };
@@ -235,6 +232,7 @@ async fn process_mention_msg(
         return Ok(());
     };
 
+    let ctx = framework_ctx.serenity_context;
     let bot_user = ctx.cache.current_user().id;
     let guild_id = require!(message.guild_id, Ok(()));
     let channel = message.channel(ctx).await?.guild().unwrap();
@@ -271,13 +269,15 @@ async fn process_mention_msg(
 }
 
 async fn process_support_dm(
-    ctx: &serenity::Context,
+    framework_ctx: FrameworkContext<'_>,
     message: &serenity::Message,
-    data: &Data,
 ) -> Result<()> {
+    let data = framework_ctx.user_data();
+    let ctx = framework_ctx.serenity_context;
+
     let channel = match message.channel(ctx).await? {
         serenity::Channel::Guild(channel) => {
-            return process_support_response(ctx, message, data, channel).await
+            return process_support_response(ctx, message, &data, channel).await
         }
         serenity::Channel::Private(channel) => channel,
         _ => return Ok(()),

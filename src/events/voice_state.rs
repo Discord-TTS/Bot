@@ -2,18 +2,19 @@ use poise::serenity_prelude as serenity;
 
 use crate::{
     opt_ext::OptionTryUnwrap,
-    structs::{Data, Result},
+    structs::{FrameworkContext, Result},
 };
 
 /// If (on leave) the bot should also leave as it is alone
 pub async fn voice_state_update(
-    ctx: &serenity::Context,
-    data: &Data,
+    framework_ctx: FrameworkContext<'_>,
     old: Option<&serenity::VoiceState>,
     new: &serenity::VoiceState,
 ) -> Result<()> {
     // User left vc
     let Some(old) = old else { return Ok(()) };
+
+    let data = framework_ctx.user_data();
 
     // Bot is in vc on server
     let guild_id = new.guild_id.try_unwrap()?;
@@ -22,6 +23,7 @@ pub async fn voice_state_update(
     }
 
     // Bot is not the one leaving
+    let ctx = framework_ctx.serenity_context;
     let bot_id = ctx.cache.current_user().id;
     if new.member.as_ref().map_or(true, |m| m.user.id == bot_id) {
         return Ok(());

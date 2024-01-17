@@ -69,7 +69,7 @@ features = ["cache"]
 branch = "serenity-next"
 
 [dependencies.songbird]
-git = "https://github.com/serenity-rs/songbird"
+git = "https://github.com/GnomedDev/songbird"
 features = ["builtin-queue"]
-branch = "serenity-next"
+branch = "fix-id"
 version = "0.4"

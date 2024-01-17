@@ -41,10 +41,10 @@ fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo
 
 pub async fn ready(
     framework_ctx: FrameworkContext<'_>,
-    ctx: &serenity::Context,
     data_about_bot: &serenity::Ready,
 ) -> Result<()> {
-    let data = framework_ctx.user_data;
+    let data = framework_ctx.user_data();
+    let ctx = framework_ctx.serenity_context;
 
     let shard_count = ctx.cache.shard_count();
     let user_name = &data_about_bot.user.name;
