@@ -41,7 +41,6 @@ use std::{
     borrow::Cow,
     collections::BTreeMap,
     num::NonZeroU16,
-    str::FromStr,
     sync::{atomic::AtomicBool, Arc, OnceLock},
 };
 
@@ -269,9 +268,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
     let logger = logging::WebhookLogger::new(
         Arc::new(http),
-        "discord_tts_bot",
         "TTS-Webhook",
-        tracing::Level::from_str(&config.main.log_level)?,
         webhooks.logs.clone(),
         webhooks.errors.clone().unwrap(),
     );

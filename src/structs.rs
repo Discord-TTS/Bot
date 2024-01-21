@@ -42,7 +42,6 @@ pub struct MainConfig {
     pub main_server_invite: String,
     pub tts_service: reqwest::Url,
     pub token: Option<String>,
-    pub log_level: String,
 
     // Only for situations where gTTS has broken
     #[serde(default)]

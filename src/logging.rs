@@ -8,12 +8,20 @@ use poise::serenity_prelude::{ExecuteWebhook, Http, Webhook};
 
 type LogMessage = (&'static str, String);
 
+fn get_avatar(level: tracing::Level) -> &'static str {
+    match level {
+        tracing::Level::TRACE | tracing::Level::DEBUG => {
+            "https://cdn.discordapp.com/embed/avatars/1.png"
+        }
+        tracing::Level::INFO => "https://cdn.discordapp.com/embed/avatars/0.png",
+        tracing::Level::WARN => "https://cdn.discordapp.com/embed/avatars/3.png",
+        tracing::Level::ERROR => "https://cdn.discordapp.com/embed/avatars/4.png",
+    }
+}
+
 pub struct WebhookLogger {
     http: Arc<Http>,
-    log_prefix: &'static str,
     webhook_name: &'static str,
-    max_verbosity: tracing::Level,
-    level_lookup: HashMap<tracing::Level, String>,
 
     pending_logs: Mutex<HashMap<tracing::Level, Vec<LogMessage>>>,
 
@@ -25,36 +33,15 @@ impl WebhookLogger {
     #[must_use]
     pub fn new(
         http: Arc<Http>,
-        log_prefix: &'static str,
         webhook_name: &'static str,
-        max_verbosity: tracing::Level,
         normal_logs: Webhook,
         error_logs: Webhook,
     ) -> ArcWrapper<Self> {
-        let level_lookup = HashMap::from_iter(
-            [
-                (tracing::Level::TRACE, 1),
-                (tracing::Level::DEBUG, 1),
-                (tracing::Level::INFO, 0),
-                (tracing::Level::WARN, 3),
-                (tracing::Level::ERROR, 4),
-            ]
-            .map(|(level, value)| {
-                (
-                    level,
-                    format!("https://cdn.discordapp.com/embed/avatars/{value}.png"),
-                )
-            }),
-        );
-
         ArcWrapper(Arc::new(Self {
             http,
-            max_verbosity,
-            level_lookup,
             normal_logs,
             error_logs,
             webhook_name,
-            log_prefix,
             pending_logs: Mutex::default(),
         }))
     }
@@ -102,27 +89,15 @@ impl crate::looper::Looper for WebhookLogger {
                 &self.normal_logs
             };
 
-            let severity_str = severity.as_str();
-            let mut webhook_name =
-                String::with_capacity(self.webhook_name.len() + 3 + severity_str.len());
-            webhook_name.push_str(self.webhook_name);
-            webhook_name.push_str(" [");
-            webhook_name.push_str(severity_str);
-            webhook_name.push(']');
+            let webhook_name = format!("{} [{}]", self.webhook_name, severity.as_str());
 
             for chunk in chunks {
-                webhook
-                    .execute(
-                        &self.http,
-                        false,
-                        ExecuteWebhook::default()
-                            .content(chunk)
-                            .username(webhook_name.clone())
-                            .avatar_url(self.level_lookup.get(&severity).cloned().unwrap_or_else(
-                                || String::from("https://cdn.discordapp.com/embed/avatars/5.png"),
-                            )),
-                    )
-                    .await?;
+                let builder = ExecuteWebhook::default()
+                    .content(chunk)
+                    .username(&webhook_name)
+                    .avatar_url(get_avatar(severity));
+
+                webhook.execute(&self.http, false, builder).await?;
             }
         }
 
@@ -174,12 +149,9 @@ impl tracing::Subscriber for ArcWrapper<WebhookLogger> {
     }
 
     fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
-        // Ordered by verbosity
-        if ["gnomeutils", self.log_prefix]
-            .into_iter()
-            .any(|t| metadata.target().starts_with(t))
-        {
-            self.max_verbosity >= *metadata.level()
+        let target = metadata.target();
+        if target.starts_with(env!("CARGO_CRATE_NAME")) {
+            tracing::Level::INFO >= *metadata.level()
         } else {
             tracing::Level::WARN >= *metadata.level()
         }
