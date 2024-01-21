@@ -473,7 +473,6 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ctx.send_error(msg).await?;
         }
 
-        poise::FrameworkError::Setup { .. } => panic!("{error:#?}"),
         poise::FrameworkError::CommandCheckFailed { error, ctx, .. } => {
             if let Some(error) = error {
                 error!("Premium Check Error: {:?}", error);

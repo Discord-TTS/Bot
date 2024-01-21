@@ -124,7 +124,6 @@ pub struct Data {
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
     pub translations: HashMap<FixedString<u8>, gettext::Catalog>,
     pub currently_purging: std::sync::atomic::AtomicBool,
-    pub fully_started: std::sync::atomic::AtomicBool,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub premium_avatar_url: FixedString<u16>,
@@ -137,9 +136,11 @@ pub struct Data {
     pub config: MainConfig,
     pub pool: sqlx::PgPool,
 
-    // Taken out at startup
+    // Startup information
     pub website_info: Mutex<Option<WebsiteInfo>>,
     pub bot_list_tokens: Mutex<Option<BotListTokens>>,
+    pub fully_started: std::sync::atomic::AtomicBool,
+    pub update_startup_lock: tokio::sync::Mutex<()>,
 
     pub espeak_voices: FixedArray<FixedString>,
     pub gtts_voices: BTreeMap<FixedString, FixedString>,

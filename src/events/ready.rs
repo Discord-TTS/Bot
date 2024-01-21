@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Write, sync::atomic::Ordering};
+use std::{collections::HashMap, fmt::Write, num::NonZeroU16, sync::atomic::Ordering};
 
 use self::serenity::builder::*;
 use poise::serenity_prelude as serenity;
@@ -7,7 +7,7 @@ use crate::{
     bot_list_updater::BotListUpdater,
     constants::FREE_NEUTRAL_COLOUR,
     looper::Looper,
-    structs::{FrameworkContext, Result},
+    structs::{Data, FrameworkContext, Result},
     web_updater,
 };
 
@@ -35,6 +35,35 @@ fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo
     status
 }
 
+async fn update_startup_message(
+    ctx: &serenity::Context,
+    data: &Data,
+    user_name: &str,
+    status: String,
+    shard_count: Option<NonZeroU16>,
+) -> Result<()> {
+    let builder = serenity::EditWebhookMessage::default().content("").embed(
+        CreateEmbed::default()
+            .description(status)
+            .colour(FREE_NEUTRAL_COLOUR)
+            .title(if let Some(shard_count) = shard_count {
+                format!("{user_name} is starting up {shard_count} shards!")
+            } else {
+                format!(
+                    "{user_name} started in {} seconds",
+                    data.start_time.elapsed().unwrap().as_secs()
+                )
+            }),
+    );
+
+    data.webhooks
+        .logs
+        .edit_message(&ctx, data.startup_message, builder)
+        .await?;
+
+    Ok(())
+}
+
 pub async fn ready(
     framework_ctx: FrameworkContext<'_>,
     data_about_bot: &serenity::Ready,
@@ -43,32 +72,21 @@ pub async fn ready(
     let ctx = framework_ctx.serenity_context;
 
     let shard_count = ctx.cache.shard_count();
-    let user_name = &data_about_bot.user.name;
-    let last_shard = (ctx.shard_id.0 + 1) == shard_count.get();
-    let status = generate_status(&*framework_ctx.shard_manager.runners.lock().await);
+    let is_last_shard = (ctx.shard_id.0 + 1) == shard_count.get();
 
-    data.webhooks
-        .logs
-        .edit_message(
-            &ctx.http,
-            data.startup_message,
-            serenity::EditWebhookMessage::default().content("").embed(
-                CreateEmbed::default()
-                    .description(status)
-                    .colour(FREE_NEUTRAL_COLOUR)
-                    .title(if last_shard {
-                        format!(
-                            "{user_name} started in {} seconds",
-                            data.start_time.elapsed().unwrap().as_secs()
-                        )
-                    } else {
-                        format!("{user_name} is starting up {shard_count} shards!")
-                    }),
-            ),
-        )
-        .await?;
+    // Don't update the welcome message for concurrent shard startups.
+    if let Ok(_guard) = data.update_startup_lock.try_lock() {
+        let status = generate_status(&*framework_ctx.shard_manager.runners.lock().await);
+        let shard_count = (!is_last_shard).then_some(shard_count);
 
-    if last_shard && !data.fully_started.load(Ordering::SeqCst) {
+        update_startup_message(ctx, &data, &data_about_bot.user.name, status, shard_count).await?;
+    }
+
+    data.regex_cache
+        .bot_mention
+        .get_or_init(|| regex::Regex::new(&format!("<@!?{}>", data_about_bot.user.id)).unwrap());
+
+    if is_last_shard && !data.fully_started.load(Ordering::SeqCst) {
         data.fully_started.store(true, Ordering::SeqCst);
 
         if let Some(bot_list_tokens) = data.bot_list_tokens.lock().take() {

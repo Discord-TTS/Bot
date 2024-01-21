@@ -300,6 +300,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         join_vc_tokens: dashmap::DashMap::new(),
         currently_purging: AtomicBool::new(false),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
+        update_startup_lock: tokio::sync::Mutex::new(()),
 
         gtts_voices,
         espeak_voices,
@@ -424,15 +425,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let mut client = serenity::Client::builder(&token, intents)
         .data(data as _)
         .voice_manager::<songbird::Songbird>(songbird)
-        .framework(poise::Framework::new(framework_options, |ctx, ready, _| {
-            let data = ctx.data::<Data>();
-            data.regex_cache
-                .bot_mention
-                .set(regex::Regex::new(&format!("<@!{}>", ready.user.id)).unwrap())
-                .unwrap();
-
-            Box::pin(std::future::ready(Ok(())))
-        }))
+        .framework(poise::Framework::new(framework_options))
         .await?;
 
     let shard_manager = client.shard_manager.clone();
