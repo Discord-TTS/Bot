@@ -3,9 +3,9 @@ pub trait Looper {
     const MILLIS: u64;
 
     async fn loop_func(&self) -> anyhow::Result<()>;
-    async fn start(self: std::sync::Arc<Self>)
+    async fn start(self)
     where
-        Self: Sync,
+        Self: Sized,
     {
         tracing::info!("{}: Started background task", Self::NAME);
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(Self::MILLIS));

@@ -47,7 +47,7 @@ impl WebhookLogger {
     }
 }
 
-impl crate::looper::Looper for WebhookLogger {
+impl crate::looper::Looper for Arc<WebhookLogger> {
     const NAME: &'static str = "Logging";
     const MILLIS: u64 = 1100;
 

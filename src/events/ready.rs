@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt::Write,
-    sync::{atomic::Ordering, Arc},
-};
+use std::{collections::HashMap, fmt::Write, sync::atomic::Ordering};
 
 use self::serenity::builder::*;
 use poise::serenity_prelude as serenity;
@@ -74,20 +70,20 @@ pub async fn ready(
 
     if last_shard && !data.fully_started.load(Ordering::SeqCst) {
         data.fully_started.store(true, Ordering::SeqCst);
-        let stats_updater = Arc::new(BotListUpdater::new(
+        let stats_updater = BotListUpdater::new(
             data.reqwest.clone(),
             ctx.cache.clone(),
             data.bot_list_tokens.clone(),
-        ));
+        );
 
         if let Some(website_info) = data.website_info.write().take() {
-            let web_updater = Arc::new(web_updater::Updater {
+            let web_updater = web_updater::Updater {
                 patreon_service: data.config.patreon_service.clone(),
                 reqwest: data.reqwest.clone(),
                 cache: ctx.cache.clone(),
                 pool: data.pool.clone(),
                 config: website_info,
-            });
+            };
 
             tokio::spawn(web_updater.start());
         }

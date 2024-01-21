@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use dashmap::DashMap;
 use sqlx::Connection;
@@ -41,7 +41,7 @@ impl Handler {
     }
 }
 
-impl crate::Looper for Handler {
+impl crate::Looper for Arc<Handler> {
     const NAME: &'static str = "Analytics";
     const MILLIS: u64 = 5000;
 
