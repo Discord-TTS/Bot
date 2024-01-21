@@ -5,13 +5,14 @@ use std::{
 };
 
 pub use anyhow::{Error, Result};
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use serde::Deserialize as _;
 use strum_macros::IntoStaticStr;
 use tracing::warn;
 use typesize::derive::TypeSize;
 
 use poise::serenity_prelude::{self as serenity, json};
+use serenity::small_fixed_array::{FixedArray, FixedString};
 
 use crate::{analytics, database, into_static_display};
 
@@ -25,23 +26,23 @@ pub struct Config {
     pub website_info: Option<WebsiteInfo>,
     #[serde(rename = "Bot-List-Tokens")]
     #[serde(default)]
-    pub bot_list_tokens: BotListTokens,
+    pub bot_list_tokens: Option<BotListTokens>,
 }
 
 #[derive(serde::Deserialize)]
 pub struct MainConfig {
     pub announcements_channel: serenity::ChannelId,
+    pub tts_service_auth_key: Option<FixedString>,
+    pub translation_token: Option<FixedString>,
     pub patreon_service: Option<reqwest::Url>,
     pub translation_url: Option<reqwest::Url>,
-    pub tts_service_auth_key: Option<String>,
     pub invite_channel: serenity::ChannelId,
     pub website_url: Option<reqwest::Url>,
-    pub translation_token: Option<String>,
+    pub main_server_invite: FixedString,
     pub main_server: serenity::GuildId,
     pub ofs_role: serenity::RoleId,
-    pub main_server_invite: String,
     pub tts_service: reqwest::Url,
-    pub token: Option<String>,
+    pub token: Option<FixedString>,
 
     // Only for situations where gTTS has broken
     #[serde(default)]
@@ -70,17 +71,17 @@ pub struct WebhookConfigRaw {
     pub dm_logs: reqwest::Url,
 }
 
-#[derive(serde::Deserialize, Clone, Default)]
+#[derive(serde::Deserialize)]
 pub struct BotListTokens {
-    pub top_gg: Option<String>,
-    pub discord_bots_gg: Option<String>,
-    pub bots_on_discord: Option<String>,
+    pub top_gg: FixedString,
+    pub discord_bots_gg: FixedString,
+    pub bots_on_discord: FixedString,
 }
 
 pub struct WebhookConfig {
     pub logs: serenity::Webhook,
+    pub errors: serenity::Webhook,
     pub dm_logs: serenity::Webhook,
-    pub errors: Option<serenity::Webhook>,
 }
 
 pub struct JoinVCToken(pub serenity::GuildId);
@@ -121,31 +122,31 @@ pub struct Data {
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRowRaw>,
 
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
-    pub system_info: parking_lot::Mutex<sysinfo::System>,
+    pub translations: HashMap<FixedString<u8>, gettext::Catalog>,
     pub currently_purging: std::sync::atomic::AtomicBool,
-    pub translations: HashMap<String, gettext::Catalog>,
     pub fully_started: std::sync::atomic::AtomicBool,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
-    pub website_info: RwLock<Option<WebsiteInfo>>,
     pub startup_message: serenity::MessageId,
+    pub premium_avatar_url: FixedString<u16>,
+    pub system_info: Mutex<sysinfo::System>,
     pub start_time: std::time::SystemTime,
     pub songbird: Arc<songbird::Songbird>,
-    pub error_webhook: serenity::Webhook,
-    pub bot_list_tokens: BotListTokens,
-    pub premium_avatar_url: String,
-    pub main_server_invite: String,
     pub reqwest: reqwest::Client,
     pub regex_cache: RegexCache,
     pub webhooks: WebhookConfig,
     pub config: MainConfig,
     pub pool: sqlx::PgPool,
 
-    pub espeak_voices: Vec<String>,
-    pub gtts_voices: BTreeMap<String, String>,
-    pub polly_voices: BTreeMap<String, PollyVoice>,
-    pub gcloud_voices: BTreeMap<String, BTreeMap<String, GoogleGender>>,
+    // Taken out at startup
+    pub website_info: Mutex<Option<WebsiteInfo>>,
+    pub bot_list_tokens: Mutex<Option<BotListTokens>>,
 
-    pub translation_languages: BTreeMap<String, String>,
+    pub espeak_voices: FixedArray<FixedString>,
+    pub gtts_voices: BTreeMap<FixedString, FixedString>,
+    pub polly_voices: BTreeMap<FixedString, PollyVoice>,
+    pub gcloud_voices: BTreeMap<FixedString, BTreeMap<FixedString, GoogleGender>>,
+
+    pub translation_languages: BTreeMap<FixedString, FixedString>,
 }
 
 impl std::fmt::Debug for Data {
@@ -404,20 +405,20 @@ impl From<TTSModeChoice> for TTSMode {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GoogleVoice {
-    pub name: String,
+    pub name: FixedString,
     #[serde(default)]
     pub ssml_gender: GoogleGender,
-    pub language_codes: [String; 1],
+    pub language_codes: [FixedString; 1],
 }
 
 #[derive(serde::Deserialize)]
 pub struct PollyVoice {
-    pub additional_language_codes: Option<Vec<String>>,
-    pub language_code: String,
-    pub language_name: String,
+    pub additional_language_codes: Option<FixedArray<FixedString>>,
+    pub language_code: FixedString,
+    pub language_name: FixedString,
     pub gender: PollyGender,
-    pub name: String,
-    pub id: String,
+    pub name: FixedString,
+    pub id: FixedString,
 }
 
 #[derive(serde::Deserialize, IntoStaticStr, Copy, Clone, Default)]

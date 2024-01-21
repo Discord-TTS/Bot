@@ -20,7 +20,11 @@ use itertools::Itertools as _;
 use rand::Rng as _;
 
 use poise::serenity_prelude as serenity;
-use serenity::{builder::*, json};
+use serenity::{
+    builder::*,
+    json,
+    small_fixed_array::{FixedString, TruncatingInto},
+};
 
 use crate::{
     database::GuildRow,
@@ -126,10 +130,10 @@ pub async fn get_translation_langs(
     reqwest: &reqwest::Client,
     url: Option<&reqwest::Url>,
     token: Option<&str>,
-) -> Result<BTreeMap<String, String>> {
+) -> Result<BTreeMap<FixedString, FixedString>> {
     #[derive(serde::Deserialize)]
     pub struct DeeplVoice {
-        pub name: String,
+        pub name: FixedString,
         pub language: String,
     }
 
@@ -157,13 +161,13 @@ pub async fn get_translation_langs(
 
     Ok(languages
         .into_iter()
-        .map(|v| (v.language.to_lowercase(), v.name))
+        .map(|v| (v.language.to_lowercase().trunc_into(), v.name))
         .collect())
 }
 
 pub fn prepare_gcloud_voices(
     raw_map: Vec<GoogleVoice>,
-) -> BTreeMap<String, BTreeMap<String, GoogleGender>> {
+) -> BTreeMap<FixedString, BTreeMap<FixedString, GoogleGender>> {
     // {lang_accent: {variant: gender}}
     let mut cleaned_map = BTreeMap::new();
     for gvoice in raw_map {
@@ -180,7 +184,7 @@ pub fn prepare_gcloud_voices(
             cleaned_map
                 .entry(language)
                 .or_insert_with(BTreeMap::new)
-                .insert(String::from(variant), gvoice.ssml_gender);
+                .insert(FixedString::from_str_trunc(variant), gvoice.ssml_gender);
         }
     }
 

@@ -41,16 +41,16 @@ impl BotListUpdater {
         bot_id: UserId,
         guild_count: usize,
         shard_count: NonZeroU16,
-    ) -> Option<BotListReq> {
-        self.tokens.top_gg.as_deref().map(|token| BotListReq {
+    ) -> BotListReq {
+        BotListReq {
             url: format!("https://top.gg/api/bots/{bot_id}/stats"),
-            token: HeaderValue::from_str(token).unwrap(),
+            token: HeaderValue::from_str(self.tokens.top_gg.as_str()).unwrap(),
             body: to_vec(&json!({
                 "server_count": guild_count,
                 "shard_count": shard_count,
             }))
             .unwrap(),
-        })
+        }
     }
 
     fn discord_bots_gg_data(
@@ -58,30 +58,24 @@ impl BotListUpdater {
         bot_id: UserId,
         guild_count: usize,
         shard_count: NonZeroU16,
-    ) -> Option<BotListReq> {
-        self.tokens
-            .discord_bots_gg
-            .as_deref()
-            .map(|token| BotListReq {
-                url: format!("https://discord.bots.gg/api/v1/bots/{bot_id}/stats"),
-                token: HeaderValue::from_str(token).unwrap(),
-                body: to_vec(&json!({
-                    "guildCount": guild_count,
-                    "shardCount": shard_count,
-                }))
-                .unwrap(),
-            })
+    ) -> BotListReq {
+        BotListReq {
+            url: format!("https://discord.bots.gg/api/v1/bots/{bot_id}/stats"),
+            token: HeaderValue::from_str(self.tokens.discord_bots_gg.as_str()).unwrap(),
+            body: to_vec(&json!({
+                "guildCount": guild_count,
+                "shardCount": shard_count,
+            }))
+            .unwrap(),
+        }
     }
 
-    fn bots_on_discord_data(&self, bot_id: UserId, guild_count: usize) -> Option<BotListReq> {
-        self.tokens
-            .bots_on_discord
-            .as_deref()
-            .map(|token| BotListReq {
-                url: format!("https://bots.ondiscord.xyz/bot-api/bots/{bot_id}/guilds"),
-                body: to_vec(&json!({"guildCount": guild_count})).unwrap(),
-                token: HeaderValue::from_str(token).unwrap(),
-            })
+    fn bots_on_discord_data(&self, bot_id: UserId, guild_count: usize) -> BotListReq {
+        BotListReq {
+            url: format!("https://bots.ondiscord.xyz/bot-api/bots/{bot_id}/guilds"),
+            token: HeaderValue::from_str(self.tokens.bots_on_discord.as_str()).unwrap(),
+            body: to_vec(&json!({"guildCount": guild_count})).unwrap(),
+        }
     }
 }
 
@@ -90,22 +84,20 @@ impl crate::Looper for BotListUpdater {
     const MILLIS: u64 = 1000 * 60 * 60;
 
     async fn loop_func(&self) -> Result<()> {
-        let perform = |req| async move {
-            if let Some(BotListReq { url, body, token }) = req {
-                let headers = reqwest::header::HeaderMap::from_iter([
-                    (AUTHORIZATION, token),
-                    (CONTENT_TYPE, HeaderValue::from_static("application/json")),
-                ]);
+        let perform = |BotListReq { url, body, token }| async move {
+            let headers = reqwest::header::HeaderMap::from_iter([
+                (AUTHORIZATION, token),
+                (CONTENT_TYPE, HeaderValue::from_static("application/json")),
+            ]);
 
-                let request = self.reqwest.post(url).body(body).headers(headers);
+            let request = self.reqwest.post(url).body(body).headers(headers);
 
-                let err = require!(match request.send().await {
-                    Ok(resp) => resp.error_for_status().err(),
-                    Err(err) => Some(err),
-                });
+            let err = require!(match request.send().await {
+                Ok(resp) => resp.error_for_status().err(),
+                Err(err) => Some(err),
+            });
 
-                tracing::error!("{} Error: {:?}", Self::NAME, err);
-            }
+            tracing::error!("{} Error: {:?}", Self::NAME, err);
         };
 
         let shard_count = self.cache.shard_count();

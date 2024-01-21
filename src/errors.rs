@@ -83,7 +83,7 @@ async fn fetch_update_occurrences(
         return Ok(Some((traceback, traceback_hash)));
     };
 
-    let error_webhook = &data.error_webhook;
+    let error_webhook = &data.webhooks.errors;
     let message_id = serenity::MessageId::new(message_id as u64);
 
     let message = error_webhook.get_message(&ctx, None, message_id).await?;
@@ -117,7 +117,8 @@ async fn insert_traceback(
         .components(components.as_slice());
 
     let message = data
-        .error_webhook
+        .webhooks
+        .errors
         .execute(&ctx, true, builder)
         .await?
         .try_unwrap()?;
@@ -139,7 +140,8 @@ async fn insert_traceback(
     .await?;
 
     if message.id != db_message_id as u64 {
-        data.error_webhook
+        data.webhooks
+            .errors
             .delete_message(&ctx, None, message.id)
             .await?;
     }

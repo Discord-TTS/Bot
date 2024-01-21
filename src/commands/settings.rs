@@ -18,11 +18,12 @@ use std::{borrow::Cow, collections::HashMap, fmt::Write};
 
 use anyhow::bail;
 
-use self::serenity::{
-    builder::*, small_fixed_array::FixedString, ChannelId, ComponentInteractionDataKind,
-    Mentionable,
-};
 use poise::serenity_prelude as serenity;
+use serenity::{
+    builder::*,
+    small_fixed_array::{FixedString, TruncatingInto},
+    ChannelId, ComponentInteractionDataKind, Mentionable,
+};
 
 use crate::{
     constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR},
@@ -144,7 +145,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
         .title("Current Settings")
         .colour(neutral_colour)
-        .url(&data.config.main_server_invite)
+        .url(data.config.main_server_invite.as_str())
         .footer(CreateEmbedFooter::new(ctx.gettext(
             "Change these settings with `/set {property} {value}`!\nNone = setting has not been set yet!"
         )))
@@ -364,26 +365,27 @@ async fn voice_autocomplete<'a>(
     let (mut i1, mut i2, mut i3, mut i4);
     let voices: &mut dyn Iterator<Item = _> = match mode {
         TTSMode::gTTS => {
-            i1 = data.gtts_voices.iter().map(|(k, v)| (v.clone(), k.clone()));
+            i1 = data
+                .gtts_voices
+                .iter()
+                .map(|(k, v)| (v.to_string(), k.to_string()));
             &mut i1
         }
         TTSMode::eSpeak => {
             i2 = data
                 .espeak_voices
                 .iter()
-                .cloned()
-                .map(|voice| (voice.clone(), voice));
+                .map(|voice| (voice.to_string(), voice.to_string()));
             &mut i2
         }
         TTSMode::Polly => {
             i3 = data.polly_voices.values().map(|voice| {
-                (
-                    format!(
-                        "{} - {} ({})",
-                        voice.name, voice.language_name, voice.gender
-                    ),
-                    voice.id.clone(),
-                )
+                let name = format!(
+                    "{} - {} ({})",
+                    voice.name, voice.language_name, voice.gender
+                );
+
+                (name, voice.id.to_string())
             });
             &mut i3
         }
@@ -423,7 +425,7 @@ async fn translation_languages_autocomplete<'a>(
         .translation_languages
         .iter()
         .filter(|(_, name)| name.starts_with(searching))
-        .map(|(value, name)| (value.clone(), name.clone()))
+        .map(|(value, name)| (value.to_string(), name.to_string()))
         .collect::<Vec<_>>();
 
     filtered_languages.sort_by_key(|(label, _)| strsim::levenshtein(label, searching));
@@ -473,7 +475,7 @@ where
         ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
-            .thumbnail(&data.premium_avatar_url)
+            .thumbnail(data.premium_avatar_url.as_str())
             .url("https://www.patreon.com/Gnome_the_Bot_Maker")
             .footer(CreateEmbedFooter::new(ctx.gettext(
                 "If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!"
@@ -515,7 +517,7 @@ async fn change_voice<'a, T, RowT1, RowT2>(
     author_id: serenity::UserId,
     guild_id: serenity::GuildId,
     key: T,
-    voice: Option<String>,
+    voice: Option<FixedString>,
     target: Target,
 ) -> Result<Cow<'a, str>, Error>
 where
@@ -530,7 +532,9 @@ where
     Ok(if let Some(voice) = voice {
         if check_valid_voice(&data, &voice, mode) {
             general_db.create_row(key).await?;
-            voice_db.set_one((key, mode), "voice", &voice).await?;
+            voice_db
+                .set_one((key, mode), "voice", voice.as_str())
+                .await?;
 
             let name = get_voice_name(&data, &voice, mode).unwrap_or(&voice);
             Cow::Owned(
@@ -552,7 +556,7 @@ where
     })
 }
 
-fn format_languages<'a>(mut iter: impl Iterator<Item = &'a String>) -> String {
+fn format_languages<'a>(mut iter: impl Iterator<Item = &'a FixedString>) -> String {
     let mut buf = String::with_capacity(iter.size_hint().0 * 2);
     if let Some(first_elt) = iter.next() {
         buf.push('`');
@@ -568,7 +572,7 @@ fn format_languages<'a>(mut iter: impl Iterator<Item = &'a String>) -> String {
     buf
 }
 
-fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a String> {
+fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a FixedString> {
     match mode {
         TTSMode::gTTS => data.gtts_voices.get(code),
         TTSMode::Polly => data.polly_voices.get(code).map(|n| &n.name),
@@ -576,7 +580,7 @@ fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a S
     }
 }
 
-fn check_valid_voice(data: &Data, code: &String, mode: TTSMode) -> bool {
+fn check_valid_voice(data: &Data, code: &FixedString, mode: TTSMode) -> bool {
     match mode {
         TTSMode::gTTS | TTSMode::Polly => get_voice_name(data, code, mode).is_some(),
         TTSMode::eSpeak => data.espeak_voices.contains(code),
@@ -935,7 +939,7 @@ pub async fn server_voice(
         ctx.author().id,
         guild_id,
         guild_id.into(),
-        Some(voice),
+        Some(voice.trunc_into()),
         Target::Guild,
     )
     .await?;
@@ -965,7 +969,8 @@ pub async fn translation_lang(
     let guild_id = ctx.guild_id().unwrap().into();
 
     let to_say = if target_lang.as_ref().map_or(true, |target_lang| {
-        data.translation_languages.contains_key(target_lang)
+        data.translation_languages
+            .contains_key(target_lang.as_str())
     }) {
         data.guilds_db
             .set_one(guild_id, "target_lang", &target_lang)
@@ -1507,7 +1512,7 @@ pub async fn voice(
         author_id,
         guild_id,
         author_id.into(),
-        voice,
+        voice.map(String::trunc_into),
         Target::User,
     )
     .await?;

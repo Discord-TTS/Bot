@@ -1656,9 +1656,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.76"
+version = "1.0.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95fc56cda0b5c3325f5fbbd7ff9fda9e02bb00bb3dac51252d2f1bfa1cb8cc8c"
+checksum = "9f9b1511a24c627ab3e92b48be4b32f8d0ea91ee351edd87fbf650aadd336340"
 dependencies = [
  "unicode-ident",
 ]
@@ -2180,7 +2180,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.0"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#311de73237e37643b2dacabdace99ab87ced571b"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#316497c549d7c34dce76d97e78b516b2382cb517"
 dependencies = [
  "arrayvec",
  "async-trait",
@@ -2290,8 +2290,7 @@ dependencies = [
 [[package]]
 name = "small-fixed-array"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8aa3c22dfb1d24119241f7b11d4927c96df799674c6e617bda809da6687de92"
+source = "git+https://github.com/GnomedDev/small-fixed-array#a89a733973fcf2dffe10fb22e755ae8c23b06183"
 dependencies = [
  "serde",
  "typesize",

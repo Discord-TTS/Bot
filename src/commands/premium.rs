@@ -77,7 +77,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
         ctx.send(CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .description(error_msg)
-            .thumbnail(&data.premium_avatar_url)
+            .thumbnail(data.premium_avatar_url.as_str())
             .colour(crate::constants::PREMIUM_NEUTRAL_COLOUR)
             .footer(CreateEmbedFooter::new({
                 let line1 = ctx.gettext("If you have just subscribed, please wait for up to an hour for the member list to update!\n");

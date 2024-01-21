@@ -73,3 +73,6 @@ git = "https://github.com/GnomedDev/songbird"
 features = ["builtin-queue"]
 branch = "fix-id"
 version = "0.4"
+
+[patch.crates-io.small-fixed-array]
+git = "https://github.com/GnomedDev/small-fixed-array"

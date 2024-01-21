@@ -150,7 +150,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
                         .description(error_message)
                         .footer(serenity::CreateEmbedFooter::new(format!(
                             "Support Server: {}",
-                            self.data().main_server_invite
+                            self.data().config.main_server_invite
                         ))),
                 ),
             )

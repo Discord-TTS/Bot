@@ -70,13 +70,15 @@ pub async fn ready(
 
     if last_shard && !data.fully_started.load(Ordering::SeqCst) {
         data.fully_started.store(true, Ordering::SeqCst);
-        let stats_updater = BotListUpdater::new(
-            data.reqwest.clone(),
-            ctx.cache.clone(),
-            data.bot_list_tokens.clone(),
-        );
 
-        if let Some(website_info) = data.website_info.write().take() {
+        if let Some(bot_list_tokens) = data.bot_list_tokens.lock().take() {
+            let stats_updater =
+                BotListUpdater::new(data.reqwest.clone(), ctx.cache.clone(), bot_list_tokens);
+
+            tokio::spawn(stats_updater.start());
+        }
+
+        if let Some(website_info) = data.website_info.lock().take() {
             let web_updater = web_updater::Updater {
                 patreon_service: data.config.patreon_service.clone(),
                 reqwest: data.reqwest.clone(),
@@ -87,8 +89,6 @@ pub async fn ready(
 
             tokio::spawn(web_updater.start());
         }
-
-        tokio::spawn(stats_updater.start());
     }
 
     Ok(())

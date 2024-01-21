@@ -45,10 +45,11 @@ use std::{
 };
 
 use anyhow::Ok;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use tracing::{error, warn};
 
 use poise::serenity_prelude::{self as serenity, builder::*, Mentionable as _};
+use serenity::small_fixed_array::{FixedArray, FixedString};
 
 mod analytics;
 mod bot_list_updater;
@@ -100,8 +101,8 @@ async fn get_webhooks(
 
     Ok(WebhookConfig {
         logs,
+        errors,
         dm_logs,
-        errors: Some(errors),
     })
 }
 
@@ -163,15 +164,12 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
                 .filter(filter_entry(EntryCheck::IsFile))
                 .filter(|e| e.path().extension().map_or(false, |e| e == "mo"))
                 .map(|entry| {
+                    let os_file_path = entry.file_name();
+                    let file_path = os_file_path.to_str().unwrap();
+                    let file_name = file_path.split('.').next().unwrap();
+
                     Ok((
-                        entry
-                            .file_name()
-                            .to_str()
-                            .unwrap()
-                            .split('.')
-                            .next()
-                            .unwrap()
-                            .to_string(),
+                        FixedString::from_str_trunc(file_name),
                         gettext::Catalog::parse(std::fs::File::open(entry.path())?)?,
                     ))
                 })
@@ -190,7 +188,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         user_voice_db,
         guild_voice_db,
         nickname_db,
-        mut webhooks,
+        webhooks,
         translation_languages,
         premium_avatar_url,
         gtts_voices,
@@ -213,11 +211,11 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             serenity::UserId::new(802632257658683442)
                 .to_user(&http)
                 .await
-                .map(|u| u.face())
+                .map(|u| FixedString::from_string_trunc(u.face()))
                 .map_err(Into::into)
         },
         async {
-            Ok(decode_resp::<BTreeMap<String, String>>(
+            Ok(decode_resp::<BTreeMap<FixedString, FixedString>>(
                 TTSMode::gTTS
                     .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
                     .await?,
@@ -225,7 +223,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             .await?)
         },
         async {
-            Ok(decode_resp::<Vec<String>>(
+            Ok(decode_resp::<FixedArray<FixedString>>(
                 TTSMode::eSpeak
                     .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
                     .await?,
@@ -243,7 +241,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             ))
         },
         async {
-            Ok(decode_resp::<Vec<PollyVoice>>(
+            Ok(decode_resp::<FixedArray<PollyVoice>>(
                 TTSMode::Polly
                     .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
                     .await?,
@@ -270,7 +268,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         Arc::new(http),
         "TTS-Webhook",
         webhooks.logs.clone(),
-        webhooks.errors.clone().unwrap(),
+        webhooks.errors.clone(),
     );
 
     tracing::subscriber::set_global_default(logger.clone())?;
@@ -294,10 +292,8 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let data = Arc::new(Data {
         pool,
         translations,
-        bot_list_tokens: config.bot_list_tokens,
-        error_webhook: webhooks.errors.take().unwrap(),
         system_info: Mutex::new(sysinfo::System::new()),
-        main_server_invite: config.main.main_server_invite.clone(),
+        bot_list_tokens: Mutex::new(config.bot_list_tokens),
 
         songbird: songbird.clone(),
         fully_started: AtomicBool::new(false),
@@ -311,7 +307,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         polly_voices,
         translation_languages,
 
-        website_info: RwLock::new(config.website_info),
+        website_info: Mutex::new(config.website_info),
         config: config.main,
         reqwest,
         premium_avatar_url,
@@ -528,7 +524,7 @@ async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
                     .title("TTS Bot Premium - Premium Only Command!")
                     .description(main_msg)
                     .colour(PREMIUM_NEUTRAL_COLOUR)
-                    .thumbnail(&data.premium_avatar_url)
+                    .thumbnail(data.premium_avatar_url.as_str())
                     .footer(serenity::CreateEmbedFooter::new(FOOTER_MSG));
 
                 builder.embed(embed)
