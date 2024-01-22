@@ -11,6 +11,16 @@ use crate::{
     web_updater,
 };
 
+#[cfg(unix)]
+fn clear_allocator_cache() {
+    unsafe {
+        libc::malloc_trim(0);
+    }
+}
+
+#[cfg(not(unix))]
+fn clear_allocator_cache() {}
+
 fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
     let mut shards: Vec<_> = shards.iter().collect();
     shards.sort_by_key(|(id, _)| *id);
@@ -107,6 +117,10 @@ pub async fn ready(
 
             tokio::spawn(web_updater.start());
         }
+
+        // Tell glibc to let go of the memory it's holding onto.
+        // We are very unlikely to reach the peak of memory allocation that was just hit.
+        clear_allocator_cache();
     }
 
     Ok(())

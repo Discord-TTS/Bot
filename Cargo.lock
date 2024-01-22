@@ -548,6 +548,7 @@ dependencies = [
  "gettext",
  "indexmap",
  "itertools",
+ "libc",
  "linkify",
  "num-format",
  "parking_lot",
@@ -558,6 +559,7 @@ dependencies = [
  "serde",
  "serenity",
  "sha2",
+ "small-fixed-array",
  "songbird",
  "sqlx",
  "strsim 0.11.0",
@@ -1896,9 +1898,9 @@ checksum = "d626bb9dae77e28219937af045c257c28bfd3f69333c512553507f5f9798cb76"
 
 [[package]]
 name = "rustfft"
-version = "6.1.0"
+version = "6.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e17d4f6cbdb180c9f4b2a26bbf01c4e647f1e1dea22fe8eb9db54198b32f9434"
+checksum = "43806561bc506d0c5d160643ad742e3161049ac01027b5e6d7524091fd401d86"
 dependencies = [
  "num-complex",
  "num-integer",
@@ -2180,7 +2182,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.0"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#316497c549d7c34dce76d97e78b516b2382cb517"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#679569bf9597096ea3c540c4d7553d499426f57b"
 dependencies = [
  "arrayvec",
  "async-trait",
