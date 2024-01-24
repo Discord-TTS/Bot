@@ -94,7 +94,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let missing_permissions = (serenity::Permissions::VIEW_CHANNEL
         | serenity::Permissions::CONNECT
         | serenity::Permissions::SPEAK)
-        - channel.permissions_for_user(ctx, bot_id)?;
+        - channel.permissions_for_user(ctx.cache(), bot_id)?;
 
     if !missing_permissions.is_empty() {
         let msg = ctx.gettext("I do not have permission to TTS in your voice channel, please ask a server administrator to give me: {missing_permissions}")

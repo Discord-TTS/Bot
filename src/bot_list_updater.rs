@@ -1,11 +1,9 @@
 use std::{num::NonZeroU16, sync::Arc};
 
 use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use serde_json::{json, to_vec};
 
-use self::serenity::{
-    json::{json, to_vec},
-    UserId,
-};
+use self::serenity::UserId;
 use poise::serenity_prelude as serenity;
 
 use crate::{require, structs::BotListTokens, Result};

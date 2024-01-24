@@ -279,15 +279,15 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chrono"
-version = "0.4.31"
+version = "0.4.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f2c685bad3eb3d45a01354cedb7d5faa66194d1d58ba6e267a8de788f79db38"
+checksum = "41daef31d7a747c5c847246f36de49ced6f7403b4cdabc807a97b5cc184cda7a"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
  "num-traits",
  "serde",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.0",
 ]
 
 [[package]]
@@ -557,6 +557,7 @@ dependencies = [
  "regex",
  "reqwest",
  "serde",
+ "serde_json",
  "serenity",
  "sha2",
  "small-fixed-array",
@@ -1600,7 +1601,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.6.1"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#3e26ef83ee58dc8829cd803834829e6966963efb"
+source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#023f66a427da03d4a05c51193daaa63aac726b00"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1616,7 +1617,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.6.1"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#3e26ef83ee58dc8829cd803834829e6966963efb"
+source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#023f66a427da03d4a05c51193daaa63aac726b00"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -2182,7 +2183,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.0"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#679569bf9597096ea3c540c4d7553d499426f57b"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#4e05d38796e50b10a6a201d2fa03a71f759ac766"
 dependencies = [
  "arrayvec",
  "async-trait",

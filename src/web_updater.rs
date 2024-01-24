@@ -6,8 +6,7 @@ use std::{
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{
-    funcs::decode_resp,
-    serenity::{self as serenity, json},
+    serenity,
     structs::{TTSMode, WebsiteInfo},
     Result,
 };
@@ -60,13 +59,14 @@ impl crate::Looper for Updater {
 
         let patreon_members = if let Some(mut patreon_service) = self.patreon_service.clone() {
             patreon_service.set_path("members");
-            let resp = self
+            let raw_members: HashMap<i64, serde::de::IgnoredAny> = self
                 .reqwest
                 .get(patreon_service)
                 .send()
                 .await?
-                .error_for_status()?;
-            let raw_members: HashMap<i64, serde::de::IgnoredAny> = decode_resp(resp).await?;
+                .error_for_status()?
+                .json()
+                .await?;
 
             raw_members.into_keys().collect()
         } else {
@@ -133,7 +133,7 @@ impl crate::Looper for Updater {
             .post(url)
             .header(AUTHORIZATION, self.config.stats_key.clone())
             .header(CONTENT_TYPE, "application/json")
-            .body(json::to_string(&stats)?)
+            .body(serde_json::to_string(&stats)?)
             .send()
             .await?
             .error_for_status()?;

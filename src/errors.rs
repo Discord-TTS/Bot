@@ -54,7 +54,7 @@ fn truncate_error(error: &Error) -> String {
 }
 
 async fn fetch_update_occurrences(
-    ctx: &serenity::Context,
+    http: &serenity::Http,
     data: &Data,
     error: &Error,
 ) -> Result<Option<(String, Vec<u8>)>, Error> {
@@ -86,20 +86,22 @@ async fn fetch_update_occurrences(
     let error_webhook = &data.webhooks.errors;
     let message_id = serenity::MessageId::new(message_id as u64);
 
-    let message = error_webhook.get_message(&ctx, None, message_id).await?;
+    let message = error_webhook.get_message(http, None, message_id).await?;
     let mut embed = message.embeds.into_vec().remove(0);
 
     embed.footer.as_mut().try_unwrap()?.text =
         format!("This error has occurred {occurrences} times!").trunc_into();
 
     let builder = serenity::EditWebhookMessage::default().embeds(vec![embed.into()]);
-    error_webhook.edit_message(ctx, message_id, builder).await?;
+    error_webhook
+        .edit_message(http, message_id, builder)
+        .await?;
 
     Ok(None)
 }
 
 async fn insert_traceback(
-    ctx: &serenity::Context,
+    http: &serenity::Http,
     data: &Data,
     embed: serenity::CreateEmbed<'_>,
     traceback: String,
@@ -119,7 +121,7 @@ async fn insert_traceback(
     let message = data
         .webhooks
         .errors
-        .execute(&ctx, true, builder)
+        .execute(http, true, builder)
         .await?
         .try_unwrap()?;
 
@@ -142,7 +144,7 @@ async fn insert_traceback(
     if message.id != db_message_id as u64 {
         data.webhooks
             .errors
-            .delete_message(&ctx, None, message.id)
+            .delete_message(http, None, message.id)
             .await?;
     }
 
@@ -161,7 +163,8 @@ pub async fn handle_unexpected<'a>(
     let data = poise_context.user_data();
     let ctx = poise_context.serenity_context;
 
-    let Some((traceback, traceback_hash)) = fetch_update_occurrences(ctx, &data, &error).await?
+    let Some((traceback, traceback_hash)) =
+        fetch_update_occurrences(&ctx.http, &data, &error).await?
     else {
         return Ok(());
     };
@@ -224,7 +227,7 @@ pub async fn handle_unexpected<'a>(
         embed = embed.author(author_builder);
     }
 
-    insert_traceback(ctx, &data, embed, traceback, traceback_hash).await
+    insert_traceback(&ctx.http, &data, embed, traceback, traceback_hash).await
 }
 
 pub async fn handle_unexpected_default(
@@ -333,7 +336,7 @@ async fn handle_cooldown(
             };
 
             if channel
-                .permissions_for_user(ctx_discord, bot_user_id)?
+                .permissions_for_user(&ctx_discord.cache, bot_user_id)?
                 .manage_messages()
             {
                 ctx.msg.delete(ctx_discord).await?;

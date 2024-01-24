@@ -22,7 +22,6 @@ use rand::Rng as _;
 use poise::serenity_prelude as serenity;
 use serenity::{
     builder::*,
-    json,
     small_fixed_array::{FixedString, TruncatingInto},
 };
 
@@ -35,10 +34,6 @@ use crate::{
         TTSServiceError,
     },
 };
-
-pub async fn decode_resp<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Result<T> {
-    json::from_slice(&resp.bytes().await?).map_err(Into::into)
-}
 
 pub async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<()> {
     data.guilds_db
@@ -92,7 +87,7 @@ pub async fn fetch_audio(
 
     match resp.error_for_status_ref() {
         Ok(_) => Ok(Some(resp)),
-        Err(backup_err) => match decode_resp::<TTSServiceError>(resp).await {
+        Err(backup_err) => match resp.json::<TTSServiceError>().await {
             Ok(err) => {
                 if err.code.should_ignore() {
                     Ok(None)
@@ -147,17 +142,15 @@ pub async fn get_translation_langs(
         return Ok(BTreeMap::new());
     };
 
-    let resp = reqwest
+    let languages: Vec<DeeplVoice> = reqwest
         .get(format!("{url}/languages"))
         .query(&DeeplVoiceRequest { kind: "target" })
         .header("Authorization", format!("DeepL-Auth-Key {token}"))
         .send()
         .await?
         .error_for_status()?
-        .bytes()
+        .json()
         .await?;
-
-    let languages: Vec<DeeplVoice> = json::from_slice(&resp)?;
 
     Ok(languages
         .into_iter()
@@ -545,7 +538,7 @@ pub async fn translate(
         preserve_formatting: 1,
     };
 
-    let resp = reqwest
+    let response: DeeplTranslateResponse = reqwest
         .get(format!("{translation_url}/translate"))
         .query(&request)
         .header(
@@ -555,10 +548,9 @@ pub async fn translate(
         .send()
         .await?
         .error_for_status()?
-        .bytes()
+        .json()
         .await?;
 
-    let response: DeeplTranslateResponse = json::from_slice(&resp)?;
     if let Some(translation) = response.translations.into_iter().next() {
         if translation.detected_source_language != target_lang {
             return Ok(Some(translation.text));
@@ -588,7 +580,7 @@ pub async fn confirm_dialog_wait(
     author_id: serenity::UserId,
 ) -> Result<Option<bool>> {
     let interaction = message
-        .await_component_interaction(&ctx.shard)
+        .await_component_interaction(ctx.shard.clone())
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(author_id)
         .await;

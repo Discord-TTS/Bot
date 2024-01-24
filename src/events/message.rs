@@ -236,7 +236,7 @@ async fn process_mention_msg(
     let bot_user = ctx.cache.current_user().id;
     let guild_id = require!(message.guild_id, Ok(()));
     let channel = message.channel(ctx).await?.guild().unwrap();
-    let permissions = channel.permissions_for_user(ctx, bot_user)?;
+    let permissions = channel.permissions_for_user(&ctx.cache, bot_user)?;
 
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
     let prefix = guild_row.prefix.as_str().replace(['`', '\\'], "");

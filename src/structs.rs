@@ -11,7 +11,7 @@ use strum_macros::IntoStaticStr;
 use tracing::warn;
 use typesize::derive::TypeSize;
 
-use poise::serenity_prelude::{self as serenity, json};
+use poise::serenity_prelude::{self as serenity};
 use serenity::small_fixed_array::{FixedArray, FixedString};
 
 use crate::{analytics, database, into_static_display};
@@ -186,8 +186,8 @@ impl Data {
             url.set_path(&format!("/members/{user_id}"));
 
             let req = self.reqwest.get(url);
-            let resp = req.send().await?.error_for_status()?.bytes().await?;
-            json::from_slice(&resp).map_err(Into::into)
+            let resp = req.send().await?.error_for_status()?.json().await?;
+            Ok(resp)
         } else {
             // Return fake PatreonInfo if `patreon_service` has not been set to simplify self-hosting.
             Ok(Some(PatreonInfo {
@@ -324,12 +324,12 @@ pub enum TTSMode {
 }
 
 impl TTSMode {
-    pub async fn fetch_voices(
+    pub async fn fetch_voices<T: serde::de::DeserializeOwned>(
         self,
         mut tts_service: reqwest::Url,
         reqwest: &reqwest::Client,
         auth_key: Option<&str>,
-    ) -> Result<reqwest::Response> {
+    ) -> Result<T> {
         tts_service.set_path("voices");
         tts_service
             .query_pairs_mut()
@@ -342,7 +342,9 @@ impl TTSMode {
             .header("Authorization", auth_key.unwrap_or(""))
             .send()
             .await?
-            .error_for_status()
+            .error_for_status()?
+            .json()
+            .await
             .map_err(Into::into)
     }
 

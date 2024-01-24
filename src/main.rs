@@ -70,7 +70,7 @@ mod traits;
 mod web_updater;
 
 use constants::PREMIUM_NEUTRAL_COLOUR;
-use funcs::{decode_resp, get_translation_langs, prepare_gcloud_voices};
+use funcs::{get_translation_langs, prepare_gcloud_voices};
 use looper::Looper;
 use opt_ext::OptionTryUnwrap;
 use structs::{
@@ -215,41 +215,41 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
                 .map_err(Into::into)
         },
         async {
-            Ok(decode_resp::<BTreeMap<FixedString, FixedString>>(
-                TTSMode::gTTS
-                    .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
-                    .await?,
-            )
-            .await?)
+            Ok(TTSMode::gTTS
+                .fetch_voices::<BTreeMap<FixedString, FixedString>>(
+                    config.main.tts_service.clone(),
+                    &reqwest,
+                    auth_key,
+                )
+                .await?)
         },
         async {
-            Ok(decode_resp::<FixedArray<FixedString>>(
-                TTSMode::eSpeak
-                    .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
-                    .await?,
-            )
-            .await?)
+            Ok(TTSMode::eSpeak
+                .fetch_voices::<FixedArray<FixedString>>(
+                    config.main.tts_service.clone(),
+                    &reqwest,
+                    auth_key,
+                )
+                .await?)
         },
         async {
             Ok(prepare_gcloud_voices(
-                decode_resp(
-                    TTSMode::gCloud
-                        .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
-                        .await?,
-                )
-                .await?,
+                TTSMode::gCloud
+                    .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
+                    .await?,
             ))
         },
         async {
-            Ok(decode_resp::<FixedArray<PollyVoice>>(
-                TTSMode::Polly
-                    .fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key)
-                    .await?,
-            )
-            .await?
-            .into_iter()
-            .map(|v| (v.id.clone(), v))
-            .collect::<BTreeMap<_, _>>())
+            Ok(TTSMode::Polly
+                .fetch_voices::<FixedArray<PollyVoice>>(
+                    config.main.tts_service.clone(),
+                    &reqwest,
+                    auth_key,
+                )
+                .await?
+                .into_iter()
+                .map(|v| (v.id.clone(), v))
+                .collect::<BTreeMap<_, _>>())
         },
     )?;
 

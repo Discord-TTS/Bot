@@ -317,7 +317,7 @@ impl<'a> MenuPaginator<'a> {
 
         loop {
             let builder = message
-                .await_component_interaction(&serenity_context.shard)
+                .await_component_interaction(serenity_context.shard.clone())
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(self.ctx.author().id);
 
@@ -1201,7 +1201,7 @@ pub async fn nick(
         && !guild_id
             .member(ctx, author.id)
             .await?
-            .permissions(ctx)?
+            .permissions(ctx.cache())?
             .administrator()
     {
         ctx.say(ctx.gettext("**Error**: You need admin to set other people's nicknames!"))
@@ -1350,7 +1350,7 @@ pub async fn setup(
             let interaction = reply
                 .message()
                 .await?
-                .await_component_interaction(&ctx.serenity_context().shard)
+                .await_component_interaction(ctx.serenity_context().shard.clone())
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(ctx.author().id)
                 .await;
@@ -1434,7 +1434,7 @@ Just do `/join` and start talking!
 
     let reply = if confirmed {
         let announcements = data.config.announcements_channel;
-        announcements.follow(ctx, channel.id).await?;
+        announcements.follow(ctx.http(), channel.id).await?;
 
         ctx.gettext("Set up update announcements in this channel!")
     } else {

@@ -33,6 +33,7 @@ typesize = { version = "0.1.2", features = ["arrayvec"] }
 bool_to_bitflags = { version = "0.1", features = ["typesize"] }
 small-fixed-array = { version = "0.2", features = ["nightly"] }
 libc = "0.2.152"
+serde_json = "1.0.111"
 
 [dependencies.symphonia]
 features = ["mp3", "ogg", "wav", "pcm"]

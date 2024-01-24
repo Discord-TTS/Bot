@@ -106,11 +106,12 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
     ) -> Result<Option<poise::ReplyHandle<'ctx>>> {
         let author = self.author();
         let serenity_ctx = self.serenity_context();
+        let serernity_cache = &serenity_ctx.cache;
 
         let (name, avatar_url) = match self.channel_id().to_channel(serenity_ctx).await? {
             serenity::Channel::Guild(channel) => {
                 let permissions = channel
-                    .permissions_for_user(serenity_ctx, serenity_ctx.cache.current_user().id)?;
+                    .permissions_for_user(serernity_cache, serernity_cache.current_user().id)?;
 
                 if !permissions.send_messages() {
                     return Ok(None);

@@ -164,7 +164,7 @@ pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandRes
 
         data.currently_purging.store(true, SeqCst);
         for guild in to_leave {
-            guild.leave(ctx).await?;
+            guild.leave(ctx.http()).await?;
 
             if !data.currently_purging.load(SeqCst) {
                 msg.edit(ctx, poise::CreateReply::default().content("Aborted!"))
