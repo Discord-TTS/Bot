@@ -68,7 +68,7 @@ async fn update_startup_message(
 
     data.webhooks
         .logs
-        .edit_message(&ctx, data.startup_message, builder)
+        .edit_message(&ctx.http, data.startup_message, builder)
         .await?;
 
     Ok(())

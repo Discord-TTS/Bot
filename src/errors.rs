@@ -581,7 +581,7 @@ pub async fn handle_traceback_button(
 
     interaction
         .create_response(
-            &framework.serenity_context,
+            &framework.serenity_context.http,
             CreateInteractionResponse::Message(response_data),
         )
         .await?;

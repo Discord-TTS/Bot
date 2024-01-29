@@ -321,26 +321,21 @@ async fn process_support_dm(
                 attachments.push(attachment_builder);
             }
 
-            data.webhooks
-                .dm_logs
-                .execute(
-                    &ctx,
-                    false,
-                    ExecuteWebhook::default()
-                        .files(attachments)
-                        .content(message.content.as_str())
-                        .username(webhook_username)
-                        .avatar_url(message.author.face())
-                        .embeds(
-                            message
-                                .embeds
-                                .iter()
-                                .cloned()
-                                .map(Into::into)
-                                .collect::<Vec<_>>(),
-                        ),
-                )
-                .await?;
+            let builder = ExecuteWebhook::default()
+                .files(attachments)
+                .content(message.content.as_str())
+                .username(webhook_username)
+                .avatar_url(message.author.face())
+                .embeds(
+                    message
+                        .embeds
+                        .iter()
+                        .cloned()
+                        .map(Into::into)
+                        .collect::<Vec<_>>(),
+                );
+
+            data.webhooks.dm_logs.execute(&ctx.http, false, builder).await?;
         }
     } else {
         let (client_id, title) = {

@@ -1356,7 +1356,7 @@ pub async fn setup(
                 .await;
 
             if let Some(interaction) = interaction {
-                interaction.defer(&ctx).await?;
+                interaction.defer(ctx.http()).await?;
 
                 let ComponentInteractionDataKind::StringSelect { values } = &interaction.data.kind
                 else {

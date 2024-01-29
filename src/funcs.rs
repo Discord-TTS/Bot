@@ -586,7 +586,7 @@ pub async fn confirm_dialog_wait(
         .await;
 
     if let Some(interaction) = interaction {
-        interaction.defer(ctx).await?;
+        interaction.defer(&ctx.http).await?;
         match &*interaction.data.custom_id {
             "True" => Ok(Some(true)),
             "False" => Ok(Some(false)),

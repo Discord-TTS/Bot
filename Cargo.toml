@@ -72,10 +72,9 @@ features = ["cache"]
 branch = "serenity-next"
 
 [dependencies.songbird]
-git = "https://github.com/GnomedDev/songbird"
+git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
-branch = "fix-id"
-version = "0.4"
+branch = "serenity-next"
 
 [patch.crates-io.small-fixed-array]
 git = "https://github.com/GnomedDev/small-fixed-array"

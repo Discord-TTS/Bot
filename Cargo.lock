@@ -1148,9 +1148,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.1.0"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
+checksum = "433de089bd45971eecf4668ee0ee8f4cec17db4f8bd8f7bc3197a6ce37aa7d9b"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.3",
@@ -1173,9 +1173,9 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 
 [[package]]
 name = "itertools"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
@@ -1601,7 +1601,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.6.1"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#023f66a427da03d4a05c51193daaa63aac726b00"
+source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#9bd3f5b4c8b842ee6184e1f6847b5ae7aecce976"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1617,7 +1617,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.6.1"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#023f66a427da03d4a05c51193daaa63aac726b00"
+source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#9bd3f5b4c8b842ee6184e1f6847b5ae7aecce976"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1668,11 +1668,11 @@ dependencies = [
 
 [[package]]
 name = "pulldown-cmark"
-version = "0.9.3"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77a1a2f1f0a7ecff9c31abbe177637be0e97a0aef46cf8738ece09327985d998"
+checksum = "57206b407293d2bcd3af849ce869d52068623f19e1b5ff8e8778e3309439682b"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.4.2",
  "memchr",
  "unicase",
 ]
@@ -2139,9 +2139,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.112"
+version = "1.0.113"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d1bd37ce2324cf3bf85e5a25f96eb4baf0d5aa6eba43e7ae8958870c4ec48ed"
+checksum = "69801b70b1c3dac963ecb03a364ba0ceda9cf60c71cfe475e99864759c8b8a79"
 dependencies = [
  "itoa",
  "ryu",
@@ -2183,7 +2183,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.0"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#a4a06a444183abbe657c1c62a3285932beeb11e9"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#d706897b0c2790c1d9fe0b64871a7ce251ef3e43"
 dependencies = [
  "arrayvec",
  "async-trait",
@@ -2318,7 +2318,7 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.4.0"
-source = "git+https://github.com/GnomedDev/songbird?branch=fix-id#516c3cc400f9c7c7a905e53cbd0b6e50721469f7"
+source = "git+https://github.com/serenity-rs/songbird?branch=serenity-next#ea7cfd97dc2363870248505537d2aa94107fb23b"
 dependencies = [
  "async-trait",
  "audiopus",
@@ -2327,6 +2327,7 @@ dependencies = [
  "dashmap",
  "derivative",
  "discortp",
+ "either",
  "flume",
  "futures",
  "nohash-hasher",
