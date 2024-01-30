@@ -27,12 +27,13 @@ use serenity::{
 
 use crate::{
     database::GuildRow,
-    opt_ext::{OptionGettext, OptionTryUnwrap},
+    opt_ext::OptionTryUnwrap,
     require,
     structs::{
         Context, Data, GoogleGender, GoogleVoice, LastToXsaidTracker, RegexCache, Result, TTSMode,
         TTSServiceError,
     },
+    translations::OptionGettext,
 };
 
 pub async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<()> {

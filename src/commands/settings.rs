@@ -29,13 +29,13 @@ use crate::{
     constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR},
     database::{self, Compact},
     funcs::{confirm_dialog, random_footer},
-    opt_ext::OptionGettext,
     require, require_guild,
     structs::{
         ApplicationContext, Command, CommandResult, Context, Data, Error, Result, SpeakingRateInfo,
         TTSMode, TTSModeChoice,
     },
     traits::PoiseContextExt,
+    translations::{GetTextContextExt, OptionGettext},
 };
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {

@@ -1,15 +1,5 @@
 use crate::Result;
 
-pub trait OptionGettext<'a> {
-    fn gettext(self, translate: &'a str) -> &'a str;
-}
-
-impl<'a> OptionGettext<'a> for Option<&'a gettext::Catalog> {
-    fn gettext(self, translate: &'a str) -> &'a str {
-        self.map_or(translate, |c| c.gettext(translate))
-    }
-}
-
 pub trait OptionTryUnwrap<T> {
     fn try_unwrap(self) -> Result<T>;
 }

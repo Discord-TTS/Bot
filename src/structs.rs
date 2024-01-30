@@ -113,6 +113,24 @@ pub struct RegexCache {
     pub emoji: regex::Regex,
 }
 
+impl RegexCache {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            replacements: [
+                (
+                    regex::Regex::new(r"\|\|(?s:.)*?\|\|")?,
+                    ". spoiler avoided.",
+                ),
+                (regex::Regex::new(r"```(?s:.)*?```")?, ". code block."),
+                (regex::Regex::new(r"`(?s:.)*?`")?, ". code snippet."),
+            ],
+            id_in_brackets: regex::Regex::new(r"\((\d+)\)")?,
+            emoji: regex::Regex::new(r"<(a?):([^<>]+):\d+>")?,
+            bot_mention: OnceLock::new(),
+        })
+    }
+}
+
 pub struct Data {
     pub analytics: Arc<analytics::Handler>,
     pub guilds_db: database::Handler<i64, database::GuildRowRaw>,
@@ -485,6 +503,7 @@ impl std::fmt::Display for TTSServiceError {
 pub type Command = poise::Command<Data, CommandError>;
 pub type Context<'a> = poise::Context<'a, Data, CommandError>;
 pub type PrefixContext<'a> = poise::PrefixContext<'a, Data, CommandError>;
+pub type PartialContext<'a> = poise::PartialContext<'a, Data, CommandError>;
 pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Data, CommandError>;
 
 pub type CommandError = Error;

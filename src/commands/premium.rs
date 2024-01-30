@@ -11,6 +11,7 @@ use crate::{
     funcs::remove_premium,
     structs::{Command, CommandResult, Context, Result, TTSMode},
     traits::PoiseContextExt,
+    translations::GetTextContextExt,
 };
 
 #[derive(sqlx::FromRow)]

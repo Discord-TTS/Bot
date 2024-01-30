@@ -31,6 +31,7 @@ use crate::{
     require_guild,
     structs::{ApplicationContext, Command, CommandResult, Context, TTSMode},
     traits::PoiseContextExt as _,
+    translations::GetTextContextExt,
 };
 
 #[allow(clippy::trivially_copy_pass_by_ref)] // Required for generic type

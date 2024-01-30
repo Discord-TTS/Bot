@@ -25,6 +25,7 @@ use crate::{
     require,
     structs::{ApplicationContext, Command, CommandResult, Context},
     traits::PoiseContextExt,
+    translations::GetTextContextExt,
 };
 
 enum HelpCommandMode<'a> {

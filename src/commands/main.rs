@@ -23,6 +23,7 @@ use crate::{
     require, require_guild,
     structs::{Command, CommandResult, Context, JoinVCToken, Result},
     traits::{PoiseContextExt, SongbirdManagerExt},
+    translations::GetTextContextExt,
 };
 
 async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>) -> Result<bool> {

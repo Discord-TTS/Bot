@@ -21,7 +21,7 @@ use sqlx::{Connection as _, Executor, Row};
 use crate::{
     constants::DB_SETUP_QUERY,
     opt_ext::OptionTryUnwrap,
-    structs::{Result, TTSMode},
+    structs::{Config, PostgresConfig, Result, TTSMode},
 };
 
 type Transaction<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
@@ -119,7 +119,7 @@ async fn migrate_speaking_rate_to_mode(transaction: &mut Transaction<'_>) -> Res
 }
 
 // I'll use a proper framework for this one day
-pub async fn run(config: &mut toml::Value, pool: &sqlx::PgPool) -> Result<()> {
+async fn run(config: &mut toml::Value, pool: &sqlx::PgPool) -> Result<()> {
     let starting_conf = config.clone();
     let mut config_clone = config.clone();
 
@@ -234,4 +234,28 @@ async fn _run(
     .await?;
     migrate_speaking_rate_to_mode(transaction).await?;
     Ok(())
+}
+
+pub async fn load_db_and_conf() -> Result<(sqlx::PgPool, Config)> {
+    let mut config_toml: toml::Value = std::fs::read_to_string("config.toml")?.parse()?;
+    let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
+
+    let pool_config = sqlx::postgres::PgPoolOptions::new();
+    let pool_config = if let Some(max_connections) = postgres.max_connections {
+        pool_config.max_connections(max_connections)
+    } else {
+        pool_config
+    };
+
+    let pool_options = sqlx::postgres::PgConnectOptions::new()
+        .host(&postgres.host)
+        .username(&postgres.user)
+        .database(&postgres.database)
+        .password(&postgres.password);
+
+    let pool = pool_config.connect_with(pool_options).await?;
+    run(&mut config_toml, &pool).await?;
+
+    let config = config_toml.try_into()?;
+    Ok((pool, config))
 }

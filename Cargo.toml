@@ -78,3 +78,7 @@ branch = "serenity-next"
 
 [patch.crates-io.small-fixed-array]
 git = "https://github.com/GnomedDev/small-fixed-array"
+
+[patch."https://github.com/serenity-rs/serenity".serenity]
+git = "https://github.com/GnomedDev/serenity"
+branch = "arc-http"

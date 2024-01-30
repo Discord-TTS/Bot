@@ -5,15 +5,12 @@ use poise::serenity_prelude as serenity;
 use crate::{
     constants,
     constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR},
-    opt_ext::{OptionGettext, OptionTryUnwrap},
+    opt_ext::OptionTryUnwrap,
     require_guild,
     structs::{Context, JoinVCToken, Result, TTSMode},
 };
 
 pub trait PoiseContextExt<'ctx> {
-    fn gettext<'a>(&'a self, translate: &'a str) -> &'a str;
-
-    fn current_catalog(&self) -> Option<&gettext::Catalog>;
     async fn send_error(
         &'ctx self,
         error_message: impl Into<Cow<'ctx, str>>,
@@ -48,24 +45,6 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
         }
 
         FREE_NEUTRAL_COLOUR
-    }
-
-    fn gettext<'a>(&'a self, translate: &'a str) -> &'a str {
-        self.current_catalog().gettext(translate)
-    }
-
-    fn current_catalog(&self) -> Option<&gettext::Catalog> {
-        if let poise::Context::Application(ctx) = self {
-            ctx.data()
-                .translations
-                .get(match ctx.interaction.locale.as_str() {
-                    "ko" => "ko-KR",
-                    "pt-BR" => "pt",
-                    l => l,
-                });
-        };
-
-        None
     }
 
     async fn author_permissions(&self) -> Result<serenity::Permissions> {

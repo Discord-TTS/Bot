@@ -14,6 +14,7 @@ use crate::{
     constants, require,
     structs::{Data, FrameworkContext},
     traits::PoiseContextExt,
+    translations::GetTextContextExt,
     Context, OptionTryUnwrap,
 };
 

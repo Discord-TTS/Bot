@@ -1,7 +1,9 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, future::Future, pin::Pin, sync::Arc};
 
 use dashmap::DashMap;
 use sqlx::Connection;
+
+use crate::structs::Context;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum EventType {
@@ -75,4 +77,24 @@ impl crate::Looper for Arc<Handler> {
         })
         .await
     }
+}
+
+pub fn pre_command(ctx: Context<'_>) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
+    let analytics_handler = &ctx.data().analytics;
+
+    analytics_handler.log(Cow::Owned(ctx.command().qualified_name.clone()), true);
+    analytics_handler.log(
+        Cow::Borrowed(match ctx {
+            poise::Context::Prefix(_) => "command",
+            poise::Context::Application(ctx) => match ctx.interaction_type {
+                poise::CommandInteractionType::Autocomplete => "autocomplete",
+                poise::CommandInteractionType::Command => "slash_command",
+            },
+        }),
+        false,
+    );
+
+    // TODO: Replace with futures::future::always_ready
+    // once https://github.com/rust-lang/futures-rs/pull/2825 is merged.
+    Box::pin(async {})
 }
