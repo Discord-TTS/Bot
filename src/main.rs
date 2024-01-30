@@ -266,7 +266,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
     let logger = logging::WebhookLogger::new(
         Arc::new(http),
-        "TTS-Webhook",
         webhooks.logs.clone(),
         webhooks.errors.clone(),
     );

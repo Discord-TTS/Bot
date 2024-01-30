@@ -21,7 +21,6 @@ fn get_avatar(level: tracing::Level) -> &'static str {
 
 pub struct WebhookLogger {
     http: Arc<Http>,
-    webhook_name: &'static str,
 
     pending_logs: Mutex<HashMap<tracing::Level, Vec<LogMessage>>>,
 
@@ -31,17 +30,12 @@ pub struct WebhookLogger {
 
 impl WebhookLogger {
     #[must_use]
-    pub fn new(
-        http: Arc<Http>,
-        webhook_name: &'static str,
-        normal_logs: Webhook,
-        error_logs: Webhook,
-    ) -> ArcWrapper<Self> {
+    pub fn new(http: Arc<Http>, normal_logs: Webhook, error_logs: Webhook) -> ArcWrapper<Self> {
         ArcWrapper(Arc::new(Self {
             http,
             normal_logs,
             error_logs,
-            webhook_name,
+
             pending_logs: Mutex::default(),
         }))
     }
@@ -89,7 +83,7 @@ impl crate::looper::Looper for Arc<WebhookLogger> {
                 &self.normal_logs
             };
 
-            let webhook_name = format!("{} [{}]", self.webhook_name, severity.as_str());
+            let webhook_name = format!("TTS-Webhook [{}]", severity.as_str());
 
             for chunk in chunks {
                 let builder = ExecuteWebhook::default()
