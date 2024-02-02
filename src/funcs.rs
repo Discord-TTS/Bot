@@ -191,9 +191,10 @@ pub fn random_footer<'a>(
 ) -> Cow<'a, str> {
     match rand::thread_rng().gen_range(0..4) {
         0 => Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
-        1 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
-        2 => Cow::Borrowed(catalog.gettext("If you want to support the development and hosting of TTS Bot, check out `/premium`!")),
-        3 => Cow::Borrowed(catalog.gettext("There are loads of customizable settings, check out `/help set`")),
+        1 => Cow::Owned(catalog.gettext("You can vote for me or review me on wumpus.store!\nhttps://wumpus.store/bot/{client_id}?ref=tts").replace("{client_id}", &client_id.to_string())),
+        2 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
+        3 => Cow::Borrowed(catalog.gettext("If you want to support the development and hosting of TTS Bot, check out `/premium`!")),
+        4 => Cow::Borrowed(catalog.gettext("There are loads of customizable settings, check out `/help set`")),
         _ => unreachable!()
     }
 }
