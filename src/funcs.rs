@@ -189,7 +189,7 @@ pub fn random_footer<'a>(
     client_id: serenity::UserId,
     catalog: Option<&'a gettext::Catalog>,
 ) -> Cow<'a, str> {
-    match rand::thread_rng().gen_range(0..4) {
+    match rand::thread_rng().gen_range(0..5) {
         0 => Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
         1 => Cow::Owned(catalog.gettext("You can vote for me or review me on wumpus.store!\nhttps://wumpus.store/bot/{client_id}?ref=tts").replace("{client_id}", &client_id.to_string())),
         2 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
