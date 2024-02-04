@@ -37,8 +37,12 @@ async fn process_tts_msg(
 
     let guild_id = require!(message.guild_id, Ok(()));
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
+    let user_row = data.userinfo_db.get(message.author.id.into()).await?;
 
-    let (mut content, to_autojoin) = require!(run_checks(ctx, message, &guild_row).await?, Ok(()));
+    let (mut content, to_autojoin) = require!(
+        run_checks(ctx, message, &guild_row, &user_row).await?,
+        Ok(())
+    );
 
     let (voice, mode) = {
         if let Some(channel_id) = to_autojoin {
@@ -335,7 +339,10 @@ async fn process_support_dm(
                         .collect::<Vec<_>>(),
                 );
 
-            data.webhooks.dm_logs.execute(&ctx.http, false, builder).await?;
+            data.webhooks
+                .dm_logs
+                .execute(&ctx.http, false, builder)
+                .await?;
         }
     } else {
         let (client_id, title) = {

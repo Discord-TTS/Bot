@@ -274,16 +274,47 @@ async fn get_prefix(ctx: PartialContext<'_>) -> Result<Option<String>> {
     Ok(Some(prefix))
 }
 
+async fn notify_banned(ctx: Context<'_>) -> Result<()> {
+    const BAN_MESSAGE: &str = "
+You have been banned from the bot. This is not reversable and is only given out in exceptional circumstances.
+You may have:
+- Committed a hate crime against the developers of the bot.
+- Exploited an issue in the bot to bring it down or receive premium without paying.
+- Broken the TTS Bot terms of service.";
+
+    let author = ctx.author();
+    let bot_face = ctx.cache().current_user().face();
+
+    let embed = serenity::CreateEmbed::new()
+        .author(serenity::CreateEmbedAuthor::new(author.name.as_str()).icon_url(author.face()))
+        .thumbnail(bot_face)
+        .colour(constants::RED)
+        .description(BAN_MESSAGE)
+        .footer(serenity::CreateEmbedFooter::new(
+            "Do not join the support server to appeal this. You are not wanted.",
+        ));
+
+    ctx.send(poise::CreateReply::default().embed(embed)).await?;
+    Ok(())
+}
+
 async fn command_check(ctx: Context<'_>) -> Result<bool> {
     if ctx.author().bot() {
         return Ok(false);
     };
 
+    let data = ctx.data();
+    let user_row = data.userinfo_db.get(ctx.author().id.into()).await?;
+    if user_row.bot_banned() {
+        notify_banned(ctx).await?;
+        return Ok(false);
+    }
+
     let Some(guild_id) = ctx.guild_id() else {
         return Ok(true);
     };
 
-    let guild_row = ctx.data().guilds_db.get(guild_id.into()).await?;
+    let guild_row = data.guilds_db.get(guild_id.into()).await?;
     let Some(required_role) = guild_row.required_role else {
         return Ok(true);
     };

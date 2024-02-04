@@ -96,6 +96,7 @@ impl Compact for GuildRowRaw {
 pub struct UserRowRaw {
     pub dm_blocked: bool,
     pub dm_welcomed: bool,
+    pub bot_banned: bool,
     pub voice_mode: Option<TTSMode>,
     pub premium_voice_mode: Option<TTSMode>,
 }
@@ -105,6 +106,7 @@ pub struct UserRowRaw {
 pub struct UserRow {
     pub dm_blocked: bool,
     pub dm_welcomed: bool,
+    pub bot_banned: bool,
     pub voice_mode: Option<TTSMode>,
     pub premium_voice_mode: Option<TTSMode>,
 }
@@ -119,6 +121,7 @@ impl Compact for UserRowRaw {
         }
         .set_dm_blocked(self.dm_blocked)
         .set_dm_welcomed(self.dm_welcomed)
+        .set_bot_banned(self.bot_banned)
     }
 }
 

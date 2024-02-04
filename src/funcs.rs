@@ -27,6 +27,7 @@ use serenity::{
 
 use crate::{
     database::GuildRow,
+    database_models::UserRow,
     opt_ext::OptionTryUnwrap,
     require,
     structs::{
@@ -268,6 +269,7 @@ pub async fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
     guild_row: &GuildRow,
+    user_row: &UserRow,
 ) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
     let guild_id = require!(message.guild_id, Ok(None));
     if guild_row.channel != Some(message.channel_id) {
@@ -282,6 +284,10 @@ pub async fn run_checks(
         if author_vc.map_or(true, |author_vc| author_vc != message.channel_id) {
             return Ok(None);
         }
+    }
+
+    if user_row.bot_banned() {
+        return Ok(None);
     }
 
     if let Some(required_role) = guild_row.required_role {
