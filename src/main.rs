@@ -274,6 +274,7 @@ async fn get_prefix(ctx: PartialContext<'_>) -> Result<Option<String>> {
     Ok(Some(prefix))
 }
 
+#[cold]
 async fn notify_banned(ctx: Context<'_>) -> Result<()> {
     const BAN_MESSAGE: &str = "
 You have been banned from the bot. This is not reversable and is only given out in exceptional circumstances.

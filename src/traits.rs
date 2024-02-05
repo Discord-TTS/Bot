@@ -79,6 +79,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
         Ok(handle)
     }
 
+    #[cold]
     async fn send_error(
         &'ctx self,
         error_message: impl Into<Cow<'ctx, str>>,

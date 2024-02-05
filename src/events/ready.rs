@@ -74,6 +74,34 @@ async fn update_startup_message(
     Ok(())
 }
 
+#[cold]
+fn finalize_startup(ctx: &serenity::Context, data: &Data) {
+    data.fully_started.store(true, Ordering::SeqCst);
+
+    if let Some(bot_list_tokens) = data.bot_list_tokens.lock().take() {
+        let stats_updater =
+            BotListUpdater::new(data.reqwest.clone(), ctx.cache.clone(), bot_list_tokens);
+
+        tokio::spawn(stats_updater.start());
+    }
+
+    if let Some(website_info) = data.website_info.lock().take() {
+        let web_updater = web_updater::Updater {
+            patreon_service: data.config.patreon_service.clone(),
+            reqwest: data.reqwest.clone(),
+            cache: ctx.cache.clone(),
+            pool: data.pool.clone(),
+            config: website_info,
+        };
+
+        tokio::spawn(web_updater.start());
+    }
+
+    // Tell glibc to let go of the memory it's holding onto.
+    // We are very unlikely to reach the peak of memory allocation that was just hit.
+    clear_allocator_cache();
+}
+
 pub async fn ready(
     framework_ctx: FrameworkContext<'_>,
     data_about_bot: &serenity::Ready,
@@ -97,30 +125,7 @@ pub async fn ready(
         .get_or_init(|| regex::Regex::new(&format!("<@!?{}>", data_about_bot.user.id)).unwrap());
 
     if is_last_shard && !data.fully_started.load(Ordering::SeqCst) {
-        data.fully_started.store(true, Ordering::SeqCst);
-
-        if let Some(bot_list_tokens) = data.bot_list_tokens.lock().take() {
-            let stats_updater =
-                BotListUpdater::new(data.reqwest.clone(), ctx.cache.clone(), bot_list_tokens);
-
-            tokio::spawn(stats_updater.start());
-        }
-
-        if let Some(website_info) = data.website_info.lock().take() {
-            let web_updater = web_updater::Updater {
-                patreon_service: data.config.patreon_service.clone(),
-                reqwest: data.reqwest.clone(),
-                cache: ctx.cache.clone(),
-                pool: data.pool.clone(),
-                config: website_info,
-            };
-
-            tokio::spawn(web_updater.start());
-        }
-
-        // Tell glibc to let go of the memory it's holding onto.
-        // We are very unlikely to reach the peak of memory allocation that was just hit.
-        clear_allocator_cache();
+        finalize_startup(ctx, &data);
     }
 
     Ok(())
