@@ -444,16 +444,13 @@ pub fn clean_msg(
 
     if announce_name {
         if contained_url {
-            write!(
-                content,
-                " {}",
-                if content.is_empty() {
-                    "a link."
-                } else {
-                    "and sent a link"
-                }
-            )
-            .unwrap();
+            let suffix = if content.is_empty() {
+                "a link."
+            } else {
+                "and sent a link"
+            };
+
+            write!(content, " {suffix}",).unwrap();
         }
 
         let said_name = nickname
@@ -467,16 +464,13 @@ pub fn clean_msg(
             None => format!("{said_name} said: {content}"),
         }
     } else if contained_url {
-        write!(
-            content,
-            "{}",
-            if content.is_empty() {
-                "a link."
-            } else {
-                ". This message contained a link"
-            }
-        )
-        .unwrap();
+        let suffix = if content.is_empty() {
+            " a link."
+        } else {
+            ". This message contained a link"
+        };
+
+        write!(content, "{suffix}",).unwrap();
     }
 
     if xsaid {
