@@ -14,13 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use songbird::error::JoinError;
 
-use poise::serenity_prelude::{self as serenity, builder::*};
+use poise::serenity_prelude::{self as serenity, builder::*, colours::branding::YELLOW};
 
 use crate::{
+    database_models::GuildRow,
     funcs::random_footer,
     require, require_guild,
     structs::{Command, CommandResult, Context, JoinVCToken, Result},
@@ -28,31 +29,47 @@ use crate::{
     translations::GetTextContextExt,
 };
 
-async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>) -> Result<bool> {
+/// Returns Some(GuildRow) on correct channel, otherwise None.
+async fn channel_check(
+    ctx: &Context<'_>,
+    author_vc: Option<serenity::ChannelId>,
+) -> Result<Option<Arc<GuildRow>>> {
     let guild_id = ctx.guild_id().unwrap();
-    let setup_id = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
+    let guild_row = ctx.data().guilds_db.get(guild_id.into()).await?;
 
     let channel_id = Some(ctx.channel_id());
-    if setup_id == channel_id || author_vc == channel_id {
-        return Ok(true);
+    if guild_row.channel == channel_id || author_vc == channel_id {
+        return Ok(Some(guild_row));
     }
 
-    let msg = if let Some(setup_id) = setup_id
-        && require_guild!(ctx, Ok(false))
-            .channels
-            .contains_key(&setup_id)
-    {
-        let msg = ctx
-            .gettext("You ran this command in the wrong channel, please move to <#{channel_id}>.")
-            .replace("{channel_id}", &setup_id.to_string());
+    let msg = if let Some(setup_id) = guild_row.channel {
+        let guild = require_guild!(ctx, Ok(None));
+        if guild.channels.contains_key(&setup_id) {
+            let msg = ctx.gettext(
+                "You ran this command in the wrong channel, please move to <#{channel_id}>.",
+            );
 
-        Cow::Owned(msg)
+            Cow::Owned(msg.replace("{channel_id}", &setup_id.to_string()))
+        } else {
+            Cow::Borrowed(ctx.gettext("Your setup channel has been deleted, please run /setup!"))
+        }
     } else {
         Cow::Borrowed(ctx.gettext("You haven't setup the bot, please run /setup!"))
     };
 
     ctx.send_error(msg).await?;
-    Ok(false)
+    Ok(None)
+}
+
+#[cold]
+fn create_warning_embed<'a>(
+    title: impl Into<Cow<'a, str>>,
+    footer: &'a str,
+) -> serenity::CreateEmbed<'a> {
+    serenity::CreateEmbed::default()
+        .title(title)
+        .colour(YELLOW)
+        .footer(serenity::CreateEmbedFooter::new(footer))
 }
 
 /// Joins the voice channel you're in!
@@ -71,9 +88,9 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         Ok(())
     });
 
-    if !channel_check(&ctx, Some(author_vc)).await? {
+    let Some(guild_row) = channel_check(&ctx, Some(author_vc)).await? else {
         return Ok(());
-    }
+    };
 
     let guild_id = ctx.guild_id().unwrap();
     let (bot_id, bot_face) = {
@@ -146,21 +163,30 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         member
     };
 
-    ctx.send(
-        poise::CreateReply::default().embed(
-            serenity::CreateEmbed::default()
-                .title(ctx.gettext("Joined your voice channel!"))
-                .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
-                .thumbnail(bot_face)
-                .author(CreateEmbedAuthor::new(member.display_name()).icon_url(author.face()))
-                .footer(CreateEmbedFooter::new(random_footer(
-                    &data.config.main_server_invite,
-                    bot_id,
-                    ctx.current_catalog(),
-                ))),
-        ),
-    )
-    .await?;
+    let embed = serenity::CreateEmbed::default()
+        .title(ctx.gettext("Joined your voice channel!"))
+        .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
+        .thumbnail(bot_face)
+        .author(CreateEmbedAuthor::new(member.display_name()).icon_url(author.face()))
+        .footer(CreateEmbedFooter::new(random_footer(
+            &data.config.main_server_invite,
+            bot_id,
+            ctx.current_catalog(),
+        )));
+
+    let mut msg = poise::CreateReply::default().embed(embed);
+    if let Some(required_prefix) = guild_row.required_prefix {
+        let title = ctx
+            .gettext("Your TTS required prefix is set to: `{}`")
+            .replace("{}", required_prefix.as_str());
+
+        let footer = ctx
+            .gettext("To disable the required prefix, use /set required_prefix with no arguments.");
+
+        msg = msg.embed(create_warning_embed(title, footer));
+    }
+
+    ctx.send(msg).await?;
     Ok(())
 }
 
@@ -192,9 +218,10 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         }
     };
 
-    if let Some(bot_vc) = bot_vc {
-        if !channel_check(&ctx, author_vc).await? {
-        } else if author_vc.map_or(true, |author_vc| bot_vc.get() != author_vc.get()) {
+    if let Some(bot_vc) = bot_vc
+        && channel_check(&ctx, author_vc).await?.is_some()
+    {
+        if author_vc.map_or(true, |author_vc| bot_vc.get() != author_vc.get()) {
             ctx.say(ctx.gettext(
                 "Error: You need to be in the same voice channel as me to make me leave!",
             ))
@@ -223,7 +250,7 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES | ADD_REACTIONS"
 )]
 pub async fn clear(ctx: Context<'_>) -> CommandResult {
-    if !channel_check(&ctx, ctx.author_vc()).await? {
+    if channel_check(&ctx, ctx.author_vc()).await?.is_none() {
         return Ok(());
     }
 
