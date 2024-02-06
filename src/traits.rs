@@ -146,7 +146,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
 pub trait SongbirdManagerExt {
     async fn join_vc(
         &self,
-        guild_id: tokio::sync::MutexGuard<'_, JoinVCToken>,
+        guild_id: JoinVCToken,
         channel_id: serenity::ChannelId,
     ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>, songbird::error::JoinError>;
 }
@@ -154,15 +154,16 @@ pub trait SongbirdManagerExt {
 impl SongbirdManagerExt for songbird::Songbird {
     async fn join_vc(
         &self,
-        guild_id: tokio::sync::MutexGuard<'_, JoinVCToken>,
+        JoinVCToken(guild_id, lock): JoinVCToken,
         channel_id: serenity::ChannelId,
     ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>, songbird::error::JoinError> {
-        match self.join(guild_id.0, channel_id).await {
+        let _guard = lock.lock().await;
+        match self.join(guild_id, channel_id).await {
             Ok(call) => Ok(call),
             Err(err) => {
                 // On error, the Call is left in a semi-connected state.
                 // We need to correct this by removing the call from the manager.
-                drop(self.leave(guild_id.0).await);
+                drop(self.leave(guild_id).await);
                 Err(err)
             }
         }

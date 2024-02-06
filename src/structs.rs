@@ -84,13 +84,16 @@ pub struct WebhookConfig {
     pub dm_logs: serenity::Webhook,
 }
 
-pub struct JoinVCToken(pub serenity::GuildId);
+pub struct JoinVCToken(pub serenity::GuildId, pub Arc<tokio::sync::Mutex<()>>);
 impl JoinVCToken {
-    pub fn acquire(data: &Data, guild_id: serenity::GuildId) -> Arc<tokio::sync::Mutex<Self>> {
-        data.join_vc_tokens
+    pub fn acquire(data: &Data, guild_id: serenity::GuildId) -> Self {
+        let lock = data
+            .join_vc_tokens
             .entry(guild_id)
-            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(Self(guild_id))))
-            .clone()
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone();
+
+        Self(guild_id, lock)
     }
 }
 
@@ -139,7 +142,7 @@ pub struct Data {
     pub user_voice_db: database::Handler<(i64, TTSMode), database::UserVoiceRowRaw>,
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRowRaw>,
 
-    pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<JoinVCToken>>>,
+    pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<()>>>,
     pub translations: HashMap<FixedString<u8>, gettext::Catalog>,
     pub currently_purging: std::sync::atomic::AtomicBool,
     pub last_to_xsaid_tracker: LastToXsaidTracker,

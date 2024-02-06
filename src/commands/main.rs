@@ -130,10 +130,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         let _typing = ctx.defer_or_broadcast().await?;
 
         let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
-        let join_vc_result = data
-            .songbird
-            .join_vc(join_vc_lock.lock().await, author_vc)
-            .await;
+        let join_vc_result = data.songbird.join_vc(join_vc_lock, author_vc).await;
 
         if let Err(err) = join_vc_result {
             return if let JoinError::TimedOut = err {

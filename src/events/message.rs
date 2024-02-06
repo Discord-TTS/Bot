@@ -47,11 +47,7 @@ async fn process_tts_msg(
     let (voice, mode) = {
         if let Some(channel_id) = to_autojoin {
             let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
-            match data
-                .songbird
-                .join_vc(join_vc_lock.lock().await, channel_id)
-                .await
-            {
+            match data.songbird.join_vc(join_vc_lock, channel_id).await {
                 Ok(call) => call,
                 Err(songbird::error::JoinError::TimedOut) => return Ok(()),
                 Err(err) => return Err(err.into()),
@@ -139,12 +135,8 @@ async fn process_tts_msg(
                 .try_unwrap()?
         };
 
-        let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
-        match data
-            .songbird
-            .join_vc(join_vc_lock.lock().await, voice_channel_id)
-            .await
-        {
+        let join_vc_token = JoinVCToken::acquire(&data, guild_id);
+        match data.songbird.join_vc(join_vc_token, voice_channel_id).await {
             Ok(call) => call,
             Err(songbird::error::JoinError::TimedOut) => return Ok(()),
             Err(err) => return Err(err.into()),
