@@ -31,8 +31,8 @@ use crate::{
     opt_ext::OptionTryUnwrap,
     require,
     structs::{
-        Context, Data, GoogleGender, GoogleVoice, LastToXsaidTracker, RegexCache, Result, TTSMode,
-        TTSServiceError,
+        Context, Data, GoogleGender, GoogleVoice, LastToXsaidTracker, LastXsaidInfo, RegexCache,
+        Result, TTSMode, TTSServiceError,
     },
     translations::OptionGettext,
 };
@@ -436,33 +436,13 @@ pub fn clean_msg(
         (content != filtered_content, filtered_content)
     };
 
-    // If xsaid is enabled, and the author has not been announced last (in one minute if more than 2 users in vc)
-    let last_to_xsaid = last_to_xsaid_tracker.get(&guild_id);
+    let announce_name = xsaid
+        && last_to_xsaid_tracker.get(&guild_id).map_or(true, |state| {
+            let guild = cache.guild(guild_id).unwrap();
+            state.should_announce_name(&guild, user.id)
+        });
 
-    if xsaid
-        && match last_to_xsaid.map(|i| *i) {
-            None => true,
-            Some((u_id, last_time)) => cache
-                .guild(guild_id)
-                .map(|guild| {
-                    guild
-                        .voice_states
-                        .get(&user.id)
-                        .and_then(|vs| vs.channel_id)
-                        .map_or(true, |voice_channel_id| {
-                            (user.id != u_id)
-                                || ((last_time.elapsed().unwrap().as_secs() > 60) &&
-                    // If more than 2 users in vc
-                    guild.voice_states.values()
-                        .filter(|vs| vs.channel_id.map_or(false, |vc| vc == voice_channel_id))
-                        .filter_map(|vs| guild.members.get(&vs.user_id))
-                        .filter(|member| !member.user.bot())
-                        .count() > 2)
-                        })
-                })
-                .unwrap(),
-        }
-    {
+    if announce_name {
         if contained_url {
             write!(
                 content,
@@ -500,7 +480,7 @@ pub fn clean_msg(
     }
 
     if xsaid {
-        last_to_xsaid_tracker.insert(guild_id, (user.id, std::time::SystemTime::now()));
+        last_to_xsaid_tracker.insert(guild_id, LastXsaidInfo::new(user.id));
     }
 
     if repeated_limit != 0 {

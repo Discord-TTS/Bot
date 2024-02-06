@@ -134,6 +134,40 @@ impl RegexCache {
     }
 }
 
+pub struct LastXsaidInfo(serenity::UserId, std::time::SystemTime);
+
+impl LastXsaidInfo {
+    fn get_vc_member_count(guild: &serenity::Guild, channel_id: serenity::ChannelId) -> usize {
+        guild
+            .voice_states
+            .values()
+            .filter(|vs| vs.channel_id.is_some_and(|vc| vc == channel_id))
+            .filter_map(|vs| guild.members.get(&vs.user_id))
+            .filter(|member| !member.user.bot())
+            .count()
+    }
+
+    pub fn new(user: serenity::UserId) -> Self {
+        Self(user, std::time::SystemTime::now())
+    }
+
+    pub fn should_announce_name(&self, guild: &serenity::Guild, user: serenity::UserId) -> bool {
+        let Some(voice_channel_id) = guild.voice_states.get(&user).and_then(|v| v.channel_id)
+        else {
+            return true;
+        };
+
+        if user != self.0 {
+            return true;
+        }
+
+        let has_been_min = self.1.elapsed().unwrap().as_secs() > 60;
+        let is_only_author = Self::get_vc_member_count(guild, voice_channel_id) > 2;
+
+        has_been_min || is_only_author
+    }
+}
+
 pub struct Data {
     pub analytics: Arc<analytics::Handler>,
     pub guilds_db: database::Handler<i64, database::GuildRowRaw>,
@@ -512,5 +546,4 @@ pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Data, CommandErr
 pub type CommandError = Error;
 pub type CommandResult<E = Error> = Result<(), E>;
 pub type FrameworkContext<'a> = poise::FrameworkContext<'a, Data, CommandError>;
-pub type LastToXsaidTracker =
-    dashmap::DashMap<serenity::GuildId, (serenity::UserId, std::time::SystemTime)>;
+pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, LastXsaidInfo>;
