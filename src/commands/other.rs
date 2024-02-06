@@ -340,13 +340,16 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
         && require_guild!(ctx).channels.contains_key(&channel)
     {
         if channel == ctx.channel_id() {
-            String::from(ctx.gettext("You are in the setup channel already!"))
+            Cow::Borrowed(ctx.gettext("You are in the setup channel already!"))
         } else {
-            ctx.gettext("The current setup channel is: <#{channel}>")
-                .replace("{channel}", &channel.to_string())
+            let msg = ctx
+                .gettext("The current setup channel is: <#{channel}>")
+                .replace("{channel}", &channel.to_string());
+
+            Cow::Owned(msg)
         }
     } else {
-        String::from(ctx.gettext("The channel hasn't been setup, do `/setup #textchannel`"))
+        Cow::Borrowed(ctx.gettext("The channel hasn't been setup, do `/setup #textchannel`"))
     };
 
     ctx.say(msg).await?;

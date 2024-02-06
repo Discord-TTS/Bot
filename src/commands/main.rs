@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::borrow::Cow;
+
 use songbird::error::JoinError;
 
 use poise::serenity_prelude::{self as serenity, builder::*};
@@ -40,10 +42,13 @@ async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>
             .channels
             .contains_key(&setup_id)
     {
-        ctx.gettext("You ran this command in the wrong channel, please move to <#{channel_id}>.")
-            .replace("{channel_id}", &setup_id.to_string())
+        let msg = ctx
+            .gettext("You ran this command in the wrong channel, please move to <#{channel_id}>.")
+            .replace("{channel_id}", &setup_id.to_string());
+
+        Cow::Owned(msg)
     } else {
-        String::from(ctx.gettext("You haven't setup the bot, please run /setup!"))
+        Cow::Borrowed(ctx.gettext("You haven't setup the bot, please run /setup!"))
     };
 
     ctx.send_error(msg).await?;
@@ -59,15 +64,12 @@ async fn channel_check(ctx: &Context<'_>, author_vc: Option<serenity::ChannelId>
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
-    let author_vc = require!(
-        ctx.author_vc(),
-        ctx.send_error(
-            ctx.gettext("I cannot join your voice channel unless you are in one!")
-                .to_owned()
-        )
-        .await
-        .map(drop)
-    );
+    let author_vc = require!(ctx.author_vc(), {
+        ctx.send_error(ctx.gettext("I cannot join your voice channel unless you are in one!"))
+            .await?;
+
+        Ok(())
+    });
 
     if !channel_check(&ctx, Some(author_vc)).await? {
         return Ok(());
@@ -83,7 +85,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     if let Some(communication_disabled_until) = bot_member.communication_disabled_until {
         if communication_disabled_until > serenity::Timestamp::now() {
             let msg = ctx.gettext("I am timed out, please ask a moderator to remove the timeout");
-            ctx.send_error(msg.to_owned()).await?;
+            ctx.send_error(msg).await?;
             return Ok(());
         }
     }
@@ -136,7 +138,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         if let Err(err) = join_vc_result {
             return if let JoinError::TimedOut = err {
                 let msg = ctx.gettext("I failed to join your voice channel, please check I have the right permissions and try again!");
-                ctx.send_error(msg.to_owned()).await?;
+                ctx.send_error(msg).await?;
                 Ok(())
             } else {
                 Err(err.into())

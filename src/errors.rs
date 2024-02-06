@@ -441,7 +441,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
 
             let msg =
                 ctx.gettext("An unknown error occurred, please report this on the support server!");
-            ctx.send_error(msg.to_owned()).await?;
+            ctx.send_error(msg).await?;
         }
         poise::FrameworkError::ArgumentParse {
             error, ctx, input, ..
@@ -467,11 +467,12 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ..
         } => {
             let msg = if let Some(missing_permissions) = missing_permissions {
-                ctx.gettext("You cannot run this command as you are missing permissions, please ask an administrator of the server to give you: {}")
-                    .replace("{}", &missing_permissions.get_permission_names().join(", "))
+                Cow::Owned(ctx.gettext("You cannot run this command as you are missing permissions, please ask an administrator of the server to give you: {}")
+                    .replace("{}", &missing_permissions.get_permission_names().join(", ")))
             } else {
-                ctx.gettext("You cannot run this command as you are missing permissions.")
-                    .to_owned()
+                Cow::Borrowed(
+                    ctx.gettext("You cannot run this command as you are missing permissions."),
+                )
             };
 
             ctx.send_error(msg).await?;
@@ -482,7 +483,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
                 error!("Premium Check Error: {:?}", error);
 
                 let msg = ctx.gettext("An unknown error occurred during the premium check, please report this on the support server!");
-                ctx.send_error(msg.to_owned()).await?;
+                ctx.send_error(msg).await?;
             }
         }
 

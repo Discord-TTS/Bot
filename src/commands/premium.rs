@@ -136,22 +136,22 @@ pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
     };
 
     let mut premium_guilds = 0;
-    let mut embed_desc = String::new();
+    let mut embed_desc = Cow::Borrowed("");
     let mut guilds = get_premium_guilds(&data.pool, ctx.author().id);
     while let Some(guild_row) = guilds.next().await {
         premium_guilds += 1;
         let guild_id = serenity::GuildId::new(guild_row?.guild_id as u64);
         if let Some(guild_ref) = ctx.cache().guild(guild_id) {
-            writeln!(embed_desc, "- (`{guild_id}`) {}", guild_ref.name)?;
+            writeln!(embed_desc.to_mut(), "- (`{guild_id}`) {}", guild_ref.name)?;
         } else {
-            writeln!(embed_desc, "- (`{guild_id}`) **<Unknown>**")?;
+            writeln!(embed_desc.to_mut(), "- (`{guild_id}`) **<Unknown>**")?;
         }
     }
 
     let author = ctx.author();
     let remaining_guilds = premium_info.entitled_servers - premium_guilds;
     if embed_desc.is_empty() {
-        embed_desc = String::from("None... set some servers with `/premium_activate`!");
+        embed_desc = Cow::Borrowed("None... set some servers with `/premium_activate`!");
     }
 
     let embed = CreateEmbed::new()

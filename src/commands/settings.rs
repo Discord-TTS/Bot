@@ -270,7 +270,7 @@ impl<'a> MenuPaginator<'a> {
                 CreateButton::new(emoji)
                     .style(serenity::ButtonStyle::Primary)
                     .emoji(serenity::ReactionType::Unicode(
-                        FixedString::from_str_trunc(emoji),
+                        FixedString::from_static_trunc(emoji),
                     ))
                     .disabled(
                         disabled
@@ -1021,12 +1021,12 @@ pub async fn translation_lang(
                 );
             };
 
-            to_say
+            Cow::Owned(to_say)
         } else {
-            String::from(ctx.gettext("Reset the target translation language"))
+            Cow::Borrowed(ctx.gettext("Reset the target translation language"))
         }
     } else {
-        String::from(ctx.gettext("Invalid translation language, do `/translation_languages`"))
+        Cow::Borrowed(ctx.gettext("Invalid translation language, do `/translation_languages`"))
     };
 
     ctx.say(to_say).await?;
