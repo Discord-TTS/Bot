@@ -294,31 +294,27 @@ pub async fn run_checks(
         let message_member = require!(message.member.as_ref(), Ok(None));
         if !message_member.roles.contains(&required_role) {
             let member = guild_id.member(ctx, message.author.id).await?;
-            let channel = require!(message.channel_id.to_channel(ctx).await?.guild(), Ok(None));
 
-            let author_permissions = require!(message.guild(&ctx.cache), Ok(None))
-                .user_permissions_in(&channel, &member);
+            let guild = require!(message.guild(&ctx.cache), Ok(None));
+            let channel = require!(guild.channels.get(&message.channel_id), Ok(None));
+
+            let author_permissions = guild.user_permissions_in(channel, &member);
             if !author_permissions.administrator() {
                 return Ok(None);
             }
         }
     }
 
-    let mut content = {
-        let Some(guild) = ctx.cache.guild(guild_id) else {
-            return Ok(None);
-        };
-
-        serenity::content_safe(
-            &guild,
-            &message.content,
-            serenity::ContentSafeOptions::default()
-                .clean_here(false)
-                .clean_everyone(false)
-                .show_discriminator(false),
-            &message.mentions,
-        )
-    };
+    let guild = require!(message.guild(&ctx.cache), Ok(None));
+    let mut content = serenity::content_safe(
+        &guild,
+        &message.content,
+        serenity::ContentSafeOptions::default()
+            .clean_here(false)
+            .clean_everyone(false)
+            .show_discriminator(false),
+        &message.mentions,
+    );
 
     if content.len() >= 1500 {
         return Ok(None);
@@ -338,7 +334,6 @@ pub async fn run_checks(
         return Ok(None);
     }
 
-    let guild = require!(message.guild(&ctx.cache), Ok(None));
     let voice_state = guild.voice_states.get(&message.author.id);
     let bot_voice_state = guild.voice_states.get(&ctx.cache.current_user().id);
 

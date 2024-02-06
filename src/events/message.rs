@@ -36,8 +36,10 @@ async fn process_tts_msg(
     let ctx = framework_ctx.serenity_context;
 
     let guild_id = require!(message.guild_id, Ok(()));
-    let guild_row = data.guilds_db.get(guild_id.into()).await?;
-    let user_row = data.userinfo_db.get(message.author.id.into()).await?;
+    let (guild_row, user_row) = tokio::try_join!(
+        data.guilds_db.get(guild_id.into()),
+        data.userinfo_db.get(message.author.id.into()),
+    )?;
 
     let (mut content, to_autojoin) = require!(
         run_checks(ctx, message, &guild_row, &user_row).await?,
