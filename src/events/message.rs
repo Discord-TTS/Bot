@@ -87,7 +87,7 @@ async fn process_tts_msg(
             &message.attachments,
             &voice,
             guild_row.xsaid(),
-            guild_row.repeated_chars as usize,
+            guild_row.repeated_chars,
             nickname_row.name.as_deref(),
             &data.regex_cache,
             &data.last_to_xsaid_tracker,

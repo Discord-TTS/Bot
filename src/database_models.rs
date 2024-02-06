@@ -1,3 +1,5 @@
+use std::num::NonZeroU8;
+
 use arrayvec::ArrayString;
 use typesize::derive::TypeSize;
 
@@ -57,7 +59,7 @@ pub struct GuildRow {
     pub require_voice: bool,
     pub audience_ignore: bool,
     pub msg_length: u16,
-    pub repeated_chars: u16,
+    pub repeated_chars: Option<NonZeroU8>,
     pub prefix: ArrayString<8>,
     pub target_lang: Option<ArrayString<8>>,
     pub required_prefix: Option<ArrayString<8>>,
@@ -73,7 +75,7 @@ impl Compact for GuildRowRaw {
             premium_user: self.premium_user.map(|id| UserId::new(id as u64)),
             required_role: self.required_role.map(|id| RoleId::new(id as u64)),
             msg_length: self.msg_length as u16,
-            repeated_chars: self.repeated_chars as u16,
+            repeated_chars: NonZeroU8::new(self.repeated_chars as u8),
             prefix: truncate_convert(self.prefix, "guild.prefix"),
             target_lang: self
                 .target_lang

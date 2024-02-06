@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, collections::HashMap, fmt::Write};
+use std::{borrow::Cow, collections::HashMap, fmt::Write, num::NonZeroU8};
 
 use anyhow::bail;
 
@@ -184,7 +184,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{guild_mode}", guild_mode.into())
             .replace("{default_voice}", &default_voice)
             .replace("{msg_length}", &guild_row.msg_length.to_string())
-            .replace("{repeated_chars}", &guild_row.repeated_chars.to_string()),
+            .replace("{repeated_chars}", &guild_row.repeated_chars.map_or(0, NonZeroU8::get).to_string()),
         false)
         .field(ctx.gettext("**Translation Settings (Premium Only)**"), &ctx.gettext("
 {sep4} Translation: `{to_translate}`

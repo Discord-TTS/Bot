@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, collections::BTreeMap, fmt::Write};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Write, num::NonZeroU8};
 
 use itertools::Itertools as _;
 use rand::Rng as _;
@@ -249,10 +249,10 @@ fn attachments_to_format(attachments: &[serenity::Attachment]) -> Option<&'stati
     }
 }
 
-fn remove_repeated_chars(content: &str, limit: usize) -> String {
+fn remove_repeated_chars(content: &str, limit: u8) -> String {
     let mut out = String::new();
     for (_, group) in &content.chars().group_by(|&c| c) {
-        out.extend(group.take(limit));
+        out.extend(group.take(usize::from(limit)));
     }
 
     out
@@ -387,7 +387,7 @@ pub fn clean_msg(
 
     voice: &str,
     xsaid: bool,
-    repeated_limit: usize,
+    repeated_limit: Option<NonZeroU8>,
     nickname: Option<&str>,
 
     regex_cache: &RegexCache,
@@ -470,8 +470,8 @@ pub fn clean_msg(
         last_to_xsaid_tracker.insert(guild_id, LastXsaidInfo::new(user.id));
     }
 
-    if repeated_limit != 0 {
-        content = remove_repeated_chars(&content, repeated_limit);
+    if let Some(repeated_limit) = repeated_limit {
+        content = remove_repeated_chars(&content, repeated_limit.get());
     }
 
     content
