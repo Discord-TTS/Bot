@@ -91,7 +91,6 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     }
 
     let author = ctx.author();
-    let member = guild_id.member(ctx, author.id).await?;
     let channel = author_vc.to_channel(ctx).await?.guild().unwrap();
 
     let missing_permissions = (serenity::Permissions::VIEW_CHANNEL
@@ -126,11 +125,13 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         }
     };
 
-    {
-        let _typing = ctx.defer_or_broadcast().await?;
-
+    let member = {
         let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
-        let join_vc_result = data.songbird.join_vc(join_vc_lock, author_vc).await;
+        let (_typing, member, join_vc_result) = tokio::try_join!(
+            ctx.defer_or_broadcast(),
+            guild_id.member(ctx, author.id),
+            async { Ok(data.songbird.join_vc(join_vc_lock, author_vc).await) }
+        )?;
 
         if let Err(err) = join_vc_result {
             return if let JoinError::TimedOut = err {
@@ -141,7 +142,9 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 Err(err.into())
             };
         };
-    }
+
+        member
+    };
 
     ctx.send(
         poise::CreateReply::default().embed(
