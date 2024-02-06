@@ -60,17 +60,17 @@ impl<'a> OptionGettext<'a> for Option<&'a gettext::Catalog> {
     }
 }
 
-pub trait GetTextContextExt {
-    fn gettext<'a>(&'a self, translate: &'a str) -> &'a str;
-    fn current_catalog(&self) -> Option<&gettext::Catalog>;
+pub trait GetTextContextExt<'a> {
+    fn gettext(self, translate: &'a str) -> &'a str;
+    fn current_catalog(self) -> Option<&'a gettext::Catalog>;
 }
 
-impl GetTextContextExt for Context<'_> {
-    fn gettext<'a>(&'a self, translate: &'a str) -> &'a str {
+impl<'a> GetTextContextExt<'a> for Context<'_> {
+    fn gettext(self, translate: &'a str) -> &'a str {
         self.current_catalog().gettext(translate)
     }
 
-    fn current_catalog(&self) -> Option<&gettext::Catalog> {
+    fn current_catalog(self) -> Option<&'a gettext::Catalog> {
         if let poise::Context::Application(ctx) = self {
             ctx.data()
                 .translations

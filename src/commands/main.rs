@@ -61,15 +61,43 @@ async fn channel_check(
     Ok(None)
 }
 
-#[cold]
-fn create_warning_embed<'a>(
-    title: impl Into<Cow<'a, str>>,
-    footer: &'a str,
-) -> serenity::CreateEmbed<'a> {
+fn create_warning_embed(title: String, footer: &str) -> serenity::CreateEmbed<'_> {
     serenity::CreateEmbed::default()
         .title(title)
         .colour(YELLOW)
         .footer(serenity::CreateEmbedFooter::new(footer))
+}
+
+#[cold]
+fn required_prefix_embed<'a>(
+    ctx: Context<'a>,
+    msg: poise::CreateReply<'a>,
+    required_prefix: &str,
+) -> poise::CreateReply<'a> {
+    let title = ctx
+        .gettext("Your TTS required prefix is set to: `{}`")
+        .replace("{}", required_prefix);
+
+    let footer =
+        ctx.gettext("To disable the required prefix, use /set required_prefix with no arguments.");
+
+    msg.embed(create_warning_embed(title, footer))
+}
+
+#[cold]
+fn required_role_embed<'a>(
+    ctx: Context<'a>,
+    msg: poise::CreateReply<'a>,
+    required_role: serenity::RoleId,
+) -> poise::CreateReply<'a> {
+    let title = ctx
+        .gettext("The required role for TTS is: <@{}>")
+        .replace("{}", &required_role.to_string());
+
+    let footer =
+        ctx.gettext("To disable the required role, use /set required_role with no arguments.");
+
+    msg.embed(create_warning_embed(title, footer))
 }
 
 /// Joins the voice channel you're in!
@@ -176,14 +204,11 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
     let mut msg = poise::CreateReply::default().embed(embed);
     if let Some(required_prefix) = guild_row.required_prefix {
-        let title = ctx
-            .gettext("Your TTS required prefix is set to: `{}`")
-            .replace("{}", required_prefix.as_str());
+        msg = required_prefix_embed(ctx, msg, required_prefix.as_str());
+    }
 
-        let footer = ctx
-            .gettext("To disable the required prefix, use /set required_prefix with no arguments.");
-
-        msg = msg.embed(create_warning_embed(title, footer));
+    if let Some(required_role) = guild_row.required_role {
+        msg = required_role_embed(ctx, msg, required_role);
     }
 
     ctx.send(msg).await?;
