@@ -874,25 +874,37 @@ pub async fn required_role(
 )]
 async fn required_prefix(
     ctx: Context<'_>,
-    #[description = "The required prefix for TTS"] tts_prefix: Option<String>,
+    #[description = "The required prefix for TTS"] mut tts_prefix: Option<String>,
 ) -> CommandResult {
-    let guild_id = ctx.guild_id().unwrap();
-    if let Some(prefix) = tts_prefix.as_deref()
+    if let Some(prefix) = &tts_prefix
         && let Err(err) = check_prefix(&ctx, prefix)
     {
         ctx.say(err).await?;
-    } else {
-        ctx.data()
-            .guilds_db
-            .set_one(guild_id.into(), "required_prefix", &tts_prefix)
-            .await?;
-        ctx.say(
-            ctx.gettext("The required prefix for TTS is now: {}")
-                .replace("{}", tts_prefix.as_deref().unwrap_or("`None`")),
-        )
-        .await?;
+        return Ok(());
     }
 
+    // Fix up some people being a little silly.
+    let mistakes = ["none", "null", "true", "false"];
+    if tts_prefix.as_deref().is_some_and(|p| mistakes.contains(&p)) {
+        tts_prefix = None;
+    }
+
+    let guild_id = ctx.guild_id().unwrap();
+    ctx.data()
+        .guilds_db
+        .set_one(guild_id.into(), "required_prefix", &tts_prefix)
+        .await?;
+
+    let msg = if let Some(tts_prefix) = tts_prefix {
+        Cow::Owned(
+            ctx.gettext("The required prefix for TTS is now: {}")
+                .replace("{}", &tts_prefix),
+        )
+    } else {
+        Cow::Borrowed(ctx.gettext("Reset your required prefix."))
+    };
+
+    ctx.say(msg).await?;
     Ok(())
 }
 

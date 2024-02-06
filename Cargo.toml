@@ -31,7 +31,7 @@ arrayvec = "0.7.4"
 bitflags = "2.4.1"
 typesize = { version = "0.1.2", features = ["arrayvec"] }
 bool_to_bitflags = { version = "0.1", features = ["typesize"] }
-small-fixed-array = { version = "0.2", features = ["nightly"] }
+small-fixed-array = { git = "https://github.com/GnomedDev/small-fixed-array", features = ["nightly"] }
 libc = "0.2.152"
 serde_json = "1.0.111"
 
@@ -76,9 +76,6 @@ git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "serenity-next"
 
-[patch.crates-io.small-fixed-array]
-git = "https://github.com/GnomedDev/small-fixed-array"
-
 [patch."https://github.com/serenity-rs/serenity".serenity]
 git = "https://github.com/GnomedDev/serenity"
-branch = "arc-http"
+branch = "fixedarray-v4"
