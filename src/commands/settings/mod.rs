@@ -36,7 +36,7 @@ use crate::{
         TTSMode, TTSModeChoice,
     },
     traits::PoiseContextExt,
-    translations::{GetTextContextExt, OptionGettext},
+    translations::GetTextContextExt,
 };
 
 use self::voice_paginator::MenuPaginator;
@@ -65,7 +65,6 @@ fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> 
     slash_command,
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
-
 pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let author_id = ctx.author().id;
@@ -456,14 +455,6 @@ fn check_valid_voice(data: &Data, code: &FixedString, mode: TTSMode) -> bool {
     }
 }
 
-fn to_enabled(catalog: Option<&gettext::Catalog>, value: bool) -> &str {
-    if value {
-        catalog.gettext("Enabled")
-    } else {
-        catalog.gettext("Disabled")
-    }
-}
-
 fn check_prefix<'a>(ctx: &'a Context<'_>, prefix: &str) -> Result<(), &'a str> {
     if prefix.len() <= 5 && prefix.matches(' ').count() <= 1 {
         Ok(())
@@ -533,9 +524,14 @@ async fn generic_bool_command(
     resp: &'static str,
 ) -> CommandResult {
     let value = require!(bool_button(ctx, value).await?, Ok(()));
-    let resp = ctx
-        .gettext(resp)
-        .replace("{}", to_enabled(ctx.current_catalog(), value));
+    let resp = ctx.gettext(resp).replace(
+        "{}",
+        if value {
+            ctx.gettext("Enabled")
+        } else {
+            ctx.gettext("Disabled")
+        },
+    );
 
     ctx.data()
         .guilds_db
