@@ -14,15 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, collections::HashMap, fmt::Write, num::NonZeroU8};
+mod setup;
+mod voice_paginator;
 
-use anyhow::bail;
+use std::{borrow::Cow, collections::HashMap, fmt::Write, num::NonZeroU8};
 
 use poise::serenity_prelude as serenity;
 use serenity::{
     builder::*,
     small_fixed_array::{FixedString, TruncatingInto},
-    ChannelId, ComponentInteractionDataKind, Mentionable,
+    Mentionable,
 };
 
 use crate::{
@@ -37,6 +38,8 @@ use crate::{
     traits::PoiseContextExt,
     translations::{GetTextContextExt, OptionGettext},
 };
+
+use self::voice_paginator::MenuPaginator;
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
     if mode == TTSMode::gCloud {
@@ -210,144 +213,6 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     )).await?;
 
     Ok(())
-}
-
-struct MenuPaginator<'a> {
-    index: usize,
-    mode: TTSMode,
-    ctx: Context<'a>,
-    pages: Vec<String>,
-    footer: Cow<'a, str>,
-    current_voice: String,
-}
-
-impl<'a> MenuPaginator<'a> {
-    pub fn new(
-        ctx: Context<'a>,
-        pages: Vec<String>,
-        current_voice: String,
-        mode: TTSMode,
-        footer: Cow<'a, str>,
-    ) -> Self {
-        Self {
-            ctx,
-            pages,
-            current_voice,
-            mode,
-            footer,
-            index: 0,
-        }
-    }
-
-    fn create_page(&self, page: &str) -> CreateEmbed<'_> {
-        let author = self.ctx.author();
-
-        CreateEmbed::default()
-            .title(
-                self.ctx
-                    .gettext("{bot_user} Voices | Mode: `{mode}`")
-                    .replace("{mode}", self.mode.into())
-                    .replace("{bot_user}", &self.ctx.cache().current_user().name),
-            )
-            .description(
-                self.ctx
-                    .gettext("**Currently Supported Voice**\n{page}")
-                    .replace("{page}", page),
-            )
-            .field(
-                self.ctx.gettext("Current voice used"),
-                &self.current_voice,
-                false,
-            )
-            .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face()))
-            .footer(CreateEmbedFooter::new(self.footer.to_string()))
-    }
-
-    fn create_action_row(&self, disabled: bool) -> serenity::CreateActionRow<'_> {
-        let buttons = ["⏮️", "◀", "⏹️", "▶️", "⏭️"]
-            .into_iter()
-            .map(|emoji| {
-                CreateButton::new(emoji)
-                    .style(serenity::ButtonStyle::Primary)
-                    .emoji(serenity::ReactionType::Unicode(
-                        FixedString::from_static_trunc(emoji),
-                    ))
-                    .disabled(
-                        disabled
-                            || (["⏮️", "◀"].contains(&emoji) && self.index == 0)
-                            || (["▶️", "⏭️"].contains(&emoji)
-                                && self.index == (self.pages.len() - 1)),
-                    )
-            })
-            .collect();
-
-        serenity::CreateActionRow::Buttons(buttons)
-    }
-
-    async fn create_message(&self) -> serenity::Result<serenity::Message> {
-        self.ctx
-            .send(
-                poise::CreateReply::default()
-                    .embed(self.create_page(&self.pages[self.index]))
-                    .components(vec![self.create_action_row(false)]),
-            )
-            .await?
-            .into_message()
-            .await
-    }
-
-    async fn edit_message(
-        &self,
-        message: &mut serenity::Message,
-        disable: bool,
-    ) -> serenity::Result<()> {
-        message
-            .edit(
-                self.ctx,
-                EditMessage::default()
-                    .embed(self.create_page(&self.pages[self.index]))
-                    .components(vec![self.create_action_row(disable)]),
-            )
-            .await
-    }
-
-    pub async fn start(mut self) -> serenity::Result<()> {
-        let mut message = self.create_message().await?;
-        let serenity_context = self.ctx.serenity_context();
-
-        loop {
-            let builder = message
-                .await_component_interaction(serenity_context.shard.clone())
-                .timeout(std::time::Duration::from_secs(60 * 5))
-                .author_id(self.ctx.author().id);
-
-            let interaction = require!(builder.await, Ok(()));
-            match interaction.data.custom_id.as_str() {
-                "⏮️" => {
-                    self.index = 0;
-                    self.edit_message(&mut message, false).await?;
-                }
-                "◀" => {
-                    self.index -= 1;
-                    self.edit_message(&mut message, false).await?;
-                }
-                "⏹️" => {
-                    self.edit_message(&mut message, true).await?;
-                    return interaction.defer(&serenity_context.http).await;
-                }
-                "▶️" => {
-                    self.index += 1;
-                    self.edit_message(&mut message, false).await?;
-                }
-                "⏭️" => {
-                    self.index = self.pages.len() - 1;
-                    self.edit_message(&mut message, false).await?;
-                }
-                _ => unreachable!(),
-            };
-            interaction.defer(&serenity_context.http).await?;
-        }
-    }
 }
 
 async fn voice_autocomplete<'a>(
@@ -1281,228 +1146,6 @@ pub async fn nick(
     Ok(())
 }
 
-fn can_send(
-    guild: &serenity::Guild,
-    channel: &serenity::GuildChannel,
-    member: &serenity::Member,
-) -> bool {
-    const REQUIRED_PERMISSIONS: serenity::Permissions = serenity::Permissions::from_bits_truncate(
-        serenity::Permissions::SEND_MESSAGES.bits() | serenity::Permissions::VIEW_CHANNEL.bits(),
-    );
-
-    (REQUIRED_PERMISSIONS - guild.user_permissions_in(channel, member)).is_empty()
-}
-
-type EligibleSetupChannel = (serenity::ChannelId, FixedString<u16>, u16, bool);
-
-async fn get_eligible_channels(
-    ctx: Context<'_>,
-    guild_id: serenity::GuildId,
-    bot_member: serenity::Member,
-) -> Result<Option<Vec<EligibleSetupChannel>>> {
-    let author = ctx.author();
-    let author_member = guild_id.member(ctx, author.id).await?;
-
-    let guild = require_guild!(ctx, Ok(None));
-    let channels = guild
-        .channels
-        .values()
-        .filter(|c| {
-            c.kind == serenity::ChannelType::Text
-                && can_send(&guild, c, &author_member)
-                && can_send(&guild, c, &bot_member)
-        })
-        .map(|c| {
-            let has_webhook_perms = guild.user_permissions_in(c, &bot_member).manage_webhooks();
-            (c.id, c.name.clone(), c.position, has_webhook_perms)
-        })
-        .collect();
-
-    Ok(Some(channels))
-}
-
-async fn show_channel_select_menu(
-    ctx: Context<'_>,
-    guild_id: serenity::GuildId,
-    bot_member: serenity::Member,
-) -> Result<Option<(ChannelId, bool)>> {
-    let mut text_channels = require!(
-        get_eligible_channels(ctx, guild_id, bot_member).await?,
-        Ok(None)
-    );
-
-    if text_channels.is_empty() {
-        ctx.say(ctx.gettext("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!")).await?;
-        return Ok(None);
-    } else if text_channels.len() >= (25 * 5) {
-        ctx.say(ctx.gettext("**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`")).await?;
-        return Ok(None);
-    };
-
-    text_channels.sort_by(|(_, _, f, _), (_, _, s, _)| Ord::cmp(&f, &s));
-
-    let builder = poise::CreateReply::default()
-        .content(ctx.gettext("Select a channel!"))
-        .components(generate_channel_select(&text_channels));
-
-    let reply = ctx.send(builder).await?;
-    let interaction = reply
-        .message()
-        .await?
-        .await_component_interaction(ctx.serenity_context().shard.clone())
-        .timeout(std::time::Duration::from_secs(60 * 5))
-        .author_id(ctx.author().id)
-        .await;
-
-    let Some(interaction) = interaction else {
-        // The timeout was hit
-        return Ok(None);
-    };
-
-    interaction.defer(ctx.http()).await?;
-
-    let ComponentInteractionDataKind::StringSelect { values } = &interaction.data.kind else {
-        bail!("Expected a string value")
-    };
-
-    let selected_id: ChannelId = values[0].parse()?;
-    let (_, _, _, has_webhook_perms) = text_channels
-        .into_iter()
-        .find(|(c_id, _, _, _)| *c_id == selected_id)
-        .unwrap();
-
-    Ok(Some((selected_id, has_webhook_perms)))
-}
-
-fn generate_channel_select(
-    text_channels: &[EligibleSetupChannel],
-) -> Vec<serenity::CreateActionRow<'_>> {
-    text_channels
-        .chunks(25)
-        .enumerate()
-        .map(|(i, chunked_channels)| {
-            CreateActionRow::SelectMenu(CreateSelectMenu::new(
-                format!("select::channels::{i}"),
-                CreateSelectMenuKind::String {
-                    options: chunked_channels
-                        .iter()
-                        .map(|(id, name, _, _)| {
-                            CreateSelectMenuOption::new(&**name, id.to_string())
-                        })
-                        .collect(),
-                },
-            ))
-        })
-        .collect::<Vec<_>>()
-}
-
-/// Setup the bot to read messages from the given channel
-#[poise::command(
-    guild_only,
-    category = "Settings",
-    prefix_command,
-    slash_command,
-    required_permissions = "ADMINISTRATOR",
-    required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
-)]
-
-pub async fn setup(
-    ctx: Context<'_>,
-    #[description = "The channel for the bot to read messages from"]
-    #[channel_types("Text")]
-    channel: Option<serenity::GuildChannel>,
-) -> CommandResult {
-    let data = ctx.data();
-    let author = ctx.author();
-    let guild_id = ctx.guild_id().unwrap();
-
-    let (bot_user_id, bot_user_name, bot_user_face) = {
-        let current_user = ctx.cache().current_user();
-        (
-            current_user.id,
-            current_user.name.clone(),
-            current_user.face(),
-        )
-    };
-
-    let (channel_id, has_webhook_perms) = {
-        let bot_member = guild_id.member(ctx, bot_user_id).await?;
-        let (channel, has_webhook_perms) = if let Some(channel) = channel {
-            let chan_perms = require_guild!(ctx).user_permissions_in(&channel, &bot_member);
-            (channel.id, chan_perms.manage_webhooks())
-        } else {
-            require!(
-                show_channel_select_menu(ctx, guild_id, bot_member).await?,
-                Ok(())
-            )
-        };
-
-        (channel, has_webhook_perms)
-    };
-
-    data.guilds_db
-        .set_one(guild_id.into(), "channel", &(channel_id.get() as i64))
-        .await?;
-    ctx.send(
-        poise::CreateReply::default().embed(
-            CreateEmbed::default()
-                .title(
-                    ctx.gettext("{bot_name} has been setup!")
-                        .replace("{bot_name}", &bot_user_name),
-                )
-                .thumbnail(&bot_user_face)
-                .description(
-                    ctx.gettext(
-                        "
-TTS Bot will now accept commands and read from <#{channel}>.
-Just do `/join` and start talking!",
-                    )
-                    .replace("{channel}", &channel_id.to_string()),
-                )
-                .footer(CreateEmbedFooter::new(random_footer(
-                    &data.config.main_server_invite,
-                    bot_user_id,
-                    ctx.current_catalog(),
-                )))
-                .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face())),
-        ),
-    )
-    .await?;
-
-    let poise::Context::Application(_) = ctx else {
-        return Ok(());
-    };
-
-    if !has_webhook_perms {
-        return Ok(());
-    }
-
-    let Some(confirmed) = confirm_dialog(
-        ctx,
-        ctx.gettext("Would you like to set up TTS Bot update announcements for the setup channel?"),
-        ctx.gettext("Yes"),
-        ctx.gettext("No"),
-    )
-    .await?
-    else {
-        return Ok(());
-    };
-
-    let reply = if confirmed {
-        let announcements = data.config.announcements_channel;
-        announcements.follow(ctx.http(), channel_id).await?;
-
-        ctx.gettext("Set up update announcements in this channel!")
-    } else {
-        ctx.gettext("Okay, didn't set up update announcements.")
-    };
-
-    ctx.send(poise::CreateReply::default().content(reply).ephemeral(true))
-        .await?;
-
-    Ok(())
-}
-
 /// Changes the voice mode that messages are read in for you
 #[poise::command(
     guild_only,
@@ -1646,34 +1289,28 @@ pub async fn voices(
     };
 
     let voices = {
-        let random_footer = || {
-            random_footer(
+        let run_paginator = |current_voice, pages| async {
+            let footer = random_footer(
                 &data.config.main_server_invite,
                 cache.current_user().id,
                 ctx.current_catalog(),
-            )
+            );
+
+            let paginator = MenuPaginator::new(ctx, pages, current_voice, mode, footer);
+            paginator.start().await?;
+            Ok(())
         };
 
         match mode {
-            TTSMode::eSpeak => format_languages(data.espeak_voices.iter()),
             TTSMode::gTTS => format_languages(data.gtts_voices.keys()),
+            TTSMode::eSpeak => format_languages(data.espeak_voices.iter()),
             TTSMode::Polly => {
-                return {
-                    let (current_voice, pages) = list_polly_voices(&ctx).await?;
-                    MenuPaginator::new(ctx, pages, current_voice, mode, random_footer())
-                        .start()
-                        .await
-                        .map_err(Into::into)
-                }
+                let (current_voice, pages) = list_polly_voices(&ctx).await?;
+                return run_paginator(current_voice, pages).await;
             }
             TTSMode::gCloud => {
-                return {
-                    let (current_voice, pages) = list_gcloud_voices(&ctx).await?;
-                    MenuPaginator::new(ctx, pages, current_voice, mode, random_footer())
-                        .start()
-                        .await
-                        .map_err(Into::into)
-                }
+                let (current_voice, pages) = list_gcloud_voices(&ctx).await?;
+                return run_paginator(current_voice, pages).await;
             }
         }
     };
@@ -1716,7 +1353,7 @@ pub async fn voices(
     Ok(())
 }
 
-pub async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
+async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
     let data = ctx.data();
 
     let (voice_id, mode) = data
@@ -1760,7 +1397,7 @@ pub async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>
     ))
 }
 
-pub async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
+async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
     let data = ctx.data();
 
     let (lang_variant, mode) = data
@@ -1793,14 +1430,14 @@ pub async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String
 pub fn commands() -> [Command; 5] {
     [
         settings(),
-        setup(),
+        setup::setup(),
         voices(),
         translation_languages(),
         poise::Command {
             subcommands: vec![
                 poise::Command {
                     name: String::from("channel"),
-                    ..setup()
+                    ..setup::setup()
                 },
                 xsaid(),
                 autojoin(),
