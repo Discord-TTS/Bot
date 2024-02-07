@@ -79,7 +79,7 @@ fn required_prefix_embed<'a>(
         .replace("{}", required_prefix);
 
     let footer =
-        ctx.gettext("To disable the required prefix, use /set required_prefix with no arguments.");
+        ctx.gettext("To disable the required prefix, use /set required_prefix with no options.");
 
     msg.embed(create_warning_embed(title, footer))
 }
@@ -90,12 +90,18 @@ fn required_role_embed<'a>(
     msg: poise::CreateReply<'a>,
     required_role: serenity::RoleId,
 ) -> poise::CreateReply<'a> {
+    let guild = ctx.guild();
+    let role_name = guild
+        .as_deref()
+        .and_then(|g| g.roles.get(&required_role).map(|r| r.name.as_str()))
+        .unwrap_or("Unknown");
+
     let title = ctx
-        .gettext("The required role for TTS is: <@{}>")
-        .replace("{}", &required_role.to_string());
+        .gettext("The required role for TTS is: `@{}`")
+        .replace("{}", role_name);
 
     let footer =
-        ctx.gettext("To disable the required role, use /set required_role with no arguments.");
+        ctx.gettext("To disable the required role, use /set required_role with no options.");
 
     msg.embed(create_warning_embed(title, footer))
 }
