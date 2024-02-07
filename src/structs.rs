@@ -305,7 +305,7 @@ impl Data {
         if mode.is_premium() && !guild_is_premium {
             mode = TTSMode::default();
 
-            if user_row.voice_mode.map_or(false, TTSMode::is_premium) {
+            if user_row.voice_mode.is_some_and(TTSMode::is_premium) {
                 warn!(
                     "User ID {author_id}'s normal voice mode is set to a premium mode! Resetting."
                 );

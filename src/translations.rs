@@ -32,7 +32,7 @@ pub fn read_files() -> Result<HashMap<FixedString<u8>, gettext::Catalog>> {
                 .unwrap()
                 .map(Result::unwrap)
                 .filter(filter_entry(EntryCheck::IsFile))
-                .filter(|e| e.path().extension().map_or(false, |e| e == "mo"))
+                .filter(|e| e.path().extension().is_some_and(|e| e == "mo"))
                 .map(|entry| {
                     let os_file_path = entry.file_name();
                     let file_path = os_file_path.to_str().unwrap();

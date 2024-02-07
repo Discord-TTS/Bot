@@ -358,7 +358,7 @@ pub async fn run_checks(
             let channel = guild.channels.get(&voice_channel).try_unwrap()?;
 
             if channel.kind == serenity::ChannelType::Stage
-                && voice_state.map_or(false, serenity::VoiceState::suppress)
+                && voice_state.is_some_and(serenity::VoiceState::suppress)
                 && guild_row.audience_ignore()
             {
                 return Ok(None); // Is audience

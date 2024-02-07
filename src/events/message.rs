@@ -56,9 +56,9 @@ async fn process_tts_msg(
             };
         }
 
-        let is_ephemeral = message.flags.map_or(false, |f| {
-            f.contains(serenity::model::channel::MessageFlags::EPHEMERAL)
-        });
+        let is_ephemeral = message
+            .flags
+            .is_some_and(|f| f.contains(serenity::model::channel::MessageFlags::EPHEMERAL));
 
         let m;
         let member_nick = match &message.member {

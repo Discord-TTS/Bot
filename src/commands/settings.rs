@@ -587,7 +587,7 @@ fn check_valid_voice(data: &Data, code: &FixedString, mode: TTSMode) -> bool {
         TTSMode::gCloud => code
             .split_once(' ')
             .and_then(|(language, variant)| data.gcloud_voices.get(language).map(|l| (l, variant)))
-            .map_or(false, |(ls, v)| ls.contains_key(v)),
+            .is_some_and(|(ls, v)| ls.contains_key(v)),
     }
 }
 
