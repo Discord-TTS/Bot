@@ -102,9 +102,11 @@ impl crate::Looper for BotListUpdater {
         let bot_id = self.cache.current_user().id;
         let guild_count = self.cache.guild_count();
 
-        perform(self.bots_on_discord_data(bot_id, guild_count)).await;
-        perform(self.top_gg_data(bot_id, guild_count, shard_count)).await;
-        perform(self.discord_bots_gg_data(bot_id, guild_count, shard_count)).await;
+        tokio::join!(
+            perform(self.bots_on_discord_data(bot_id, guild_count)),
+            perform(self.top_gg_data(bot_id, guild_count, shard_count)),
+            perform(self.discord_bots_gg_data(bot_id, guild_count, shard_count)),
+        );
 
         Ok(())
     }

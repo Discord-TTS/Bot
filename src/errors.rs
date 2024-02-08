@@ -325,6 +325,7 @@ async fn handle_cooldown(
 
     if let poise::Context::Prefix(ctx) = ctx {
         if let Some(error_reply) = cooldown_response {
+            // Never actually fetches, as Prefix already has message.
             let error_message = error_reply.into_message().await?;
             tokio::time::sleep(remaining_cooldown).await;
 

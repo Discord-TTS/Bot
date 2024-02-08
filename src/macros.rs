@@ -15,13 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #[macro_export]
-macro_rules! async_try {
-    ($inner:block) => {
-        async { $inner }.await
-    };
-}
-
-#[macro_export]
 macro_rules! into_static_display {
     ($struct:ident) => {
         impl std::fmt::Display for $struct {

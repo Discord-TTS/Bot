@@ -277,8 +277,12 @@ impl Data {
         author_id: serenity::UserId,
         guild_id: Option<serenity::GuildId>,
     ) -> Result<(Cow<'static, str>, TTSMode)> {
-        let user_row = self.userinfo_db.get(author_id.into()).await?;
-        let guild_is_premium = self.premium_check(guild_id).await?.is_none();
+        let (user_row, premium_check_res) = tokio::try_join!(
+            self.userinfo_db.get(author_id.into()),
+            self.premium_check(guild_id)
+        )?;
+
+        let guild_is_premium = premium_check_res.is_none();
         let mut guild_row = None;
 
         let mut mode = {

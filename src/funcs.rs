@@ -38,12 +38,14 @@ use crate::{
 };
 
 pub async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<()> {
-    data.guilds_db
-        .set_one(guild_id.into(), "premium_user", None::<i64>)
-        .await?;
-    data.guilds_db
-        .set_one(guild_id.into(), "voice_mode", TTSMode::default())
-        .await
+    tokio::try_join!(
+        data.guilds_db
+            .set_one(guild_id.into(), "premium_user", None::<i64>),
+        data.guilds_db
+            .set_one(guild_id.into(), "voice_mode", TTSMode::default()),
+    )?;
+
+    Ok(())
 }
 
 pub async fn dm_generic<'ctx, 'a>(
