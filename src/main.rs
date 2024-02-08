@@ -130,6 +130,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let http = Arc::new(serenity::Http::new(config.main.token.as_deref().unwrap()));
 
     let (
+        translations,
         webhooks,
         guilds_db,
         userinfo_db,
@@ -143,6 +144,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         polly_voices,
         translation_languages,
     ) = tokio::try_join!(
+        translations::read_files(),
         get_webhooks(&http, config.webhooks),
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
         create_db_handler!(pool.clone(), "userinfo", "user_id"),
@@ -184,7 +186,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
     let data = Arc::new(Data {
         pool,
-        translations: translations::read_files()?,
+        translations,
         system_info: Mutex::new(sysinfo::System::new()),
         bot_list_tokens: Mutex::new(config.bot_list_tokens),
 

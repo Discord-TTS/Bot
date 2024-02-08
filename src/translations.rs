@@ -6,46 +6,34 @@ use poise::serenity_prelude::small_fixed_array::FixedString;
 
 use crate::structs::{Context, Result};
 
-pub fn read_files() -> Result<HashMap<FixedString<u8>, gettext::Catalog>> {
-    enum EntryCheck {
-        IsFile,
-        IsDir,
-    }
-
-    let filter_entry = |to_check| {
-        move |entry: &std::fs::DirEntry| {
-            entry
-                .metadata()
-                .map(|m| match to_check {
-                    EntryCheck::IsFile => m.is_file(),
-                    EntryCheck::IsDir => m.is_dir(),
-                })
-                .unwrap_or(false)
+pub async fn read_files() -> Result<HashMap<FixedString<u8>, gettext::Catalog>> {
+    let mut translations = HashMap::new();
+    let mut reader = tokio::fs::read_dir("translations").await?;
+    while let Some(entry) = reader.next_entry().await? {
+        if !entry.metadata().await.is_ok_and(|e| e.is_dir()) {
+            continue;
         }
-    };
 
-    let translations = std::fs::read_dir("translations")?
-        .map(Result::unwrap)
-        .filter(filter_entry(EntryCheck::IsDir))
-        .flat_map(|d| {
-            std::fs::read_dir(d.path())
-                .unwrap()
-                .map(Result::unwrap)
-                .filter(filter_entry(EntryCheck::IsFile))
-                .filter(|e| e.path().extension().is_some_and(|e| e == "mo"))
-                .map(|entry| {
-                    let os_file_path = entry.file_name();
-                    let file_path = os_file_path.to_str().unwrap();
-                    let file_name = file_path.split('.').next().unwrap();
+        let mut reader = tokio::fs::read_dir(entry.path()).await?;
+        while let Some(entry) = reader.next_entry().await? {
+            if !entry.metadata().await.is_ok_and(|e| e.is_file()) {
+                continue;
+            }
 
-                    Ok((
-                        FixedString::from_str_trunc(file_name),
-                        gettext::Catalog::parse(std::fs::File::open(entry.path())?)?,
-                    ))
-                })
-                .filter_map(Result::ok)
-        })
-        .collect();
+            if !entry.path().extension().is_some_and(|e| e == "mo") {
+                continue;
+            }
+
+            let os_file_path = entry.file_name();
+            let file_path = os_file_path.to_str().unwrap();
+            let file_name = file_path.split('.').next().unwrap();
+
+            translations.insert(
+                FixedString::from_str_trunc(file_name),
+                gettext::Catalog::parse(std::fs::File::open(entry.path())?)?,
+            );
+        }
+    }
 
     Ok(translations)
 }
