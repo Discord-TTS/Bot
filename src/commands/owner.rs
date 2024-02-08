@@ -47,14 +47,14 @@ pub async fn dm(
         todm.id,
         todm.tag(),
         attachment_url,
-        message,
+        &message,
     )
     .await?;
 
     ctx.msg
         .channel_id
         .send_message(
-            &ctx.serenity_context(),
+            ctx.serenity_context(),
             CreateMessage::default()
                 .content(content)
                 .add_embed(CreateEmbed::from(embed)),

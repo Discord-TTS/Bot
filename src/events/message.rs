@@ -324,6 +324,7 @@ async fn process_support_dm(
                 .content(message.content.as_str())
                 .username(webhook_username)
                 .avatar_url(message.author.face())
+                .allowed_mentions(serenity::CreateAllowedMentions::new())
                 .embeds(
                     message
                         .embeds
@@ -423,7 +424,7 @@ async fn process_support_response(
         target,
         target_tag,
         attachment_url,
-        message.content.to_string(),
+        &message.content,
     )
     .await?;
 

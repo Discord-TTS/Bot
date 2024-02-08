@@ -52,7 +52,7 @@ pub async fn dm_generic<'ctx, 'a>(
     target: serenity::UserId,
     mut target_tag: String,
     attachment_url: Option<impl Into<Cow<'a, str>>>,
-    message: String,
+    message: &str,
 ) -> Result<(String, serenity::Embed)> {
     let dm_channel = target.create_dm_channel(ctx).await?;
     let sent = dm_channel
