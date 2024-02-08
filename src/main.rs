@@ -193,7 +193,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         fully_started: AtomicBool::new(false),
         join_vc_tokens: dashmap::DashMap::new(),
         songbird: songbird::Songbird::serenity(),
-        currently_purging: AtomicBool::new(false),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
         update_startup_lock: tokio::sync::Mutex::new(()),
 

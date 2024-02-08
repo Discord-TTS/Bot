@@ -1,5 +1,3 @@
-use std::sync::atomic::Ordering;
-
 use reqwest::StatusCode;
 use tracing::info;
 
@@ -84,9 +82,6 @@ pub async fn guild_delete(
     data.guilds_db.delete(incomplete.id.into()).await?;
 
     let Some(guild) = full else { return Ok(()) };
-    if data.currently_purging.load(Ordering::SeqCst) {
-        return Ok(());
-    }
 
     let ctx = framework_ctx.serenity_context;
     let owner_of_other_server = ctx

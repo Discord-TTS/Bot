@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, collections::HashSet, hash::Hash, sync::atomic::Ordering::SeqCst};
+use std::{borrow::Cow, hash::Hash};
 
 use self::serenity::builder::*;
 use num_format::{Locale, ToFormattedString};
-use poise::{futures_util::TryStreamExt, serenity_prelude as serenity, CreateReply};
+use poise::{serenity_prelude as serenity, CreateReply};
 use typesize::TypeSize;
 
 use crate::{
@@ -64,18 +64,6 @@ pub async fn dm(
     Ok(())
 }
 
-#[poise::command(prefix_command, hide_in_help, owners_only)]
-pub async fn close(ctx: Context<'_>) -> CommandResult {
-    ctx.say(format!(
-        "Shutting down {} shards!",
-        ctx.cache().shard_count()
-    ))
-    .await?;
-    ctx.framework().shard_manager().shutdown_all().await;
-
-    Ok(())
-}
-
 #[poise::command(
     prefix_command,
     owners_only,
@@ -117,72 +105,6 @@ pub async fn user_voice(ctx: Context<'_>, user: i64, mode: TTSModeChoice) -> Com
         .user_voice_db
         .invalidate_cache(&(user, mode.into()));
     ctx.say("Done!").await?;
-    Ok(())
-}
-
-#[derive(poise::ChoiceParameter, PartialEq, Eq)]
-pub enum PurgeGuildsMode {
-    Run,
-    Check,
-    Abort,
-}
-
-#[poise::command(prefix_command, owners_only, hide_in_help)]
-pub async fn purge_guilds(ctx: Context<'_>, mode: PurgeGuildsMode) -> CommandResult {
-    #[derive(sqlx::FromRow)]
-    struct HasGuildId {
-        guild_id: i64,
-    }
-
-    let data = ctx.data();
-    if mode == PurgeGuildsMode::Abort {
-        data.currently_purging.store(false, SeqCst);
-        ctx.say("Done!").await?;
-        return Ok(());
-    }
-
-    let cache = ctx.cache();
-    let mut setup_guilds = HashSet::with_capacity(cache.guild_count());
-
-    let mut stream =
-        sqlx::query_as::<_, HasGuildId>("SELECT guild_id from guilds WHERE channel != 0")
-            .fetch(&data.pool);
-
-    while let Some(item) = stream.try_next().await? {
-        setup_guilds.insert(item.guild_id as u64);
-    }
-
-    let to_leave: Vec<_> = cache
-        .guilds()
-        .into_iter()
-        .filter(|g| !setup_guilds.contains(&g.get()))
-        .collect();
-
-    let to_leave_count = to_leave.len();
-    if mode == PurgeGuildsMode::Run {
-        let msg = ctx.say(format!("Leaving {to_leave_count} guilds!")).await?;
-
-        data.currently_purging.store(true, SeqCst);
-        for guild in to_leave {
-            guild.leave(ctx.http()).await?;
-
-            if !data.currently_purging.load(SeqCst) {
-                msg.edit(ctx, poise::CreateReply::default().content("Aborted!"))
-                    .await?;
-                return Ok(());
-            }
-        }
-
-        msg.edit(
-            ctx,
-            poise::CreateReply::default().content("Done! Left {to_leave_count} guilds!"),
-        )
-        .await?;
-    } else {
-        ctx.say(format!("Would purge {to_leave_count} guilds!"))
-            .await?;
-    }
-
     Ok(())
 }
 
@@ -445,15 +367,13 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
     Ok(())
 }
 
-pub fn commands() -> [Command; 8] {
+pub fn commands() -> [Command; 6] {
     [
         dm(),
-        close(),
         debug(),
         register(),
         remove_cache(),
         refresh_ofs(),
-        purge_guilds(),
         cache_info(),
     ]
 }

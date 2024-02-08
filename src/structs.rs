@@ -178,7 +178,6 @@ pub struct Data {
 
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<()>>>,
     pub translations: HashMap<FixedString<u8>, gettext::Catalog>,
-    pub currently_purging: std::sync::atomic::AtomicBool,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub premium_avatar_url: FixedString<u16>,
