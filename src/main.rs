@@ -262,14 +262,19 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     client.start_autosharded().await.map_err(Into::into)
 }
 
-async fn get_prefix(ctx: PartialContext<'_>) -> Result<Option<String>> {
-    let prefix = match ctx.guild_id {
-        Some(guild_id) => {
-            let data = ctx.framework.user_data();
-            let row = data.guilds_db.get(guild_id.into()).await?;
-            String::from(row.prefix.as_str())
-        }
-        None => String::from("-"),
+async fn get_prefix(ctx: PartialContext<'_>) -> Result<Option<Cow<'static, str>>> {
+    let Some(guild_id) = ctx.guild_id else {
+        return Ok(Some(Cow::Borrowed("-")));
+    };
+
+    let data = ctx.framework.user_data();
+    let row = data.guilds_db.get(guild_id.into()).await?;
+
+    let prefix = row.prefix.as_str();
+    let prefix = if prefix == "-" {
+        Cow::Borrowed("-")
+    } else {
+        Cow::Owned(String::from(prefix))
     };
 
     Ok(Some(prefix))
