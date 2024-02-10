@@ -162,7 +162,7 @@ impl LastXsaidInfo {
         }
 
         let has_been_min = self.1.elapsed().unwrap().as_secs() > 60;
-        let is_only_author = Self::get_vc_member_count(guild, voice_channel_id) > 2;
+        let is_only_author = Self::get_vc_member_count(guild, voice_channel_id) <= 1;
 
         has_been_min || is_only_author
     }
