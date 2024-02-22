@@ -6,6 +6,8 @@ use parking_lot::Mutex;
 
 use poise::serenity_prelude::{ExecuteWebhook, Http, Webhook};
 
+use crate::looper::Looper;
+
 type LogMessage = (&'static str, String);
 
 fn get_avatar(level: tracing::Level) -> &'static str {
@@ -29,19 +31,21 @@ pub struct WebhookLogger {
 }
 
 impl WebhookLogger {
-    #[must_use]
-    pub fn new(http: Arc<Http>, normal_logs: Webhook, error_logs: Webhook) -> ArcWrapper<Self> {
-        ArcWrapper(Arc::new(Self {
+    pub fn init(http: Arc<Http>, normal_logs: Webhook, error_logs: Webhook) {
+        let logger = ArcWrapper(Arc::new(Self {
             http,
             normal_logs,
             error_logs,
 
             pending_logs: Mutex::default(),
-        }))
+        }));
+
+        tracing::subscriber::set_global_default(logger.clone()).unwrap();
+        tokio::spawn(logger.0.start());
     }
 }
 
-impl crate::looper::Looper for Arc<WebhookLogger> {
+impl Looper for Arc<WebhookLogger> {
     const NAME: &'static str = "Logging";
     const MILLIS: u64 = 1100;
 

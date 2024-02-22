@@ -65,44 +65,22 @@ mod looper;
 mod macros;
 mod migration;
 mod opt_ext;
+mod startup;
 mod structs;
 mod traits;
 mod translations;
 mod web_updater;
 
 use constants::PREMIUM_NEUTRAL_COLOUR;
-use funcs::{get_translation_langs, prepare_gcloud_voices};
 use looper::Looper;
 use opt_ext::OptionTryUnwrap;
-use structs::{
-    Context, Data, FailurePoint, PartialContext, PollyVoice, Result, TTSMode, WebhookConfig,
-    WebhookConfigRaw,
-};
+use structs::{Context, Data, FailurePoint, PartialContext, PollyVoice, Result, TTSMode};
 use traits::PoiseContextExt;
 use translations::GetTextContextExt;
 
-async fn get_webhooks(
-    http: &serenity::Http,
-    webhooks_raw: WebhookConfigRaw,
-) -> Result<WebhookConfig> {
-    let get_webhook = |url: reqwest::Url| async move {
-        let (webhook_id, token) = serenity::parse_webhook(&url).try_unwrap()?;
-        Ok(http.get_webhook_with_token(webhook_id, token).await?)
-    };
-
-    let (logs, errors, dm_logs) = tokio::try_join!(
-        get_webhook(webhooks_raw.logs),
-        get_webhook(webhooks_raw.errors),
-        get_webhook(webhooks_raw.dm_logs),
-    )?;
-
-    println!("Fetched webhooks");
-    Ok(WebhookConfig {
-        logs,
-        errors,
-        dm_logs,
-    })
-}
+use crate::startup::{
+    get_translation_langs, get_webhooks, prepare_gcloud_voices, send_startup_message,
+};
 
 fn main() -> Result<()> {
     let start_time = std::time::SystemTime::now();
@@ -170,25 +148,15 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         }
     )?;
 
+    println!("Setting up webhook logging");
+    logging::WebhookLogger::init(http.clone(), webhooks.logs.clone(), webhooks.errors.clone());
+
+    println!("Sending startup message");
+    let startup_message = send_startup_message(&http, &webhooks.logs).await?;
+
     println!("Spawning analytics handler");
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));
     tokio::spawn(analytics.clone().start());
-
-    println!("Sending startup message");
-    let startup_builder = ExecuteWebhook::default().content("**TTS Bot is starting up**");
-    let startup_message = webhooks
-        .logs
-        .execute(&http, true, startup_builder)
-        .await?
-        .unwrap()
-        .id;
-
-    println!("Setting up webhook logging");
-    let logger =
-        logging::WebhookLogger::new(http.clone(), webhooks.logs.clone(), webhooks.errors.clone());
-
-    tracing::subscriber::set_global_default(logger.clone())?;
-    tokio::spawn(logger.0.start());
 
     let data = Arc::new(Data {
         pool,
