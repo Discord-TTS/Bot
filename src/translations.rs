@@ -35,6 +35,7 @@ pub async fn read_files() -> Result<HashMap<FixedString<u8>, gettext::Catalog>> 
         }
     }
 
+    println!("Loaded translations");
     Ok(translations)
 }
 

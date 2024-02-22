@@ -40,7 +40,6 @@
 use std::{
     borrow::Cow,
     collections::BTreeMap,
-    future::Future,
     num::NonZeroU16,
     sync::{atomic::AtomicBool, Arc},
 };
@@ -82,14 +81,6 @@ use structs::{
 use traits::PoiseContextExt;
 use translations::GetTextContextExt;
 
-async fn wrap_in_res<T, E, Fut>(fut: Fut) -> Result<T>
-where
-    E: Into<anyhow::Error>,
-    Fut: Future<Output = Result<T, E>>,
-{
-    fut.await.map_err(Into::into)
-}
-
 async fn get_webhooks(
     http: &serenity::Http,
     webhooks_raw: WebhookConfigRaw,
@@ -105,6 +96,7 @@ async fn get_webhooks(
         get_webhook(webhooks_raw.dm_logs),
     )?;
 
+    println!("Fetched webhooks");
     Ok(WebhookConfig {
         logs,
         errors,
@@ -115,6 +107,7 @@ async fn get_webhooks(
 fn main() -> Result<()> {
     let start_time = std::time::SystemTime::now();
 
+    println!("Starting tokio runtime");
     std::env::set_var("RUST_LIB_BACKTRACE", "1");
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -123,12 +116,15 @@ fn main() -> Result<()> {
 }
 
 async fn _main(start_time: std::time::SystemTime) -> Result<()> {
+    println!("Loading and performing migrations");
     let (pool, config) = migration::load_db_and_conf().await?;
 
+    println!("Initialising Http client");
     let reqwest = reqwest::Client::new();
     let auth_key = config.main.tts_service_auth_key.as_deref();
     let http = Arc::new(serenity::Http::new(config.main.token.as_deref().unwrap()));
 
+    println!("Performing big startup join");
     let (
         translations,
         webhooks,
@@ -137,12 +133,12 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         user_voice_db,
         guild_voice_db,
         nickname_db,
-        premium_user,
         gtts_voices,
         espeak_voices,
         gcloud_voices,
         polly_voices,
         translation_languages,
+        premium_user,
     ) = tokio::try_join!(
         translations::read_files(),
         get_webhooks(&http, config.webhooks),
@@ -151,7 +147,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         create_db_handler!(pool.clone(), "user_voice", "user_id", "mode"),
         create_db_handler!(pool.clone(), "guild_voice", "guild_id", "mode"),
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
-        wrap_in_res(serenity::UserId::new(802632257658683442).to_user(&http)),
         TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key),
         TTSMode::eSpeak.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key),
         TTSMode::gCloud.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key),
@@ -165,11 +160,21 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             config.main.translation_url.as_ref(),
             config.main.translation_token.as_deref()
         ),
+        async {
+            let res = serenity::UserId::new(802632257658683442)
+                .to_user(&http)
+                .await?;
+
+            println!("Loaded premium user");
+            Ok(res)
+        }
     )?;
 
+    println!("Spawning analytics handler");
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));
     tokio::spawn(analytics.clone().start());
 
+    println!("Sending startup message");
     let startup_builder = ExecuteWebhook::default().content("**TTS Bot is starting up**");
     let startup_message = webhooks
         .logs
@@ -178,6 +183,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         .unwrap()
         .id;
 
+    println!("Setting up webhook logging");
     let logger =
         logging::WebhookLogger::new(http.clone(), webhooks.logs.clone(), webhooks.errors.clone());
 

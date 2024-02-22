@@ -156,10 +156,13 @@ pub async fn get_translation_langs(
         .json()
         .await?;
 
-    Ok(languages
+    let language_map = languages
         .into_iter()
         .map(|v| (v.language.to_lowercase().trunc_into(), v.name))
-        .collect())
+        .collect();
+
+    println!("Loaded DeepL translation languages");
+    Ok(language_map)
 }
 
 pub fn prepare_gcloud_voices(

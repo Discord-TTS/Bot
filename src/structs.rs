@@ -395,15 +395,17 @@ impl TTSMode {
             .append_pair("raw", "true")
             .finish();
 
-        reqwest
+        let res = reqwest
             .get(tts_service)
             .header("Authorization", auth_key.unwrap_or(""))
             .send()
             .await?
             .error_for_status()?
             .json()
-            .await
-            .map_err(Into::into)
+            .await?;
+
+        println!("Loaded voices for TTS Mode: {self}");
+        Ok(res)
     }
 
     pub const fn is_premium(self) -> bool {

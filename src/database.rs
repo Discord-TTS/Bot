@@ -83,11 +83,14 @@ where
         create_row: &'static str,
         single_insert: &'static str,
     ) -> Result<Self> {
+        let default_row = Self::_get(&pool, CacheKey::default(), select)
+            .await?
+            .expect("Default row not in table!");
+
+        println!("Loaded default row for table with select: {select}");
         Ok(Self {
             cache: DashMap::new(),
-            default_row: Self::_get(&pool, CacheKey::default(), select)
-                .await?
-                .expect("Default row not in table!"),
+            default_row,
             pool,
             select,
             delete,
