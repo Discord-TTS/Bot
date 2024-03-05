@@ -122,7 +122,7 @@ pub async fn ready(
 
     data.regex_cache
         .bot_mention
-        .get_or_init(|| regex::Regex::new(&format!("<@!?{}>", data_about_bot.user.id)).unwrap());
+        .get_or_init(|| regex::Regex::new(&format!("^<@!?{}>$", data_about_bot.user.id)).unwrap());
 
     if is_last_shard && !data.fully_started.load(Ordering::SeqCst) {
         finalize_startup(ctx, &data);
