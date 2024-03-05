@@ -219,7 +219,7 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
             guilds.len(),
             guilds
                 .iter()
-                .filter(|g| g.voice_states.get(&bot_user_id).is_some())
+                .filter(|g| g.voice_states.contains_key(&bot_user_id))
                 .count(),
             guilds
                 .into_iter()
