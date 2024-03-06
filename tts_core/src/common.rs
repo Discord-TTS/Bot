@@ -32,7 +32,7 @@ pub async fn dm_generic<'ctx, 'a>(
     author: &serenity::User,
     target: serenity::UserId,
     mut target_tag: String,
-    attachment_url: Option<impl Into<Cow<'a, str>>>,
+    attachment_url: Option<&'a str>,
     message: &str,
 ) -> Result<(String, serenity::Embed)> {
     let dm_channel = target.create_dm_channel(ctx).await?;
@@ -403,10 +403,10 @@ pub fn clean_msg(
     content
 }
 
-pub fn confirm_dialog_components<'ctx>(
-    positive: impl Into<Cow<'ctx, str>>,
-    negative: impl Into<Cow<'ctx, str>>,
-) -> Cow<'ctx, [CreateActionRow<'ctx>]> {
+pub fn confirm_dialog_components<'a>(
+    positive: &'a str,
+    negative: &'a str,
+) -> Cow<'a, [CreateActionRow<'a>]> {
     Cow::Owned(vec![CreateActionRow::Buttons(vec![
         CreateButton::new("True")
             .style(serenity::ButtonStyle::Success)
@@ -440,11 +440,11 @@ pub async fn confirm_dialog_wait(
     }
 }
 
-pub async fn confirm_dialog<'ctx>(
-    ctx: Context<'ctx>,
-    prompt: &'ctx str,
-    positive: impl Into<Cow<'ctx, str>>,
-    negative: impl Into<Cow<'ctx, str>>,
+pub async fn confirm_dialog(
+    ctx: Context<'_>,
+    prompt: &str,
+    positive: &str,
+    negative: &str,
 ) -> Result<Option<bool>> {
     let builder = poise::CreateReply::default()
         .content(prompt)

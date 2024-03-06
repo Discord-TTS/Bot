@@ -27,9 +27,9 @@ use serenity::{
 };
 
 use tts_core::{
+    common::{confirm_dialog, random_footer},
     constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR},
     database::{self, Compact},
-    common::{confirm_dialog, random_footer},
     require, require_guild,
     structs::{
         ApplicationContext, Command, CommandResult, Context, Data, Error, Result, SpeakingRateInfo,
@@ -693,7 +693,7 @@ pub async fn required_role(
     });
 
     if require!(
-        confirm_dialog(ctx, question, ctx.gettext("Yes, I'm sure."), negative).await?,
+        confirm_dialog(ctx, question, ctx.gettext("Yes, I'm sure."), &negative).await?,
         Ok(())
     ) {
         ctx.data()
