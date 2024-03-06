@@ -1,0 +1,19 @@
+[package]
+name = "tts_events"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "0.2.152"
+
+poise = { workspace = true }
+tokio = { workspace = true }
+regex = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+serenity = { workspace = true }
+songbird = { workspace = true }
+
+tts_core = { path = "../tts_core" }
+tts_tasks = { path = "../tts_tasks" }

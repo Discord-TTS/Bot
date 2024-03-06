@@ -4,7 +4,7 @@ use small_fixed_array::{FixedString, TruncatingInto as _};
 
 use poise::serenity_prelude as serenity;
 
-use crate::{
+use tts_core::{
     opt_ext::OptionTryUnwrap as _,
     structs::{GoogleGender, GoogleVoice, Result, TTSMode, WebhookConfig, WebhookConfigRaw},
 };

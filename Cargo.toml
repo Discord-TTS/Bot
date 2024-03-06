@@ -4,74 +4,81 @@ version = "0.1.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = ["tts_core", "tts_commands", "tts_events", "tts_tasks"]
+
 [profile.release]
 lto = "thin"
 panic = "abort"
 debug = 2
 
 [dependencies]
-serde = "1"
-regex = "1"
 toml = "0.8"
-rand = "0.8"
-anyhow = "1"
-sha2 = "0.10"
-indexmap = "2"
-tracing = "0.1"
-gettext = "0.4"
-linkify = "0.10"
-strsim = "0.11"
-sysinfo = "0.30"
-num-format = "0.4"
-itertools = "0.12"
-parking_lot = "0.12"
 const_format = "0.2"
-strum_macros = "0.26"
-arrayvec = "0.7.4"
-bitflags = "2.4.1"
-typesize = { version = "0.1.2", features = ["arrayvec"] }
-bool_to_bitflags = { version = "0.1", features = ["typesize"] }
 small-fixed-array = { version = "0.4", features = ["nightly"] }
-libc = "0.2.152"
-serde_json = "1.0.111"
+
+sqlx = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+poise = { workspace = true }
+anyhow = { workspace = true }
+sysinfo = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+dashmap = { workspace = true }
+songbird = { workspace = true }
+parking_lot = { workspace = true }
+
+tts_core = { path = "tts_core" }
+tts_tasks = { path = "tts_tasks" }
+tts_events = { path = "tts_events" }
+tts_commands = { path = "tts_commands" }
 
 [dependencies.symphonia]
 features = ["mp3", "ogg", "wav", "pcm"]
 default-features = false
 version = "0.5.3"
 
-[dependencies.sqlx]
+[workspace.dependencies]
+regex = "1"
+serde = "1"
+anyhow = "1"
+tracing = "0.1"
+sysinfo = "0.30"
+itertools = "0.12"
+parking_lot = "0.12"
+typesize = { version = "0.1.2", features = ["arrayvec"] }
+
+[workspace.dependencies.sqlx]
 version = "0.7"
 default-features = false
 features = ["macros", "postgres", "runtime-tokio-rustls"]
 
-[dependencies.reqwest]
+[workspace.dependencies.reqwest]
 version = "0.11"
 default-features = false
 features = ["rustls-tls"]
 
-[dependencies.tokio]
+[workspace.dependencies.tokio]
 version = "1"
 features = ["rt-multi-thread", "signal", "parking_lot"]
 
-[dependencies.dashmap]
+[workspace.dependencies.dashmap]
 version = "5"
 default-features = false
 
-[dependencies.serenity_feature_only]
+[workspace.dependencies.serenity]
 git = "https://github.com/serenity-rs/serenity"
 features = ["unstable_discord_api", "typesize"]
 default-features = false
-package = "serenity"
-version = "0.12.0"
 branch = "next"
 
-[dependencies.poise]
+[workspace.dependencies.poise]
 git = "https://github.com/serenity-rs/poise"
 features = ["cache"]
 branch = "serenity-next"
 
-[dependencies.songbird]
+[workspace.dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "serenity-next"

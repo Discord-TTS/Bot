@@ -18,7 +18,7 @@ use std::io::Write;
 
 use sqlx::{Connection as _, Executor, Row};
 
-use crate::{
+use tts_core::{
     constants::DB_SETUP_QUERY,
     opt_ext::OptionTryUnwrap,
     structs::{Config, PostgresConfig, Result, TTSMode},

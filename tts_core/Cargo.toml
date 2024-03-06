@@ -1,0 +1,30 @@
+[package]
+name = "tts_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rand = "0.8"
+sha2 = "0.10"
+gettext = "0.4"
+linkify = "0.10"
+bitflags = "2.4.1"
+arrayvec = "0.7.4"
+strum_macros = "0.26"
+bool_to_bitflags = { version = "0.1", features = ["typesize"] }
+
+sqlx = { workspace = true }
+regex = { workspace = true }
+poise = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+sysinfo = { workspace = true }
+tracing = { workspace = true }
+dashmap = { workspace = true }
+reqwest = { workspace = true }
+typesize = { workspace = true }
+songbird = { workspace = true }
+serenity = { workspace = true }
+itertools = { workspace = true }
+parking_lot = { workspace = true }

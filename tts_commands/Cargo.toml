@@ -1,0 +1,21 @@
+[package]
+name = "tts_commands"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+indexmap = "2"
+strsim = "0.11"
+num-format = "0.4"
+
+sqlx = { workspace = true }
+tokio = { workspace = true }
+poise = { workspace = true }
+anyhow = { workspace = true }
+sysinfo = { workspace = true }
+tracing = { workspace = true }
+serenity = { workspace = true }
+typesize = { workspace = true }
+songbird = { workspace = true }
+
+tts_core = { path = "../tts_core" }
