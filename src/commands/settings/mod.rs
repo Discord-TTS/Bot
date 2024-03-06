@@ -295,7 +295,7 @@ async fn translation_languages_autocomplete<'a>(
     filtered_languages.sort_by_key(|(label, _)| strsim::levenshtein(label, searching));
     filtered_languages
         .into_iter()
-        .map(|(label, value)| serenity::AutocompleteChoice::new(label, value))
+        .map(|(value, name)| serenity::AutocompleteChoice::new(name, value))
 }
 
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {

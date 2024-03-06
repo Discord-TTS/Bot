@@ -150,11 +150,6 @@ async fn _run(
     if main_config.get("setup").is_none() {
         transaction.execute(DB_SETUP_QUERY).await?;
         main_config.insert("setup".into(), true.into());
-    } else if main_config.get("translation_url").is_none() {
-        main_config.insert(
-            "translation_url".into(),
-            "https://api-free.deepl.com/v2".into(),
-        );
     }
 
     transaction.execute("

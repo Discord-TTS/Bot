@@ -66,6 +66,18 @@ pub struct GuildRow {
     pub voice_mode: TTSMode,
 }
 
+impl GuildRow {
+    pub fn target_lang(&self) -> Option<&str> {
+        if let Some(target_lang) = &self.target_lang
+            && self.to_translate()
+        {
+            Some(target_lang.as_str())
+        } else {
+            None
+        }
+    }
+}
+
 impl Compact for GuildRowRaw {
     type Compacted = GuildRow;
     fn compact(self) -> Self::Compacted {

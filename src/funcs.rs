@@ -108,17 +108,25 @@ pub fn prepare_url(
     mode: TTSMode,
     speaking_rate: &str,
     max_length: &str,
+    translation_lang: Option<&str>,
 ) -> reqwest::Url {
+    {
+        let mut params = tts_service.query_pairs_mut();
+        params.append_pair("text", content);
+        params.append_pair("lang", lang);
+        params.append_pair("mode", mode.into());
+        params.append_pair("max_length", max_length);
+        params.append_pair("preferred_format", "mp3");
+        params.append_pair("speaking_rate", speaking_rate);
+
+        if let Some(translation_lang) = translation_lang {
+            params.append_pair("translation_lang", translation_lang);
+        }
+
+        params.finish();
+    }
+
     tts_service.set_path("tts");
-    tts_service
-        .query_pairs_mut()
-        .append_pair("text", content)
-        .append_pair("lang", lang)
-        .append_pair("mode", mode.into())
-        .append_pair("max_length", max_length)
-        .append_pair("preferred_format", "mp3")
-        .append_pair("speaking_rate", speaking_rate)
-        .finish();
     tts_service
 }
 
@@ -411,59 +419,6 @@ pub fn clean_msg(
     }
 
     content
-}
-
-pub async fn translate(
-    reqwest: &reqwest::Client,
-    translation_url: &reqwest::Url,
-    translation_token: &str,
-    content: &str,
-    target_lang: &str,
-) -> Result<Option<String>> {
-    #[derive(serde::Deserialize)]
-    pub struct DeeplTranslateResponse {
-        pub translations: Vec<DeeplTranslation>,
-    }
-
-    #[derive(serde::Deserialize)]
-    pub struct DeeplTranslation {
-        pub text: String,
-        pub detected_source_language: String,
-    }
-
-    #[derive(serde::Serialize)]
-    struct DeeplTranslateRequest<'a> {
-        text: &'a str,
-        target_lang: &'a str,
-        preserve_formatting: u8,
-    }
-
-    let request = DeeplTranslateRequest {
-        target_lang,
-        text: content,
-        preserve_formatting: 1,
-    };
-
-    let response: DeeplTranslateResponse = reqwest
-        .get(format!("{translation_url}/translate"))
-        .query(&request)
-        .header(
-            "Authorization",
-            format!("DeepL-Auth-Key {translation_token}"),
-        )
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
-
-    if let Some(translation) = response.translations.into_iter().next() {
-        if translation.detected_source_language != target_lang {
-            return Ok(Some(translation.text));
-        }
-    }
-
-    Ok(None)
 }
 
 pub fn confirm_dialog_components<'ctx>(

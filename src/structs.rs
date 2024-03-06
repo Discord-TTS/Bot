@@ -33,9 +33,7 @@ pub struct Config {
 pub struct MainConfig {
     pub announcements_channel: serenity::ChannelId,
     pub tts_service_auth_key: Option<FixedString>,
-    pub translation_token: Option<FixedString>,
     pub patreon_service: Option<reqwest::Url>,
-    pub translation_url: Option<reqwest::Url>,
     pub invite_channel: serenity::ChannelId,
     pub website_url: Option<reqwest::Url>,
     pub main_server_invite: FixedString,
@@ -382,32 +380,6 @@ pub enum TTSMode {
 }
 
 impl TTSMode {
-    pub async fn fetch_voices<T: serde::de::DeserializeOwned>(
-        self,
-        mut tts_service: reqwest::Url,
-        reqwest: &reqwest::Client,
-        auth_key: Option<&str>,
-    ) -> Result<T> {
-        tts_service.set_path("voices");
-        tts_service
-            .query_pairs_mut()
-            .append_pair("mode", self.into())
-            .append_pair("raw", "true")
-            .finish();
-
-        let res = reqwest
-            .get(tts_service)
-            .header("Authorization", auth_key.unwrap_or(""))
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-
-        println!("Loaded voices for TTS Mode: {self}");
-        Ok(res)
-    }
-
     pub const fn is_premium(self) -> bool {
         match self {
             Self::gTTS | Self::eSpeak => false,

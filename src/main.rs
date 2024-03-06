@@ -74,13 +74,10 @@ mod web_updater;
 use constants::PREMIUM_NEUTRAL_COLOUR;
 use looper::Looper;
 use opt_ext::OptionTryUnwrap;
+use startup::*;
 use structs::{Context, Data, FailurePoint, PartialContext, PollyVoice, Result, TTSMode};
 use traits::PoiseContextExt;
 use translations::GetTextContextExt;
-
-use crate::startup::{
-    get_translation_langs, get_webhooks, prepare_gcloud_voices, send_startup_message,
-};
 
 fn main() -> Result<()> {
     let start_time = std::time::SystemTime::now();
@@ -103,6 +100,7 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     let http = Arc::new(serenity::Http::new(config.main.token.as_deref().unwrap()));
 
     println!("Performing big startup join");
+    let tts_service = || config.main.tts_service.clone();
     let (
         translations,
         webhooks,
@@ -125,19 +123,11 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         create_db_handler!(pool.clone(), "user_voice", "user_id", "mode"),
         create_db_handler!(pool.clone(), "guild_voice", "guild_id", "mode"),
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
-        TTSMode::gTTS.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key),
-        TTSMode::eSpeak.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key),
-        TTSMode::gCloud.fetch_voices(config.main.tts_service.clone(), &reqwest, auth_key),
-        TTSMode::Polly.fetch_voices::<Vec<PollyVoice>>(
-            config.main.tts_service.clone(),
-            &reqwest,
-            auth_key
-        ),
-        get_translation_langs(
-            &reqwest,
-            config.main.translation_url.as_ref(),
-            config.main.translation_token.as_deref()
-        ),
+        fetch_voices(&reqwest, tts_service(), auth_key, TTSMode::gTTS),
+        fetch_voices(&reqwest, tts_service(), auth_key, TTSMode::eSpeak),
+        fetch_voices(&reqwest, tts_service(), auth_key, TTSMode::gCloud),
+        fetch_voices::<Vec<PollyVoice>>(&reqwest, tts_service(), auth_key, TTSMode::Polly),
+        fetch_translation_languages(&reqwest, tts_service(), auth_key),
         async {
             let res = serenity::UserId::new(802632257658683442)
                 .to_user(&http)

@@ -127,6 +127,14 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
         let data = ctx.data();
         let (voice, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
 
+        let guild_row;
+        let translation_lang = if let Some(guild_id) = ctx.guild_id() {
+            guild_row = data.guilds_db.get(guild_id.get() as _).await?;
+            guild_row.target_lang()
+        } else {
+            None
+        };
+
         let author_name: String = author
             .name
             .chars()
@@ -141,17 +149,16 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             mode,
             &speaking_rate,
             &u64::MAX.to_string(),
+            translation_lang,
         );
 
-        let audio = fetch_audio(
-            &data.reqwest,
-            url,
-            data.config.tts_service_auth_key.as_deref(),
-        )
-        .await?
-        .try_unwrap()?
-        .bytes()
-        .await?;
+        let auth_key = data.config.tts_service_auth_key.as_deref();
+        let audio = fetch_audio(&data.reqwest, url, auth_key)
+            .await?
+            .try_unwrap()?
+            .bytes()
+            .await?;
+
         serenity::CreateAttachment::bytes(
             audio.to_vec(),
             format!(

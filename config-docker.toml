@@ -1,7 +1,6 @@
 [Main]
 log_level = 'info'
 tts_service = 'https://localhost:20310'
-#translation_token = token from https://deepl.com/
 #main_server_invite = 'https://discord.gg/example'
 #announcements_channel = id here
 #invite_channel = id here
@@ -11,7 +10,7 @@ tts_service = 'https://localhost:20310'
 
 [PostgreSQL-Info]
 database = 'tts'
-password = 'tts_password' 
+password = 'tts_password'
 host = 'localhost'
 user = 'tts'
 
@@ -22,4 +21,4 @@ user = 'tts'
 #dm_logs = 
 #servers = 
 #analytics = 
-#suggestions = 
+#suggestions =

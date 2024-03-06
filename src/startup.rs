@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 
-use poise::serenity_prelude as serenity;
 use small_fixed_array::{FixedString, TruncatingInto as _};
+
+use poise::serenity_prelude as serenity;
 
 use crate::{
     opt_ext::OptionTryUnwrap as _,
-    structs::{GoogleGender, GoogleVoice, Result, WebhookConfig, WebhookConfigRaw},
+    structs::{GoogleGender, GoogleVoice, Result, TTSMode, WebhookConfig, WebhookConfigRaw},
 };
 
 pub async fn get_webhooks(
@@ -31,44 +32,58 @@ pub async fn get_webhooks(
     })
 }
 
-pub async fn get_translation_langs(
-    reqwest: &reqwest::Client,
-    url: Option<&reqwest::Url>,
-    token: Option<&str>,
-) -> Result<BTreeMap<FixedString, FixedString>> {
-    #[derive(serde::Deserialize)]
-    pub struct DeeplVoice {
-        pub name: FixedString,
-        pub language: String,
-    }
-
-    #[derive(serde::Serialize)]
-    struct DeeplVoiceRequest {
-        #[serde(rename = "type")]
-        kind: &'static str,
-    }
-
-    let (Some(url), Some(token)) = (url, token) else {
-        return Ok(BTreeMap::new());
-    };
-
-    let languages: Vec<DeeplVoice> = reqwest
-        .get(format!("{url}/languages"))
-        .query(&DeeplVoiceRequest { kind: "target" })
-        .header("Authorization", format!("DeepL-Auth-Key {token}"))
+async fn fetch_json<T>(reqwest: &reqwest::Client, url: reqwest::Url, auth_header: &str) -> Result<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let resp = reqwest
+        .get(url)
+        .header("Authorization", auth_header)
         .send()
         .await?
         .error_for_status()?
         .json()
         .await?;
 
-    let language_map = languages
-        .into_iter()
-        .map(|v| (v.language.to_lowercase().trunc_into(), v.name))
-        .collect();
+    Ok(resp)
+}
+
+pub async fn fetch_voices<T: serde::de::DeserializeOwned>(
+    reqwest: &reqwest::Client,
+    mut tts_service: reqwest::Url,
+    auth_key: Option<&str>,
+    mode: TTSMode,
+) -> Result<T> {
+    tts_service.set_path("voices");
+    tts_service
+        .query_pairs_mut()
+        .append_pair("mode", mode.into())
+        .append_pair("raw", "true")
+        .finish();
+
+    let res = fetch_json(reqwest, tts_service, auth_key.unwrap_or("")).await?;
+
+    println!("Loaded voices for TTS Mode: {mode}");
+    Ok(res)
+}
+
+pub async fn fetch_translation_languages(
+    reqwest: &reqwest::Client,
+    mut tts_service: reqwest::Url,
+    auth_key: Option<&str>,
+) -> Result<BTreeMap<FixedString, FixedString>> {
+    tts_service.set_path("translation_languages");
+
+    let raw_langs: Vec<(String, FixedString)> =
+        fetch_json(reqwest, tts_service, auth_key.unwrap_or("")).await?;
+
+    let lang_map = raw_langs.into_iter().map(|(mut lang, name)| {
+        lang.make_ascii_lowercase();
+        (lang.trunc_into(), name)
+    });
 
     println!("Loaded DeepL translation languages");
-    Ok(language_map)
+    Ok(lang_map.collect())
 }
 
 pub fn prepare_gcloud_voices(
