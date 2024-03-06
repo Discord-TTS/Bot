@@ -5,7 +5,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = ["tts_core", "tts_commands", "tts_events", "tts_tasks"]
+members = [
+    "tts_core",
+    "tts_commands",
+    "tts_events",
+    "tts_tasks",
+    "tts_migrations",
+]
 
 [profile.release]
 lto = "thin"
@@ -13,7 +19,6 @@ panic = "abort"
 debug = 2
 
 [dependencies]
-toml = "0.8"
 const_format = "0.2"
 small-fixed-array = { version = "0.4", features = ["nightly"] }
 
@@ -33,6 +38,7 @@ tts_core = { path = "tts_core" }
 tts_tasks = { path = "tts_tasks" }
 tts_events = { path = "tts_events" }
 tts_commands = { path = "tts_commands" }
+tts_migrations = { path = "tts_migrations" }
 
 [dependencies.symphonia]
 features = ["mp3", "ogg", "wav", "pcm"]

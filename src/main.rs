@@ -55,7 +55,6 @@ use tts_core::{
 };
 use tts_tasks::Looper as _;
 
-mod migration;
 mod startup;
 
 use startup::*;
@@ -73,7 +72,7 @@ fn main() -> Result<()> {
 
 async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     println!("Loading and performing migrations");
-    let (pool, config) = migration::load_db_and_conf().await?;
+    let (pool, config) = tts_migrations::load_db_and_conf().await?;
 
     println!("Initialising Http client");
     let reqwest = reqwest::Client::new();

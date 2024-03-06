@@ -555,11 +555,11 @@ dependencies = [
  "symphonia",
  "sysinfo",
  "tokio",
- "toml",
  "tracing",
  "tts_commands",
  "tts_core",
  "tts_events",
+ "tts_migrations",
  "tts_tasks",
 ]
 
@@ -3237,6 +3237,16 @@ dependencies = [
  "tracing",
  "tts_core",
  "tts_tasks",
+]
+
+[[package]]
+name = "tts_migrations"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "sqlx",
+ "toml",
+ "tts_core",
 ]
 
 [[package]]

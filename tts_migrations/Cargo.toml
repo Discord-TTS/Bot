@@ -1,0 +1,10 @@
+[package]
+name = "tts_migrations"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+toml = "0.8"
+sqlx = { workspace = true }
+anyhow = { workspace = true }
+tts_core = { path = "../tts_core" }
