@@ -6,6 +6,7 @@ use poise::{
     CreateReply,
 };
 
+use to_arraystring::ToArrayString;
 use tts_core::{
     common::remove_premium,
     constants::PREMIUM_NEUTRAL_COLOUR,
@@ -62,8 +63,8 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
             if linked_guilds as u8 >= tier.entitled_servers {
                 Some(Cow::Owned(ctx
                     .gettext("Hey, you already have {server_count} servers linked, you are only subscribed to the {entitled_servers} tier!")
-                    .replace("{entitled_servers}", &tier.entitled_servers.to_string())
-                    .replace("{server_count}", &linked_guilds.to_string())
+                    .replace("{entitled_servers}", &tier.entitled_servers.to_arraystring())
+                    .replace("{server_count}", &linked_guilds.to_arraystring())
                 ))
             } else {
                 None

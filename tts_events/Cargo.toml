@@ -14,6 +14,7 @@ tracing = { workspace = true }
 reqwest = { workspace = true }
 serenity = { workspace = true }
 songbird = { workspace = true }
+to-arraystring = { workspace = true }
 
 tts_core = { path = "../tts_core" }
 tts_tasks = { path = "../tts_tasks" }

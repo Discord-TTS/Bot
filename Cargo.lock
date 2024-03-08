@@ -2898,6 +2898,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
+name = "to-arraystring"
+version = "0.1.0"
+source = "git+https://github.com/GnomedDev/to-arraystring#e2d352e738ef9c85ab6d321bf2f1f4960d895b28"
+dependencies = [
+ "arrayvec",
+ "itoa",
+ "ryu",
+]
+
+[[package]]
 name = "tokio"
 version = "1.36.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3179,6 +3189,7 @@ name = "tts_commands"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrayvec",
  "indexmap",
  "num-format",
  "poise",
@@ -3187,6 +3198,7 @@ dependencies = [
  "sqlx",
  "strsim 0.11.0",
  "sysinfo",
+ "to-arraystring",
  "tokio",
  "tracing",
  "tts_core",
@@ -3217,6 +3229,7 @@ dependencies = [
  "sqlx",
  "strum_macros",
  "sysinfo",
+ "to-arraystring",
  "tokio",
  "tracing",
  "typesize",
@@ -3233,6 +3246,7 @@ dependencies = [
  "reqwest",
  "serenity",
  "songbird",
+ "to-arraystring",
  "tokio",
  "tracing",
  "tts_core",

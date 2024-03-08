@@ -11,11 +11,12 @@ use self::serenity::{
 use poise::serenity_prelude as serenity;
 
 use crate::{
-    constants, require,
-    structs::{Data, FrameworkContext, Context},
+    constants,
+    opt_ext::OptionTryUnwrap,
+    require,
+    structs::{Context, Data, FrameworkContext},
     traits::PoiseContextExt,
     translations::GetTextContextExt,
-    opt_ext::OptionTryUnwrap,
 };
 
 const VIEW_TRACEBACK_CUSTOM_ID: &str = "error::traceback::view";

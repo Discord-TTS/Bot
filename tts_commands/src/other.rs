@@ -24,6 +24,7 @@ use poise::{
     CreateReply,
 };
 
+use to_arraystring::ToArrayString;
 use tts_core::{
     common::{fetch_audio, prepare_url},
     constants::OPTION_SEPERATORS,
@@ -60,7 +61,7 @@ pub async fn uptime(ctx: Context<'_>) -> CommandResult {
     ctx.say(
         ctx.gettext("{user_mention} has been up since: <t:{timestamp}:R>")
             .replace("{user_mention}", &current_user_mention)
-            .replace("{timestamp}", &timestamp.to_string()),
+            .replace("{timestamp}", &timestamp.to_arraystring()),
     )
     .await?;
 
@@ -148,7 +149,7 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             &voice,
             mode,
             &speaking_rate,
-            &u64::MAX.to_string(),
+            &u64::MAX.to_arraystring(),
             translation_lang,
         );
 
@@ -223,11 +224,12 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
         let guilds: Vec<_> = guild_ids.iter().filter_map(|id| cache.guild(*id)).collect();
 
         (
-            guilds.len(),
+            guilds.len().to_arraystring(),
             guilds
                 .iter()
                 .filter(|g| g.voice_states.contains_key(&bot_user_id))
-                .count(),
+                .count()
+                .to_arraystring(),
             guilds
                 .into_iter()
                 .map(|g| g.member_count)
@@ -319,10 +321,10 @@ and can be used by {total_members} people!",
             )
             .replace("{sep1}", sep1)
             .replace("{sep2}", sep2)
-            .replace("{total_guild_count}", &total_guild_count.to_string())
-            .replace("{total_voice_clients}", &total_voice_clients.to_string())
+            .replace("{total_guild_count}", &total_guild_count)
+            .replace("{total_voice_clients}", &total_voice_clients)
             .replace("{total_members}", &total_members)
-            .replace("{shard_count}", &shard_count.to_string())
+            .replace("{shard_count}", &shard_count.get().to_arraystring())
             .replace("{ram_usage}", &format!("{ram_usage:.1}"))
             .replace("{scheduler_stats}", &scheduler_stats),
         );
@@ -351,7 +353,7 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
         } else {
             let msg = ctx
                 .gettext("The current setup channel is: <#{channel}>")
-                .replace("{channel}", &channel.to_string());
+                .replace("{channel}", &channel.get().to_arraystring());
 
             Cow::Owned(msg)
         }
@@ -394,7 +396,7 @@ pub async fn ping(ctx: Context<'_>) -> CommandResult {
 
     let msg = ctx
         .gettext("Current Latency: {}ms")
-        .replace("{}", &ping_before.elapsed()?.as_millis().to_string());
+        .replace("{}", &ping_before.elapsed()?.as_millis().to_arraystring());
 
     ping_msg
         .edit(ctx, CreateReply::default().content(msg))

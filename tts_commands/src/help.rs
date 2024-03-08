@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::fmt::Write;
+use std::{borrow::Cow, fmt::Write};
 
 use indexmap::IndexMap;
 
@@ -233,12 +233,13 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                 .icon_url(ctx.author().face()),
         )
         .footer(serenity::CreateEmbedFooter::new(match mode {
-            HelpCommandMode::Group(c) => ctx
-                .gettext("Use `/help {command_name} [command]` for more info on a command")
-                .replace("{command_name}", &c.qualified_name),
-            HelpCommandMode::Command(_) | HelpCommandMode::Root => ctx
-                .gettext("Use `/help [command]` for more info on a command")
-                .to_string(),
+            HelpCommandMode::Group(c) => Cow::Owned(
+                ctx.gettext("Use `/help {command_name} [command]` for more info on a command")
+                    .replace("{command_name}", &c.qualified_name),
+            ),
+            HelpCommandMode::Command(_) | HelpCommandMode::Root => {
+                Cow::Borrowed(ctx.gettext("Use `/help [command]` for more info on a command"))
+            }
         }));
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;

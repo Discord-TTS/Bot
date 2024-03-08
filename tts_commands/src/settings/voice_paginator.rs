@@ -57,7 +57,7 @@ impl<'a> MenuPaginator<'a> {
                 false,
             )
             .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face()))
-            .footer(CreateEmbedFooter::new(self.footer.to_string()))
+            .footer(CreateEmbedFooter::new(self.footer.as_ref()))
     }
 
     fn create_action_row(&self, disabled: bool) -> serenity::CreateActionRow<'_> {

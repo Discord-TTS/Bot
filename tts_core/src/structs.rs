@@ -232,9 +232,11 @@ impl Data {
 
         Ok(row.speaking_rate.map_or_else(
             || {
-                mode.speaking_rate_info()
-                    .map(|info| info.default.to_string())
-                    .map_or(Cow::Borrowed("1.0"), Cow::Owned)
+                Cow::Borrowed(
+                    mode.speaking_rate_info()
+                        .map(|info| info.default)
+                        .unwrap_or("1.0"),
+                )
             },
             |r| Cow::Owned(r.to_string()),
         ))
@@ -361,13 +363,13 @@ impl Data {
 pub struct SpeakingRateInfo {
     pub min: f32,
     pub max: f32,
-    pub default: f32,
+    pub default: &'static str,
     pub kind: &'static str,
 }
 
 impl SpeakingRateInfo {
     #[allow(clippy::unnecessary_wraps)]
-    const fn new(min: f32, default: f32, max: f32, kind: &'static str) -> Option<Self> {
+    const fn new(min: f32, default: &'static str, max: f32, kind: &'static str) -> Option<Self> {
         Some(Self {
             min,
             max,
@@ -409,9 +411,9 @@ impl TTSMode {
     pub const fn speaking_rate_info(self) -> Option<SpeakingRateInfo> {
         match self {
             Self::gTTS => None,
-            Self::gCloud => SpeakingRateInfo::new(0.25, 1.0, 4.0, "x"),
-            Self::Polly => SpeakingRateInfo::new(10.0, 100.0, 500.0, "%"),
-            Self::eSpeak => SpeakingRateInfo::new(100.0, 175.0, 400.0, " words per minute"),
+            Self::gCloud => SpeakingRateInfo::new(0.25, "1.0", 4.0, "x"),
+            Self::Polly => SpeakingRateInfo::new(10.0, "100.0", 500.0, "%"),
+            Self::eSpeak => SpeakingRateInfo::new(100.0, "175.0", 400.0, " words per minute"),
         }
     }
 }

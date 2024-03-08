@@ -19,12 +19,14 @@ mod voice_paginator;
 
 use std::{borrow::Cow, collections::HashMap, fmt::Write, num::NonZeroU8};
 
+use arrayvec::ArrayString;
 use poise::serenity_prelude as serenity;
 use serenity::{
     builder::*,
     small_fixed_array::{FixedString, TruncatingInto},
     Mentionable,
 };
+use to_arraystring::ToArrayString;
 
 use tts_core::{
     common::{confirm_dialog, random_footer},
@@ -131,14 +133,17 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
         let (default, kind) = mode
             .speaking_rate_info()
-            .map_or((1.0, "x"), |info| (info.default, info.kind));
+            .map_or(("1.0", "x"), |info| (info.default, info.kind));
 
         (
-            Cow::Owned(user_voice_row.speaking_rate.unwrap_or(default).to_string()),
+            user_voice_row
+                .speaking_rate
+                .map(f32::to_arraystring)
+                .unwrap_or(ArrayString::from(default)?),
             kind,
         )
     } else {
-        (Cow::Borrowed("1.0"), "x")
+        (ArrayString::from("1.0").unwrap(), "x")
     };
 
     let neutral_colour = ctx.neutral_colour().await;
@@ -161,7 +166,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{sep1}", sep1)
             .replace("{prefix}", prefix)
             .replace("{channel_mention}", &channel_mention)
-            .replace("{autojoin}", &guild_row.auto_join().to_string())
+            .replace("{autojoin}", &guild_row.auto_join().to_arraystring())
             .replace("{role_mention}", required_role.as_deref().unwrap_or(none_str)),
         false)
         .field("**TTS Settings**", &ctx.gettext("
@@ -178,22 +183,22 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep2} Max Repeated Characters: `{repeated_chars}`
         ")
             .replace("{sep2}", sep2)
-            .replace("{xsaid}", &guild_row.xsaid().to_string())
-            .replace("{bot_ignore}", &guild_row.bot_ignore().to_string())
-            .replace("{audience_ignore}", &guild_row.audience_ignore().to_string())
-            .replace("{require_voice}", &guild_row.require_voice().to_string())
+            .replace("{xsaid}", &guild_row.xsaid().to_arraystring())
+            .replace("{bot_ignore}", &guild_row.bot_ignore().to_arraystring())
+            .replace("{audience_ignore}", &guild_row.audience_ignore().to_arraystring())
+            .replace("{require_voice}", &guild_row.require_voice().to_arraystring())
             .replace("{required_prefix}", guild_row.required_prefix.as_deref().unwrap_or(none_str))
             .replace("{guild_mode}", guild_mode.into())
             .replace("{default_voice}", &default_voice)
-            .replace("{msg_length}", &guild_row.msg_length.to_string())
-            .replace("{repeated_chars}", &guild_row.repeated_chars.map_or(0, NonZeroU8::get).to_string()),
+            .replace("{msg_length}", &guild_row.msg_length.to_arraystring())
+            .replace("{repeated_chars}", &guild_row.repeated_chars.map_or(0, NonZeroU8::get).to_arraystring()),
         false)
         .field(ctx.gettext("**Translation Settings (Premium Only)**"), &ctx.gettext("
 {sep4} Translation: `{to_translate}`
 {sep4} Translation Language: `{target_lang}`
         ")
             .replace("{sep4}", sep4)
-            .replace("{to_translate}", &guild_row.to_translate().to_string())
+            .replace("{to_translate}", &guild_row.to_translate().to_arraystring())
             .replace("{target_lang}", target_lang),
         false)
         .field("**User Specific**", &ctx.gettext("
@@ -957,7 +962,7 @@ pub async fn repeated_characters(
                 .await?;
             Cow::Owned(
                 ctx.gettext("Max repeated characters is now: {}")
-                    .replace("{}", &chars.to_string()),
+                    .replace("{}", &chars.to_arraystring()),
             )
         }
     };
@@ -1000,7 +1005,7 @@ pub async fn msg_length(
                 .await?;
             Cow::Owned(
                 ctx.gettext("Max message length is now: {} seconds")
-                    .replace("{}", &seconds.to_string()),
+                    .replace("{}", &seconds.to_arraystring()),
             )
         }
     };
@@ -1051,10 +1056,10 @@ pub async fn speaking_rate(
     let to_send = {
         if speaking_rate > max {
             ctx.gettext("**Error**: Cannot set the speaking rate multiplier above {max}{kind}")
-                .replace("{max}", &max.to_string())
+                .replace("{max}", &max.to_arraystring())
         } else if speaking_rate < min {
             ctx.gettext("**Error**: Cannot set the speaking rate multiplier below {min}{kind}")
-                .replace("{min}", &min.to_string())
+                .replace("{min}", &min.to_arraystring())
         } else {
             data.userinfo_db.create_row(author.id.get() as i64).await?;
             data.user_voice_db
@@ -1065,7 +1070,7 @@ pub async fn speaking_rate(
                 )
                 .await?;
             ctx.gettext("Your speaking rate is now: {speaking_rate}{kind}")
-                .replace("{speaking_rate}", &speaking_rate.to_string())
+                .replace("{speaking_rate}", &speaking_rate.to_arraystring())
         }
     }
     .replace("{kind}", kind);

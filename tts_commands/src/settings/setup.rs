@@ -1,4 +1,5 @@
 use anyhow::bail;
+use to_arraystring::ToArrayString;
 
 use poise::serenity_prelude as serenity;
 use serenity::{builder::*, small_fixed_array::FixedString, ComponentInteractionDataKind};
@@ -22,7 +23,14 @@ fn can_send(
     (REQUIRED_PERMISSIONS - guild.user_permissions_in(channel, member)).is_empty()
 }
 
-type EligibleSetupChannel = (serenity::ChannelId, FixedString<u16>, u16, bool);
+type U64ArrayString = <u64 as ToArrayString>::ArrayString;
+type EligibleSetupChannel = (
+    serenity::ChannelId,
+    U64ArrayString,
+    FixedString<u16>,
+    u16,
+    bool,
+);
 
 async fn get_eligible_channels(
     ctx: Context<'_>,
@@ -43,7 +51,8 @@ async fn get_eligible_channels(
         })
         .map(|c| {
             let has_webhook_perms = guild.user_permissions_in(c, &bot_member).manage_webhooks();
-            (c.id, c.name.clone(), c.position, has_webhook_perms)
+            let id_str = c.id.get().to_arraystring();
+            (c.id, id_str, c.name.clone(), c.position, has_webhook_perms)
         })
         .collect();
 
@@ -68,7 +77,7 @@ async fn show_channel_select_menu(
         return Ok(None);
     };
 
-    text_channels.sort_by(|(_, _, f, _), (_, _, s, _)| Ord::cmp(&f, &s));
+    text_channels.sort_by(|(_, _, _, f, _), (_, _, _, s, _)| Ord::cmp(&f, &s));
 
     let builder = poise::CreateReply::default()
         .content(ctx.gettext("Select a channel!"))
@@ -95,9 +104,9 @@ async fn show_channel_select_menu(
     };
 
     let selected_id: serenity::ChannelId = values[0].parse()?;
-    let (_, _, _, has_webhook_perms) = text_channels
+    let (_, _, _, _, has_webhook_perms) = text_channels
         .into_iter()
-        .find(|(c_id, _, _, _)| *c_id == selected_id)
+        .find(|(c_id, _, _, _, _)| *c_id == selected_id)
         .unwrap();
 
     Ok(Some((selected_id, has_webhook_perms)))
@@ -113,8 +122,8 @@ fn generate_channel_select(text_channels: &[EligibleSetupChannel]) -> Vec<Create
                 CreateSelectMenuKind::String {
                     options: chunked_channels
                         .iter()
-                        .map(|(id, name, _, _)| {
-                            CreateSelectMenuOption::new(&**name, id.to_string())
+                        .map(|(_, id_str, name, _, _)| {
+                            CreateSelectMenuOption::new(&**name, &**id_str)
                         })
                         .collect(),
                 },
@@ -184,7 +193,7 @@ pub async fn setup(
 TTS Bot will now accept commands and read from <#{channel}>.
 Just do `/join` and start talking!",
                     )
-                    .replace("{channel}", &channel_id.to_string()),
+                    .replace("{channel}", &channel_id.get().to_arraystring()),
                 )
                 .footer(serenity::CreateEmbedFooter::new(random_footer(
                     &data.config.main_server_invite,

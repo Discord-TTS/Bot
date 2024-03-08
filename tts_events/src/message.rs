@@ -1,5 +1,6 @@
 use std::{borrow::Cow, num::NonZeroU16};
 
+use to_arraystring::ToArrayString;
 use tracing::info;
 
 use self::serenity::{CreateEmbed, CreateEmbedFooter, CreateMessage, ExecuteWebhook, Mentionable};
@@ -103,7 +104,7 @@ async fn process_tts_msg(
         &voice,
         mode,
         &speaking_rate,
-        &guild_row.msg_length.to_string(),
+        &guild_row.msg_length.to_arraystring(),
         guild_row.target_lang(),
     );
 

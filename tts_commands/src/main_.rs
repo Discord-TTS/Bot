@@ -20,6 +20,7 @@ use songbird::error::JoinError;
 
 use poise::serenity_prelude::{self as serenity, builder::*, colours::branding::YELLOW};
 
+use to_arraystring::ToArrayString as _;
 use tts_core::{
     common::random_footer,
     database_models::GuildRow,
@@ -49,7 +50,7 @@ async fn channel_check(
                 "You ran this command in the wrong channel, please move to <#{channel_id}>.",
             );
 
-            Cow::Owned(msg.replace("{channel_id}", &setup_id.to_string()))
+            Cow::Owned(msg.replace("{channel_id}", &setup_id.get().to_arraystring()))
         } else {
             Cow::Borrowed(ctx.gettext("Your setup channel has been deleted, please run /setup!"))
         }
@@ -169,7 +170,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
             ctx.say(
                 ctx.gettext("I am already in <#{channel_id}>!")
-                    .replace("{channel_id}", &bot_channel_id.to_string()),
+                    .replace("{channel_id}", &bot_channel_id.get().to_arraystring()),
             )
             .await?;
             return Ok(());

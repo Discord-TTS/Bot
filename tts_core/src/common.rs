@@ -7,6 +7,7 @@ use rand::Rng as _;
 
 use serenity::all as serenity;
 use serenity::{CreateActionRow, CreateButton};
+use to_arraystring::ToArrayString as _;
 
 use crate::database::{GuildRow, UserRow};
 use crate::opt_ext::OptionTryUnwrap as _;
@@ -117,10 +118,11 @@ pub fn random_footer<'a>(
     client_id: serenity::UserId,
     catalog: Option<&'a gettext::Catalog>,
 ) -> Cow<'a, str> {
+    let client_id_str = client_id.get().to_arraystring();
     match rand::thread_rng().gen_range(0..5) {
         0 => Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
-        1 => Cow::Owned(catalog.gettext("You can vote for me or review me on wumpus.store!\nhttps://wumpus.store/bot/{client_id}?ref=tts").replace("{client_id}", &client_id.to_string())),
-        2 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id.to_string())),
+        1 => Cow::Owned(catalog.gettext("You can vote for me or review me on wumpus.store!\nhttps://wumpus.store/bot/{client_id}?ref=tts").replace("{client_id}", &client_id_str)),
+        2 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id_str)),
         3 => Cow::Borrowed(catalog.gettext("If you want to support the development and hosting of TTS Bot, check out `/premium`!")),
         4 => Cow::Borrowed(catalog.gettext("There are loads of customizable settings, check out `/help set`")),
         _ => unreachable!()
