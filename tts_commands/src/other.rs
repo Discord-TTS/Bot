@@ -20,7 +20,9 @@ use anyhow::Error;
 use num_format::{Locale, ToFormattedString};
 
 use poise::{
-    serenity_prelude::{self as serenity, builder::*, Mentionable as _},
+    serenity_prelude::{
+        self as serenity, builder::*, small_fixed_array::FixedString, Mentionable as _,
+    },
     CreateReply,
 };
 
@@ -79,7 +81,7 @@ pub async fn tts(
     ctx: Context<'_>,
     #[description = "The text to TTS"]
     #[rest]
-    message: String,
+    message: FixedString<u16>,
 ) -> CommandResult {
     let is_unnecessary_command_invoke = async {
         if !matches!(ctx, poise::Context::Prefix(_)) {

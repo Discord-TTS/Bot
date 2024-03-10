@@ -16,7 +16,7 @@
 
 use std::{borrow::Cow, hash::Hash};
 
-use self::serenity::builder::*;
+use self::serenity::{builder::*, small_fixed_array::FixedString};
 use num_format::{Locale, ToFormattedString};
 use poise::{serenity_prelude as serenity, CreateReply};
 use typesize::TypeSize;
@@ -38,7 +38,7 @@ pub async fn register(ctx: Context<'_>) -> CommandResult {
 pub async fn dm(
     ctx: PrefixContext<'_>,
     todm: serenity::User,
-    #[rest] message: String,
+    #[rest] message: FixedString<u16>,
 ) -> CommandResult {
     let attachment_url = ctx.msg.attachments.first().map(|a| a.url.as_str());
     let (content, embed) = dm_generic(

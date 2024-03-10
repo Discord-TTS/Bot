@@ -71,10 +71,10 @@ pub async fn fetch_translation_languages(
     reqwest: &reqwest::Client,
     mut tts_service: reqwest::Url,
     auth_key: Option<&str>,
-) -> Result<BTreeMap<FixedString, FixedString>> {
+) -> Result<BTreeMap<FixedString<u8>, FixedString<u8>>> {
     tts_service.set_path("translation_languages");
 
-    let raw_langs: Vec<(String, FixedString)> =
+    let raw_langs: Vec<(String, FixedString<u8>)> =
         fetch_json(reqwest, tts_service, auth_key.unwrap_or("")).await?;
 
     let lang_map = raw_langs.into_iter().map(|(mut lang, name)| {
@@ -88,7 +88,7 @@ pub async fn fetch_translation_languages(
 
 pub fn prepare_gcloud_voices(
     raw_map: Vec<GoogleVoice>,
-) -> BTreeMap<FixedString, BTreeMap<FixedString, GoogleGender>> {
+) -> BTreeMap<FixedString<u8>, BTreeMap<FixedString<u8>, GoogleGender>> {
     // {lang_accent: {variant: gender}}
     let mut cleaned_map = BTreeMap::new();
     for gvoice in raw_map {

@@ -204,12 +204,12 @@ pub struct Data {
     pub fully_started: std::sync::atomic::AtomicBool,
     pub update_startup_lock: tokio::sync::Mutex<()>,
 
-    pub espeak_voices: FixedArray<FixedString>,
-    pub gtts_voices: BTreeMap<FixedString, FixedString>,
-    pub polly_voices: BTreeMap<FixedString, PollyVoice>,
-    pub gcloud_voices: BTreeMap<FixedString, BTreeMap<FixedString, GoogleGender>>,
+    pub espeak_voices: FixedArray<FixedString<u8>>,
+    pub gtts_voices: BTreeMap<FixedString<u8>, FixedString<u8>>,
+    pub polly_voices: BTreeMap<FixedString<u8>, PollyVoice>,
+    pub gcloud_voices: BTreeMap<FixedString<u8>, BTreeMap<FixedString<u8>, GoogleGender>>,
 
-    pub translation_languages: BTreeMap<FixedString, FixedString>,
+    pub translation_languages: BTreeMap<FixedString<u8>, FixedString<u8>>,
 }
 
 impl std::fmt::Debug for Data {
@@ -452,10 +452,10 @@ impl From<TTSModeChoice> for TTSMode {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GoogleVoice {
-    pub name: FixedString,
+    pub name: FixedString<u8>,
     #[serde(default)]
     pub ssml_gender: GoogleGender,
-    pub language_codes: [FixedString; 1],
+    pub language_codes: [FixedString<u8>; 1],
 }
 
 #[derive(serde::Deserialize)]
@@ -464,8 +464,8 @@ pub struct PollyVoice {
     pub language_code: FixedString,
     pub language_name: FixedString,
     pub gender: PollyGender,
-    pub name: FixedString,
-    pub id: FixedString,
+    pub name: FixedString<u8>,
+    pub id: FixedString<u8>,
 }
 
 #[derive(serde::Deserialize, IntoStaticStr, Copy, Clone, Default)]

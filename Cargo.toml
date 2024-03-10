@@ -77,7 +77,7 @@ default-features = false
 
 [workspace.dependencies.serenity]
 git = "https://github.com/serenity-rs/serenity"
-features = ["unstable_discord_api", "typesize"]
+features = ["typesize"]
 default-features = false
 branch = "next"
 

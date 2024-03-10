@@ -2243,7 +2243,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.1"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#ae51461c8f279e8cb70d6bcfa84a225f636dbe69"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#494ee637e4a9eba1f6e58d3a720dfe6bb1642ab0"
 dependencies = [
  "arrayvec",
  "async-trait",
@@ -2367,9 +2367,9 @@ dependencies = [
 
 [[package]]
 name = "small-fixed-array"
-version = "0.4.1"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c8ed67294ebf2f0f520f6ad58f9a4c30c79f35107b04742021cb23bfbc70c8c"
+checksum = "15856fcbbfc50ef197dd2ee3b7d44a25fbde2c10612f3f63c4ce67237085d44d"
 dependencies = [
  "serde",
  "typesize",

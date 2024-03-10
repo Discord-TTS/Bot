@@ -386,7 +386,7 @@ async fn change_voice<'a, T, RowT1, RowT2>(
     author_id: serenity::UserId,
     guild_id: serenity::GuildId,
     key: T,
-    voice: Option<FixedString>,
+    voice: Option<FixedString<u8>>,
     target: Target,
 ) -> Result<Cow<'a, str>, Error>
 where
@@ -425,7 +425,7 @@ where
     })
 }
 
-fn format_languages<'a>(mut iter: impl Iterator<Item = &'a FixedString>) -> String {
+fn format_languages<'a>(mut iter: impl Iterator<Item = &'a FixedString<u8>>) -> String {
     let mut buf = String::with_capacity(iter.size_hint().0 * 2);
     if let Some(first_elt) = iter.next() {
         buf.push('`');
@@ -441,7 +441,7 @@ fn format_languages<'a>(mut iter: impl Iterator<Item = &'a FixedString>) -> Stri
     buf
 }
 
-fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a FixedString> {
+fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a FixedString<u8>> {
     match mode {
         TTSMode::gTTS => data.gtts_voices.get(code),
         TTSMode::Polly => data.polly_voices.get(code).map(|n| &n.name),
@@ -449,7 +449,7 @@ fn get_voice_name<'a>(data: &'a Data, code: &str, mode: TTSMode) -> Option<&'a F
     }
 }
 
-fn check_valid_voice(data: &Data, code: &FixedString, mode: TTSMode) -> bool {
+fn check_valid_voice(data: &Data, code: &FixedString<u8>, mode: TTSMode) -> bool {
     match mode {
         TTSMode::gTTS | TTSMode::Polly => get_voice_name(data, code, mode).is_some(),
         TTSMode::eSpeak => data.espeak_voices.contains(code),
@@ -829,7 +829,7 @@ pub async fn server_voice(
     #[description = "The default voice to read messages in"]
     #[autocomplete = "voice_autocomplete"]
     #[rest]
-    voice: String,
+    voice: FixedString<u8>,
 ) -> CommandResult {
     let data = ctx.data();
     let guild_id = ctx.guild_id().unwrap();
@@ -841,7 +841,7 @@ pub async fn server_voice(
         ctx.author().id,
         guild_id,
         guild_id.into(),
-        Some(voice.trunc_into()),
+        Some(voice),
         Target::Guild,
     )
     .await?;
@@ -911,14 +911,14 @@ pub async fn command_prefix(
     ctx: Context<'_>,
     #[description = "The prefix to be used before commands"]
     #[rest]
-    prefix: String,
+    prefix: FixedString<u8>,
 ) -> CommandResult {
     let to_send = if let Err(err) = check_prefix(&ctx, &prefix) {
         Cow::Borrowed(err)
     } else {
         ctx.data()
             .guilds_db
-            .set_one(ctx.guild_id().unwrap().into(), "prefix", &prefix)
+            .set_one(ctx.guild_id().unwrap().into(), "prefix", prefix.as_str())
             .await?;
         Cow::Owned(
             ctx.gettext("Command prefix for this server is now: {prefix}")
