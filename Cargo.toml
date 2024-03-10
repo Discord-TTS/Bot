@@ -54,8 +54,8 @@ sysinfo = "0.30"
 itertools = "0.12"
 arrayvec = "0.7.4"
 parking_lot = "0.12"
+to-arraystring = "0.1"
 typesize = { version = "0.1.2", features = ["arrayvec"] }
-to-arraystring = { git = "https://github.com/GnomedDev/to-arraystring" }
 
 [workspace.dependencies.sqlx]
 version = "0.7"
