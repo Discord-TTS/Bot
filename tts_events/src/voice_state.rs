@@ -29,21 +29,26 @@ pub async fn voice_state_update(
         return Ok(());
     }
 
-    let channel_members = ctx
-        .cache
-        .channel(old.channel_id.try_unwrap()?)
-        .try_unwrap()?
-        .members(&ctx.cache)?;
+    {
+        let channel_id = old.channel_id.try_unwrap()?;
+        let guild = ctx.cache.guild(guild_id).try_unwrap()?;
+        let mut channel_members = guild.members.iter().filter(|(m, _)| {
+            guild
+                .voice_states
+                .get(m)
+                .is_some_and(|v| v.channel_id == Some(channel_id))
+        });
 
-    // Bot is in the voice channel being left from
-    if channel_members.iter().all(|m| m.user.id != bot_id) {
-        return Ok(());
+        // Bot is in the voice channel being left from
+        if channel_members.clone().all(|(_, m)| m.user.id != bot_id) {
+            return Ok(());
+        }
+
+        // All the users in the vc are now bots
+        if channel_members.any(|(_, m)| !m.user.bot()) {
+            return Ok(());
+        };
     }
-
-    // All the users in the vc are now bots
-    if channel_members.into_iter().any(|m| !m.user.bot()) {
-        return Ok(());
-    };
 
     data.songbird.remove(guild_id).await.map_err(Into::into)
 }
