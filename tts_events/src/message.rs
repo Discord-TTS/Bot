@@ -238,7 +238,7 @@ async fn process_mention_msg(
 
         match message
             .author
-            .direct_message(ctx, CreateMessage::default().content(msg))
+            .dm(&ctx.http, CreateMessage::default().content(msg))
             .await
         {
             Err(serenity::Error::Http(error))
@@ -353,7 +353,7 @@ async fn process_support_dm(
             .set_one(message.author.id.into(), "dm_welcomed", &true)
             .await?;
         if channel.pins(&ctx.http).await?.len() < 50 {
-            welcome_msg.pin(ctx).await?;
+            welcome_msg.pin(ctx, None).await?;
         }
 
         info!(

@@ -21,8 +21,7 @@ pub async fn guild_create(
     };
 
     let data = framework_ctx.user_data();
-    let dm_channel = guild.owner_id.create_dm_channel(&ctx).await?;
-    match dm_channel.send_message(&ctx, serenity::CreateMessage::default().embed(CreateEmbed::default()
+    match guild.owner_id.dm(&ctx.http, serenity::CreateMessage::default().embed(CreateEmbed::default()
         .title(format!("Welcome to {}!", ctx.cache.current_user().name))
         .description(format!("
 Hello! Someone invited me to your server `{}`!

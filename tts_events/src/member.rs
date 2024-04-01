@@ -87,7 +87,7 @@ pub async fn guild_member_removal(
     }
 
     let ctx = framework_ctx.serenity_context;
-    let msg = match user.dm(ctx, create_premium_notice()).await {
+    let msg = match user.dm(&ctx.http, create_premium_notice()).await {
         Ok(msg) => msg,
         Err(err) => {
             // We cannot DM this premium user, just remove premium by default.
@@ -119,7 +119,7 @@ pub async fn guild_member_removal(
         }
     };
 
-    user.dm(ctx, serenity::CreateMessage::new().content(response))
+    user.dm(&ctx.http, serenity::CreateMessage::new().content(response))
         .await?;
 
     Ok(())

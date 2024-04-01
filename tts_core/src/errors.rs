@@ -331,7 +331,7 @@ async fn handle_cooldown(
             tokio::time::sleep(remaining_cooldown).await;
 
             let ctx_discord = ctx.serenity_context();
-            error_message.delete(ctx_discord).await?;
+            error_message.delete(ctx_discord, None).await?;
 
             let bot_user_id = ctx_discord.cache.current_user().id;
             let Some(channel) = error_message.channel(ctx_discord).await?.guild() else {
@@ -342,7 +342,8 @@ async fn handle_cooldown(
                 .permissions_for_user(&ctx_discord.cache, bot_user_id)?
                 .manage_messages()
             {
-                ctx.msg.delete(ctx_discord).await?;
+                let reason = "Deleting command invocation that hit cooldown";
+                ctx.msg.delete(ctx_discord, Some(reason)).await?;
             }
         }
     };

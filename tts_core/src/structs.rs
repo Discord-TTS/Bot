@@ -148,7 +148,7 @@ impl LastXsaidInfo {
     fn get_vc_member_count(guild: &serenity::Guild, channel_id: serenity::ChannelId) -> usize {
         guild
             .voice_states
-            .values()
+            .iter()
             .filter(|vs| vs.channel_id.is_some_and(|vc| vc == channel_id))
             .filter_map(|vs| guild.members.get(&vs.user_id))
             .filter(|member| !member.user.bot())

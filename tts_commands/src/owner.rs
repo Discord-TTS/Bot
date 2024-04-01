@@ -309,10 +309,10 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
                 guild_iter(serenity_cache).map(|g| g.get_size_details()),
             )),
             Some("channel") => Some(average_details(
-                guild_iter(serenity_cache).flat_map(|g| details_iter(g.channels.values())),
+                guild_iter(serenity_cache).flat_map(|g| details_iter(g.channels.iter())),
             )),
             Some("role") => Some(average_details(
-                guild_iter(serenity_cache).flat_map(|g| details_iter(g.roles.values())),
+                guild_iter(serenity_cache).flat_map(|g| details_iter(g.roles.iter())),
             )),
             Some(_) => None,
             None => Some(serenity_cache.get_size_details()),

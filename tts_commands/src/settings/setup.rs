@@ -43,7 +43,7 @@ async fn get_eligible_channels(
     let guild = require_guild!(ctx, Ok(None));
     let channels = guild
         .channels
-        .values()
+        .iter()
         .filter(|c| {
             c.kind == serenity::ChannelType::Text
                 && can_send(&guild, c, &author_member)

@@ -36,9 +36,8 @@ pub async fn dm_generic<'ctx, 'a>(
     attachment_url: Option<&'a str>,
     message: &str,
 ) -> Result<(String, serenity::Embed)> {
-    let dm_channel = target.create_dm_channel(ctx).await?;
-    let sent = dm_channel
-        .send_message(
+    let sent = target
+        .dm(
             &ctx.http,
             serenity::CreateMessage::default().embed({
                 let mut embed = serenity::CreateEmbed::default();

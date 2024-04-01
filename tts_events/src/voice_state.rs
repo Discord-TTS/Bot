@@ -32,20 +32,20 @@ pub async fn voice_state_update(
     {
         let channel_id = old.channel_id.try_unwrap()?;
         let guild = ctx.cache.guild(guild_id).try_unwrap()?;
-        let mut channel_members = guild.members.iter().filter(|(m, _)| {
+        let mut channel_members = guild.members.iter().filter(|m| {
             guild
                 .voice_states
-                .get(m)
+                .get(&m.user.id)
                 .is_some_and(|v| v.channel_id == Some(channel_id))
         });
 
         // Bot is in the voice channel being left from
-        if channel_members.clone().all(|(_, m)| m.user.id != bot_id) {
+        if channel_members.clone().all(|m| m.user.id != bot_id) {
             return Ok(());
         }
 
         // All the users in the vc are now bots
-        if channel_members.any(|(_, m)| !m.user.bot()) {
+        if channel_members.any(|m| !m.user.bot()) {
             return Ok(());
         };
     }
