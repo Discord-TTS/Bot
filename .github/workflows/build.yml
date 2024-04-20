@@ -1,0 +1,53 @@
+name: Main Workflow
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    name: Build
+    strategy:
+      matrix:
+        rust-version: ['nightly']
+        cache-key: ['']
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository Checkout
+        uses: actions/checkout@v4
+
+      - name: "Install Rust"
+        run: |
+          rustup toolchain install ${{ matrix.rust-version }} --profile minimal --no-self-update
+          rustup default ${{ matrix.rust-version }}
+        shell: bash
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.cache-key }}
+      
+      # - name: Install sqlx-cli
+      #   run: cargo install sqlx-cli --no-default-features --features postgres,sqlite
+
+      # - name: Migrate database
+      #   env:
+      #     DATABASE_URL: sqlite://./data/crackedmusic.db
+      #   run: |
+      #     sqlx database create
+      #     sqlx migrate run --source migrations/
+      #     cargo sqlx prepare --workspace -- --tests
+
+      - name: Run Unit Tests
+        if: github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/tags/')
+        run: cargo test
+
+      - name: Run Release Unit Tests
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        run: cargo test --release --locked
+
+      - name: Build Binary
+        if: github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/tags/')
+        run: cargo build --locked
+
+      - name: Build Release Binary
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        run: cargo build --release --locked

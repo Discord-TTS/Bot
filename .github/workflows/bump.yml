@@ -1,0 +1,59 @@
+name: Bump version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to bump to (e.g. 1.4.3)'
+        required: true
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+  bump:
+    name: Bump version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+
+      - name: Install cargo-bump
+        run: cargo +nightly install cargo-bump
+
+      - name: Bump Cargo version
+        run: cargo-bump +nightly bump ${{ github.event.inputs.version }}
+
+      - name: Bump Cargo.lock
+        run: cargo +nightly build
+
+      - name: Get latest version
+        id: get_version
+        run: echo ::set-output name=VERSION::$(cargo pkgid | cut -d# -f2)
+
+      - name: Create bump PR
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: bump version to ${{ steps.get_version.outputs.VERSION }}'
+          title: 'chore: bump version to ${{ steps.get_version.outputs.VERSION }}'
+          body: |
+            Bump version to ${{ steps.get_version.outputs.VERSION }}
+
+            - [x] Bump version in Cargo.toml
+            - [x] Bump version in Cargo.lock
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: bump/${{ steps.get_version.outputs.VERSION }}
+          base: master
+          delete-branch: true
+          labels: ':cracktunes: release'

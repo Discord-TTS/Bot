@@ -1,0 +1,25 @@
+name: CI Workflow
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  lint:
+    name: Lint
+    uses: ./.github/workflows/lint.yml
+    secrets: inherit
+
+  # docker:
+  #   name: Docker
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+  #   needs: [build, lint]
+  #   uses: ./.github/workflows/docker.yml
+  #   secrets: inherit
