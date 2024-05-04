@@ -74,8 +74,6 @@ async fn update_startup_message(
 
 #[cold]
 fn finalize_startup(ctx: &serenity::Context, data: &Data) {
-    data.fully_started.store(true, Ordering::SeqCst);
-
     if let Some(bot_list_tokens) = data.bot_list_tokens.lock().take() {
         let stats_updater = tts_tasks::bot_list_updater::BotListUpdater::new(
             data.reqwest.clone(),
@@ -125,7 +123,7 @@ pub async fn ready(
         .bot_mention
         .get_or_init(|| regex::Regex::new(&format!("^<@!?{}>$", data_about_bot.user.id)).unwrap());
 
-    if is_last_shard && !data.fully_started.load(Ordering::SeqCst) {
+    if is_last_shard && !data.fully_started.swap(true, Ordering::SeqCst) {
         finalize_startup(ctx, &data);
     }
 

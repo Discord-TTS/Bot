@@ -77,7 +77,7 @@ default-features = false
 
 [workspace.dependencies.serenity]
 git = "https://github.com/serenity-rs/serenity"
-features = ["typesize"]
+features = ["typesize", "temp_cache"]
 default-features = false
 branch = "next"
 
@@ -90,7 +90,3 @@ branch = "serenity-next"
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "serenity-next"
-
-[patch."https://github.com/serenity-rs/serenity".serenity]
-git = "https://github.com/GnomedDev/serenity"
-branch = "updated-deps"

@@ -293,7 +293,7 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
         match ctx {
             poise::Context::Prefix(ctx) => {
                 // Prefixed command, just add a thumbsup reaction
-                ctx.msg.react(ctx.serenity_context(), '👍').await?;
+                ctx.msg.react(ctx.http(), '👍').await?;
             }
             poise::Context::Application(_) => {
                 // Slash command, no message to react to, just say thumbsup

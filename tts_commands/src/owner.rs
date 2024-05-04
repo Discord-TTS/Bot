@@ -54,7 +54,7 @@ pub async fn dm(
     ctx.msg
         .channel_id
         .send_message(
-            ctx.serenity_context(),
+            ctx.http(),
             CreateMessage::default()
                 .content(content)
                 .add_embed(CreateEmbed::from(embed)),

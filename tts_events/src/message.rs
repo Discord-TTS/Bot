@@ -226,7 +226,10 @@ async fn process_mention_msg(
 
     if permissions.send_messages() {
         channel
-            .say(ctx, format!("Current prefix for this server is: {prefix}"))
+            .say(
+                &ctx.http,
+                format!("Current prefix for this server is: {prefix}"),
+            )
             .await?;
     } else {
         let msg = {
@@ -287,9 +290,9 @@ async fn process_support_dm(
                 )
             };
 
-            channel.say(&ctx, content).await?;
+            channel.say(&ctx.http, content).await?;
         } else if content.as_str() == "help" {
-            channel.say(&ctx, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
+            channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
         } else if !userinfo.dm_blocked() {
             let webhook_username = format!("{} ({})", message.author.tag(), message.author.id);
 
@@ -353,7 +356,7 @@ async fn process_support_dm(
             .set_one(message.author.id.into(), "dm_welcomed", &true)
             .await?;
         if channel.pins(&ctx.http).await?.len() < 50 {
-            welcome_msg.pin(ctx, None).await?;
+            welcome_msg.pin(&ctx.http, None).await?;
         }
 
         info!(
@@ -415,7 +418,7 @@ async fn process_support_response(
 
     channel
         .send_message(
-            ctx,
+            &ctx.http,
             CreateMessage::default()
                 .content(content)
                 .embed(CreateEmbed::from(embed)),
