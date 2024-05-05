@@ -12,7 +12,7 @@ use tts_core::{
     errors,
     opt_ext::OptionTryUnwrap,
     require,
-    structs::{Data, FrameworkContext, JoinVCToken, Result, TTSMode},
+    structs::{Data, FrameworkContext, IsPremium, JoinVCToken, Result, TTSMode},
     traits::SongbirdManagerExt,
 };
 
@@ -47,6 +47,7 @@ async fn process_tts_msg(
         Ok(())
     );
 
+    let is_premium = data.is_premium_simple(guild_id).await?;
     let (voice, mode) = {
         if let Some(channel_id) = to_autojoin {
             let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
@@ -72,8 +73,9 @@ async fn process_tts_msg(
         };
 
         let (voice, mode) = data
-            .parse_user_or_guild(message.author.id, Some(guild_id))
+            .parse_user_or_guild_with_premium(message.author.id, Some((guild_id, is_premium)))
             .await?;
+
         let nickname_row = data
             .nickname_db
             .get([guild_id.into(), message.author.id.into()])
@@ -97,7 +99,6 @@ async fn process_tts_msg(
         (voice, mode)
     };
 
-    let is_premium = data.is_premium_simple(guild_id).await?;
     let speaking_rate = data.speaking_rate(message.author.id, mode).await?;
     let url = prepare_url(
         data.config.tts_service.clone(),
@@ -106,7 +107,7 @@ async fn process_tts_msg(
         mode,
         &speaking_rate,
         &guild_row.msg_length.to_arraystring(),
-        guild_row.target_lang(is_premium),
+        guild_row.target_lang(IsPremium::from(is_premium)),
     );
 
     let call_lock = if let Some(call) = data.songbird.get(guild_id) {

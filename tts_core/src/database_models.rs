@@ -5,7 +5,7 @@ use typesize::derive::TypeSize;
 
 use poise::serenity_prelude::{ChannelId, GuildId, RoleId, UserId};
 
-use crate::structs::TTSMode;
+use crate::structs::{IsPremium, TTSMode};
 
 const MAX_VOICE_LENGTH: usize = 20;
 
@@ -67,10 +67,10 @@ pub struct GuildRow {
 }
 
 impl GuildRow {
-    pub fn target_lang(&self, is_premium: bool) -> Option<&str> {
+    pub fn target_lang(&self, is_premium: IsPremium) -> Option<&str> {
         if let Some(target_lang) = &self.target_lang
             && self.to_translate()
-            && is_premium
+            && is_premium.into()
         {
             Some(target_lang.as_str())
         } else {

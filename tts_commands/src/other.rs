@@ -32,7 +32,7 @@ use tts_core::{
     constants::OPTION_SEPERATORS,
     opt_ext::OptionTryUnwrap,
     require_guild,
-    structs::{ApplicationContext, Command, CommandResult, Context, TTSMode},
+    structs::{ApplicationContext, Command, CommandResult, Context, IsPremium, TTSMode},
     traits::PoiseContextExt as _,
     translations::GetTextContextExt,
 };
@@ -128,14 +128,20 @@ pub async fn tts(
 async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> CommandResult {
     let attachment = {
         let data = ctx.data();
-        let (voice, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
+        let guild_info = if let Some(guild_id) = ctx.guild_id() {
+            Some((guild_id, data.is_premium_simple(guild_id).await?))
+        } else {
+            None
+        };
+
+        let (voice, mode) = data
+            .parse_user_or_guild_with_premium(author.id, guild_info)
+            .await?;
 
         let guild_row;
-        let translation_lang = if let Some(guild_id) = ctx.guild_id() {
-            let is_premium = data.is_premium_simple(guild_id).await?;
-
+        let translation_lang = if let Some((guild_id, is_premium)) = guild_info {
             guild_row = data.guilds_db.get(guild_id.into()).await?;
-            guild_row.target_lang(is_premium)
+            guild_row.target_lang(IsPremium::from(is_premium))
         } else {
             None
         };

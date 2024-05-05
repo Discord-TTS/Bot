@@ -14,7 +14,7 @@ use typesize::derive::TypeSize;
 use poise::serenity_prelude::{self as serenity};
 use serenity::small_fixed_array::{FixedArray, FixedString};
 
-use crate::{analytics, database};
+use crate::{analytics, bool_enum, database};
 
 macro_rules! into_static_display {
     ($struct:ident) => {
@@ -104,6 +104,8 @@ impl JoinVCToken {
         Self(guild_id, lock)
     }
 }
+
+bool_enum!(IsPremium(No | Yes));
 
 pub enum FailurePoint {
     NotSubscribed(serenity::UserId),
@@ -291,14 +293,25 @@ impl Data {
         author_id: serenity::UserId,
         guild_id: Option<serenity::GuildId>,
     ) -> Result<(Cow<'static, str>, TTSMode)> {
-        let (user_row, premium_check_res) = tokio::try_join!(
-            self.userinfo_db.get(author_id.into()),
-            self.premium_check(guild_id)
-        )?;
+        let info = if let Some(guild_id) = guild_id {
+            Some((guild_id, self.is_premium_simple(guild_id).await?))
+        } else {
+            None
+        };
 
-        let guild_is_premium = premium_check_res.is_none();
+        self.parse_user_or_guild_with_premium(author_id, info).await
+    }
+
+    pub async fn parse_user_or_guild_with_premium(
+        &self,
+        author_id: serenity::UserId,
+        guild_info: Option<(serenity::GuildId, bool)>,
+    ) -> Result<(Cow<'static, str>, TTSMode)> {
+        let user_row = self.userinfo_db.get(author_id.into()).await?;
+        let (guild_id, guild_is_premium) =
+            guild_info.map_or((None, false), |(id, p)| (Some(id), p));
+
         let mut guild_row = None;
-
         let mut mode = {
             let user_mode = if guild_is_premium {
                 user_row.premium_voice_mode

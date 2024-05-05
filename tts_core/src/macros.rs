@@ -54,6 +54,12 @@ macro_rules! bool_enum {
             $false_value,
         }
 
+        impl From<$name> for bool {
+            fn from(value: $name) -> bool {
+                value == $name::$true_value
+            }
+        }
+
         impl From<bool> for $name {
             fn from(value: bool) -> Self {
                 if value {
