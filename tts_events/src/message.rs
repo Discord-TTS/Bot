@@ -92,12 +92,20 @@ async fn process_tts_msg(
             guild_row.xsaid(),
             guild_row.repeated_chars,
             nickname_row.name.as_deref(),
+            user_row.use_new_formatting(),
             &data.regex_cache,
             &data.last_to_xsaid_tracker,
         );
 
         (voice, mode)
     };
+
+    // Final check, make sure we aren't sending an empty message or just symbols.
+    let mut removed_chars_content = content.clone();
+    removed_chars_content.retain(|c| !" ?.)'!\":".contains(c));
+    if removed_chars_content.is_empty() {
+        return Ok(());
+    }
 
     let speaking_rate = data.speaking_rate(message.author.id, mode).await?;
     let url = prepare_url(

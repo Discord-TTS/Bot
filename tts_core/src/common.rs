@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::fmt::Write;
 use std::num::NonZeroU8;
 
 use itertools::Itertools;
@@ -293,12 +292,6 @@ pub async fn run_checks(
         }
     }
 
-    let mut removed_chars_content = content.clone();
-    removed_chars_content.retain(|c| !" ?.)'!\":".contains(c));
-    if removed_chars_content.is_empty() {
-        return Ok(None);
-    }
-
     Ok(Some((content, to_autojoin)))
 }
 
@@ -316,6 +309,7 @@ pub fn clean_msg(
     xsaid: bool,
     repeated_limit: Option<NonZeroU8>,
     nickname: Option<&str>,
+    use_new_formatting: bool,
 
     regex_cache: &RegexCache,
     last_to_xsaid_tracker: &LastToXsaidTracker,
@@ -362,7 +356,40 @@ pub fn clean_msg(
             state.should_announce_name(&guild, user.id)
         });
 
-    if announce_name {
+    let attached_file_format = attachments_to_format(attachments);
+    let said_name = announce_name.then(|| {
+        nickname
+            .or(member_nick)
+            .or(user.global_name.as_deref())
+            .unwrap_or(&user.name)
+    });
+
+    if use_new_formatting {
+        format_message(&mut content, said_name, contained_url, attached_file_format);
+    } else {
+        format_message_legacy(&mut content, said_name, contained_url, attached_file_format);
+    }
+
+    if xsaid {
+        last_to_xsaid_tracker.insert(guild_id, LastXsaidInfo::new(user.id));
+    }
+
+    if let Some(repeated_limit) = repeated_limit {
+        content = remove_repeated_chars(&content, repeated_limit.get());
+    }
+
+    content
+}
+
+pub fn format_message_legacy(
+    content: &mut String,
+    said_name: Option<&str>,
+    contained_url: bool,
+    attached_file_format: Option<&str>,
+) {
+    use std::fmt::Write;
+
+    if let Some(said_name) = said_name {
         if contained_url {
             let suffix = if content.is_empty() {
                 "a link."
@@ -373,12 +400,7 @@ pub fn clean_msg(
             write!(content, " {suffix}",).unwrap();
         }
 
-        let said_name = nickname
-            .or(member_nick)
-            .or(user.global_name.as_deref())
-            .unwrap_or(&user.name);
-
-        content = match attachments_to_format(attachments) {
+        *content = match attached_file_format {
             Some(file_format) if content.is_empty() => format!("{said_name} sent {file_format}"),
             Some(file_format) => format!("{said_name} sent {file_format} and said {content}"),
             None => format!("{said_name} said: {content}"),
@@ -392,16 +414,67 @@ pub fn clean_msg(
 
         write!(content, "{suffix}",).unwrap();
     }
+}
 
-    if xsaid {
-        last_to_xsaid_tracker.insert(guild_id, LastXsaidInfo::new(user.id));
+pub fn format_message(
+    content: &mut String,
+    said_name: Option<&str>,
+    contained_url: bool,
+    attached_file_format: Option<&str>,
+) {
+    match (
+        said_name,
+        content.trim(),
+        contained_url,
+        attached_file_format,
+    ) {
+        (Some(said_name), "", true, Some(format)) => {
+            *content = format!("{said_name} sent a link and attached {format}");
+        }
+        (Some(said_name), "", true, None) => {
+            *content = format!("{said_name} sent a link");
+        }
+        (Some(said_name), "", false, Some(format)) => {
+            *content = format!("{said_name} sent {format}");
+        }
+        // Fallback, this shouldn't occur
+        (Some(said_name), "", false, None) => {
+            *content = format!("{said_name} sent a message");
+        }
+        (Some(said_name), msg, true, Some(format)) => {
+            *content = format!("{said_name} sent a link, attached {format}, and said {msg}");
+        }
+        (Some(said_name), msg, true, None) => {
+            *content = format!("{said_name} sent a link and said {msg}");
+        }
+        (Some(said_name), msg, false, Some(format)) => {
+            *content = format!("{said_name} sent {format} and said {msg}");
+        }
+        (Some(said_name), msg, false, None) => {
+            *content = format!("{said_name} said: {msg}");
+        }
+        (None, "", true, Some(format)) => {
+            *content = format!("A link and {format}");
+        }
+        (None, "", true, None) => {
+            "A link".clone_into(content);
+        }
+        (None, "", false, Some(format)) => {
+            format.clone_into(content);
+        }
+        // Again, fallback, there is nothing to say
+        (None, "", false, None) => {}
+        (None, msg, true, Some(format)) => {
+            *content = format!("{msg} with {format} and a link");
+        }
+        (None, msg, true, None) => {
+            *content = format!("{msg} with a link");
+        }
+        (None, msg, false, Some(format)) => {
+            *content = format!("{msg} with {format}");
+        }
+        (None, _msg, false, None) => {}
     }
-
-    if let Some(repeated_limit) = repeated_limit {
-        content = remove_repeated_chars(&content, repeated_limit.get());
-    }
-
-    content
 }
 
 pub fn confirm_dialog_components<'a>(
