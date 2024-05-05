@@ -95,7 +95,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
     let required_role = guild_row.required_role.map(|r| r.mention().to_string());
 
-    let user_mode = if data.premium_check(Some(guild_id)).await?.is_none() {
+    let user_mode = if data.is_premium_simple(guild_id).await? {
         userinfo_row.premium_voice_mode
     } else {
         userinfo_row.voice_mode
@@ -339,7 +339,7 @@ where
     let data = ctx.data();
     if let Some(mode) = mode
         && mode.is_premium()
-        && data.premium_check(Some(guild_id)).await?.is_some()
+        && !data.is_premium_simple(guild_id).await?
     {
         ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
@@ -1166,8 +1166,6 @@ pub async fn mode(
     let author_id = ctx.author().id.into();
     let guild_id = ctx.guild_id().unwrap();
 
-    let guild_is_premium = data.premium_check(Some(guild_id)).await?.is_none();
-
     let to_send = change_mode(
         &ctx,
         &data.userinfo_db,
@@ -1175,7 +1173,7 @@ pub async fn mode(
         author_id,
         mode.map(TTSMode::from),
         Target::User,
-        guild_is_premium,
+        data.is_premium_simple(guild_id).await?,
     )
     .await?;
 

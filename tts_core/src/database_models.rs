@@ -67,9 +67,10 @@ pub struct GuildRow {
 }
 
 impl GuildRow {
-    pub fn target_lang(&self) -> Option<&str> {
+    pub fn target_lang(&self, is_premium: bool) -> Option<&str> {
         if let Some(target_lang) = &self.target_lang
             && self.to_translate()
+            && is_premium
         {
             Some(target_lang.as_str())
         } else {

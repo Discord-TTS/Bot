@@ -281,6 +281,11 @@ impl Data {
         }
     }
 
+    pub async fn is_premium_simple(&self, guild_id: serenity::GuildId) -> Result<bool> {
+        let guild_id = Some(guild_id);
+        self.premium_check(guild_id).await.map(|o| o.is_none())
+    }
+
     pub async fn parse_user_or_guild(
         &self,
         author_id: serenity::UserId,

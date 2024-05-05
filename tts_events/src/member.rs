@@ -82,7 +82,7 @@ pub async fn guild_member_removal(
         return Ok(());
     }
 
-    if data.premium_check(Some(guild_id)).await?.is_some() {
+    if !data.is_premium_simple(guild_id).await? {
         return Ok(());
     }
 

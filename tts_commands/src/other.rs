@@ -132,8 +132,10 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
 
         let guild_row;
         let translation_lang = if let Some(guild_id) = ctx.guild_id() {
-            guild_row = data.guilds_db.get(guild_id.get() as _).await?;
-            guild_row.target_lang()
+            let is_premium = data.is_premium_simple(guild_id).await?;
+
+            guild_row = data.guilds_db.get(guild_id.into()).await?;
+            guild_row.target_lang(is_premium)
         } else {
             None
         };

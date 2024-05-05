@@ -50,7 +50,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let data = ctx.data();
 
-    if data.premium_check(Some(guild_id)).await?.is_none() {
+    if data.is_premium_simple(guild_id).await? {
         ctx.say(ctx.gettext("Hey, this server is already premium!"))
             .await?;
         return Ok(());

@@ -97,6 +97,7 @@ async fn process_tts_msg(
         (voice, mode)
     };
 
+    let is_premium = data.is_premium_simple(guild_id).await?;
     let speaking_rate = data.speaking_rate(message.author.id, mode).await?;
     let url = prepare_url(
         data.config.tts_service.clone(),
@@ -105,7 +106,7 @@ async fn process_tts_msg(
         mode,
         &speaking_rate,
         &guild_row.msg_length.to_arraystring(),
-        guild_row.target_lang(),
+        guild_row.target_lang(is_premium),
     );
 
     let call_lock = if let Some(call) = data.songbird.get(guild_id) {
