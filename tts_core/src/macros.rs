@@ -44,3 +44,24 @@ macro_rules! require_guild {
         })
     };
 }
+
+#[macro_export]
+macro_rules! bool_enum {
+    ($name:ident($true_value:ident | $false_value:ident)) => {
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+        pub enum $name {
+            $true_value,
+            $false_value,
+        }
+
+        impl From<bool> for $name {
+            fn from(value: bool) -> Self {
+                if value {
+                    Self::$true_value
+                } else {
+                    Self::$false_value
+                }
+            }
+        }
+    };
+}

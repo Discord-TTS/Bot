@@ -2,23 +2,9 @@ use std::{borrow::Cow, future::Future, pin::Pin};
 
 use dashmap::DashMap;
 
-use crate::structs::Context;
+use crate::{bool_enum, structs::Context};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum EventType {
-    Normal,
-    Command,
-}
-
-impl From<bool> for EventType {
-    fn from(is_command: bool) -> Self {
-        if is_command {
-            EventType::Command
-        } else {
-            EventType::Normal
-        }
-    }
-}
+bool_enum!(EventType(Normal | Command));
 
 pub struct Handler {
     pub log_buffer: DashMap<(Cow<'static, str>, EventType), i32>,
