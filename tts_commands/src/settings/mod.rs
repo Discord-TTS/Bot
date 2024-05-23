@@ -157,7 +157,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             "Change these settings with `/set {property} {value}`!\nNone = setting has not been set yet!"
         )))
 
-        .field(ctx.gettext("**General Server Settings**"), &ctx.gettext("
+        .field(ctx.gettext("**General Server Settings**"), ctx.gettext("
 {sep1} Setup Channel: {channel_mention}
 {sep1} Required Role: {role_mention}
 {sep1} Command Prefix: `{prefix}`
@@ -169,7 +169,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{autojoin}", &guild_row.auto_join().to_arraystring())
             .replace("{role_mention}", required_role.as_deref().unwrap_or(none_str)),
         false)
-        .field("**TTS Settings**", &ctx.gettext("
+        .field("**TTS Settings**", ctx.gettext("
 {sep2} <User> said: message: `{xsaid}`
 {sep2} Ignore bot's messages: `{bot_ignore}`
 {sep2} Ignore audience messages: `{audience_ignore}`
@@ -193,7 +193,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{msg_length}", &guild_row.msg_length.to_arraystring())
             .replace("{repeated_chars}", &guild_row.repeated_chars.map_or(0, NonZeroU8::get).to_arraystring()),
         false)
-        .field(ctx.gettext("**Translation Settings (Premium Only)**"), &ctx.gettext("
+        .field(ctx.gettext("**Translation Settings (Premium Only)**"), ctx.gettext("
 {sep4} Translation: `{to_translate}`
 {sep4} Translation Language: `{target_lang}`
         ")
@@ -201,7 +201,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .replace("{to_translate}", &guild_row.to_translate().to_arraystring())
             .replace("{target_lang}", target_lang),
         false)
-        .field("**User Specific**", &ctx.gettext("
+        .field("**User Specific**", ctx.gettext("
 {sep3} Voice: `{user_voice}`
 {sep3} Voice Mode: `{voice_mode}`
 {sep3} Nickname: `{nickname}`

@@ -177,7 +177,7 @@ fn attachments_to_format(attachments: &[serenity::Attachment]) -> Option<&'stati
 
 fn remove_repeated_chars(content: &str, limit: u8) -> String {
     let mut out = String::new();
-    for (_, group) in &content.chars().group_by(|&c| c) {
+    for (_, group) in &content.chars().chunk_by(|&c| c) {
         out.extend(group.take(usize::from(limit)));
     }
 
