@@ -48,6 +48,7 @@ pub struct MainConfig {
     pub website_url: Option<reqwest::Url>,
     pub main_server_invite: FixedString,
     pub main_server: serenity::GuildId,
+    pub proxy_url: Option<FixedString>,
     pub ofs_role: serenity::RoleId,
     pub tts_service: reqwest::Url,
     pub token: Option<FixedString>,

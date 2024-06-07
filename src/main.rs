@@ -77,7 +77,16 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     println!("Initialising Http client");
     let reqwest = reqwest::Client::new();
     let auth_key = config.main.tts_service_auth_key.as_deref();
-    let http = Arc::new(serenity::Http::new(config.main.token.as_deref().unwrap()));
+
+    let mut http_builder = serenity::HttpBuilder::new(config.main.token.as_deref().unwrap());
+    if let Some(proxy) = &config.main.proxy_url {
+        println!("Connecting via proxy");
+        http_builder = http_builder
+            .proxy(proxy.as_str())
+            .ratelimiter_disabled(true);
+    }
+
+    let http = Arc::new(http_builder.build());
 
     println!("Performing big startup join");
     let tts_service = || config.main.tts_service.clone();
