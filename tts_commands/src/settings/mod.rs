@@ -38,7 +38,6 @@ use tts_core::{
         TTSMode, TTSModeChoice,
     },
     traits::PoiseContextExt,
-    translations::GetTextContextExt,
 };
 
 use self::voice_paginator::MenuPaginator;
@@ -72,7 +71,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let author_id = ctx.author().id;
 
     let data = ctx.data();
-    let none_str = ctx.gettext("none");
+    let none_str = "none";
 
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
     let userinfo_row = data.userinfo_db.get(author_id.into()).await?;
@@ -149,27 +148,32 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let neutral_colour = ctx.neutral_colour().await;
     let [sep1, sep2, sep3, sep4] = OPTION_SEPERATORS;
 
+    let xsaid = guild_row.xsaid();
+    let autojoin = guild_row.auto_join();
+    let msg_length = guild_row.msg_length;
+    let bot_ignore = guild_row.bot_ignore();
+    let guild_mode: &str = guild_mode.into();
+    let to_translate = guild_row.to_translate();
+    let require_voice = guild_row.require_voice();
+    let audience_ignore = guild_row.audience_ignore();
+    let voice_mode = user_mode.map_or(none_str, |m| m.into());
+    let role_mention = required_role.as_deref().unwrap_or(none_str);
+    let repeated_chars = guild_row.repeated_chars.map_or(0, NonZeroU8::get);
+    let required_prefix = guild_row.required_prefix.as_deref().unwrap_or(none_str);
+
     ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
         .title("Current Settings")
         .colour(neutral_colour)
         .url(data.config.main_server_invite.as_str())
-        .footer(CreateEmbedFooter::new(ctx.gettext(
+        .footer(CreateEmbedFooter::new(
             "Change these settings with `/set {property} {value}`!\nNone = setting has not been set yet!"
-        )))
-
-        .field(ctx.gettext("**General Server Settings**"), ctx.gettext("
+        ))
+        .field("**General Server Settings**", format!("
 {sep1} Setup Channel: {channel_mention}
 {sep1} Required Role: {role_mention}
 {sep1} Command Prefix: `{prefix}`
-{sep1} Auto Join: `{autojoin}`
-        ")
-            .replace("{sep1}", sep1)
-            .replace("{prefix}", prefix)
-            .replace("{channel_mention}", &channel_mention)
-            .replace("{autojoin}", &guild_row.auto_join().to_arraystring())
-            .replace("{role_mention}", required_role.as_deref().unwrap_or(none_str)),
-        false)
-        .field("**TTS Settings**", ctx.gettext("
+{sep1} Auto Join: `{autojoin}`"), false)
+        .field("**TTS Settings**", format!("
 {sep2} <User> said: message: `{xsaid}`
 {sep2} Ignore bot's messages: `{bot_ignore}`
 {sep2} Ignore audience messages: `{audience_ignore}`
@@ -181,38 +185,18 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 
 {sep2} Max Time to Read: `{msg_length} seconds`
 {sep2} Max Repeated Characters: `{repeated_chars}`
-        ")
-            .replace("{sep2}", sep2)
-            .replace("{xsaid}", &guild_row.xsaid().to_arraystring())
-            .replace("{bot_ignore}", &guild_row.bot_ignore().to_arraystring())
-            .replace("{audience_ignore}", &guild_row.audience_ignore().to_arraystring())
-            .replace("{require_voice}", &guild_row.require_voice().to_arraystring())
-            .replace("{required_prefix}", guild_row.required_prefix.as_deref().unwrap_or(none_str))
-            .replace("{guild_mode}", guild_mode.into())
-            .replace("{default_voice}", &default_voice)
-            .replace("{msg_length}", &guild_row.msg_length.to_arraystring())
-            .replace("{repeated_chars}", &guild_row.repeated_chars.map_or(0, NonZeroU8::get).to_arraystring()),
-        false)
-        .field(ctx.gettext("**Translation Settings (Premium Only)**"), ctx.gettext("
+        "),        false)
+        .field("**Translation Settings (Premium Only)**", format!("
 {sep4} Translation: `{to_translate}`
 {sep4} Translation Language: `{target_lang}`
         ")
-            .replace("{sep4}", sep4)
-            .replace("{to_translate}", &guild_row.to_translate().to_arraystring())
-            .replace("{target_lang}", target_lang),
-        false)
-        .field("**User Specific**", ctx.gettext("
+        ,false)
+        .field("**User Specific**", format!("
 {sep3} Voice: `{user_voice}`
 {sep3} Voice Mode: `{voice_mode}`
 {sep3} Nickname: `{nickname}`
 {sep3} Speaking Rate: `{speaking_rate}{speaking_rate_kind}`
-        ")
-            .replace("{sep3}", sep3)
-            .replace("{user_voice}", &user_voice)
-            .replace("{voice_mode}", user_mode.map_or(none_str, #[allow(clippy::redundant_closure_for_method_calls)] |m| m.into()))
-            .replace("{nickname}", nickname)
-            .replace("{speaking_rate}", &speaking_rate)
-            .replace("{speaking_rate_kind}", speaking_rate_kind),
+        "),
         false)
     )).await?;
 
@@ -307,13 +291,7 @@ async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<boo
     if let Some(value) = value {
         Ok(Some(value))
     } else {
-        confirm_dialog(
-            ctx,
-            ctx.gettext("What would you like to set this to?"),
-            ctx.gettext("True"),
-            ctx.gettext("False"),
-        )
-        .await
+        confirm_dialog(ctx, "What would you like to set this to?", "True", "False").await
     }
 }
 
@@ -346,12 +324,12 @@ where
             .colour(PREMIUM_NEUTRAL_COLOUR)
             .thumbnail(data.premium_avatar_url.as_str())
             .url("https://www.patreon.com/Gnome_the_Bot_Maker")
-            .footer(CreateEmbedFooter::new(ctx.gettext(
+            .footer(CreateEmbedFooter::new(
                 "If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!"
-            )))
-            .description(ctx.gettext("
-                The `{mode_name}` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
-            ").replace("{mode_name}", mode.into()))
+            ))
+            .description(format!("
+                The `{}` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
+            ", <&str>::from(mode)))
         )).await?;
         Ok(None)
     } else {
@@ -363,16 +341,13 @@ where
 
         general_db.set_one(identifier, key, &mode).await?;
         Ok(Some(match mode {
-            Some(mode) => Cow::Owned(
-                match target {
-                    Target::Guild => ctx.gettext("Changed the server TTS Mode to: {mode}"),
-                    Target::User => ctx.gettext("Changed your TTS Mode to: {mode}"),
-                }
-                .replace("{mode}", mode.into()),
-            ),
+            Some(mode) => Cow::Owned(match target {
+                Target::Guild => format!("Changed the server TTS Mode to: {mode}"),
+                Target::User => format!("Changed your TTS Mode to: {mode}"),
+            }),
             None => Cow::Borrowed(match target {
-                Target::Guild => ctx.gettext("Reset the server mode"),
-                Target::User => ctx.gettext("Reset your mode"),
+                Target::Guild => "Reset the server mode",
+                Target::User => "Reset your mode",
             }),
         }))
     }
@@ -406,21 +381,18 @@ where
                 .await?;
 
             let name = get_voice_name(&data, &voice, mode).unwrap_or(&voice);
-            Cow::Owned(
-                match target {
-                    Target::Guild => ctx.gettext("Changed the server voice to: {voice}"),
-                    Target::User => ctx.gettext("Changed your voice to {voice}"),
-                }
-                .replace("{voice}", name),
-            )
+            Cow::Owned(match target {
+                Target::Guild => format!("Changed the server voice to: {name}"),
+                Target::User => format!("Changed your voice to {name}"),
+            })
         } else {
-            Cow::Borrowed(ctx.gettext("Invalid voice, do `/voices`"))
+            Cow::Borrowed("Invalid voice, do `/voices`")
         }
     } else {
         voice_db.delete((key, mode)).await?;
         Cow::Borrowed(match target {
-            Target::Guild => ctx.gettext("Reset the server voice"),
-            Target::User => ctx.gettext("Reset your voice"),
+            Target::Guild => "Reset the server voice",
+            Target::User => "Reset your voice",
         })
     })
 }
@@ -460,13 +432,11 @@ fn check_valid_voice(data: &Data, code: &FixedString<u8>, mode: TTSMode) -> bool
     }
 }
 
-fn check_prefix<'a>(ctx: &'a Context<'_>, prefix: &str) -> Result<(), &'a str> {
+fn check_prefix(prefix: &str) -> Result<(), &'static str> {
     if prefix.len() <= 5 && prefix.matches(' ').count() <= 1 {
         Ok(())
     } else {
-        Err(ctx.gettext(
-            "**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space",
-        ))
+        Err("**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space")
     }
 }
 
@@ -495,7 +465,7 @@ pub async fn block(ctx: Context<'_>, user: serenity::UserId, value: bool) -> Com
         .set_one(user.into(), "dm_blocked", &value)
         .await?;
 
-    ctx.say(ctx.gettext("Done!")).await?;
+    ctx.say("Done!").await?;
     Ok(())
 }
 
@@ -522,15 +492,8 @@ pub async fn bot_ban(ctx: Context<'_>, user: serenity::UserId, value: bool) -> C
     Ok(())
 }
 
-fn replace_bool(ctx: Context<'_>, original: &str, value: bool) -> String {
-    ctx.gettext(original).replace(
-        "{}",
-        if value {
-            ctx.gettext("Enabled")
-        } else {
-            ctx.gettext("Disabled")
-        },
-    )
+fn replace_bool(original: &str, value: bool) -> String {
+    original.replace("{}", if value { "Enabled" } else { "Disabled" })
 }
 
 async fn generic_bool_command(
@@ -545,7 +508,7 @@ async fn generic_bool_command(
     let guild_id = ctx.guild_id().unwrap();
 
     guilds_db.set_one(guild_id.into(), key, &value).await?;
-    ctx.say(replace_bool(ctx, resp, value)).await?;
+    ctx.say(replace_bool(resp, value)).await?;
 
     Ok(())
 }
@@ -651,8 +614,8 @@ async fn use_new_formatting(
 
     userinfo.set_one(id, "use_new_formatting", value).await?;
 
-    let resp = ctx.gettext("Experimental new message formatting is now: {}");
-    ctx.say(replace_bool(ctx, resp, value)).await?;
+    let resp = "Experimental new message formatting is now: {}";
+    ctx.say(replace_bool(resp, value)).await?;
     Ok(())
 }
 
@@ -690,24 +653,23 @@ pub async fn required_role(
             Some(
                 if let Some(currently_required_role) = currently_required_role {
                     (
-                        ctx.gettext("Are you sure you want to change the required role?"),
-                        ctx.gettext("No, keep {role_name} as the required role.")
-                            .replace("{role_name}", &currently_required_role),
+                        "Are you sure you want to change the required role?",
+                        format!("No, keep {currently_required_role} as the required role."),
                     )
                 } else {
                     (
-                        ctx.gettext("Are you sure you want to set the required role?"),
-                        ctx.gettext("No, keep {bot_name} usable by everyone.")
-                            .replace("{bot_name}", &current_user.name),
+                        "Are you sure you want to set the required role?",
+                        format!("No, keep {} usable by everyone.", current_user.name),
                     )
                 },
             )
         } else if let Some(currently_required_role) = currently_required_role {
             Some((
-                ctx.gettext("Are you sure you want to remove the required role?"),
-                ctx.gettext("No, keep {bot_name} restricted to {role_name}.")
-                    .replace("{bot_name}", &current_user.name)
-                    .replace("{role_name}", &currently_required_role),
+                "Are you sure you want to remove the required role?",
+                format!(
+                    "No, keep {} restricted to {currently_required_role}.",
+                    current_user.name
+                ),
             ))
         } else {
             None
@@ -721,7 +683,7 @@ pub async fn required_role(
     });
 
     if require!(
-        confirm_dialog(ctx, question, ctx.gettext("Yes, I'm sure."), &negative).await?,
+        confirm_dialog(ctx, question, "Yes, I'm sure.", &negative).await?,
         Ok(())
     ) {
         ctx.data()
@@ -733,19 +695,19 @@ pub async fn required_role(
             )
             .await?;
         ctx.say({
-            let current_user = cache.current_user();
+            let bot_name = &cache.current_user().name;
             if let Some(required_role) = required_role {
-                ctx.gettext("{bot_name} now requires {required_role} to use.")
-                    .replace("{required_role}", &required_role.mention().to_string())
-                    .replace("{bot_name}", &current_user.name)
+                format!(
+                    "{bot_name} now requires {} to use.",
+                    required_role.mention()
+                )
             } else {
-                ctx.gettext("{bot_name} is now usable by everyone!")
-                    .replace("{bot_name}", &current_user.name)
+                format!("{bot_name} is now usable by everyone!")
             }
         })
         .await
     } else {
-        ctx.say(ctx.gettext("Cancelled!")).await
+        ctx.say("Cancelled!").await
     }?;
 
     Ok(())
@@ -766,7 +728,7 @@ async fn required_prefix(
     #[description = "The required prefix for TTS"] mut tts_prefix: Option<String>,
 ) -> CommandResult {
     if let Some(prefix) = &tts_prefix
-        && let Err(err) = check_prefix(&ctx, prefix)
+        && let Err(err) = check_prefix(prefix)
     {
         ctx.say(err).await?;
         return Ok(());
@@ -785,12 +747,9 @@ async fn required_prefix(
         .await?;
 
     let msg = if let Some(tts_prefix) = tts_prefix {
-        Cow::Owned(
-            ctx.gettext("The required prefix for TTS is now: {}")
-                .replace("{}", &tts_prefix),
-        )
+        &format!("The required prefix for TTS is now: {tts_prefix}")
     } else {
-        Cow::Borrowed(ctx.gettext("Reset your required prefix."))
+        "Reset your required prefix."
     };
 
     ctx.say(msg).await?;
@@ -901,21 +860,17 @@ pub async fn translation_lang(
             .set_one(guild_id, "target_lang", &target_lang)
             .await?;
         if let Some(target_lang) = target_lang {
-            let mut to_say = ctx
-                .gettext("The target translation language is now: `{}`")
-                .replace("{}", &target_lang);
+            let mut to_say = format!("The target translation language is now: `{target_lang}`");
             if !data.guilds_db.get(guild_id).await?.to_translate() {
-                to_say.push_str(
-                    ctx.gettext("\nYou may want to enable translation with `/set translation on`"),
-                );
+                to_say.push_str("\nYou may want to enable translation with `/set translation on`");
             };
 
             Cow::Owned(to_say)
         } else {
-            Cow::Borrowed(ctx.gettext("Reset the target translation language"))
+            Cow::Borrowed("Reset the target translation language")
         }
     } else {
-        Cow::Borrowed(ctx.gettext("Invalid translation language, do `/translation_languages`"))
+        Cow::Borrowed("Invalid translation language, do `/translation_languages`")
     };
 
     ctx.say(to_say).await?;
@@ -936,17 +891,15 @@ pub async fn command_prefix(
     #[rest]
     prefix: FixedString<u8>,
 ) -> CommandResult {
-    let to_send = if let Err(err) = check_prefix(&ctx, &prefix) {
-        Cow::Borrowed(err)
+    let to_send = if let Err(err) = check_prefix(&prefix) {
+        err
     } else {
         ctx.data()
             .guilds_db
             .set_one(ctx.guild_id().unwrap().into(), "prefix", prefix.as_str())
             .await?;
-        Cow::Owned(
-            ctx.gettext("Command prefix for this server is now: {prefix}")
-                .replace("{prefix}", &prefix),
-        )
+
+        &format!("Command prefix for this server is now: {prefix}")
     };
 
     ctx.say(to_send).await?;
@@ -967,27 +920,18 @@ pub async fn repeated_characters(
     ctx: Context<'_>,
     #[description = "The max repeated characters"] chars: u8,
 ) -> CommandResult {
-    let to_send = {
-        if chars > 100 {
-            Cow::Borrowed(
-                ctx.gettext("**Error**: Cannot set the max repeated characters above 100"),
-            )
-        } else if chars < 5 && chars != 0 {
-            Cow::Borrowed(ctx.gettext("**Error**: Cannot set the max repeated characters below 5"))
-        } else {
-            ctx.data()
-                .guilds_db
-                .set_one(
-                    ctx.guild_id().unwrap().into(),
-                    "repeated_chars",
-                    &(chars as i16),
-                )
-                .await?;
-            Cow::Owned(
-                ctx.gettext("Max repeated characters is now: {}")
-                    .replace("{}", &chars.to_arraystring()),
-            )
-        }
+    let to_send = if chars > 100 {
+        "**Error**: Cannot set the max repeated characters above 100"
+    } else if chars < 5 && chars != 0 {
+        "**Error**: Cannot set the max repeated characters below 5"
+    } else {
+        let guild_id = ctx.guild_id().unwrap().into();
+        ctx.data()
+            .guilds_db
+            .set_one(guild_id, "repeated_chars", &(chars as i16))
+            .await?;
+
+        &format!("Max repeated characters is now: {chars}")
     };
 
     ctx.say(to_send).await?;
@@ -1008,29 +952,21 @@ pub async fn msg_length(
     ctx: Context<'_>,
     #[description = "Max length of TTS message in seconds"] seconds: u8,
 ) -> CommandResult {
-    let to_send = {
-        if seconds > 60 {
-            Cow::Borrowed(
-                ctx.gettext("**Error**: Cannot set the max length of messages above 60 seconds"),
+    let to_send = if seconds > 60 {
+        "**Error**: Cannot set the max length of messages above 60 seconds"
+    } else if seconds < 10 {
+        "**Error**: Cannot set the max length of messages below 10 seconds"
+    } else {
+        ctx.data()
+            .guilds_db
+            .set_one(
+                ctx.guild_id().unwrap().into(),
+                "msg_length",
+                &(seconds as i16),
             )
-        } else if seconds < 10 {
-            Cow::Borrowed(
-                ctx.gettext("**Error**: Cannot set the max length of messages below 10 seconds"),
-            )
-        } else {
-            ctx.data()
-                .guilds_db
-                .set_one(
-                    ctx.guild_id().unwrap().into(),
-                    "msg_length",
-                    &(seconds as i16),
-                )
-                .await?;
-            Cow::Owned(
-                ctx.gettext("Max message length is now: {} seconds")
-                    .replace("{}", &seconds.to_arraystring()),
-            )
-        }
+            .await?;
+
+        &format!("Max message length is now: {seconds} seconds")
     };
 
     ctx.say(to_send).await?;
@@ -1068,35 +1004,29 @@ pub async fn speaking_rate(
         default: _,
         kind,
     } = require!(mode.speaking_rate_info(), {
-        ctx.say(
-            ctx.gettext("**Error**: Cannot set speaking rate for the {mode} mode")
-                .replace("{mode}", mode.into()),
-        )
+        ctx.say(format!(
+            "**Error**: Cannot set speaking rate for the {mode} mode"
+        ))
         .await?;
         Ok(())
     });
 
-    let to_send = {
-        if speaking_rate > max {
-            ctx.gettext("**Error**: Cannot set the speaking rate multiplier above {max}{kind}")
-                .replace("{max}", &max.to_arraystring())
-        } else if speaking_rate < min {
-            ctx.gettext("**Error**: Cannot set the speaking rate multiplier below {min}{kind}")
-                .replace("{min}", &min.to_arraystring())
-        } else {
-            data.userinfo_db.create_row(author.id.get() as i64).await?;
-            data.user_voice_db
-                .set_one(
-                    (author.id.get() as i64, mode),
-                    "speaking_rate",
-                    &speaking_rate,
-                )
-                .await?;
-            ctx.gettext("Your speaking rate is now: {speaking_rate}{kind}")
-                .replace("{speaking_rate}", &speaking_rate.to_arraystring())
-        }
-    }
-    .replace("{kind}", kind);
+    let to_send = if speaking_rate > max {
+        format!("**Error**: Cannot set the speaking rate multiplier above {max}{kind}")
+    } else if speaking_rate < min {
+        format!("**Error**: Cannot set the speaking rate multiplier below {min}{kind}")
+    } else {
+        data.userinfo_db.create_row(author.id.get() as i64).await?;
+        data.user_voice_db
+            .set_one(
+                (author.id.get() as i64, mode),
+                "speaking_rate",
+                &speaking_rate,
+            )
+            .await?;
+
+        format!("Your speaking rate is now: {speaking_rate}{kind}")
+    };
 
     ctx.say(to_send).await?;
     Ok(())
@@ -1129,7 +1059,7 @@ pub async fn nick(
             .permissions(ctx.cache())?
             .administrator()
     {
-        ctx.say(ctx.gettext("**Error**: You need admin to set other people's nicknames!"))
+        ctx.say("**Error**: You need admin to set other people's nicknames!")
             .await?;
         return Ok(());
     }
@@ -1138,9 +1068,7 @@ pub async fn nick(
 
     let to_send = if let Some(nick) = nickname {
         if nick.contains('<') && nick.contains('>') {
-            Cow::Borrowed(
-                ctx.gettext("**Error**: You can't have mentions/emotes in your nickname!"),
-            )
+            "**Error**: You can't have mentions/emotes in your nickname!"
         } else {
             tokio::try_join!(
                 data.guilds_db.create_row(guild_id.into()),
@@ -1150,20 +1078,15 @@ pub async fn nick(
             data.nickname_db
                 .set_one([guild_id.into(), user.id.into()], "name", &nick)
                 .await?;
-            Cow::Owned(
-                ctx.gettext("Changed {user}'s nickname to {new_nick}")
-                    .replace("{user}", &user.name)
-                    .replace("{new_nick}", &nick),
-            )
+
+            &format!("Changed {}'s nickname to {nick}", user.name)
         }
     } else {
         data.nickname_db
             .delete([guild_id.into(), user.id.into()])
             .await?;
-        Cow::Owned(
-            ctx.gettext("Reset {user}'s nickname")
-                .replace("{user}", &user.name),
-        )
+
+        &format!("Reset {}'s nickname", user.name)
     };
 
     ctx.say(to_send).await?;
@@ -1258,8 +1181,7 @@ pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
     let (embed_title, client_id) = {
         let current_user = ctx.cache().current_user();
         (
-            ctx.gettext("{} Translation Languages")
-                .replace("{}", &current_user.name),
+            format!("{} Translation Languages", current_user.name),
             current_user.id,
         )
     };
@@ -1278,7 +1200,6 @@ pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
                 .footer(CreateEmbedFooter::new(random_footer(
                     &data.config.main_server_invite,
                     client_id,
-                    ctx.current_catalog(),
                 ))),
         ),
     )
@@ -1312,11 +1233,7 @@ pub async fn voices(
 
     let voices = {
         let run_paginator = |current_voice, pages| async {
-            let footer = random_footer(
-                &data.config.main_server_invite,
-                cache.current_user().id,
-                ctx.current_catalog(),
-            );
+            let footer = random_footer(&data.config.main_server_invite, cache.current_user().id);
 
             let paginator = MenuPaginator::new(ctx, pages, current_voice, mode, footer);
             paginator.start().await?;
@@ -1341,10 +1258,11 @@ pub async fn voices(
 
     let (embed_title, client_id) = {
         let current_user = cache.current_user();
-        let embed_title = ctx
-            .gettext("{bot_user} Voices | Mode: `{mode}`")
-            .replace("{bot_user}", &cache.current_user().name)
-            .replace("{mode}", mode.into());
+        let embed_title = format!(
+            "{} Voices | Mode: `{}`",
+            cache.current_user().name,
+            <&str>::from(mode)
+        );
 
         (embed_title, current_user.id)
     };
@@ -1356,16 +1274,15 @@ pub async fn voices(
                 .footer(CreateEmbedFooter::new(random_footer(
                     &data.config.main_server_invite,
                     client_id,
-                    ctx.current_catalog(),
                 )))
                 .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face()))
-                .field(ctx.gettext("Currently supported voices"), &voices, true)
+                .field("Currently supported voices", &voices, true)
                 .field(
-                    ctx.gettext("Current voice used"),
+                    "Current voice used",
                     user_voice_row
                         .voice
                         .as_ref()
-                        .map_or_else(|| ctx.gettext("None"), std::ops::Deref::deref),
+                        .map_or_else(|| "None", std::ops::Deref::deref),
                     false,
                 ),
         ),

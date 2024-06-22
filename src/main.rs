@@ -51,7 +51,6 @@ use serenity::small_fixed_array::FixedString;
 use tts_core::{
     analytics, create_db_handler, database,
     structs::{Data, PollyVoice, RegexCache, Result, TTSMode},
-    translations,
 };
 use tts_tasks::Looper as _;
 
@@ -91,7 +90,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
     println!("Performing big startup join");
     let tts_service = || config.main.tts_service.clone();
     let (
-        translations,
         webhooks,
         guilds_db,
         userinfo_db,
@@ -105,7 +103,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         translation_languages,
         premium_user,
     ) = tokio::try_join!(
-        translations::read_files(),
         get_webhooks(&http, config.webhooks),
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
         create_db_handler!(pool.clone(), "userinfo", "user_id"),
@@ -143,7 +140,6 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
 
     let data = Arc::new(Data {
         pool,
-        translations,
         system_info: Mutex::new(sysinfo::System::new()),
         bot_list_tokens: Mutex::new(config.bot_list_tokens),
 

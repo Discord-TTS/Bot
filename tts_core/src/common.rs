@@ -6,7 +6,6 @@ use rand::Rng as _;
 
 use serenity::all as serenity;
 use serenity::{CreateActionRow, CreateButton};
-use to_arraystring::ToArrayString as _;
 
 use crate::database::{GuildRow, UserRow};
 use crate::opt_ext::OptionTryUnwrap as _;
@@ -14,7 +13,16 @@ use crate::require;
 use crate::structs::{
     Context, Data, LastToXsaidTracker, LastXsaidInfo, RegexCache, Result, TTSMode, TTSServiceError,
 };
-use crate::translations::OptionGettext as _;
+
+pub fn push_permission_names(buffer: &mut String, permissions: serenity::Permissions) {
+    let permission_names = permissions.get_permission_names();
+    for (i, permission) in permission_names.iter().enumerate() {
+        buffer.push_str(permission);
+        if i != permission_names.len() - 1 {
+            buffer.push_str(", ");
+        }
+    }
+}
 
 pub async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<()> {
     tokio::try_join!(
@@ -111,18 +119,13 @@ pub fn prepare_url(
     tts_service
 }
 
-pub fn random_footer<'a>(
-    server_invite: &str,
-    client_id: serenity::UserId,
-    catalog: Option<&'a gettext::Catalog>,
-) -> Cow<'a, str> {
-    let client_id_str = client_id.get().to_arraystring();
+pub fn random_footer(server_invite: &str, client_id: serenity::UserId) -> Cow<'static, str> {
     match rand::thread_rng().gen_range(0..5) {
-        0 => Cow::Owned(catalog.gettext("If you find a bug or want to ask a question, join the support server: {server_invite}").replace("{server_invite}", server_invite)),
-        1 => Cow::Owned(catalog.gettext("You can vote for me or review me on wumpus.store!\nhttps://wumpus.store/bot/{client_id}?ref=tts").replace("{client_id}", &client_id_str)),
-        2 => Cow::Owned(catalog.gettext("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}").replace("{client_id}", &client_id_str)),
-        3 => Cow::Borrowed(catalog.gettext("If you want to support the development and hosting of TTS Bot, check out `/premium`!")),
-        4 => Cow::Borrowed(catalog.gettext("There are loads of customizable settings, check out `/help set`")),
+        0 => Cow::Owned(format!("If you find a bug or want to ask a question, join the support server: {server_invite}")),
+        1 => Cow::Owned(format!("You can vote for me or review me on wumpus.store!\nhttps://wumpus.store/bot/{client_id}?ref=tts")),
+        2 => Cow::Owned(format!("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}")),
+        3 => Cow::Borrowed("If you want to support the development and hosting of TTS Bot, check out `/premium`!"),
+        4 => Cow::Borrowed("There are loads of customizable settings, check out `/help set`"),
         _ => unreachable!()
     }
 }

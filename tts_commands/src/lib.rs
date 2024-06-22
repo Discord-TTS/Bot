@@ -25,7 +25,6 @@ use tts_core::{
     require_guild,
     structs::{Command, Context, FailurePoint, PartialContext, Result},
     traits::PoiseContextExt,
-    translations::GetTextContextExt as _,
 };
 
 mod help;
@@ -188,11 +187,10 @@ pub async fn command_check(ctx: Context<'_>) -> Result<bool> {
         return Ok(true);
     };
 
-    let msg = ctx
-        .gettext(
-            "You do not have the required role to use this bot, ask a server administrator for {}.",
-        )
-        .replace("{}", &required_role.mention().to_string());
+    let msg = format!(
+        "You do not have the required role to use this bot, ask a server administrator for {}.",
+        required_role.mention()
+    );
 
     ctx.send_error(msg).await?;
     Ok(false)

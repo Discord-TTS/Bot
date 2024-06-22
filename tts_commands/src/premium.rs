@@ -6,13 +6,11 @@ use poise::{
     CreateReply,
 };
 
-use to_arraystring::ToArrayString;
 use tts_core::{
     common::remove_premium,
     constants::PREMIUM_NEUTRAL_COLOUR,
     structs::{Command, CommandResult, Context, Result, TTSMode},
     traits::PoiseContextExt,
-    translations::GetTextContextExt,
 };
 
 #[derive(sqlx::FromRow)]
@@ -51,8 +49,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
 
     if data.is_premium_simple(guild_id).await? {
-        ctx.say(ctx.gettext("Hey, this server is already premium!"))
-            .await?;
+        ctx.say("Hey, this server is already premium!").await?;
         return Ok(());
     }
 
@@ -61,17 +58,13 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let error_msg = match data.fetch_patreon_info(author.id).await? {
         Some(tier) => {
             if linked_guilds as u8 >= tier.entitled_servers {
-                Some(Cow::Owned(ctx
-                    .gettext("Hey, you already have {server_count} servers linked, you are only subscribed to the {entitled_servers} tier!")
-                    .replace("{entitled_servers}", &tier.entitled_servers.to_arraystring())
-                    .replace("{server_count}", &linked_guilds.to_arraystring())
-                ))
+                Some(Cow::Owned(format!("Hey, you already have {linked_guilds} servers linked, you are only subscribed to the {} tier!", tier.entitled_servers)))
             } else {
                 None
             }
         }
         None => Some(Cow::Borrowed(
-            ctx.gettext("Hey, I don't think you are subscribed on Patreon!"),
+            "Hey, I don't think you are subscribed on Patreon!",
         )),
     };
 
@@ -82,8 +75,8 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
             .thumbnail(data.premium_avatar_url.as_str())
             .colour(PREMIUM_NEUTRAL_COLOUR)
             .footer(CreateEmbedFooter::new({
-                let line1 = ctx.gettext("If you have just subscribed, please wait for up to an hour for the member list to update!\n");
-                let line2 = ctx.gettext("If this is incorrect, and you have waited an hour, please contact GnomedDev.");
+                let line1 = "If you have just subscribed, please wait for up to an hour for the member list to update!\n";
+                let line2 = "If this is incorrect, and you have waited an hour, please contact GnomedDev.";
 
                 let mut concat = String::with_capacity(line1.len() + line2.len());
                 concat.push_str(line1);
@@ -104,8 +97,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
         .set_one(guild_id.into(), "voice_mode", &TTSMode::gCloud)
         .await?;
 
-    ctx.say(ctx.gettext("Done! This server is now premium!"))
-        .await?;
+    ctx.say("Done! This server is now premium!").await?;
 
     let guild = ctx.cache().guild(guild_id);
     let guild_name = guild.as_ref().map_or("<Unknown>", |g| g.name.as_str());
@@ -132,7 +124,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
 pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
     let Some(premium_info) = ctx.data().fetch_patreon_info(ctx.author().id).await? else {
-        ctx.say(ctx.gettext("I cannot confirm you are subscribed on patreon, so you don't have any premium servers!")).await?;
+        ctx.say("I cannot confirm you are subscribed on patreon, so you don't have any premium servers!").await?;
         return Ok(());
     };
 
@@ -184,22 +176,20 @@ pub async fn premium_deactivate(ctx: Context<'_>) -> CommandResult {
     let guild_row = data.guilds_db.get(guild_id.get() as i64).await?;
 
     let Some(premium_user) = guild_row.premium_user else {
-        let msg = ctx.gettext("This server isn't activated for premium, so I can't deactivate it!");
+        let msg = "This server isn't activated for premium, so I can't deactivate it!";
         ctx.send_ephemeral(msg).await?;
         return Ok(());
     };
 
     if premium_user != author.id {
-        let msg = ctx.gettext(
-            "You are not setup as the premium user for this server, so cannot deactivate it!",
-        );
+        let msg = "You are not setup as the premium user for this server, so cannot deactivate it!";
         ctx.send_ephemeral(msg).await?;
         return Ok(());
     }
 
     remove_premium(&data, guild_id).await?;
 
-    let msg = ctx.gettext("Deactivated premium from this server.");
+    let msg = "Deactivated premium from this server.";
     ctx.say(msg).await?;
     Ok(())
 }

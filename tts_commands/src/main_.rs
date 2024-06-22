@@ -20,14 +20,12 @@ use songbird::error::JoinError;
 
 use poise::serenity_prelude::{self as serenity, builder::*, colours::branding::YELLOW};
 
-use to_arraystring::ToArrayString as _;
 use tts_core::{
-    common::random_footer,
+    common::{push_permission_names, random_footer},
     database_models::GuildRow,
     require, require_guild,
     structs::{Command, CommandResult, Context, JoinVCToken, Result},
     traits::{PoiseContextExt, SongbirdManagerExt},
-    translations::GetTextContextExt,
 };
 
 /// Returns Some(GuildRow) on correct channel, otherwise None.
@@ -46,16 +44,14 @@ async fn channel_check(
     let msg = if let Some(setup_id) = guild_row.channel {
         let guild = require_guild!(ctx, Ok(None));
         if guild.channels.contains_key(&setup_id) {
-            let msg = ctx.gettext(
-                "You ran this command in the wrong channel, please move to <#{channel_id}>.",
-            );
-
-            Cow::Owned(msg.replace("{channel_id}", &setup_id.get().to_arraystring()))
+            let msg =
+                format!("You ran this command in the wrong channel, please move to <#{setup_id}>.");
+            Cow::Owned(msg)
         } else {
-            Cow::Borrowed(ctx.gettext("Your setup channel has been deleted, please run /setup!"))
+            Cow::Borrowed("Your setup channel has been deleted, please run /setup!")
         }
     } else {
-        Cow::Borrowed(ctx.gettext("You haven't setup the bot, please run /setup!"))
+        Cow::Borrowed("You haven't setup the bot, please run /setup!")
     };
 
     ctx.send_error(msg).await?;
@@ -71,16 +67,11 @@ fn create_warning_embed(title: String, footer: &str) -> serenity::CreateEmbed<'_
 
 #[cold]
 fn required_prefix_embed<'a>(
-    ctx: Context<'a>,
     msg: poise::CreateReply<'a>,
     required_prefix: &str,
 ) -> poise::CreateReply<'a> {
-    let title = ctx
-        .gettext("Your TTS required prefix is set to: `{}`")
-        .replace("{}", required_prefix);
-
-    let footer =
-        ctx.gettext("To disable the required prefix, use /set required_prefix with no options.");
+    let title = format!("Your TTS required prefix is set to: `{required_prefix}`");
+    let footer = "To disable the required prefix, use /set required_prefix with no options.";
 
     msg.embed(create_warning_embed(title, footer))
 }
@@ -97,12 +88,8 @@ fn required_role_embed<'a>(
         .and_then(|g| g.roles.get(&required_role).map(|r| r.name.as_str()))
         .unwrap_or("Unknown");
 
-    let title = ctx
-        .gettext("The required role for TTS is: `@{}`")
-        .replace("{}", role_name);
-
-    let footer =
-        ctx.gettext("To disable the required role, use /set required_role with no options.");
+    let title = format!("The required role for TTS is: `@{role_name}`");
+    let footer = "To disable the required role, use /set required_role with no options.";
 
     msg.embed(create_warning_embed(title, footer))
 }
@@ -117,7 +104,7 @@ fn required_role_embed<'a>(
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
     let author_vc = require!(ctx.author_vc(), {
-        ctx.send_error(ctx.gettext("I cannot join your voice channel unless you are in one!"))
+        ctx.send_error("I cannot join your voice channel unless you are in one!")
             .await?;
 
         Ok(())
@@ -136,7 +123,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let bot_member = guild_id.member(ctx, bot_id).await?;
     if let Some(communication_disabled_until) = bot_member.communication_disabled_until {
         if communication_disabled_until > serenity::Timestamp::now() {
-            let msg = ctx.gettext("I am timed out, please ask a moderator to remove the timeout");
+            let msg = "I am timed out, please ask a moderator to remove the timeout";
             ctx.send_error(msg).await?;
             return Ok(());
         }
@@ -151,8 +138,8 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         - channel.permissions_for_user(ctx.cache(), bot_id)?;
 
     if !missing_permissions.is_empty() {
-        let msg = ctx.gettext("I do not have permission to TTS in your voice channel, please ask a server administrator to give me: {missing_permissions}")
-            .replace("{missing_permissions}", &missing_permissions.get_permission_names().join(", "));
+        let mut msg = String::from("I do not have permission to TTS in your voice channel, please ask a server administrator to give me: ");
+        push_permission_names(&mut msg, missing_permissions);
 
         ctx.send_error(msg).await?;
         return Ok(());
@@ -163,16 +150,12 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
             if bot_channel_id.get() == author_vc.get() {
-                ctx.say(ctx.gettext("I am already in your voice channel!"))
-                    .await?;
+                ctx.say("I am already in your voice channel!").await?;
                 return Ok(());
             };
 
-            ctx.say(
-                ctx.gettext("I am already in <#{channel_id}>!")
-                    .replace("{channel_id}", &bot_channel_id.get().to_arraystring()),
-            )
-            .await?;
+            ctx.say(format!("I am already in <#{bot_channel_id}>!"))
+                .await?;
             return Ok(());
         }
     };
@@ -187,7 +170,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
         if let Err(err) = join_vc_result {
             return if let JoinError::TimedOut = err {
-                let msg = ctx.gettext("I failed to join your voice channel, please check I have the right permissions and try again!");
+                let msg = "I failed to join your voice channel, please check I have the right permissions and try again!";
                 ctx.send_error(msg).await?;
                 Ok(())
             } else {
@@ -199,19 +182,18 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     };
 
     let embed = serenity::CreateEmbed::default()
-        .title(ctx.gettext("Joined your voice channel!"))
-        .description(ctx.gettext("Just type normally and TTS Bot will say your messages!"))
+        .title("Joined your voice channel!")
+        .description("Just type normally and TTS Bot will say your messages!")
         .thumbnail(bot_face)
         .author(CreateEmbedAuthor::new(member.display_name()).icon_url(author.face()))
         .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite,
             bot_id,
-            ctx.current_catalog(),
         )));
 
     let mut msg = poise::CreateReply::default().embed(embed);
     if let Some(required_prefix) = guild_row.required_prefix {
-        msg = required_prefix_embed(ctx, msg, required_prefix.as_str());
+        msg = required_prefix_embed(msg, required_prefix.as_str());
     }
 
     if let Some(required_role) = guild_row.required_role {
@@ -254,18 +236,16 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         && channel_check(&ctx, author_vc).await?.is_some()
     {
         if author_vc.map_or(true, |author_vc| bot_vc.get() != author_vc.get()) {
-            ctx.say(ctx.gettext(
-                "Error: You need to be in the same voice channel as me to make me leave!",
-            ))
-            .await?;
+            ctx.say("Error: You need to be in the same voice channel as me to make me leave!")
+                .await?;
         } else {
             data.songbird.remove(guild_id).await?;
             data.last_to_xsaid_tracker.remove(&guild_id);
 
-            ctx.say(ctx.gettext("Left voice channel!")).await?;
+            ctx.say("Left voice channel!").await?;
         }
     } else {
-        ctx.say(ctx.gettext("Error: How do I leave a voice channel if I am not in one?"))
+        ctx.say("Error: How do I leave a voice channel if I am not in one?")
             .await?;
     }
 
@@ -297,12 +277,11 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
             }
             poise::Context::Application(_) => {
                 // Slash command, no message to react to, just say thumbsup
-                ctx.say('👍').await?;
+                ctx.say("👍").await?;
             }
         }
     } else {
-        ctx.say(ctx.gettext("**Error**: I am not in a voice channel!"))
-            .await?;
+        ctx.say("**Error**: I am not in a voice channel!").await?;
     };
 
     Ok(())

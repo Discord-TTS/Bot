@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     sync::{Arc, OnceLock},
 };
 
@@ -188,7 +188,6 @@ pub struct Data {
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRowRaw>,
 
     pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<()>>>,
-    pub translations: HashMap<FixedString<u8>, gettext::Catalog>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub premium_avatar_url: FixedString<u16>,
@@ -222,10 +221,6 @@ impl std::fmt::Debug for Data {
 }
 
 impl Data {
-    pub fn default_catalog(&self) -> Option<&gettext::Catalog> {
-        self.translations.get("en-US")
-    }
-
     pub async fn speaking_rate(
         &self,
         user_id: serenity::UserId,

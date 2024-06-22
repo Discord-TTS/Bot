@@ -11,12 +11,12 @@ use self::serenity::{
 use poise::serenity_prelude as serenity;
 
 use crate::{
+    common::push_permission_names,
     constants,
     opt_ext::OptionTryUnwrap,
     require,
     structs::{Context, Data, FrameworkContext},
     traits::PoiseContextExt,
-    translations::GetTextContextExt,
 };
 
 const VIEW_TRACEBACK_CUSTOM_ID: &str = "error::traceback::view";
@@ -316,13 +316,13 @@ async fn handle_cooldown(
     ctx: Context<'_>,
     remaining_cooldown: std::time::Duration,
 ) -> Result<(), Error> {
-    let cooldown_response = ctx
-        .send_error(
-            ctx.gettext("`/{command_name}` is on cooldown, please try again in {} seconds!")
-                .replace("{command_name}", &ctx.command().name)
-                .replace("{}", &format!("{:.1}", remaining_cooldown.as_secs_f32())),
-        )
-        .await?;
+    let msg = format!(
+        "`/{}` is on cooldown, please try again in {:.1} seconds!",
+        ctx.command().name,
+        remaining_cooldown.as_secs_f32()
+    );
+
+    let cooldown_response = ctx.send_error(msg).await?;
 
     if let poise::Context::Prefix(ctx) = ctx {
         if let Some(error_reply) = cooldown_response {
@@ -358,29 +358,29 @@ async fn handle_argparse(
 ) -> Result<(), Error> {
     let reason = if let Some(input) = input {
         let reason = if error.is::<serenity::MemberParseError>() {
-            ctx.gettext("I cannot find the member: `{}`")
+            "I cannot find the member: `{}`"
         } else if error.is::<serenity::GuildParseError>() {
-            ctx.gettext("I cannot find the server: `{}`")
+            "I cannot find the server: `{}`"
         } else if error.is::<serenity::GuildChannelParseError>() {
-            ctx.gettext("I cannot find the channel: `{}`")
+            "I cannot find the channel: `{}`"
         } else if error.is::<std::num::ParseIntError>() {
-            ctx.gettext("I cannot convert `{}` to a number")
+            "I cannot convert `{}` to a number"
         } else if error.is::<std::str::ParseBoolError>() {
-            ctx.gettext("I cannot convert `{}` to True/False")
+            "I cannot convert `{}` to True/False"
         } else {
-            ctx.gettext("I cannot understand your message")
+            "I cannot understand your message"
         };
 
         Cow::Owned(reason.replace("{}", &input))
     } else {
-        Cow::Borrowed(ctx.gettext("You missed an argument to the command"))
+        Cow::Borrowed("You missed an argument to the command")
     };
 
-    let fix = ctx
-        .gettext("please check out `/help {command}`")
-        .replace("{command}", &ctx.command().qualified_name);
-
-    ctx.send_error(format!("{reason}, {fix}")).await?;
+    ctx.send_error(format!(
+        "{reason}, please check out `/help {}`",
+        ctx.command().qualified_name
+    ))
+    .await?;
     Ok(())
 }
 
@@ -444,8 +444,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             )
             .await?;
 
-            let msg =
-                ctx.gettext("An unknown error occurred, please report this on the support server!");
+            let msg = "An unknown error occurred, please report this on the support server!";
             ctx.send_error(msg).await?;
         }
         poise::FrameworkError::ArgumentParse {
@@ -461,8 +460,8 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ctx,
             ..
         } => {
-            let msg = ctx.gettext("I cannot run this command as I am missing permissions, please ask an administrator of the server to give me: {}")
-                .replace("{}", &missing_permissions.get_permission_names().join(", "));
+            let mut msg = String::from("I cannot run this command as I am missing permissions, please ask an administrator of the server to give me: ");
+            push_permission_names(&mut msg, missing_permissions);
 
             ctx.send_error(msg).await?;
         }
@@ -472,12 +471,11 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ..
         } => {
             let msg = if let Some(missing_permissions) = missing_permissions {
-                Cow::Owned(ctx.gettext("You cannot run this command as you are missing permissions, please ask an administrator of the server to give you: {}")
-                    .replace("{}", &missing_permissions.get_permission_names().join(", ")))
+                let mut msg = String::from("You cannot run this command as you are missing permissions, please ask an administrator of the server to give you: ");
+                push_permission_names(&mut msg, missing_permissions);
+                Cow::Owned(msg)
             } else {
-                Cow::Borrowed(
-                    ctx.gettext("You cannot run this command as you are missing permissions."),
-                )
+                Cow::Borrowed("You cannot run this command as you are missing permissions.")
             };
 
             ctx.send_error(msg).await?;
@@ -487,7 +485,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             if let Some(error) = error {
                 error!("Premium Check Error: {:?}", error);
 
-                let msg = ctx.gettext("An unknown error occurred during the premium check, please report this on the support server!");
+                let msg = "An unknown error occurred during the premium check, please report this on the support server!";
                 ctx.send_error(msg).await?;
             }
         }
@@ -539,11 +537,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
         | poise::FrameworkError::UnknownCommand { .. }
         | poise::FrameworkError::NonCommandMessage { .. } => {}
         poise::FrameworkError::GuildOnly { ctx, .. } => {
-            let error = ctx
-                .gettext("`/{command_name}` cannot be used in private messages, please run this command in a server channel.")
-                .replace("{bot_name}", &ctx.cache().current_user().name)
-                .replace("{command_name}", &ctx.command().qualified_name);
-
+            let error = format!("`/{}` cannot be used in private messages, please run this command in a server channel.", ctx.command().qualified_name);
             ctx.send_error(error).await?;
         }
         poise::FrameworkError::CommandPanic { .. } => panic!("Command panicked!"),

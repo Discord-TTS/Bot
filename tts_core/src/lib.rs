@@ -11,4 +11,3 @@ pub mod macros;
 pub mod opt_ext;
 pub mod structs;
 pub mod traits;
-pub mod translations;

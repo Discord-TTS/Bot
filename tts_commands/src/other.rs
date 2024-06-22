@@ -34,7 +34,6 @@ use tts_core::{
     require_guild,
     structs::{ApplicationContext, Command, CommandResult, Context, IsPremium, TTSMode},
     traits::PoiseContextExt as _,
-    translations::GetTextContextExt,
 };
 
 /// Shows how long TTS Bot has been online
@@ -45,23 +44,14 @@ use tts_core::{
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn uptime(ctx: Context<'_>) -> CommandResult {
-    let timestamp = ctx
-        .data()
-        .start_time
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs();
-    let current_user_mention = {
-        let current_user = ctx.cache().current_user();
-        current_user.mention().to_string()
+    let start_time = ctx.data().start_time;
+    let time_since_start = start_time.duration_since(std::time::UNIX_EPOCH)?.as_secs();
+    let msg = {
+        let current_user = ctx.cache().current_user().mention();
+        format!("{current_user} has been up since: <t:{time_since_start}:R>")
     };
 
-    ctx.say(
-        ctx.gettext("{user_mention} has been up since: <t:{timestamp}:R>")
-            .replace("{user_mention}", &current_user_mention)
-            .replace("{timestamp}", &timestamp.to_arraystring()),
-    )
-    .await?;
-
+    ctx.say(msg).await?;
     Ok(())
 }
 
@@ -112,7 +102,7 @@ pub async fn tts(
     };
 
     if is_unnecessary_command_invoke.await? {
-        ctx.say(ctx.gettext("You don't need to include the `/tts` for messages to be said!"))
+        ctx.say("You don't need to include the `/tts` for messages to be said!")
             .await?;
         Ok(())
     } else {
@@ -180,7 +170,7 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
 
     ctx.send(
         CreateReply::default()
-            .content(ctx.gettext("Generated some TTS!"))
+            .content("Generated some TTS!")
             .attachment(attachment),
     )
     .await?;
@@ -259,9 +249,7 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
     let (embed_title, embed_thumbnail) = {
         let current_user = cache.current_user();
 
-        let title = ctx
-            .gettext("{bot_name}: Freshly rewritten in Rust!")
-            .replace("{bot_name}", &current_user.name);
+        let title = format!("{}: Freshly rewritten in Rust!", current_user.name);
         let thumbnail = current_user.face();
 
         (title, thumbnail)
@@ -273,33 +261,21 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
         .thumbnail(embed_thumbnail)
         .url(data.config.main_server_invite.clone())
         .colour(neutral_colour)
-        .footer(CreateEmbedFooter::new(
-            ctx.gettext(
-                "Time to fetch: {time_to_fetch}ms
-Support Server: {main_server_invite}
+        .footer(CreateEmbedFooter::new(format!(
+            "Time to fetch: {time_to_fetch:.2}ms
+Support Server: {}
 Repository: https://github.com/Discord-TTS/Bot",
-            )
-            .replace("{time_to_fetch}", &format!("{time_to_fetch:.2}"))
-            .replace("{main_server_invite}", &data.config.main_server_invite),
-        ))
-        .description(
-            ctx.gettext(
-                "Currently in:
+            data.config.main_server_invite
+        )))
+        .description(format!(
+            "Currently in:
 {sep2} {total_voice_clients} voice channels
 {sep2} {total_guild_count} servers
 Currently using:
 {sep1} {shard_count} shards
-{sep1} {ram_usage}MB of RAM{scheduler_stats}
+{sep1} {ram_usage:.1}MB of RAM
 and can be used by {total_members} people!",
-            )
-            .replace("{sep1}", sep1)
-            .replace("{sep2}", sep2)
-            .replace("{total_guild_count}", &total_guild_count)
-            .replace("{total_voice_clients}", &total_voice_clients)
-            .replace("{total_members}", &total_members)
-            .replace("{shard_count}", &shard_count.get().to_arraystring())
-            .replace("{ram_usage}", &format!("{ram_usage:.1}")),
-        );
+        ));
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())
@@ -321,16 +297,12 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
         && require_guild!(ctx).channels.contains_key(&channel)
     {
         if channel == ctx.channel_id() {
-            Cow::Borrowed(ctx.gettext("You are in the setup channel already!"))
+            Cow::Borrowed("You are in the setup channel already!")
         } else {
-            let msg = ctx
-                .gettext("The current setup channel is: <#{channel}>")
-                .replace("{channel}", &channel.get().to_arraystring());
-
-            Cow::Owned(msg)
+            Cow::Owned(format!("The current setup channel is: <#{channel}>"))
         }
     } else {
-        Cow::Borrowed(ctx.gettext("The channel hasn't been setup, do `/setup #textchannel`"))
+        Cow::Borrowed("The channel hasn't been setup, do `/setup #textchannel`")
     };
 
     ctx.say(msg).await?;
@@ -346,10 +318,9 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
     aliases("purchase", "donate")
 )]
 pub async fn premium(ctx: Context<'_>) -> CommandResult {
-    ctx.say(ctx.gettext("
+    ctx.say("
 To support the development and hosting of TTS Bot and get access to TTS Bot Premium, including more modes (`/set mode`), many more voices (`/set voice`), and extra options such as TTS translation, see:
-https://www.patreon.com/Gnome_the_Bot_Maker
-    ")).await?;
+https://www.patreon.com/Gnome_the_Bot_Maker").await?;
 
     Ok(())
 }
@@ -366,9 +337,7 @@ pub async fn ping(ctx: Context<'_>) -> CommandResult {
     let ping_before = std::time::SystemTime::now();
     let ping_msg = ctx.say("Loading!").await?;
 
-    let msg = ctx
-        .gettext("Current Latency: {}ms")
-        .replace("{}", &ping_before.elapsed()?.as_millis().to_arraystring());
+    let msg = format!("Current Latency: {}ms", ping_before.elapsed()?.as_millis());
 
     ping_msg
         .edit(ctx, CreateReply::default().content(msg))
@@ -387,30 +356,29 @@ pub async fn ping(ctx: Context<'_>) -> CommandResult {
 pub async fn invite(ctx: Context<'_>) -> CommandResult {
     let cache = ctx.cache();
     let config = &ctx.data().config;
-    let bot_mention = cache.current_user().id.mention().to_string();
 
-    let invite_channel = config.invite_channel;
-    ctx.say(if ctx.guild_id() == Some(config.main_server) {
-        ctx.gettext("Check out {channel_mention} to invite {bot_mention}!")
-            .replace("{channel_mention}", &invite_channel.mention().to_string())
-            .replace("{bot_mention}", &bot_mention)
+    let bot_mention = cache.current_user().id.mention();
+    let msg = if ctx.guild_id() == Some(config.main_server) {
+        format!(
+            "Check out {} to invite {bot_mention}!",
+            config.invite_channel.mention(),
+        )
     } else {
         let guild = cache.guild(config.main_server).try_unwrap()?;
 
         guild
             .channels
-            .get(&invite_channel)
+            .get(&config.invite_channel)
             .map(|c| {
-                ctx.gettext(
-                    "Join {server_invite} and look in #{channel_name} to invite {bot_mention}",
+                format!(
+                    "Join {} and look in #{} to invite {bot_mention}",
+                    config.main_server_invite, c.name,
                 )
-                .replace("{channel_name}", &c.name)
-                .replace("{bot_mention}", &bot_mention)
-                .replace("{server_invite}", &config.main_server_invite)
             })
             .try_unwrap()?
-    })
-    .await?;
+    };
+
+    ctx.say(msg).await?;
     Ok(())
 }
 

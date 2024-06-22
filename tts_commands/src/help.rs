@@ -25,7 +25,6 @@ use tts_core::{
     require,
     structs::{ApplicationContext, Command, CommandResult, Context},
     traits::PoiseContextExt,
-    translations::GetTextContextExt,
 };
 
 enum HelpCommandMode<'a> {
@@ -135,10 +134,7 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
             let (mut command_obj, _, _) = require!(
                 poise::find_command(commands, top_level_command, true, &mut Vec::new()),
                 {
-                    let msg = ctx
-                        .gettext("No command called {} found!")
-                        .replace("{}", top_level_command);
-
+                    let msg = format!("No command called {top_level_command} found!");
                     ctx.say(msg).await?;
                     Ok(())
                 }
@@ -154,9 +150,8 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                         &mut Vec::new()
                     ),
                     {
-                        let msg = ctx
-                            .gettext("The group {group_name} does not have a subcommand called {subcommand_name}!")
-                            .replace("{subcommand_name}", &remaining_args).replace("{group_name}", &command_obj.name);
+                        let group_name = &command_obj.name;
+                        let msg = format!("The group {group_name} does not have a subcommand called {remaining_args}!");
 
                         ctx.say(msg).await?;
                         Ok(())
@@ -165,7 +160,7 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
             };
 
             if command_obj.owners_only && !framework_options.owners.contains(&ctx.author().id) {
-                ctx.say(ctx.gettext("This command is only available to the bot owner!"))
+                ctx.say("This command is only available to the bot owner!")
                     .await?;
                 return Ok(());
             }
@@ -180,15 +175,12 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
 
     let neutral_colour = ctx.neutral_colour().await;
     let embed = CreateEmbed::default()
-        .title(ctx.gettext("{command_name} Help!").replace(
-            "{command_name}",
-            &match &mode {
-                HelpCommandMode::Root => ctx.cache().current_user().name.to_string(),
-                HelpCommandMode::Group(c) | HelpCommandMode::Command(c) => {
-                    format!("`{}`", c.qualified_name)
-                }
-            },
-        ))
+        .title(match mode {
+            HelpCommandMode::Root => format!("{} Help!", ctx.cache().current_user().name),
+            HelpCommandMode::Group(c) | HelpCommandMode::Command(c) => {
+                format!("{} Help!", c.qualified_name)
+            }
+        })
         .description(match &mode {
             HelpCommandMode::Root => show_group_description(&get_command_mapping(commands)),
             HelpCommandMode::Command(command_obj) => {
@@ -197,7 +189,7 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                     command_obj
                         .description
                         .as_deref()
-                        .unwrap_or_else(|| ctx.gettext("Command description not found!")),
+                        .unwrap_or("Command description not found!"),
                     command_obj.qualified_name
                 );
 
@@ -205,13 +197,10 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                 msg.push_str("```\n");
 
                 if !command_obj.parameters.is_empty() {
-                    msg.push_str(ctx.gettext("__**Parameter Descriptions**__\n"));
+                    msg.push_str("__**Parameter Descriptions**__\n");
                     command_obj.parameters.iter().for_each(|p| {
                         let name = &p.name;
-                        let description = p
-                            .description
-                            .as_deref()
-                            .unwrap_or_else(|| ctx.gettext("no description"));
+                        let description = p.description.as_deref().unwrap_or("no description");
                         writeln!(msg, "`{name}`: {description}").unwrap();
                     });
                 };
@@ -233,12 +222,12 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                 .icon_url(ctx.author().face()),
         )
         .footer(serenity::CreateEmbedFooter::new(match mode {
-            HelpCommandMode::Group(c) => Cow::Owned(
-                ctx.gettext("Use `/help {command_name} [command]` for more info on a command")
-                    .replace("{command_name}", &c.qualified_name),
-            ),
+            HelpCommandMode::Group(c) => Cow::Owned(format!(
+                "Use `/help {} [command]` for more info on a command",
+                c.qualified_name
+            )),
             HelpCommandMode::Command(_) | HelpCommandMode::Root => {
-                Cow::Borrowed(ctx.gettext("Use `/help [command]` for more info on a command"))
+                Cow::Borrowed("Use `/help [command]` for more info on a command")
             }
         }));
 

@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 rand = "0.8"
 sha2 = "0.10"
-gettext = "0.4"
 linkify = "0.10"
 bitflags = "2.4.1"
 strum_macros = "0.26"

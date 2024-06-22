@@ -1,3 +1,0 @@
-files:
-  - source: /translations/master.pot
-    translation: /translations/%locale%/%locale%.po

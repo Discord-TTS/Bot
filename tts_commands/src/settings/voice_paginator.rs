@@ -6,7 +6,6 @@ use serenity::{builder::*, small_fixed_array::FixedString};
 use tts_core::{
     require,
     structs::{Context, TTSMode},
-    translations::GetTextContextExt as _,
 };
 
 pub struct MenuPaginator<'a> {
@@ -38,24 +37,12 @@ impl<'a> MenuPaginator<'a> {
 
     fn create_page(&self, page: &str) -> CreateEmbed<'_> {
         let author = self.ctx.author();
+        let bot_user = &self.ctx.cache().current_user().name;
 
         CreateEmbed::default()
-            .title(
-                self.ctx
-                    .gettext("{bot_user} Voices | Mode: `{mode}`")
-                    .replace("{mode}", self.mode.into())
-                    .replace("{bot_user}", &self.ctx.cache().current_user().name),
-            )
-            .description(
-                self.ctx
-                    .gettext("**Currently Supported Voice**\n{page}")
-                    .replace("{page}", page),
-            )
-            .field(
-                self.ctx.gettext("Current voice used"),
-                &self.current_voice,
-                false,
-            )
+            .title(format!("{bot_user} Voices | Mode: `{}`", self.mode))
+            .description(format!("**Currently Supported Voice**\n{page}"))
+            .field("Current voice used", &self.current_voice, false)
             .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face()))
             .footer(CreateEmbedFooter::new(self.footer.as_ref()))
     }

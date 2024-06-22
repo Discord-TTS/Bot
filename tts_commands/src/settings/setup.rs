@@ -8,7 +8,6 @@ use tts_core::{
     common::{confirm_dialog, random_footer},
     require, require_guild,
     structs::{CommandResult, Context, Result},
-    translations::GetTextContextExt as _,
 };
 
 fn can_send(
@@ -70,17 +69,17 @@ async fn show_channel_select_menu(
     );
 
     if text_channels.is_empty() {
-        ctx.say(ctx.gettext("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!")).await?;
+        ctx.say("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!").await?;
         return Ok(None);
     } else if text_channels.len() >= (25 * 5) {
-        ctx.say(ctx.gettext("**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`")).await?;
+        ctx.say("**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`").await?;
         return Ok(None);
     };
 
     text_channels.sort_by(|(_, _, _, f, _), (_, _, _, s, _)| Ord::cmp(&f, &s));
 
     let builder = poise::CreateReply::default()
-        .content(ctx.gettext("Select a channel!"))
+        .content("Select a channel!")
         .components(generate_channel_select(&text_channels));
 
     let reply = ctx.send(builder).await?;
@@ -182,23 +181,18 @@ pub async fn setup(
     ctx.send(
         poise::CreateReply::default().embed(
             serenity::CreateEmbed::default()
-                .title(
-                    ctx.gettext("{bot_name} has been setup!")
-                        .replace("{bot_name}", &bot_user_name),
-                )
+                .title(format!("{bot_user_name} has been setup!"))
                 .thumbnail(&bot_user_face)
-                .description(
-                    ctx.gettext(
-                        "
-TTS Bot will now accept commands and read from <#{channel}>.
-Just do `/join` and start talking!",
-                    )
-                    .replace("{channel}", &channel_id.get().to_arraystring()),
-                )
+                .description(format!(
+                    concat!(
+                        "TTS Bot will now accept commands and read from <#{}>.\n",
+                        "Just do `/join` and start talking!"
+                    ),
+                    channel_id
+                ))
                 .footer(serenity::CreateEmbedFooter::new(random_footer(
                     &data.config.main_server_invite,
                     bot_user_id,
-                    ctx.current_catalog(),
                 )))
                 .author(serenity::CreateEmbedAuthor::new(&*author.name).icon_url(author.face())),
         ),
@@ -215,9 +209,9 @@ Just do `/join` and start talking!",
 
     let Some(confirmed) = confirm_dialog(
         ctx,
-        ctx.gettext("Would you like to set up TTS Bot update announcements for the setup channel?"),
-        ctx.gettext("Yes"),
-        ctx.gettext("No"),
+        "Would you like to set up TTS Bot update announcements for the setup channel?",
+        "Yes",
+        "No",
     )
     .await?
     else {
@@ -228,9 +222,9 @@ Just do `/join` and start talking!",
         let announcements = data.config.announcements_channel;
         announcements.follow(ctx.http(), channel_id).await?;
 
-        ctx.gettext("Set up update announcements in this channel!")
+        "Set up update announcements in this channel!"
     } else {
-        ctx.gettext("Okay, didn't set up update announcements.")
+        "Okay, didn't set up update announcements."
     };
 
     ctx.send(poise::CreateReply::default().content(reply).ephemeral(true))

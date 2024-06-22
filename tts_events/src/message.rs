@@ -356,7 +356,6 @@ async fn process_support_dm(
                         .footer(CreateEmbedFooter::new(random_footer(
                             &data.config.main_server_invite,
                             client_id,
-                            data.default_catalog(),
                         ))),
                 ),
             )
