@@ -143,7 +143,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     }
 
     let author = ctx.author();
-    let channel = author_vc.to_channel(ctx).await?.guild().unwrap();
+    let channel = author_vc.to_guild_channel(ctx, Some(guild_id)).await?;
 
     let missing_permissions = (serenity::Permissions::VIEW_CHANNEL
         | serenity::Permissions::CONNECT

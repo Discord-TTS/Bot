@@ -262,7 +262,7 @@ pub async fn handle_message(
 
     extra_fields.push((
         "Channel Type",
-        Cow::Borrowed(channel_type(&message.channel_id.to_channel(&ctx).await?)),
+        Cow::Borrowed(channel_type(&message.channel(ctx).await?)),
         true,
     ));
     handle_unexpected(
@@ -419,7 +419,9 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
                 ),
                 (
                     "Channel Type",
-                    Cow::Borrowed(channel_type(&ctx.channel_id().to_channel(&ctx).await?)),
+                    Cow::Borrowed(channel_type(
+                        &ctx.channel_id().to_channel(&ctx, ctx.guild_id()).await?,
+                    )),
                     true,
                 ),
             ];

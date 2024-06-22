@@ -85,10 +85,11 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
         error_message: impl Into<Cow<'ctx, str>>,
     ) -> Result<Option<poise::ReplyHandle<'ctx>>> {
         let author = self.author();
+        let guild_id = self.guild_id();
         let serenity_ctx = self.serenity_context();
         let serernity_cache = &serenity_ctx.cache;
 
-        let (name, avatar_url) = match self.channel_id().to_channel(serenity_ctx).await? {
+        let (name, avatar_url) = match self.channel_id().to_channel(serenity_ctx, guild_id).await? {
             serenity::Channel::Guild(channel) => {
                 let permissions = channel
                     .permissions_for_user(serernity_cache, serernity_cache.current_user().id)?;
