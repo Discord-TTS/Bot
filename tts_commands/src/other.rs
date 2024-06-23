@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, cmp::Ordering};
+use std::borrow::Cow;
 
 use anyhow::Error;
 use num_format::{Locale, ToFormattedString};
@@ -36,11 +36,6 @@ use tts_core::{
     traits::PoiseContextExt as _,
     translations::GetTextContextExt,
 };
-
-#[allow(clippy::trivially_copy_pass_by_ref)] // Required for generic type
-fn cmp_float(a: &f64, b: &f64) -> Ordering {
-    a.total_cmp(b)
-}
 
 /// Shows how long TTS Bot has been online
 #[poise::command(
@@ -227,7 +222,7 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
     let bot_user_id = cache.current_user().id;
 
     let start_time = std::time::SystemTime::now();
-    let [sep1, sep2, sep3, ..] = OPTION_SEPERATORS;
+    let [sep1, sep2, ..] = OPTION_SEPERATORS;
 
     let guild_ids = cache.guilds();
     let (total_guild_count, total_voice_clients, total_members) = {
@@ -246,38 +241,6 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
                 .sum::<u64>()
                 .to_formatted_string(&Locale::en),
         )
-    };
-
-    #[allow(clippy::cast_precision_loss)]
-    let scheduler_stats = {
-        let scheduler = songbird::driver::get_default_scheduler();
-        if let Ok(stats) = scheduler.worker_thread_stats().await
-            && !stats.is_empty()
-        {
-            const NANOS_PER_MILLI: f64 = 1_000_000.0;
-            let compute_time_iter = stats
-                .iter()
-                .map(|s| (s.last_compute_cost_ns() as f64) / NANOS_PER_MILLI);
-
-            // Unwraps are safe due to !stats.is_empty()
-            let min = compute_time_iter.clone().min_by(cmp_float).try_unwrap()?;
-            let max = compute_time_iter.clone().max_by(cmp_float).try_unwrap()?;
-            let avg = compute_time_iter.sum::<f64>() / (stats.len() as f64);
-
-            let mixer_use =
-                (scheduler.live_tasks() as f64 / scheduler.total_tasks() as f64) * 100.0;
-
-            Cow::Owned(format!(
-                "
-With the songbird scheduler stats of
-{sep3} Minimum compute cost: {min}
-{sep3} Average compute cost: {avg}
-{sep3} Maximum compute cost: {max}
-{sep3} Mixer usage percentage: {mixer_use:.2}%"
-            ))
-        } else {
-            Cow::Borrowed("")
-        }
     };
 
     let shard_count = cache.shard_count();
@@ -335,8 +298,7 @@ and can be used by {total_members} people!",
             .replace("{total_voice_clients}", &total_voice_clients)
             .replace("{total_members}", &total_members)
             .replace("{shard_count}", &shard_count.get().to_arraystring())
-            .replace("{ram_usage}", &format!("{ram_usage:.1}"))
-            .replace("{scheduler_stats}", &scheduler_stats),
+            .replace("{ram_usage}", &format!("{ram_usage:.1}")),
         );
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
