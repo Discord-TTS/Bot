@@ -6,15 +6,15 @@ edition = "2021"
 [dependencies]
 serde_json = "1.0.111"
 
-sqlx = { workspace = true }
-tokio = { workspace = true }
-serde = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
-reqwest = { workspace = true }
-aformat = { workspace = true }
-serenity = { workspace = true }
-itertools = { workspace = true }
-parking_lot = { workspace = true }
+sqlx.workspace = true
+tokio.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
+aformat.workspace = true
+serenity.workspace = true
+itertools.workspace = true
+parking_lot.workspace = true
 
 tts_core = { path = "../tts_core" }

@@ -25,17 +25,17 @@ small-fixed-array = { version = "0.4.5", features = [
     "to-arraystring",
 ] }
 
-sqlx = { workspace = true }
-serde = { workspace = true }
-tokio = { workspace = true }
-poise = { workspace = true }
-anyhow = { workspace = true }
-sysinfo = { workspace = true }
-tracing = { workspace = true }
-reqwest = { workspace = true }
-dashmap = { workspace = true }
-songbird = { workspace = true }
-parking_lot = { workspace = true }
+sqlx.workspace = true
+serde.workspace = true
+tokio.workspace = true
+poise.workspace = true
+anyhow.workspace = true
+sysinfo.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
+dashmap.workspace = true
+songbird.workspace = true
+parking_lot.workspace = true
 
 tts_core = { path = "tts_core" }
 tts_tasks = { path = "tts_tasks" }

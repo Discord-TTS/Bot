@@ -8,17 +8,17 @@ indexmap = "2"
 strsim = "0.11"
 num-format = "0.4"
 
-sqlx = { workspace = true }
-tokio = { workspace = true }
-poise = { workspace = true }
-anyhow = { workspace = true }
-sysinfo = { workspace = true }
-tracing = { workspace = true }
-aformat = { workspace = true }
-serenity = { workspace = true }
-typesize = { workspace = true }
-songbird = { workspace = true }
-arrayvec = { workspace = true }
-to-arraystring = { workspace = true }
+sqlx.workspace = true
+tokio.workspace = true
+poise.workspace = true
+anyhow.workspace = true
+sysinfo.workspace = true
+tracing.workspace = true
+aformat.workspace = true
+serenity.workspace = true
+typesize.workspace = true
+songbird.workspace = true
+arrayvec.workspace = true
+to-arraystring.workspace = true
 
 tts_core = { path = "../tts_core" }
