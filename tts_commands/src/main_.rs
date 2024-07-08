@@ -152,15 +152,23 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     if let Some(bot_vc) = data.songbird.get(guild_id) {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
-            let bot_channel_id = bot_channel_id.get();
-            if author_vc.get() == bot_channel_id {
-                ctx.say("I am already in your voice channel!").await?;
-                return Ok(());
-            };
+            let bot_channel_id = serenity::ChannelId::new(bot_channel_id.get());
+            let channel_exists = require_guild!(ctx).channels.contains_key(&bot_channel_id);
 
-            ctx.say(aformat!("I am already in <#{bot_channel_id}>!").as_str())
-                .await?;
-            return Ok(());
+            if channel_exists {
+                if author_vc == bot_channel_id {
+                    ctx.say("I am already in your voice channel!").await?;
+                    return Ok(());
+                };
+
+                let msg = aformat!("I am already in <#{bot_channel_id}>!");
+                ctx.say(msg.as_str()).await?;
+                return Ok(());
+            } else {
+                tracing::warn!("Channel {bot_channel_id} didn't exist in {guild_id} in `/join`");
+                data.last_to_xsaid_tracker.remove(&channel.guild_id);
+                data.songbird.remove(guild_id).await?;
+            }
         }
     };
 
