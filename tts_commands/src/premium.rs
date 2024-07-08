@@ -102,12 +102,14 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     ctx.say("Done! This server is now premium!").await?;
 
     let guild = ctx.cache().guild(guild_id);
-    let guild_name = guild.as_ref().map_or("<Unknown>", |g| g.name.as_str());
+    let guild_name = match guild.as_ref() {
+        Some(g) => g.name.as_str(),
+        None => "<Unknown>",
+    };
 
     tracing::info!(
-        "{}#{} | {} linked premium to {} | {}, they had {} linked servers",
-        author.name,
-        author.discriminator.map_or(0, std::num::NonZeroU16::get),
+        "{} | {} linked premium to {} | {}, they had {} linked servers",
+        author.tag(),
         author.id,
         guild_name,
         guild_id,

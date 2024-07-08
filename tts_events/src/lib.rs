@@ -1,5 +1,5 @@
 #![allow(clippy::module_name_repetitions)]
-#![feature(let_chains)]
+#![feature(let_chains, is_none_or)]
 
 mod channel;
 mod guild;

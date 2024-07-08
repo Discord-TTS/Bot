@@ -25,7 +25,7 @@ pub async fn voice_state_update(
     // Bot is not the one leaving
     let ctx = framework_ctx.serenity_context;
     let bot_id = ctx.cache.current_user().id;
-    if new.member.as_ref().map_or(true, |m| m.user.id == bot_id) {
+    if new.member.as_ref().is_none_or(|m| m.user.id == bot_id) {
         return Ok(());
     }
 

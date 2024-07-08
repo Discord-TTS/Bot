@@ -242,7 +242,7 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
     if let Some(bot_vc) = bot_vc
         && channel_check(&ctx, author_vc).await?.is_some()
     {
-        if author_vc.map_or(true, |author_vc| bot_vc.get() != author_vc.get()) {
+        if author_vc.is_none_or(|author_vc| bot_vc.get() != author_vc.get()) {
             ctx.say("Error: You need to be in the same voice channel as me to make me leave!")
                 .await?;
         } else {

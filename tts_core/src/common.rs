@@ -203,7 +203,7 @@ pub async fn run_checks(
             .get(&message.author.id)
             .and_then(|c| c.channel_id);
 
-        if author_vc.map_or(true, |author_vc| author_vc != message.channel_id) {
+        if author_vc.is_none_or(|author_vc| author_vc != message.channel_id) {
             return Ok(None);
         }
     }
@@ -354,7 +354,7 @@ pub fn clean_msg(
     };
 
     let announce_name = xsaid
-        && last_to_xsaid_tracker.get(&guild_id).map_or(true, |state| {
+        && last_to_xsaid_tracker.get(&guild_id).is_none_or(|state| {
             let guild = cache.guild(guild_id).unwrap();
             state.should_announce_name(&guild, user.id)
         });

@@ -1,4 +1,4 @@
-#![feature(let_chains)]
+#![feature(let_chains, is_none_or)]
 #![allow(async_fn_in_trait)]
 
 pub mod analytics;

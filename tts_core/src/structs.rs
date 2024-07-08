@@ -239,16 +239,14 @@ impl Data {
     ) -> Result<Cow<'static, str>> {
         let row = self.user_voice_db.get((user_id.into(), mode)).await?;
 
-        Ok(row.speaking_rate.map_or_else(
-            || {
-                Cow::Borrowed(
-                    mode.speaking_rate_info()
-                        .map(|info| info.default)
-                        .unwrap_or("1.0"),
-                )
-            },
-            |r| Cow::Owned(r.to_string()),
-        ))
+        Ok(match row.speaking_rate {
+            Some(r) => Cow::Owned(r.to_string()),
+            None => Cow::Borrowed(
+                mode.speaking_rate_info()
+                    .map(|info| info.default)
+                    .unwrap_or("1.0"),
+            ),
+        })
     }
 
     pub async fn fetch_patreon_info(
@@ -315,8 +313,10 @@ impl Data {
         guild_info: Option<(serenity::GuildId, bool)>,
     ) -> Result<(Cow<'static, str>, TTSMode)> {
         let user_row = self.userinfo_db.get(author_id.into()).await?;
-        let (guild_id, guild_is_premium) =
-            guild_info.map_or((None, false), |(id, p)| (Some(id), p));
+        let (guild_id, guild_is_premium) = match guild_info {
+            Some((id, p)) => (Some(id), p),
+            None => (None, false),
+        };
 
         let mut guild_row = None;
         let mut mode = {

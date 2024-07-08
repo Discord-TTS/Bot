@@ -17,7 +17,7 @@
 mod setup;
 mod voice_paginator;
 
-use std::{borrow::Cow, collections::HashMap, fmt::Write, num::NonZeroU8};
+use std::{borrow::Cow, collections::HashMap, fmt::Write};
 
 use aformat::aformat;
 use arrayvec::ArrayString;
@@ -122,12 +122,10 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
             .get((author_id.into(), currently_set_voice_mode))
             .await?;
 
-        user_voice_row
-            .voice
-            .as_ref()
-            .map_or(Cow::Borrowed(none_str), |voice| {
-                format_voice(&data, voice, currently_set_voice_mode)
-            })
+        match user_voice_row.voice.as_ref() {
+            Some(voice) => format_voice(&data, voice, currently_set_voice_mode),
+            None => Cow::Borrowed(none_str),
+        }
     };
 
     let (speaking_rate, speaking_rate_kind) = if let Some(mode) = user_mode {
@@ -159,10 +157,13 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let to_translate = guild_row.to_translate();
     let require_voice = guild_row.require_voice();
     let audience_ignore = guild_row.audience_ignore();
-    let voice_mode = user_mode.map_or(none_str, |m| m.into());
     let role_mention = required_role.as_deref().unwrap_or(none_str);
-    let repeated_chars = guild_row.repeated_chars.map_or(0, NonZeroU8::get);
+    let voice_mode = user_mode.map(|m| m.into()).unwrap_or(none_str);
     let required_prefix = guild_row.required_prefix.as_deref().unwrap_or(none_str);
+    let repeated_chars = match guild_row.repeated_chars {
+        Some(chars) => &chars.to_arraystring(),
+        None => "Disabled",
+    };
 
     ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
         .title("Current Settings")
@@ -856,7 +857,7 @@ pub async fn translation_lang(
     let data = ctx.data();
     let guild_id = ctx.guild_id().unwrap().into();
 
-    let to_say = if target_lang.as_ref().map_or(true, |target_lang| {
+    let to_say = if target_lang.as_ref().is_none_or(|target_lang| {
         data.translation_languages
             .contains_key(target_lang.as_str())
     }) {
@@ -1050,7 +1051,7 @@ pub async fn nick(
 ) -> CommandResult {
     let author = ctx.author();
     let guild_id = ctx.guild_id().unwrap();
-    let user = user.map_or(Cow::Borrowed(author), Cow::Owned);
+    let user = user.as_ref().unwrap_or(author);
 
     if author.id != user.id
         && !guild_id
@@ -1275,10 +1276,7 @@ pub async fn voices(
                 .field("Currently supported voices", &voices, true)
                 .field(
                     "Current voice used",
-                    user_voice_row
-                        .voice
-                        .as_ref()
-                        .map_or_else(|| "None", std::ops::Deref::deref),
+                    user_voice_row.voice.as_deref().unwrap_or("None"),
                     false,
                 ),
         ),

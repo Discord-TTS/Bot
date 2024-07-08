@@ -13,9 +13,9 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#![feature(let_chains)]
+#![feature(let_chains, is_none_or)]
 
-use std::{borrow::Cow, num::NonZeroU16};
+use std::borrow::Cow;
 
 use aformat::aformat;
 
@@ -68,8 +68,8 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
                 let premium_user = premium_user_id.to_user(serenity_ctx).await?;
                 Cow::Owned(format!(concat!(
                     "Hey, this server has a premium user setup, however they are not longer a patreon! ",
-                    "Please ask {}#{} to renew their membership."
-                ), premium_user.name, premium_user.discriminator.map_or(0, NonZeroU16::get)))
+                    "Please ask {} to renew their membership."
+                ), premium_user.tag()))
             }
         };
 
@@ -80,9 +80,8 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     };
 
     tracing::warn!(
-        "{}#{} | {} failed the premium check in {}",
-        author.name,
-        author.discriminator.map_or(0, NonZeroU16::get),
+        "{} | {} failed the premium check in {}",
+        author.tag(),
         author.id,
         guild_info
     );

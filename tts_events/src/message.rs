@@ -1,4 +1,4 @@
-use std::{borrow::Cow, num::NonZeroU16};
+use std::borrow::Cow;
 
 use aformat::aformat;
 use to_arraystring::ToArrayString;
@@ -241,7 +241,10 @@ async fn process_mention_msg(
     } else {
         let msg = {
             let guild = ctx.cache.guild(guild_id);
-            let guild_name = guild.as_ref().map_or("Unknown Server", |g| g.name.as_str());
+            let guild_name = match guild.as_ref() {
+                Some(g) => &g.name,
+                None => "Unknown Server",
+            };
 
             format!("My prefix for `{guild_name}` is {prefix} however I do not have permission to send messages so I cannot respond to your commands!")
         };
@@ -370,9 +373,8 @@ async fn process_support_dm(
         }
 
         info!(
-            "{}#{} just got the 'Welcome to support DMs' message",
-            message.author.name,
-            message.author.discriminator.map_or(0, NonZeroU16::get)
+            "{} just got the 'Welcome to support DMs' message",
+            message.author.tag(),
         );
     };
 

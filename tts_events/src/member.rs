@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use poise::serenity_prelude as serenity;
 use reqwest::StatusCode;
 
@@ -102,10 +100,10 @@ pub async fn guild_member_removal(
         }
     };
 
-    let guild_name = ctx.cache.guild(guild_id).map_or_else(
-        || Cow::Borrowed("<Unknown>"),
-        |g| Cow::Owned(g.name.to_string()),
-    );
+    let guild_name = match ctx.cache.guild(guild_id) {
+        Some(g) => &g.name.clone(),
+        None => "<Unknown>",
+    };
 
     let response = match confirm_dialog_wait(ctx, &msg, premium_user).await? {
         Some(true) => format!("Okay, kept your premium assigned to {guild_name} ({guild_id})."),
