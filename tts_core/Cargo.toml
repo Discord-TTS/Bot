@@ -17,6 +17,7 @@ poise = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
+aformat = { workspace = true }
 sysinfo = { workspace = true }
 tracing = { workspace = true }
 dashmap = { workspace = true }

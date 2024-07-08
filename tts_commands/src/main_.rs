@@ -14,11 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
-use songbird::error::JoinError;
+use aformat::{aformat, ArrayString};
 
 use poise::serenity_prelude::{self as serenity, builder::*, colours::branding::YELLOW};
+use songbird::error::JoinError;
 
 use tts_core::{
     common::{push_permission_names, random_footer},
@@ -44,21 +45,19 @@ async fn channel_check(
     let msg = if let Some(setup_id) = guild_row.channel {
         let guild = require_guild!(ctx, Ok(None));
         if guild.channels.contains_key(&setup_id) {
-            let msg =
-                format!("You ran this command in the wrong channel, please move to <#{setup_id}>.");
-            Cow::Owned(msg)
+            &aformat!("You ran this command in the wrong channel, please move to <#{setup_id}>.")
         } else {
-            Cow::Borrowed("Your setup channel has been deleted, please run /setup!")
+            "Your setup channel has been deleted, please run /setup!"
         }
     } else {
-        Cow::Borrowed("You haven't setup the bot, please run /setup!")
+        "You haven't setup the bot, please run /setup!"
     };
 
     ctx.send_error(msg).await?;
     Ok(None)
 }
 
-fn create_warning_embed(title: String, footer: &str) -> serenity::CreateEmbed<'_> {
+fn create_warning_embed<'a>(title: &'a str, footer: &'a str) -> serenity::CreateEmbed<'a> {
     serenity::CreateEmbed::default()
         .title(title)
         .colour(YELLOW)
@@ -67,17 +66,20 @@ fn create_warning_embed(title: String, footer: &str) -> serenity::CreateEmbed<'_
 
 #[cold]
 fn required_prefix_embed<'a>(
+    title_place: &'a mut ArrayString<46>,
     msg: poise::CreateReply<'a>,
-    required_prefix: &str,
+    required_prefix: ArrayString<8>,
 ) -> poise::CreateReply<'a> {
-    let title = format!("Your TTS required prefix is set to: `{required_prefix}`");
+    *title_place = aformat!("Your TTS required prefix is set to: `{required_prefix}`");
     let footer = "To disable the required prefix, use /set required_prefix with no options.";
 
-    msg.embed(create_warning_embed(title, footer))
+    msg.embed(create_warning_embed(title_place.as_str(), footer))
 }
 
 #[cold]
 fn required_role_embed<'a>(
+    title_place: &'a mut ArrayString<133>,
+
     ctx: Context<'a>,
     msg: poise::CreateReply<'a>,
     required_role: serenity::RoleId,
@@ -88,10 +90,11 @@ fn required_role_embed<'a>(
         .and_then(|g| g.roles.get(&required_role).map(|r| r.name.as_str()))
         .unwrap_or("Unknown");
 
-    let title = format!("The required role for TTS is: `@{role_name}`");
+    let role_name = aformat::CapStr::<100>(role_name);
+    *title_place = aformat!("The required role for TTS is: `@{role_name}`");
     let footer = "To disable the required role, use /set required_role with no options.";
 
-    msg.embed(create_warning_embed(title, footer))
+    msg.embed(create_warning_embed(title_place.as_str(), footer))
 }
 
 /// Joins the voice channel you're in!
@@ -149,12 +152,13 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     if let Some(bot_vc) = data.songbird.get(guild_id) {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
-            if bot_channel_id.get() == author_vc.get() {
+            let bot_channel_id = bot_channel_id.get();
+            if author_vc.get() == bot_channel_id {
                 ctx.say("I am already in your voice channel!").await?;
                 return Ok(());
             };
 
-            ctx.say(format!("I am already in <#{bot_channel_id}>!"))
+            ctx.say(aformat!("I am already in <#{bot_channel_id}>!").as_str())
                 .await?;
             return Ok(());
         }
@@ -192,12 +196,15 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         )));
 
     let mut msg = poise::CreateReply::default().embed(embed);
+
+    let mut title_place = ArrayString::new();
     if let Some(required_prefix) = guild_row.required_prefix {
-        msg = required_prefix_embed(msg, required_prefix.as_str());
+        msg = required_prefix_embed(&mut title_place, msg, required_prefix);
     }
 
+    let mut title_place = ArrayString::new();
     if let Some(required_role) = guild_row.required_role {
-        msg = required_role_embed(ctx, msg, required_role);
+        msg = required_role_embed(&mut title_place, ctx, msg, required_role);
     }
 
     ctx.send(msg).await?;

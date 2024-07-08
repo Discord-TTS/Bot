@@ -1,3 +1,4 @@
+use aformat::{aformat, astr};
 use anyhow::bail;
 use to_arraystring::ToArrayString;
 
@@ -151,7 +152,7 @@ pub async fn setup(
     let author = ctx.author();
     let guild_id = ctx.guild_id().unwrap();
 
-    let (bot_user_id, bot_user_name, bot_user_face) = {
+    let (bot_user_id, ref bot_user_name, bot_user_face) = {
         let current_user = ctx.cache().current_user();
         (
             current_user.id,
@@ -181,15 +182,15 @@ pub async fn setup(
     ctx.send(
         poise::CreateReply::default().embed(
             serenity::CreateEmbed::default()
-                .title(format!("{bot_user_name} has been setup!"))
+                .title(aformat!("{bot_user_name} has been setup!").as_str())
                 .thumbnail(&bot_user_face)
-                .description(format!(
-                    concat!(
-                        "TTS Bot will now accept commands and read from <#{}>.\n",
-                        "Just do `/join` and start talking!"
-                    ),
-                    channel_id
-                ))
+                .description(
+                    aformat!(
+                        "TTS Bot will now accept commands and read from <#{channel_id}>.\n{}"
+                        astr!("Just do `/join` and start talking!")
+                    )
+                    .as_str(),
+                )
                 .footer(serenity::CreateEmbedFooter::new(random_footer(
                     &data.config.main_server_invite,
                     bot_user_id,

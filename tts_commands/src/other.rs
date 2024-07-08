@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::borrow::Cow;
-
+use aformat::{aformat, astr};
 use anyhow::Error;
 use num_format::{Locale, ToFormattedString};
 
@@ -48,10 +47,10 @@ pub async fn uptime(ctx: Context<'_>) -> CommandResult {
     let time_since_start = start_time.duration_since(std::time::UNIX_EPOCH)?.as_secs();
     let msg = {
         let current_user = ctx.cache().current_user().mention();
-        format!("{current_user} has been up since: <t:{time_since_start}:R>")
+        aformat!("{current_user} has been up since: <t:{time_since_start}:R>")
     };
 
-    ctx.say(msg).await?;
+    ctx.say(&*msg).await?;
     Ok(())
 }
 
@@ -155,17 +154,17 @@ async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             .bytes()
             .await?;
 
-        serenity::CreateAttachment::bytes(
-            audio.to_vec(),
-            format!(
-                "{author_name}-{}.{}",
-                ctx.id(),
-                match mode {
-                    TTSMode::gTTS | TTSMode::gCloud | TTSMode::Polly => "mp3",
-                    TTSMode::eSpeak => "wav",
-                }
-            ),
-        )
+        let mut file_name = author_name;
+        file_name.push_str(&aformat!(
+            "-{}.{}",
+            ctx.id(),
+            match mode {
+                TTSMode::gTTS | TTSMode::gCloud | TTSMode::Polly => astr!("mp3"),
+                TTSMode::eSpeak => astr!("wav"),
+            }
+        ));
+
+        serenity::CreateAttachment::bytes(audio.to_vec(), file_name)
     };
 
     ctx.send(
@@ -297,12 +296,12 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
         && require_guild!(ctx).channels.contains_key(&channel)
     {
         if channel == ctx.channel_id() {
-            Cow::Borrowed("You are in the setup channel already!")
+            "You are in the setup channel already!"
         } else {
-            Cow::Owned(format!("The current setup channel is: <#{channel}>"))
+            &aformat!("The current setup channel is: <#{channel}>")
         }
     } else {
-        Cow::Borrowed("The channel hasn't been setup, do `/setup #textchannel`")
+        "The channel hasn't been setup, do `/setup #textchannel`"
     };
 
     ctx.say(msg).await?;
@@ -337,10 +336,10 @@ pub async fn ping(ctx: Context<'_>) -> CommandResult {
     let ping_before = std::time::SystemTime::now();
     let ping_msg = ctx.say("Loading!").await?;
 
-    let msg = format!("Current Latency: {}ms", ping_before.elapsed()?.as_millis());
+    let msg = aformat!("Current Latency: {}ms", ping_before.elapsed()?.as_millis());
 
     ping_msg
-        .edit(ctx, CreateReply::default().content(msg))
+        .edit(ctx, CreateReply::default().content(msg.as_str()))
         .await?;
 
     Ok(())
@@ -359,23 +358,18 @@ pub async fn invite(ctx: Context<'_>) -> CommandResult {
 
     let bot_mention = cache.current_user().id.mention();
     let msg = if ctx.guild_id() == Some(config.main_server) {
-        format!(
+        &*aformat!(
             "Check out {} to invite {bot_mention}!",
             config.invite_channel.mention(),
         )
     } else {
         let guild = cache.guild(config.main_server).try_unwrap()?;
+        let channel = guild.channels.get(&config.invite_channel).try_unwrap()?;
 
-        guild
-            .channels
-            .get(&config.invite_channel)
-            .map(|c| {
-                format!(
-                    "Join {} and look in #{} to invite {bot_mention}",
-                    config.main_server_invite, c.name,
-                )
-            })
-            .try_unwrap()?
+        &format!(
+            "Join {} and look in #{} to invite {bot_mention}",
+            config.main_server_invite, channel.name,
+        )
     };
 
     ctx.say(msg).await?;

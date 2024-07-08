@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fmt::Write, sync::Arc};
 
+use aformat::{aformat, CapStr};
 use anyhow::Result;
 use itertools::Itertools as _;
 use parking_lot::Mutex;
@@ -87,12 +88,12 @@ impl Looper for Arc<WebhookLogger> {
                 &self.normal_logs
             };
 
-            let webhook_name = format!("TTS-Webhook [{}]", severity.as_str());
+            let webhook_name = aformat!("TTS-Webhook [{}]", CapStr::<5>(severity.as_str()));
 
             for chunk in chunks {
                 let builder = ExecuteWebhook::default()
                     .content(chunk)
-                    .username(&webhook_name)
+                    .username(webhook_name.as_str())
                     .avatar_url(get_avatar(severity));
 
                 webhook.execute(&self.http, false, builder).await?;

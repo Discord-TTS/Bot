@@ -12,6 +12,7 @@ serde = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 reqwest = { workspace = true }
+aformat = { workspace = true }
 serenity = { workspace = true }
 itertools = { workspace = true }
 parking_lot = { workspace = true }

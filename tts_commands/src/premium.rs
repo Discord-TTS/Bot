@@ -1,5 +1,7 @@
 use std::{borrow::Cow, fmt::Write as _};
 
+use aformat::aformat;
+
 use poise::{
     futures_util::{stream::BoxStream, StreamExt as _},
     serenity_prelude::{self as serenity, builder::*},
@@ -147,14 +149,13 @@ pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
         embed_desc = Cow::Borrowed("None... set some servers with `/premium_activate`!");
     }
 
+    let footer = aformat!("You have {remaining_guilds} server(s) remaining for premium activation");
     let embed = CreateEmbed::new()
         .title("The premium servers you have activated:")
         .description(embed_desc)
         .colour(PREMIUM_NEUTRAL_COLOUR)
         .author(CreateEmbedAuthor::new(&*author.name).icon_url(author.face()))
-        .footer(CreateEmbedFooter::new(format!(
-            "You have {remaining_guilds} server(s) remaining for premium activation"
-        )));
+        .footer(CreateEmbedFooter::new(footer.as_str()));
 
     ctx.send(CreateReply::default().embed(embed)).await?;
     Ok(())

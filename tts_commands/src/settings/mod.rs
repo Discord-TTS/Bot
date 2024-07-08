@@ -19,14 +19,16 @@ mod voice_paginator;
 
 use std::{borrow::Cow, collections::HashMap, fmt::Write, num::NonZeroU8};
 
+use aformat::aformat;
 use arrayvec::ArrayString;
+use to_arraystring::ToArrayString;
+
 use poise::serenity_prelude as serenity;
 use serenity::{
     builder::*,
     small_fixed_array::{FixedString, TruncatingInto},
     Mentionable,
 };
-use to_arraystring::ToArrayString;
 
 use tts_core::{
     common::{confirm_dialog, random_footer},
@@ -130,9 +132,10 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 
     let (speaking_rate, speaking_rate_kind) = if let Some(mode) = user_mode {
         let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
-        let (default, kind) = mode
-            .speaking_rate_info()
-            .map_or(("1.0", "x"), |info| (info.default, info.kind));
+        let (default, kind) = match mode.speaking_rate_info() {
+            Some(info) => (info.default, info.kind),
+            None => ("1.0", "x"),
+        };
 
         (
             user_voice_row
@@ -327,9 +330,9 @@ where
             .footer(CreateEmbedFooter::new(
                 "If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!"
             ))
-            .description(format!("
-                The `{}` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
-            ", <&str>::from(mode)))
+            .description(aformat!("
+                The `{mode}` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
+            ").as_str())
         )).await?;
         Ok(None)
     } else {
@@ -432,9 +435,9 @@ fn check_valid_voice(data: &Data, code: &FixedString<u8>, mode: TTSMode) -> bool
     }
 }
 
-fn check_prefix(prefix: &str) -> Result<(), &'static str> {
+fn check_prefix(prefix: &str) -> Result<ArrayString<5>, &'static str> {
     if prefix.len() <= 5 && prefix.matches(' ').count() <= 1 {
-        Ok(())
+        Ok(ArrayString::from(prefix).unwrap())
     } else {
         Err("**Error**: Invalid Prefix, please use 5 or less characters with maximum 1 space")
     }
@@ -486,8 +489,8 @@ pub async fn bot_ban(ctx: Context<'_>, user: serenity::UserId, value: bool) -> C
         userinfo_db.set_one(user_id, "dm_blocked", &true).await?;
     }
 
-    let msg = format!("Set bot ban status for user {user} to `{value}`.");
-    ctx.say(msg).await?;
+    let msg = aformat!("Set bot ban status for user {user} to `{value}`.");
+    ctx.say(msg.as_str()).await?;
 
     Ok(())
 }
@@ -694,18 +697,20 @@ pub async fn required_role(
                 &required_role.as_ref().map(|r| r.id.get() as i64),
             )
             .await?;
-        ctx.say({
+
+        let msg: &str = {
             let bot_name = &cache.current_user().name;
             if let Some(required_role) = required_role {
-                format!(
+                &aformat!(
                     "{bot_name} now requires {} to use.",
                     required_role.mention()
                 )
             } else {
-                format!("{bot_name} is now usable by everyone!")
+                &aformat!("{bot_name} is now usable by everyone!")
             }
-        })
-        .await
+        };
+
+        ctx.say(msg).await
     } else {
         ctx.say("Cancelled!").await
     }?;
@@ -725,20 +730,19 @@ pub async fn required_role(
 )]
 async fn required_prefix(
     ctx: Context<'_>,
-    #[description = "The required prefix for TTS"] mut tts_prefix: Option<String>,
+    #[description = "The required prefix for TTS"] tts_prefix: Option<String>,
 ) -> CommandResult {
-    if let Some(prefix) = &tts_prefix
-        && let Err(err) = check_prefix(prefix)
-    {
-        ctx.say(err).await?;
-        return Ok(());
-    }
-
     // Fix up some people being a little silly.
     let mistakes = ["none", "null", "true", "false"];
-    if tts_prefix.as_deref().is_some_and(|p| mistakes.contains(&p)) {
-        tts_prefix = None;
-    }
+    let prefix = match tts_prefix.as_deref().map(check_prefix) {
+        None => None,
+        Some(Ok(p)) if mistakes.contains(&p.as_str()) => None,
+        Some(Ok(p)) => Some(p),
+        Some(Err(err)) => {
+            ctx.say(err).await?;
+            return Ok(());
+        }
+    };
 
     let guild_id = ctx.guild_id().unwrap();
     ctx.data()
@@ -746,8 +750,8 @@ async fn required_prefix(
         .set_one(guild_id.into(), "required_prefix", &tts_prefix)
         .await?;
 
-    let msg = if let Some(tts_prefix) = tts_prefix {
-        &format!("The required prefix for TTS is now: {tts_prefix}")
+    let msg = if let Some(tts_prefix) = prefix {
+        &aformat!("The required prefix for TTS is now: {tts_prefix}")
     } else {
         "Reset your required prefix."
     };
@@ -891,15 +895,16 @@ pub async fn command_prefix(
     #[rest]
     prefix: FixedString<u8>,
 ) -> CommandResult {
-    let to_send = if let Err(err) = check_prefix(&prefix) {
-        err
-    } else {
-        ctx.data()
-            .guilds_db
-            .set_one(ctx.guild_id().unwrap().into(), "prefix", prefix.as_str())
-            .await?;
+    let to_send = match check_prefix(&prefix) {
+        Err(err) => err,
+        Ok(prefix) => {
+            ctx.data()
+                .guilds_db
+                .set_one(ctx.guild_id().unwrap().into(), "prefix", prefix.as_str())
+                .await?;
 
-        &format!("Command prefix for this server is now: {prefix}")
+            &aformat!("Command prefix for this server is now: {prefix}")
+        }
     };
 
     ctx.say(to_send).await?;
@@ -931,7 +936,7 @@ pub async fn repeated_characters(
             .set_one(guild_id, "repeated_chars", &(chars as i16))
             .await?;
 
-        &format!("Max repeated characters is now: {chars}")
+        &aformat!("Max repeated characters is now: {chars}")
     };
 
     ctx.say(to_send).await?;
@@ -966,7 +971,7 @@ pub async fn msg_length(
             )
             .await?;
 
-        &format!("Max message length is now: {seconds} seconds")
+        &aformat!("Max message length is now: {seconds} seconds")
     };
 
     ctx.say(to_send).await?;
@@ -998,23 +1003,18 @@ pub async fn speaking_rate(
     let author = ctx.author();
 
     let (_, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
-    let SpeakingRateInfo {
-        min,
-        max,
-        default: _,
-        kind,
-    } = require!(mode.speaking_rate_info(), {
-        ctx.say(format!(
-            "**Error**: Cannot set speaking rate for the {mode} mode"
-        ))
-        .await?;
+    let speaking_rate_info = require!(mode.speaking_rate_info(), {
+        ctx.say(aformat!("**Error**: Cannot set speaking rate for the {mode} mode").as_str())
+            .await?;
         Ok(())
     });
 
-    let to_send = if speaking_rate > max {
-        format!("**Error**: Cannot set the speaking rate multiplier above {max}{kind}")
+    let kind = speaking_rate_info.kind();
+    let SpeakingRateInfo { min, max, .. } = speaking_rate_info;
+    let to_send: &str = if speaking_rate > max {
+        &aformat!("**Error**: Cannot set the speaking rate multiplier above {max}{kind}")
     } else if speaking_rate < min {
-        format!("**Error**: Cannot set the speaking rate multiplier below {min}{kind}")
+        &aformat!("**Error**: Cannot set the speaking rate multiplier below {min}{kind}")
     } else {
         data.userinfo_db.create_row(author.id.get() as i64).await?;
         data.user_voice_db
@@ -1025,7 +1025,7 @@ pub async fn speaking_rate(
             )
             .await?;
 
-        format!("Your speaking rate is now: {speaking_rate}{kind}")
+        &aformat!("Your speaking rate is now: {speaking_rate}{kind}")
     };
 
     ctx.say(to_send).await?;
@@ -1086,7 +1086,7 @@ pub async fn nick(
             .delete([guild_id.into(), user.id.into()])
             .await?;
 
-        &format!("Reset {}'s nickname", user.name)
+        &aformat!("Reset {}'s nickname", &user.name)
     };
 
     ctx.say(to_send).await?;
@@ -1181,7 +1181,7 @@ pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
     let (embed_title, client_id) = {
         let current_user = ctx.cache().current_user();
         (
-            format!("{} Translation Languages", current_user.name),
+            &aformat!("{} Translation Languages", &current_user.name),
             current_user.id,
         )
     };
@@ -1189,7 +1189,7 @@ pub async fn translation_languages(ctx: Context<'_>) -> CommandResult {
     ctx.send(
         poise::CreateReply::default().embed(
             CreateEmbed::default()
-                .title(embed_title)
+                .title(embed_title.as_str())
                 .colour(neutral_colour)
                 .field(
                     "Currently Supported Languages",
@@ -1258,11 +1258,7 @@ pub async fn voices(
 
     let (embed_title, client_id) = {
         let current_user = cache.current_user();
-        let embed_title = format!(
-            "{} Voices | Mode: `{}`",
-            cache.current_user().name,
-            <&str>::from(mode)
-        );
+        let embed_title = aformat!("{} Voices | Mode: `{mode}`", &cache.current_user().name);
 
         (embed_title, current_user.id)
     };
@@ -1270,7 +1266,7 @@ pub async fn voices(
     ctx.send(
         poise::CreateReply::default().embed(
             CreateEmbed::default()
-                .title(embed_title)
+                .title(embed_title.as_str())
                 .footer(CreateEmbedFooter::new(random_footer(
                     &data.config.main_server_invite,
                     client_id,

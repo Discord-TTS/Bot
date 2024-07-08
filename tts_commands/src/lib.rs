@@ -17,6 +17,8 @@
 
 use std::{borrow::Cow, num::NonZeroU16};
 
+use aformat::aformat;
+
 use serenity::all::{self as serenity, Mentionable as _};
 
 use tts_core::{
@@ -57,7 +59,7 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     let guild_id = ctx.guild_id();
     let serenity_ctx = ctx.serenity_context();
 
-    let main_msg =
+    let mut main_msg =
         match data.premium_check(guild_id).await? {
             None => return Ok(true),
             Some(FailurePoint::Guild) => Cow::Borrowed("Hey, this is a premium command so it must be run in a server!"),
@@ -72,17 +74,17 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
         };
 
     let author = ctx.author();
+    let guild_info = match guild_id.and_then(|g_id| serenity_ctx.cache.guild(g_id)) {
+        Some(g) => &format!("{} | {}", g.name, g.id),
+        None => "DMs",
+    };
+
     tracing::warn!(
         "{}#{} | {} failed the premium check in {}",
         author.name,
         author.discriminator.map_or(0, NonZeroU16::get),
         author.id,
-        guild_id
-            .and_then(|g_id| serenity_ctx.cache.guild(g_id))
-            .map_or(Cow::Borrowed("DMs"), |g| (Cow::Owned(format!(
-                "{} | {}",
-                g.name, g.id
-            ))))
+        guild_info
     );
 
     let permissions = ctx.author_permissions().await?;
@@ -100,7 +102,10 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
 
                 builder.embed(embed)
             } else {
-                builder.content(format!("{main_msg}\n{FOOTER_MSG}"))
+                let main_msg = main_msg.to_mut();
+                main_msg.push('\n');
+                main_msg.push_str(FOOTER_MSG);
+                builder.content(main_msg.as_str())
             }
         })
         .await?;
@@ -187,11 +192,11 @@ pub async fn command_check(ctx: Context<'_>) -> Result<bool> {
         return Ok(true);
     };
 
-    let msg = format!(
+    let msg = aformat!(
         "You do not have the required role to use this bot, ask a server administrator for {}.",
         required_role.mention()
     );
 
-    ctx.send_error(msg).await?;
+    ctx.send_error(msg.as_str()).await?;
     Ok(false)
 }

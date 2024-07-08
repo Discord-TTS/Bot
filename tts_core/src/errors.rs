@@ -1,12 +1,13 @@
 use std::{borrow::Cow, sync::Arc};
 
+use aformat::aformat;
 use anyhow::{Error, Result};
 use sha2::Digest;
 use tracing::error;
 
 use self::serenity::{
-    small_fixed_array::{FixedString, TruncatingInto},
-    CreateActionRow, CreateButton, CreateInteractionResponse, FullEvent as Event,
+    small_fixed_array::FixedString, CreateActionRow, CreateButton, CreateInteractionResponse,
+    FullEvent as Event,
 };
 use poise::serenity_prelude as serenity;
 
@@ -92,7 +93,7 @@ async fn fetch_update_occurrences(
     let mut embed = message.embeds.into_vec().remove(0);
 
     embed.footer.as_mut().try_unwrap()?.text =
-        format!("This error has occurred {occurrences} times!").trunc_into();
+        FixedString::from_str_trunc(&aformat!("This error has occurred {occurrences} times!"));
 
     let builder = serenity::EditWebhookMessage::default().embeds(vec![embed.into()]);
     error_webhook

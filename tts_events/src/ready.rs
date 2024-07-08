@@ -1,6 +1,8 @@
 use std::{collections::HashMap, fmt::Write, num::NonZeroU16, sync::atomic::Ordering};
 
-use self::serenity::builder::*;
+use aformat::aformat;
+
+use self::serenity::{builder::*, small_fixed_array::FixedString};
 use poise::serenity_prelude as serenity;
 
 use tts_core::{
@@ -46,22 +48,24 @@ fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo
 async fn update_startup_message(
     ctx: &serenity::Context,
     data: &Data,
-    user_name: &str,
+    user_name: &FixedString<u8>,
     status: String,
     shard_count: Option<NonZeroU16>,
 ) -> Result<()> {
+    let title: &str = if let Some(shard_count) = shard_count {
+        &aformat!("{user_name} is starting up {shard_count} shards!")
+    } else {
+        &aformat!(
+            "{user_name} started in {} seconds",
+            data.start_time.elapsed().unwrap().as_secs()
+        )
+    };
+
     let builder = serenity::EditWebhookMessage::default().content("").embed(
         CreateEmbed::default()
             .description(status)
             .colour(FREE_NEUTRAL_COLOUR)
-            .title(if let Some(shard_count) = shard_count {
-                format!("{user_name} is starting up {shard_count} shards!")
-            } else {
-                format!(
-                    "{user_name} started in {} seconds",
-                    data.start_time.elapsed().unwrap().as_secs()
-                )
-            }),
+            .title(title),
     );
 
     data.webhooks
@@ -121,7 +125,7 @@ pub async fn ready(
 
     data.regex_cache
         .bot_mention
-        .get_or_init(|| regex::Regex::new(&format!("^<@!?{}>$", data_about_bot.user.id)).unwrap());
+        .get_or_init(|| regex::Regex::new(&aformat!("^<@!?{}>$", data_about_bot.user.id)).unwrap());
 
     if is_last_shard && !data.fully_started.swap(true, Ordering::SeqCst) {
         finalize_startup(ctx, &data);

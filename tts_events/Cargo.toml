@@ -12,6 +12,7 @@ regex = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 reqwest = { workspace = true }
+aformat = { workspace = true }
 serenity = { workspace = true }
 songbird = { workspace = true }
 to-arraystring = { workspace = true }

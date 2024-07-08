@@ -1,3 +1,4 @@
+use aformat::aformat;
 use reqwest::StatusCode;
 use tracing::info;
 
@@ -21,8 +22,9 @@ pub async fn guild_create(
     };
 
     let data = framework_ctx.user_data();
+    let title = aformat!("Welcome to {}!", &ctx.cache.current_user().name);
     match guild.owner_id.dm(&ctx.http, serenity::CreateMessage::default().embed(CreateEmbed::default()
-        .title(format!("Welcome to {}!", ctx.cache.current_user().name))
+        .title(title.as_str())
         .description(format!("
 Hello! Someone invited me to your server `{}`!
 TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
@@ -37,7 +39,7 @@ You can view all the commands with `/help`
 Ask questions by either responding here or asking on the support server!",
         guild.name))
         .footer(CreateEmbedFooter::new(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
-        .author(CreateEmbedAuthor::new(owner_tag.clone()).icon_url(owner_face))
+        .author(CreateEmbedAuthor::new(&owner_tag).icon_url(owner_face))
     )).await {
         Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
         Err(error) => return Err(anyhow::Error::from(error)),

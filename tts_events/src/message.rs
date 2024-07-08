@@ -1,5 +1,6 @@
 use std::{borrow::Cow, num::NonZeroU16};
 
+use aformat::aformat;
 use to_arraystring::ToArrayString;
 use tracing::info;
 
@@ -232,15 +233,11 @@ async fn process_mention_msg(
     let permissions = channel.permissions_for_user(&ctx.cache, bot_user)?;
 
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
-    let prefix = guild_row.prefix.as_str().replace(['`', '\\'], "");
+    let mut prefix = guild_row.prefix.as_str().replace(['`', '\\'], "");
 
     if permissions.send_messages() {
-        channel
-            .say(
-                &ctx.http,
-                format!("Current prefix for this server is: {prefix}"),
-            )
-            .await?;
+        prefix.insert_str(0, "Current prefix for this server is: ");
+        channel.say(&ctx.http, prefix).await?;
     } else {
         let msg = {
             let guild = ctx.cache.guild(guild_id);
@@ -304,7 +301,11 @@ async fn process_support_dm(
         } else if content.as_str() == "help" {
             channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
         } else if !userinfo.dm_blocked() {
-            let webhook_username = format!("{} ({})", message.author.tag(), message.author.id);
+            let webhook_username = {
+                let mut tag = message.author.tag();
+                tag.push_str(&aformat!(" ({})", message.author.id));
+                tag
+            };
 
             let mut attachments = Vec::new();
             for attachment in &message.attachments {
@@ -342,7 +343,7 @@ async fn process_support_dm(
             let current_user = ctx.cache.current_user();
             (
                 current_user.id,
-                format!("Welcome to {} Support DMs!", current_user.name),
+                aformat!("Welcome to {} Support DMs!", &current_user.name),
             )
         };
 
@@ -351,7 +352,7 @@ async fn process_support_dm(
                 &ctx.http,
                 CreateMessage::default().embed(
                     CreateEmbed::default()
-                        .title(title)
+                        .title(title.as_str())
                         .description(DM_WELCOME_MESSAGE)
                         .footer(CreateEmbedFooter::new(random_footer(
                             &data.config.main_server_invite,

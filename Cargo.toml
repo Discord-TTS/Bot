@@ -20,7 +20,10 @@ debug = 2
 
 [dependencies]
 const_format = "0.2"
-small-fixed-array = { version = "0.4", features = ["nightly"] }
+small-fixed-array = { version = "0.4.5", features = [
+    "nightly",
+    "to-arraystring",
+] }
 
 sqlx = { workspace = true }
 serde = { workspace = true }
@@ -51,11 +54,12 @@ serde = "1"
 anyhow = "1"
 tracing = "0.1"
 sysinfo = "0.30"
+aformat = "0.1.3"
 itertools = "0.13"
 arrayvec = "0.7.4"
 parking_lot = "0.12"
-to-arraystring = "0.2"
 typesize = { version = "0.1.2", features = ["arrayvec"] }
+to-arraystring = { version = "0.2.2", features = ["nonzero_impls"] }
 
 [workspace.dependencies.sqlx]
 version = "0.7"

@@ -4,7 +4,9 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
+use aformat::aformat;
 pub use anyhow::{Error, Result};
+use arrayvec::ArrayString;
 use parking_lot::Mutex;
 use serde::Deserialize as _;
 use strum_macros::IntoStaticStr;
@@ -17,7 +19,16 @@ use serenity::small_fixed_array::{FixedArray, FixedString};
 use crate::{analytics, bool_enum, database};
 
 macro_rules! into_static_display {
-    ($struct:ident) => {
+    ($struct:ident, max_length($len:literal)) => {
+        impl to_arraystring::ToArrayString for $struct {
+            const MAX_LENGTH: usize = $len;
+            type ArrayString = arrayvec::ArrayString<$len>;
+
+            fn to_arraystring(self) -> Self::ArrayString {
+                arrayvec::ArrayString::from(self.into()).unwrap()
+            }
+        }
+
         impl std::fmt::Display for $struct {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str(self.into())
@@ -245,7 +256,7 @@ impl Data {
         user_id: serenity::UserId,
     ) -> Result<Option<PatreonInfo>> {
         if let Some(mut url) = self.config.patreon_service.clone() {
-            url.set_path(&format!("/members/{user_id}"));
+            url.set_path(&aformat!("/members/{user_id}"));
 
             let req = self.reqwest.get(url);
             let resp = req.send().await?.error_for_status()?.json().await?;
@@ -391,6 +402,10 @@ impl SpeakingRateInfo {
             kind,
         })
     }
+
+    pub fn kind(&self) -> ArrayString<16> {
+        ArrayString::from(self.kind).unwrap()
+    }
 }
 
 #[derive(IntoStaticStr, sqlx::Type, TypeSize, Debug, Default, Hash, PartialEq, Eq, Copy, Clone)]
@@ -432,7 +447,7 @@ impl TTSMode {
     }
 }
 
-into_static_display!(TTSMode);
+into_static_display!(TTSMode, max_length(6));
 
 #[derive(poise::ChoiceParameter, Clone, Copy)]
 #[allow(non_camel_case_types)]
@@ -498,8 +513,8 @@ pub enum PollyGender {
     Female,
 }
 
-into_static_display!(GoogleGender);
-into_static_display!(PollyGender);
+into_static_display!(GoogleGender, max_length(6));
+into_static_display!(PollyGender, max_length(11));
 
 fn deserialize_error_code<'de, D: serde::Deserializer<'de>>(
     deserializer: D,

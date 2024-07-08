@@ -16,10 +16,12 @@
 
 use std::{borrow::Cow, hash::Hash};
 
-use self::serenity::{builder::*, small_fixed_array::FixedString};
+use aformat::aformat;
 use num_format::{Locale, ToFormattedString};
-use poise::{serenity_prelude as serenity, CreateReply};
 use typesize::TypeSize;
+
+use self::serenity::{builder::*, small_fixed_array::FixedString};
+use poise::{serenity_prelude as serenity, CreateReply};
 
 use tts_core::{
     common::dm_generic,
@@ -137,23 +139,23 @@ pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
             && support_guild_members.iter().any(|m| m.user.id == **owner)
     });
 
-    let mut added_role = 0;
+    let mut added_role: u64 = 0;
     for member in should_be_ofs_members {
         added_role += 1;
         http.add_member_role(support_guild_id, *member, data.config.ofs_role, None)
             .await?;
     }
 
-    let mut removed_role = 0;
+    let mut removed_role: u64 = 0;
     for member in should_not_be_ofs_members {
         removed_role += 1;
         http.remove_member_role(support_guild_id, *member, data.config.ofs_role, None)
             .await?;
     }
 
-    ctx.say(format!(
-        "Done! Removed {removed_role} members and added {added_role} members!"
-    ))
+    ctx.say(
+        aformat!("Done! Removed {removed_role} members and added {added_role} members!").as_str(),
+    )
     .await?;
     Ok(())
 }
