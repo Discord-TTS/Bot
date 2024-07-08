@@ -1,6 +1,5 @@
 use std::{borrow::Cow, sync::Arc};
 
-use aformat::aformat;
 use anyhow::{Error, Result};
 use sha2::Digest;
 use tracing::error;
@@ -57,50 +56,24 @@ fn truncate_error(error: &Error) -> String {
 }
 
 async fn fetch_update_occurrences(
-    http: &serenity::Http,
     data: &Data,
     error: &Error,
 ) -> Result<Option<(String, Vec<u8>)>, Error> {
-    #[derive(sqlx::FromRow)]
-    struct ErrorRowWithOccurrences {
-        pub message_id: i64,
-        pub occurrences: i32,
-    }
-
     let traceback = format!("{error:?}");
     let traceback_hash = hash(traceback.as_bytes());
 
-    let query = "
-        UPDATE errors SET occurrences = occurrences + 1
-        WHERE traceback_hash = $1
-        RETURNING message_id, occurrences";
-
-    let Some(ErrorRowWithOccurrences {
-        message_id,
-        occurrences,
-    }) = sqlx::query_as(query)
+    let query =
+        "UPDATE errors SET occurrences = occurrences + 1 WHERE traceback_hash = $1 RETURNING ''";
+    let result = sqlx::query_as::<_, ()>(query)
         .bind(traceback_hash.clone())
         .fetch_optional(&data.pool)
-        .await?
-    else {
-        return Ok(Some((traceback, traceback_hash)));
-    };
-
-    let error_webhook = &data.webhooks.errors;
-    let message_id = serenity::MessageId::new(message_id as u64);
-
-    let message = error_webhook.get_message(http, None, message_id).await?;
-    let mut embed = message.embeds.into_vec().remove(0);
-
-    embed.footer.as_mut().try_unwrap()?.text =
-        FixedString::from_str_trunc(&aformat!("This error has occurred {occurrences} times!"));
-
-    let builder = serenity::EditWebhookMessage::default().embeds(vec![embed.into()]);
-    error_webhook
-        .edit_message(http, message_id, builder)
         .await?;
 
-    Ok(None)
+    if result.is_some() {
+        Ok(None)
+    } else {
+        Ok(Some((traceback, traceback_hash)))
+    }
 }
 
 async fn insert_traceback(
@@ -166,9 +139,7 @@ pub async fn handle_unexpected<'a>(
     let data = poise_context.user_data();
     let ctx = poise_context.serenity_context;
 
-    let Some((traceback, traceback_hash)) =
-        fetch_update_occurrences(&ctx.http, &data, &error).await?
-    else {
+    let Some((traceback, traceback_hash)) = fetch_update_occurrences(&data, &error).await? else {
         return Ok(());
     };
 
@@ -201,11 +172,9 @@ pub async fn handle_unexpected<'a>(
         ("Shard Count", Cow::Owned(shards.len().to_string()), true),
     ];
 
-    let footer = serenity::CreateEmbedFooter::new("This error has occurred 1 time!");
     let mut embed = serenity::CreateEmbed::default()
-        .colour(constants::RED)
         .title(truncate_error(&error))
-        .footer(footer);
+        .colour(constants::RED);
 
     for (title, mut value, inline) in before_fields
         .into_iter()
