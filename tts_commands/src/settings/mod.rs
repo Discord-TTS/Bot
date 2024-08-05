@@ -86,16 +86,18 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let channel_mention = if let Some(channel) = guild_row.channel
         && require_guild!(ctx).channels.contains_key(&channel)
     {
-        Cow::Owned(channel.mention().to_string())
+        &*channel.mention().to_arraystring()
     } else {
-        Cow::Borrowed(none_str)
+        none_str
     };
 
     let prefix = &guild_row.prefix;
     let guild_mode = guild_row.voice_mode;
     let nickname = nickname_row.name.as_deref().unwrap_or(none_str);
     let target_lang = guild_row.target_lang.as_deref().unwrap_or(none_str);
-    let required_role = guild_row.required_role.map(|r| r.mention().to_string());
+    let required_role = guild_row
+        .required_role
+        .map(|r| r.mention().to_arraystring());
 
     let user_mode = if data.is_premium_simple(guild_id).await? {
         userinfo_row.premium_voice_mode
