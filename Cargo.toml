@@ -94,3 +94,7 @@ branch = "serenity-next"
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "serenity-next"
+
+[patch.crates-io.serenity-voice-model]
+git = "https://github.com/serenity-rs/serenity"
+branch = "current"
