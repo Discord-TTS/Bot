@@ -4,9 +4,8 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use aformat::aformat;
+use aformat::{aformat, CapStr};
 pub use anyhow::{Error, Result};
-use arrayvec::ArrayString;
 use parking_lot::Mutex;
 use serde::Deserialize as _;
 use strum_macros::IntoStaticStr;
@@ -403,8 +402,8 @@ impl SpeakingRateInfo {
         })
     }
 
-    pub fn kind(&self) -> ArrayString<16> {
-        ArrayString::from(self.kind).unwrap()
+    pub fn kind(&self) -> CapStr<32> {
+        CapStr(self.kind)
     }
 }
 
