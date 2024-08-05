@@ -32,7 +32,7 @@ use serenity::{
 
 use tts_core::{
     common::{confirm_dialog, random_footer},
-    constants::{OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR},
+    constants::{GTTS_DISABLED_ERROR, OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR},
     database::{self, Compact},
     require, require_guild,
     structs::{
@@ -777,13 +777,19 @@ pub async fn server_mode(
 ) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
 
+    let mode = TTSMode::from(mode);
+    if ctx.data().config.gtts_disabled && mode == TTSMode::gTTS {
+        ctx.send_error(GTTS_DISABLED_ERROR).await?;
+        return Ok(());
+    }
+
     let data = ctx.data();
     let to_send = change_mode(
         &ctx,
         &data.guilds_db,
         guild_id,
         guild_id.into(),
-        Some(TTSMode::from(mode)),
+        Some(mode),
         Target::Guild,
         false,
     )
@@ -1113,12 +1119,18 @@ pub async fn mode(
     let author_id = ctx.author().id.into();
     let guild_id = ctx.guild_id().unwrap();
 
+    let mode = mode.map(TTSMode::from);
+    if ctx.data().config.gtts_disabled && mode == Some(TTSMode::gTTS) {
+        ctx.send_error(GTTS_DISABLED_ERROR).await?;
+        return Ok(());
+    }
+
     let to_send = change_mode(
         &ctx,
         &data.userinfo_db,
         guild_id,
         author_id,
-        mode.map(TTSMode::from),
+        mode,
         Target::User,
         data.is_premium_simple(guild_id).await?,
     )

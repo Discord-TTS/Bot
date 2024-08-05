@@ -23,6 +23,7 @@ use songbird::error::JoinError;
 
 use tts_core::{
     common::{push_permission_names, random_footer},
+    constants::RED,
     database_models::GuildRow,
     require, require_guild,
     structs::{Command, CommandResult, Context, JoinVCToken, Result},
@@ -62,6 +63,20 @@ fn create_warning_embed<'a>(title: &'a str, footer: &'a str) -> serenity::Create
         .title(title)
         .colour(YELLOW)
         .footer(serenity::CreateEmbedFooter::new(footer))
+}
+
+#[cold]
+fn gtts_disabled_embed<'a>(
+    msg: poise::CreateReply<'a>,
+    support_server: &'a str,
+) -> poise::CreateReply<'a> {
+    msg.embed(
+        serenity::CreateEmbed::default()
+            .title("The `gTTS` voice mode is globally disabled due to maintainance")
+            .description("Any usage of this mode will instead use the lower quality `eSpeak` mode, while premium modes are unaffected.")
+            .footer(serenity::CreateEmbedFooter::new(format!("Support server: {support_server}")))
+            .colour(RED)
+    )
 }
 
 #[cold]
@@ -204,6 +219,11 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         )));
 
     let mut msg = poise::CreateReply::default().embed(embed);
+
+    // In-perfect premium check, but we don't need to be perfect
+    if data.config.gtts_disabled && guild_row.premium_user.is_none() {
+        msg = gtts_disabled_embed(msg, &data.config.main_server_invite);
+    }
 
     let mut title_place = ArrayString::new();
     if let Some(required_prefix) = guild_row.required_prefix {

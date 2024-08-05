@@ -25,6 +25,9 @@ pub const OPTION_SEPERATORS: [&str; 4] = [
     ":star:",
 ];
 
+pub const GTTS_DISABLED_ERROR: &str =
+    "The `gTTS` voice mode is currently disabled due to maintenance so cannot be used.";
+
 pub const DM_WELCOME_MESSAGE: &str = "
 **All messages after this will be sent to a private channel where we can assist you.**
 **DO NOT SEND PERSONAL INFORMATION TO ANY DISCORD BOT, BOT DEVELOPERS CAN SEE THE MESSAGES.**
