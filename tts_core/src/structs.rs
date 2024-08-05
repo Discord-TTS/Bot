@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     collections::BTreeMap,
-    sync::{Arc, OnceLock},
+    sync::{atomic::{AtomicBool, Ordering}, Arc, OnceLock},
 };
 
 use aformat::{aformat, CapStr};
@@ -65,7 +65,7 @@ pub struct MainConfig {
 
     // Only for situations where gTTS has broken
     #[serde(default)]
-    pub gtts_disabled: bool,
+    pub gtts_disabled: AtomicBool,
 }
 
 #[derive(serde::Deserialize)]
@@ -335,7 +335,7 @@ impl Data {
             }
         };
 
-        if self.config.gtts_disabled && mode == TTSMode::gTTS {
+        if self.config.gtts_disabled.load(Ordering::Relaxed) && mode == TTSMode::gTTS {
             mode = TTSMode::eSpeak;
         }
 

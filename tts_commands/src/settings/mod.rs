@@ -17,7 +17,7 @@
 mod setup;
 mod voice_paginator;
 
-use std::{borrow::Cow, collections::HashMap, fmt::Write};
+use std::{borrow::Cow, collections::HashMap, fmt::Write, sync::atomic::Ordering};
 
 use aformat::aformat;
 use arrayvec::ArrayString;
@@ -496,6 +496,31 @@ pub async fn bot_ban(ctx: Context<'_>, user: serenity::UserId, value: bool) -> C
     Ok(())
 }
 
+/// Owner only: Enables or disables the gTTS voice mode
+#[poise::command(
+    prefix_command,
+    category = "Settings",
+    owners_only,
+    hide_in_help,
+    required_bot_permissions = "SEND_MESSAGES"
+)]
+async fn gtts_disabled(ctx: Context<'_>, value: bool) -> CommandResult {
+    let data = ctx.data();
+    if data.config.gtts_disabled.swap(value, Ordering::Relaxed) == value {
+        ctx.say("It's already set that way, silly.").await?;
+        return Ok(());
+    }
+
+    let msg = if value {
+        "Disabled gTTS globally, womp womp"
+    } else {
+        "Re-enabled gTTS globally, yippee!\nMake sure to check the config file though."
+    };
+
+    ctx.say(msg).await?;
+    Ok(())
+}
+
 fn replace_bool(original: &str, value: bool) -> String {
     original.replace("{}", if value { "Enabled" } else { "Disabled" })
 }
@@ -775,15 +800,15 @@ pub async fn server_mode(
     ctx: Context<'_>,
     #[description = "The TTS Mode to change to"] mode: TTSModeChoice,
 ) -> CommandResult {
+    let data = ctx.data();
     let guild_id = ctx.guild_id().unwrap();
 
     let mode = TTSMode::from(mode);
-    if ctx.data().config.gtts_disabled && mode == TTSMode::gTTS {
+    if data.config.gtts_disabled.load(Ordering::Relaxed) && mode == TTSMode::gTTS {
         ctx.send_error(GTTS_DISABLED_ERROR).await?;
         return Ok(());
     }
 
-    let data = ctx.data();
     let to_send = change_mode(
         &ctx,
         &data.guilds_db,
@@ -1120,7 +1145,7 @@ pub async fn mode(
     let guild_id = ctx.guild_id().unwrap();
 
     let mode = mode.map(TTSMode::from);
-    if ctx.data().config.gtts_disabled && mode == Some(TTSMode::gTTS) {
+    if data.config.gtts_disabled.load(Ordering::Relaxed) && mode == Some(TTSMode::gTTS) {
         ctx.send_error(GTTS_DISABLED_ERROR).await?;
         return Ok(());
     }
@@ -1404,6 +1429,7 @@ pub fn commands() -> [Command; 5] {
                 command_prefix(),
                 block(),
                 bot_ban(),
+                gtts_disabled(),
                 use_new_formatting(),
             ],
             ..set()

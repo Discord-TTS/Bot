@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{atomic::Ordering, Arc};
 
 use aformat::{aformat, ArrayString};
 
@@ -221,7 +221,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let mut msg = poise::CreateReply::default().embed(embed);
 
     // In-perfect premium check, but we don't need to be perfect
-    if data.config.gtts_disabled && guild_row.premium_user.is_none() {
+    if data.config.gtts_disabled.load(Ordering::Relaxed) && guild_row.premium_user.is_none() {
         msg = gtts_disabled_embed(msg, &data.config.main_server_invite);
     }
 
