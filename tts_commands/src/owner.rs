@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, hash::Hash};
+use std::{borrow::Cow, hash::Hash, sync::Arc};
 
 use aformat::aformat;
 use num_format::{Locale, ToFormattedString};
@@ -287,47 +287,35 @@ fn average_details(iter: impl Iterator<Item = Vec<typesize::Field>>) -> Vec<type
     details.collect()
 }
 
-#[poise::command(prefix_command, owners_only)]
-pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult {
-    struct Field {
-        name: String,
-        size: usize,
-        value: String,
-        is_collection: bool,
-    }
+struct Field {
+    name: String,
+    size: usize,
+    value: String,
+    is_collection: bool,
+}
 
-    let serenity_cache = ctx.cache();
-    let cache_stats = {
-        let data = ctx.data();
-        match kind.as_deref() {
-            Some("db") => Some(vec![
-                get_db_info("guild db", &data.guilds_db),
-                get_db_info("userinfo db", &data.userinfo_db),
-                get_db_info("nickname db", &data.nickname_db),
-                get_db_info("user voice db", &data.user_voice_db),
-                get_db_info("guild voice db", &data.guild_voice_db),
-            ]),
-            Some("guild") => Some(average_details(
-                guild_iter(serenity_cache).map(|g| g.get_size_details()),
-            )),
-            Some("channel") => Some(average_details(
-                guild_iter(serenity_cache).flat_map(|g| details_iter(g.channels.iter())),
-            )),
-            Some("role") => Some(average_details(
-                guild_iter(serenity_cache).flat_map(|g| details_iter(g.roles.iter())),
-            )),
-            Some(_) => None,
-            None => Some(serenity_cache.get_size_details()),
-        }
-    };
-
-    let Some(cache_stats) = cache_stats else {
-        ctx.say("Unknown cache!").await?;
-        return Ok(());
+fn process_cache_info(
+    serenity_cache: Arc<serenity::Cache>,
+    kind: Option<String>,
+    db_info: Option<Vec<typesize::Field>>,
+) -> Option<Vec<Field>> {
+    let cache_stats = match kind.as_deref() {
+        Some("db") => Some(db_info.expect("if kind is db, db_info should be filled")),
+        Some("guild") => Some(average_details(
+            guild_iter(&serenity_cache).map(|g| g.get_size_details()),
+        )),
+        Some("channel") => Some(average_details(
+            guild_iter(&serenity_cache).flat_map(|g| details_iter(g.channels.iter())),
+        )),
+        Some("role") => Some(average_details(
+            guild_iter(&serenity_cache).flat_map(|g| details_iter(g.roles.iter())),
+        )),
+        Some(_) => None,
+        None => Some(serenity_cache.get_size_details()),
     };
 
     let mut fields = Vec::new();
-    for field in cache_stats {
+    for field in cache_stats? {
         let name = format!("`{}`", field.name);
         let size = field.size.to_formatted_string(&Locale::en);
         if let Some(count) = field.collection_items {
@@ -360,6 +348,32 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
     fields.sort_by_key(|field| field.size);
     fields.sort_by_key(|field| field.is_collection);
     fields.reverse();
+    Some(fields)
+}
+
+#[poise::command(prefix_command, owners_only)]
+pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult {
+    ctx.defer().await?;
+
+    let db_info = if kind.as_deref() == Some("db") {
+        let data = ctx.data();
+        Some(vec![
+            get_db_info("guild db", &data.guilds_db),
+            get_db_info("userinfo db", &data.userinfo_db),
+            get_db_info("nickname db", &data.nickname_db),
+            get_db_info("user voice db", &data.user_voice_db),
+            get_db_info("guild voice db", &data.guild_voice_db),
+        ])
+    } else {
+        None
+    };
+
+    let cache = ctx.serenity_context().cache.clone();
+    let get_cache_info = move || process_cache_info(cache, kind, db_info);
+    let Some(fields) = tokio::task::spawn_blocking(get_cache_info).await.unwrap() else {
+        ctx.say("Unknown cache!").await?;
+        return Ok(());
+    };
 
     let embed = CreateEmbed::default()
         .title("Cache Statistics")
