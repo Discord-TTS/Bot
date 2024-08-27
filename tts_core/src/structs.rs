@@ -1,7 +1,11 @@
 use std::{
     borrow::Cow,
     collections::BTreeMap,
-    sync::{atomic::{AtomicBool, Ordering}, Arc, OnceLock},
+    num::NonZeroU8,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, OnceLock,
+    },
 };
 
 use aformat::{aformat, CapStr};
@@ -126,8 +130,7 @@ pub enum FailurePoint {
 
 #[derive(serde::Deserialize, Clone, Copy)]
 pub struct PatreonInfo {
-    pub tier: u8,
-    pub entitled_servers: u8,
+    pub entitled_servers: NonZeroU8,
 }
 
 pub struct RegexCache {
@@ -261,8 +264,7 @@ impl Data {
         } else {
             // Return fake PatreonInfo if `patreon_service` has not been set to simplify self-hosting.
             Ok(Some(PatreonInfo {
-                tier: u8::MAX,
-                entitled_servers: u8::MAX,
+                entitled_servers: NonZeroU8::MAX,
             }))
         }
     }

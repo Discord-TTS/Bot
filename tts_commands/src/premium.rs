@@ -59,7 +59,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let linked_guilds = get_premium_guild_count(&data.pool, author.id).await?;
     let error_msg = match data.fetch_patreon_info(author.id).await? {
         Some(tier) => {
-            if linked_guilds as u8 >= tier.entitled_servers {
+            if linked_guilds >= tier.entitled_servers.get().into() {
                 Some(Cow::Owned(format!("Hey, you already have {linked_guilds} servers linked, you are only subscribed to the {} tier!", tier.entitled_servers)))
             } else {
                 None
@@ -146,7 +146,7 @@ pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
     }
 
     let author = ctx.author();
-    let remaining_guilds = premium_info.entitled_servers - premium_guilds;
+    let remaining_guilds = premium_info.entitled_servers.get() - premium_guilds;
     if embed_desc.is_empty() {
         embed_desc = Cow::Borrowed("None... set some servers with `/premium_activate`!");
     }
