@@ -6,7 +6,7 @@ use typesize::TypeSize;
 pub use crate::database_models::*;
 use crate::structs::{Result, TTSMode};
 
-type PgArguments<'a> = <sqlx::Postgres as sqlx::database::HasArguments<'a>>::Arguments;
+type PgArguments<'a> = <sqlx::Postgres as sqlx::database::Database>::Arguments<'a>;
 type QueryAs<'a, R> = sqlx::query::QueryAs<'a, sqlx::Postgres, R, PgArguments<'a>>;
 type Query<'a> = sqlx::query::Query<'a, sqlx::Postgres, PgArguments<'a>>;
 
