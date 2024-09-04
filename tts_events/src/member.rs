@@ -22,7 +22,7 @@ async fn add_ofs_role(data: &Data, http: &serenity::Http, user_id: serenity::Use
     {
         // Unknown member
         Err(serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(err)))
-            if err.error.code == 10007 =>
+            if err.error.code == serenity::JsonErrorCode::UnknownMember =>
         {
             Ok(())
         }

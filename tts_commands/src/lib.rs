@@ -1,4 +1,4 @@
-#![feature(let_chains, is_none_or)]
+#![feature(let_chains)]
 
 use std::borrow::Cow;
 

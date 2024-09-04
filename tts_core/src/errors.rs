@@ -511,7 +511,6 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ctx.send_error(error).await?;
         }
         poise::FrameworkError::CommandPanic { .. } => panic!("Command panicked!"),
-        poise::FrameworkError::__NonExhaustive(_) => unreachable!(),
     }
 
     Ok(())
