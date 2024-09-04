@@ -258,8 +258,8 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
             ctx.say("Error: You need to be in the same voice channel as me to make me leave!")
                 .await?;
         } else {
-            data.songbird.remove(guild_id).await?;
             data.last_to_xsaid_tracker.remove(&guild_id);
+            data.songbird.remove(guild_id).await?;
 
             ctx.say("Left voice channel!").await?;
         }

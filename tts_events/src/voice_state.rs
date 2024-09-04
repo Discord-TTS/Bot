@@ -5,7 +5,6 @@ use tts_core::{
     structs::{FrameworkContext, Result},
 };
 
-/// If (on leave) the bot should also leave as it is alone
 pub async fn voice_state_update(
     framework_ctx: FrameworkContext<'_>,
     old: Option<&serenity::VoiceState>,
@@ -22,33 +21,49 @@ pub async fn voice_state_update(
         return Ok(());
     }
 
-    // Bot is not the one leaving
+    // Check if the bot is leaving
     let ctx = framework_ctx.serenity_context;
     let bot_id = ctx.cache.current_user().id;
-    if new.member.as_ref().is_none_or(|m| m.user.id == bot_id) {
-        return Ok(());
+    let leave_vc = match &new.member {
+        // songbird does not clean up state on VC disconnections, so we have to do it here
+        Some(member) if member.user.id == bot_id => true,
+        Some(_) => check_is_lonely(ctx, bot_id, guild_id, old)?,
+        None => false,
+    };
+
+    if leave_vc {
+        data.last_to_xsaid_tracker.remove(&guild_id);
+        data.songbird.remove(guild_id).await?;
     }
 
-    {
-        let channel_id = old.channel_id.try_unwrap()?;
-        let guild = ctx.cache.guild(guild_id).try_unwrap()?;
-        let mut channel_members = guild.members.iter().filter(|m| {
-            guild
-                .voice_states
-                .get(&m.user.id)
-                .is_some_and(|v| v.channel_id == Some(channel_id))
-        });
+    Ok(())
+}
 
-        // Bot is in the voice channel being left from
-        if channel_members.clone().all(|m| m.user.id != bot_id) {
-            return Ok(());
-        }
+/// If (on leave) the bot should also leave as it is alone
+fn check_is_lonely(
+    ctx: &serenity::Context,
+    bot_id: serenity::UserId,
+    guild_id: serenity::GuildId,
+    old: &serenity::VoiceState,
+) -> Result<bool> {
+    let channel_id = old.channel_id.try_unwrap()?;
+    let guild = ctx.cache.guild(guild_id).try_unwrap()?;
+    let mut channel_members = guild.members.iter().filter(|m| {
+        guild
+            .voice_states
+            .get(&m.user.id)
+            .is_some_and(|v| v.channel_id == Some(channel_id))
+    });
 
-        // All the users in the vc are now bots
-        if channel_members.any(|m| !m.user.bot()) {
-            return Ok(());
-        };
+    // Bot is in the voice channel being left from
+    if channel_members.clone().all(|m| m.user.id != bot_id) {
+        return Ok(false);
     }
 
-    data.songbird.remove(guild_id).await.map_err(Into::into)
+    // All the users in the vc are now bots
+    if channel_members.any(|m| !m.user.bot()) {
+        return Ok(false);
+    }
+
+    Ok(true)
 }
