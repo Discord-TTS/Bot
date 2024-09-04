@@ -143,6 +143,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let guild_mode: &str = guild_mode.into();
     let to_translate = guild_row.to_translate();
     let require_voice = guild_row.require_voice();
+    let text_in_voice = guild_row.text_in_voice();
     let audience_ignore = guild_row.audience_ignore();
     let role_mention = required_role.as_deref().unwrap_or(none_str);
     let voice_mode = user_mode.map(|m| m.into()).unwrap_or(none_str);
@@ -170,6 +171,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep2} Ignore audience messages: `{audience_ignore}`
 {sep2} Require users in voice channel: `{require_voice}`
 {sep2} Required prefix for TTS: `{required_prefix}`
+{sep2} Read from Text in Voice channels: `{text_in_voice}`
 
 **{sep2} Default Server Voice Mode: `{guild_mode}`**
 **{sep2} Default Server Voice: `{default_voice}`**
@@ -529,6 +531,12 @@ create_bool_command!(
     audience_ignore,
     "audience_ignore",
     aliases("audienceignore", "ignore_audience", "ignoreaudience"),
+);
+create_bool_command!(
+    "Makes the bot read messages from text-in-voice channels",
+    text_in_voice,
+    "text_in_voice",
+    aliases(),
 );
 create_bool_command!(
     "Makes the bot translate all TTS messages to the same language",
@@ -1337,6 +1345,7 @@ pub fn commands() -> [Command; 5] {
                 require_voice(),
                 required_prefix(),
                 command_prefix(),
+                text_in_voice(),
                 owner::block(),
                 owner::bot_ban(),
                 owner::gtts_disabled(),

@@ -197,6 +197,10 @@ pub async fn run_checks(
     if guild_row.channel != Some(message.channel_id) {
         // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
         // checking if the message's channel_id is the author's voice channel_id
+        if !guild_row.text_in_voice() {
+            return Ok(None);
+        }
+
         let guild = require!(message.guild(&ctx.cache), Ok(None));
         let author_vc = guild
             .voice_states

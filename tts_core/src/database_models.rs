@@ -37,6 +37,7 @@ pub struct GuildRowRaw {
     pub bot_ignore: bool,
     pub to_translate: bool,
     pub require_voice: bool,
+    pub text_in_voice: bool,
     pub audience_ignore: bool,
     pub msg_length: i16,
     pub repeated_chars: i16,
@@ -57,6 +58,7 @@ pub struct GuildRow {
     pub bot_ignore: bool,
     pub to_translate: bool,
     pub require_voice: bool,
+    pub text_in_voice: bool,
     pub audience_ignore: bool,
     pub msg_length: u16,
     pub repeated_chars: Option<NonZeroU8>,
@@ -103,6 +105,7 @@ impl Compact for GuildRowRaw {
         .set_bot_ignore(self.bot_ignore)
         .set_to_translate(self.to_translate)
         .set_require_voice(self.require_voice)
+        .set_text_in_voice(self.text_in_voice)
         .set_audience_ignore(self.audience_ignore)
     }
 }
