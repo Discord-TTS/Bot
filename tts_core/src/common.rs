@@ -7,9 +7,6 @@ use rand::Rng as _;
 use serenity::all as serenity;
 use serenity::{CreateActionRow, CreateButton};
 
-use crate::database::{GuildRow, UserRow};
-use crate::opt_ext::OptionTryUnwrap as _;
-use crate::require;
 use crate::structs::{
     Context, Data, LastToXsaidTracker, LastXsaidInfo, RegexCache, Result, TTSMode, TTSServiceError,
 };
@@ -185,121 +182,6 @@ fn remove_repeated_chars(content: &str, limit: u8) -> String {
     }
 
     out
-}
-
-pub async fn run_checks(
-    ctx: &serenity::Context,
-    message: &serenity::Message,
-    guild_id: serenity::GuildId,
-    guild_row: &GuildRow,
-    user_row: &UserRow,
-) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
-    if user_row.bot_banned() {
-        return Ok(None);
-    }
-
-    if guild_row.channel != Some(message.channel_id) {
-        // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
-        // checking if the message's channel_id is the author's voice channel_id
-        if !guild_row.text_in_voice() {
-            return Ok(None);
-        }
-
-        let guild = require!(message.guild(&ctx.cache), Ok(None));
-        let author_vc = guild
-            .voice_states
-            .get(&message.author.id)
-            .and_then(|c| c.channel_id);
-
-        if author_vc.is_none_or(|author_vc| author_vc != message.channel_id) {
-            return Ok(None);
-        }
-    }
-
-    if let Some(required_role) = guild_row.required_role {
-        let message_member = require!(message.member.as_ref(), Ok(None));
-        if !message_member.roles.contains(&required_role) {
-            let member = guild_id.member(ctx, message.author.id).await?;
-
-            let guild = require!(message.guild(&ctx.cache), Ok(None));
-            let channel = require!(guild.channels.get(&message.channel_id), Ok(None));
-
-            let author_permissions = guild.user_permissions_in(channel, &member);
-            if !author_permissions.administrator() {
-                return Ok(None);
-            }
-        }
-    }
-
-    let guild = require!(message.guild(&ctx.cache), Ok(None));
-    let mut content = serenity::content_safe(
-        &guild,
-        &message.content,
-        serenity::ContentSafeOptions::default()
-            .clean_here(false)
-            .clean_everyone(false)
-            .show_discriminator(false),
-        &message.mentions,
-    );
-
-    if content.len() >= 1500 {
-        return Ok(None);
-    }
-
-    content = content.to_lowercase();
-
-    if let Some(required_prefix) = &guild_row.required_prefix {
-        if let Some(stripped_content) = content.strip_prefix(required_prefix.as_str()) {
-            content = String::from(stripped_content);
-        } else {
-            return Ok(None);
-        }
-    }
-
-    if content.starts_with(guild_row.prefix.as_str()) {
-        return Ok(None);
-    }
-
-    let voice_state = guild.voice_states.get(&message.author.id);
-    let bot_voice_state = guild.voice_states.get(&ctx.cache.current_user().id);
-
-    let mut to_autojoin = None;
-    if message.author.bot() {
-        if guild_row.bot_ignore() || bot_voice_state.is_none() {
-            return Ok(None); // Is bot
-        }
-    } else {
-        // If the bot is in vc
-        if let Some(vc) = bot_voice_state {
-            // If the user needs to be in the vc, and the user's voice channel is not the same as the bot's
-            if guild_row.require_voice()
-                && vc.channel_id != voice_state.and_then(|vs| vs.channel_id)
-            {
-                return Ok(None); // Wrong vc
-            }
-        // Else if the user is in the vc and autojoin is on
-        } else if let Some(voice_state) = voice_state
-            && guild_row.auto_join()
-        {
-            to_autojoin = Some(voice_state.channel_id.try_unwrap()?);
-        } else {
-            return Ok(None); // Bot not in vc
-        };
-
-        if guild_row.require_voice() {
-            let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
-            let channel = guild.channels.get(&voice_channel).try_unwrap()?;
-
-            if channel.kind == serenity::ChannelType::Stage
-                && voice_state.is_some_and(serenity::VoiceState::suppress)
-                && guild_row.audience_ignore()
-            {
-                return Ok(None); // Is audience
-            }
-        }
-    }
-
-    Ok(Some((content, to_autojoin)))
 }
 
 #[allow(clippy::too_many_arguments)]

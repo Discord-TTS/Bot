@@ -1,21 +1,22 @@
 use std::borrow::Cow;
 
 use aformat::aformat;
-use to_arraystring::ToArrayString;
 use tracing::info;
 
 use self::serenity::{CreateEmbed, CreateEmbedFooter, CreateMessage, ExecuteWebhook, Mentionable};
 use poise::serenity_prelude as serenity;
 
 use tts_core::{
-    common::{clean_msg, dm_generic, fetch_audio, prepare_url, random_footer, run_checks},
+    common::{dm_generic, random_footer},
     constants::DM_WELCOME_MESSAGE,
-    errors,
     opt_ext::OptionTryUnwrap,
     require,
-    structs::{Data, FrameworkContext, IsPremium, JoinVCToken, Result, TTSMode},
-    traits::SongbirdManagerExt,
+    structs::{Data, FrameworkContext, Result},
 };
+
+use tts::process_tts_msg;
+
+mod tts;
 
 pub async fn message(
     framework_ctx: FrameworkContext<'_>,
@@ -28,189 +29,6 @@ pub async fn message(
     )?;
 
     Ok(())
-}
-
-async fn process_tts_msg(
-    framework_ctx: FrameworkContext<'_>,
-    message: &serenity::Message,
-) -> Result<()> {
-    let data = framework_ctx.user_data();
-    let ctx = framework_ctx.serenity_context;
-
-    let guild_id = require!(message.guild_id, Ok(()));
-    let (guild_row, user_row) = tokio::try_join!(
-        data.guilds_db.get(guild_id.into()),
-        data.userinfo_db.get(message.author.id.into()),
-    )?;
-
-    let (mut content, to_autojoin) = require!(
-        run_checks(ctx, message, guild_id, &guild_row, &user_row).await?,
-        Ok(())
-    );
-
-    let is_premium = data.is_premium_simple(guild_id).await?;
-    let (voice, mode) = {
-        if let Some(channel_id) = to_autojoin {
-            let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
-            match data.songbird.join_vc(join_vc_lock, channel_id).await {
-                Ok(call) => call,
-                Err(songbird::error::JoinError::TimedOut) => return Ok(()),
-                Err(err) => return Err(err.into()),
-            };
-        }
-
-        let is_ephemeral = message
-            .flags
-            .is_some_and(|f| f.contains(serenity::model::channel::MessageFlags::EPHEMERAL));
-
-        let m;
-        let member_nick = match &message.member {
-            Some(member) => member.nick.as_deref(),
-            None if message.webhook_id.is_none() && !is_ephemeral => {
-                m = guild_id.member(ctx, message.author.id).await?;
-                m.nick.as_deref()
-            }
-            None => None,
-        };
-
-        let (voice, mode) = data
-            .parse_user_or_guild_with_premium(message.author.id, Some((guild_id, is_premium)))
-            .await?;
-
-        let nickname_row = data
-            .nickname_db
-            .get([guild_id.into(), message.author.id.into()])
-            .await?;
-
-        content = clean_msg(
-            &content,
-            &message.author,
-            &ctx.cache,
-            guild_id,
-            member_nick,
-            &message.attachments,
-            &voice,
-            guild_row.xsaid(),
-            guild_row.repeated_chars,
-            nickname_row.name.as_deref(),
-            user_row.use_new_formatting(),
-            &data.regex_cache,
-            &data.last_to_xsaid_tracker,
-        );
-
-        (voice, mode)
-    };
-
-    // Final check, make sure we aren't sending an empty message or just symbols.
-    let mut removed_chars_content = content.clone();
-    removed_chars_content.retain(|c| !" ?.)'!\":".contains(c));
-    if removed_chars_content.is_empty() {
-        return Ok(());
-    }
-
-    let speaking_rate = data.speaking_rate(message.author.id, mode).await?;
-    let url = prepare_url(
-        data.config.tts_service.clone(),
-        &content,
-        &voice,
-        mode,
-        &speaking_rate,
-        &guild_row.msg_length.to_arraystring(),
-        guild_row.target_lang(IsPremium::from(is_premium)),
-    );
-
-    let call_lock = if let Some(call) = data.songbird.get(guild_id) {
-        call
-    } else {
-        // At this point, the bot is "in" the voice channel, but without a voice client,
-        // this is usually if the bot restarted but the bot is still in the vc from the last boot.
-        let voice_channel_id = {
-            let guild = ctx.cache.guild(guild_id).try_unwrap()?;
-            guild
-                .voice_states
-                .get(&message.author.id)
-                .and_then(|vs| vs.channel_id)
-                .try_unwrap()?
-        };
-
-        let join_vc_token = JoinVCToken::acquire(&data, guild_id);
-        match data.songbird.join_vc(join_vc_token, voice_channel_id).await {
-            Ok(call) => call,
-            Err(songbird::error::JoinError::TimedOut) => return Ok(()),
-            Err(err) => return Err(err.into()),
-        }
-    };
-
-    // Pre-fetch the audio to handle max_length errors
-    let audio = require!(
-        fetch_audio(
-            &data.reqwest,
-            url.clone(),
-            data.config.tts_service_auth_key.as_deref()
-        )
-        .await?,
-        Ok(())
-    );
-
-    let hint = audio
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .map(|ct| {
-            let mut hint = songbird::input::core::probe::Hint::new();
-            hint.mime_type(ct.to_str()?);
-            Ok::<_, anyhow::Error>(hint)
-        })
-        .transpose()?;
-
-    let input = Box::new(std::io::Cursor::new(audio.bytes().await?));
-    let wrapped_audio =
-        songbird::input::LiveInput::Raw(songbird::input::AudioStream { input, hint });
-
-    let track_handle = {
-        let mut call = call_lock.lock().await;
-        call.enqueue_input(songbird::input::Input::Live(wrapped_audio, None))
-            .await
-    };
-
-    data.analytics.log(
-        Cow::Borrowed(match mode {
-            TTSMode::gTTS => "gTTS_tts",
-            TTSMode::eSpeak => "eSpeak_tts",
-            TTSMode::gCloud => "gCloud_tts",
-            TTSMode::Polly => "Polly_tts",
-        }),
-        false,
-    );
-
-    let guild = ctx.cache.guild(guild_id).try_unwrap()?;
-    let (blank_name, blank_value, blank_inline) = errors::blank_field();
-
-    let extra_fields = [
-        ("Guild Name", Cow::Owned(guild.name.to_string()), true),
-        ("Guild ID", Cow::Owned(guild.id.to_string()), true),
-        (blank_name, blank_value, blank_inline),
-        (
-            "Message length",
-            Cow::Owned(content.len().to_string()),
-            true,
-        ),
-        ("Voice", voice, true),
-        ("Mode", Cow::Owned(mode.to_string()), true),
-    ];
-
-    let shard_manager = framework_ctx.shard_manager.clone();
-    let author_name = message.author.name.clone();
-    let icon_url = message.author.face();
-
-    errors::handle_track(
-        ctx.clone(),
-        shard_manager,
-        extra_fields,
-        author_name,
-        icon_url,
-        &track_handle,
-    )
-    .map_err(Into::into)
 }
 
 async fn process_mention_msg(
