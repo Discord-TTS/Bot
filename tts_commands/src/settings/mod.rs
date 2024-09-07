@@ -4,9 +4,8 @@ mod voice_paginator;
 
 use std::{borrow::Cow, collections::HashMap, fmt::Write, sync::atomic::Ordering};
 
-use aformat::aformat;
+use aformat::{aformat, ToArrayString};
 use arrayvec::ArrayString;
-use to_arraystring::ToArrayString;
 
 use poise::serenity_prelude as serenity;
 use serenity::{

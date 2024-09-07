@@ -1,6 +1,5 @@
-use aformat::{aformat, astr};
+use aformat::{aformat, astr, ToArrayString};
 use anyhow::bail;
-use to_arraystring::ToArrayString;
 
 use poise::serenity_prelude as serenity;
 use serenity::{builder::*, small_fixed_array::FixedString, ComponentInteractionDataKind};

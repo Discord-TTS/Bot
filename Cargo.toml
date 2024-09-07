@@ -25,7 +25,6 @@ small-fixed-array = { version = "0.4.5", features = [
     "to-arraystring",
 ] }
 
-sqlx.workspace = true
 serde.workspace = true
 tokio.workspace = true
 poise.workspace = true
@@ -59,7 +58,6 @@ itertools = "0.13"
 arrayvec = "0.7.6"
 parking_lot = "0.12"
 typesize = { version = "0.1.2", features = ["arrayvec"] }
-to-arraystring = { version = "0.2.2", features = ["nonzero_impls"] }
 
 [workspace.dependencies.sqlx]
 version = "0.8.1"
@@ -94,3 +92,9 @@ branch = "serenity-next"
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "serenity-next"
+
+[package.metadata.cargo-machete]
+ignored = [
+    "const_format", # Used by database initialisation in macro
+    "symphonia",    # Enabled for the features
+]

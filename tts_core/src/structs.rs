@@ -23,7 +23,7 @@ use crate::{analytics, bool_enum, database};
 
 macro_rules! into_static_display {
     ($struct:ident, max_length($len:literal)) => {
-        impl to_arraystring::ToArrayString for $struct {
+        impl aformat::ToArrayString for $struct {
             const MAX_LENGTH: usize = $len;
             type ArrayString = arrayvec::ArrayString<$len>;
 

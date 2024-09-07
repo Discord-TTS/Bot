@@ -19,6 +19,5 @@ serenity.workspace = true
 typesize.workspace = true
 songbird.workspace = true
 arrayvec.workspace = true
-to-arraystring.workspace = true
 
 tts_core = { path = "../tts_core" }

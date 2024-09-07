@@ -9,7 +9,7 @@ use poise::{
     CreateReply,
 };
 
-use to_arraystring::ToArrayString;
+use aformat::ToArrayString;
 use tts_core::{
     common::{fetch_audio, prepare_url},
     constants::OPTION_SEPERATORS,
