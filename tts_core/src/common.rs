@@ -193,6 +193,10 @@ pub async fn run_checks(
     guild_row: &GuildRow,
     user_row: &UserRow,
 ) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
+    if user_row.bot_banned() {
+        return Ok(None);
+    }
+
     let guild_id = require!(message.guild_id, Ok(None));
     if guild_row.channel != Some(message.channel_id) {
         // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
@@ -210,10 +214,6 @@ pub async fn run_checks(
         if author_vc.is_none_or(|author_vc| author_vc != message.channel_id) {
             return Ok(None);
         }
-    }
-
-    if user_row.bot_banned() {
-        return Ok(None);
     }
 
     if let Some(required_role) = guild_row.required_role {
