@@ -44,7 +44,7 @@ async fn process_tts_msg(
     )?;
 
     let (mut content, to_autojoin) = require!(
-        run_checks(ctx, message, &guild_row, &user_row).await?,
+        run_checks(ctx, message, guild_id, &guild_row, &user_row).await?,
         Ok(())
     );
 
