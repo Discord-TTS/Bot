@@ -127,6 +127,27 @@ pub fn random_footer(server_invite: &str, client_id: serenity::UserId) -> Cow<'s
     }
 }
 
+fn strip_emoji<'c>(regex_cache: &RegexCache, content: &'c str) -> Cow<'c, str> {
+    regex_cache.emoji_filter.replace_all(content, "")
+}
+
+fn make_emoji_readable<'c>(regex_cache: &RegexCache, content: &'c str) -> Cow<'c, str> {
+    regex_cache
+        .emoji_captures
+        .replace_all(content, |re_match: &regex::Captures<'_>| {
+            let is_animated = re_match.get(1).unwrap().as_str();
+            let emoji_name = re_match.get(2).unwrap().as_str();
+
+            let emoji_prefix = if is_animated.is_empty() {
+                "emoji"
+            } else {
+                "animated emoji"
+            };
+
+            format!("{emoji_prefix} {emoji_name}")
+        })
+}
+
 fn parse_acronyms(original: &str) -> String {
     original
         .split(' ')
@@ -196,6 +217,7 @@ pub fn clean_msg(
 
     voice: &str,
     xsaid: bool,
+    skip_emoji: bool,
     repeated_limit: Option<NonZeroU8>,
     nickname: Option<&str>,
     use_new_formatting: bool,
@@ -206,28 +228,20 @@ pub fn clean_msg(
     let (contained_url, mut content) = if content == "?" {
         (false, String::from("what"))
     } else {
-        let mut content: String = regex_cache
-            .emoji
-            .replace_all(content, |re_match: &regex::Captures<'_>| {
-                let is_animated = re_match.get(1).unwrap().as_str();
-                let emoji_name = re_match.get(2).unwrap().as_str();
-
-                let emoji_prefix = if is_animated.is_empty() {
-                    "emoji"
-                } else {
-                    "animated emoji"
-                };
-
-                format!("{emoji_prefix} {emoji_name}")
-            })
-            .into_owned();
+        let mut content = if skip_emoji {
+            strip_emoji(regex_cache, content)
+        } else {
+            make_emoji_readable(regex_cache, content)
+        };
 
         for (regex, replacement) in &regex_cache.replacements {
-            content = regex.replace_all(&content, *replacement).into_owned();
+            if let Cow::Owned(replaced) = regex.replace_all(&content, *replacement) {
+                content = Cow::Owned(replaced);
+            }
         }
 
         if voice.starts_with("en") {
-            content = parse_acronyms(&content);
+            content = Cow::Owned(parse_acronyms(&content));
         }
 
         let filtered_content: String = linkify::LinkFinder::new()

@@ -74,6 +74,7 @@ pub(crate) async fn process_tts_msg(
             &message.attachments,
             &voice,
             guild_row.xsaid(),
+            guild_row.skip_emoji(),
             guild_row.repeated_chars,
             nickname_row.name.as_deref(),
             user_row.use_new_formatting(),

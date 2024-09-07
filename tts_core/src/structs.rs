@@ -137,7 +137,8 @@ pub struct RegexCache {
     pub replacements: [(regex::Regex, &'static str); 3],
     pub bot_mention: OnceLock<regex::Regex>,
     pub id_in_brackets: regex::Regex,
-    pub emoji: regex::Regex,
+    pub emoji_captures: regex::Regex,
+    pub emoji_filter: regex::Regex,
 }
 
 impl RegexCache {
@@ -152,7 +153,8 @@ impl RegexCache {
                 (regex::Regex::new(r"`(?s:.)*?`")?, ". code snippet."),
             ],
             id_in_brackets: regex::Regex::new(r"\((\d+)\)")?,
-            emoji: regex::Regex::new(r"<(a?):([^<>]+):\d+>")?,
+            emoji_captures: regex::Regex::new(r"<(a?):([^<>]+):\d+>")?,
+            emoji_filter: regex::Regex::new(r"(?s:<a?:[^<>]+:\d+>)|\p{Emoji}")?,
             bot_mention: OnceLock::new(),
         })
     }

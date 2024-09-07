@@ -139,6 +139,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let autojoin = guild_row.auto_join();
     let msg_length = guild_row.msg_length;
     let bot_ignore = guild_row.bot_ignore();
+    let skip_emoji = guild_row.skip_emoji();
     let guild_mode: &str = guild_mode.into();
     let to_translate = guild_row.to_translate();
     let require_voice = guild_row.require_voice();
@@ -171,6 +172,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 {sep2} Require users in voice channel: `{require_voice}`
 {sep2} Required prefix for TTS: `{required_prefix}`
 {sep2} Read from Text in Voice channels: `{text_in_voice}`
+{sep2} Skip emojis when reading messages: `{skip_emoji}`
 
 **{sep2} Default Server Voice Mode: `{guild_mode}`**
 **{sep2} Default Server Voice: `{default_voice}`**
@@ -536,6 +538,12 @@ create_bool_command!(
     text_in_voice,
     "text_in_voice",
     aliases(),
+);
+create_bool_command!(
+    "Makes the bot skip emoji within messages",
+    skip_emoji,
+    "skip_emoji",
+    aliases("skip_emojis"),
 );
 create_bool_command!(
     "Makes the bot translate all TTS messages to the same language",
@@ -1345,6 +1353,7 @@ pub fn commands() -> [Command; 5] {
                 required_prefix(),
                 command_prefix(),
                 text_in_voice(),
+                skip_emoji(),
                 owner::block(),
                 owner::bot_ban(),
                 owner::gtts_disabled(),

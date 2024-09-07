@@ -35,6 +35,7 @@ pub struct GuildRowRaw {
     pub xsaid: bool,
     pub auto_join: bool,
     pub bot_ignore: bool,
+    pub skip_emoji: bool,
     pub to_translate: bool,
     pub require_voice: bool,
     pub text_in_voice: bool,
@@ -56,6 +57,7 @@ pub struct GuildRow {
     pub xsaid: bool,
     pub auto_join: bool,
     pub bot_ignore: bool,
+    pub skip_emoji: bool,
     pub to_translate: bool,
     pub require_voice: bool,
     pub text_in_voice: bool,
@@ -103,6 +105,7 @@ impl Compact for GuildRowRaw {
         .set_xsaid(self.xsaid)
         .set_auto_join(self.auto_join)
         .set_bot_ignore(self.bot_ignore)
+        .set_skip_emoji(self.skip_emoji)
         .set_to_translate(self.to_translate)
         .set_require_voice(self.require_voice)
         .set_text_in_voice(self.text_in_voice)
