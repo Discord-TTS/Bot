@@ -2,24 +2,38 @@ use aformat::{aformat, astr, ToArrayString};
 use anyhow::bail;
 
 use poise::serenity_prelude as serenity;
-use serenity::{builder::*, small_fixed_array::FixedString, ComponentInteractionDataKind};
+use serenity::{
+    builder::*, small_fixed_array::FixedString, ComponentInteractionDataKind, Permissions,
+};
 
 use tts_core::{
     common::{confirm_dialog, random_footer},
+    opt_ext::OptionTryUnwrap as _,
     require, require_guild,
     structs::{CommandResult, Context, Result},
 };
+
+fn can_send_generic(permissions: Permissions) -> bool {
+    let required_permissions = Permissions::SEND_MESSAGES | Permissions::VIEW_CHANNEL;
+
+    (required_permissions - permissions).is_empty()
+}
 
 fn can_send(
     guild: &serenity::Guild,
     channel: &serenity::GuildChannel,
     member: &serenity::Member,
 ) -> bool {
-    const REQUIRED_PERMISSIONS: serenity::Permissions = serenity::Permissions::from_bits_truncate(
-        serenity::Permissions::SEND_MESSAGES.bits() | serenity::Permissions::VIEW_CHANNEL.bits(),
-    );
+    can_send_generic(guild.user_permissions_in(channel, member))
+}
 
-    (REQUIRED_PERMISSIONS - guild.user_permissions_in(channel, member)).is_empty()
+fn can_send_partial(
+    guild: &serenity::Guild,
+    channel: &serenity::GuildChannel,
+    user_id: serenity::UserId,
+    partial_member: &serenity::PartialMember,
+) -> bool {
+    can_send_generic(guild.partial_member_permissions_in(channel, user_id, partial_member))
 }
 
 type U64ArrayString = <u64 as ToArrayString>::ArrayString;
@@ -31,22 +45,29 @@ type EligibleSetupChannel = (
     bool,
 );
 
-async fn get_eligible_channels(
+fn get_eligible_channels(
     ctx: Context<'_>,
-    guild_id: serenity::GuildId,
     bot_member: serenity::Member,
 ) -> Result<Option<Vec<EligibleSetupChannel>>> {
-    let author = ctx.author();
-    let author_member = guild_id.member(ctx, author.id).await?;
-
     let guild = require_guild!(ctx, Ok(None));
+    let author_can_send: &dyn Fn(_) -> _ = match ctx {
+        Context::Application(poise::ApplicationContext { interaction, .. }) => {
+            let author_member = &interaction.member.as_deref().try_unwrap()?;
+            &|c| can_send(&guild, c, author_member)
+        }
+        Context::Prefix(poise::PrefixContext { msg, .. }) => {
+            let author_member = msg.member.as_deref().try_unwrap()?;
+            &|c| can_send_partial(&guild, c, msg.author.id, author_member)
+        }
+    };
+
     let channels = guild
         .channels
         .iter()
         .filter(|c| {
             c.kind == serenity::ChannelType::Text
-                && can_send(&guild, c, &author_member)
                 && can_send(&guild, c, &bot_member)
+                && author_can_send(c)
         })
         .map(|c| {
             let has_webhook_perms = guild.user_permissions_in(c, &bot_member).manage_webhooks();
@@ -60,13 +81,9 @@ async fn get_eligible_channels(
 
 async fn show_channel_select_menu(
     ctx: Context<'_>,
-    guild_id: serenity::GuildId,
     bot_member: serenity::Member,
 ) -> Result<Option<(serenity::ChannelId, bool)>> {
-    let mut text_channels = require!(
-        get_eligible_channels(ctx, guild_id, bot_member).await?,
-        Ok(None)
-    );
+    let mut text_channels = require!(get_eligible_channels(ctx, bot_member)?, Ok(None));
 
     if text_channels.is_empty() {
         ctx.say("**Error**: This server doesn't have any text channels that we both have Read/Send Messages in!").await?;
@@ -166,10 +183,7 @@ pub async fn setup(
             let chan_perms = require_guild!(ctx).user_permissions_in(&channel, &bot_member);
             (channel.id, chan_perms.manage_webhooks())
         } else {
-            require!(
-                show_channel_select_menu(ctx, guild_id, bot_member).await?,
-                Ok(())
-            )
+            require!(show_channel_select_menu(ctx, bot_member).await?, Ok(()))
         };
 
         (channel, has_webhook_perms)

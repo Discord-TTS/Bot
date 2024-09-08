@@ -26,10 +26,8 @@ pub(crate) async fn process_tts_msg(
         data.userinfo_db.get(message.author.id.into()),
     )?;
 
-    let (mut content, to_autojoin) = require!(
-        run_checks(ctx, message, guild_id, &guild_row, &user_row).await?,
-        Ok(())
-    );
+    let (mut content, to_autojoin) =
+        require!(run_checks(ctx, message, &guild_row, &user_row)?, Ok(()));
 
     let is_premium = data.is_premium_simple(guild_id).await?;
     let (voice, mode) = {
@@ -197,10 +195,9 @@ pub(crate) async fn process_tts_msg(
     .map_err(Into::into)
 }
 
-async fn run_checks(
+fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
-    guild_id: serenity::GuildId,
     guild_row: &GuildRow,
     user_row: &UserRow,
 ) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
@@ -208,6 +205,7 @@ async fn run_checks(
         return Ok(None);
     }
 
+    let guild = require!(message.guild(&ctx.cache), Ok(None));
     if guild_row.channel != Some(message.channel_id) {
         // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
         // checking if the message's channel_id is the author's voice channel_id
@@ -215,7 +213,6 @@ async fn run_checks(
             return Ok(None);
         }
 
-        let guild = require!(message.guild(&ctx.cache), Ok(None));
         let author_vc = guild
             .voice_states
             .get(&message.author.id)
@@ -227,21 +224,18 @@ async fn run_checks(
     }
 
     if let Some(required_role) = guild_row.required_role {
-        let message_member = require!(message.member.as_ref(), Ok(None));
+        let message_member = message.member.as_deref().try_unwrap()?;
         if !message_member.roles.contains(&required_role) {
-            let member = guild_id.member(ctx, message.author.id).await?;
-
-            let guild = require!(message.guild(&ctx.cache), Ok(None));
             let channel = require!(guild.channels.get(&message.channel_id), Ok(None));
 
-            let author_permissions = guild.user_permissions_in(channel, &member);
+            let author_permissions =
+                guild.partial_member_permissions_in(channel, message.author.id, message_member);
             if !author_permissions.administrator() {
                 return Ok(None);
             }
         }
     }
 
-    let guild = require!(message.guild(&ctx.cache), Ok(None));
     let mut content = serenity::content_safe(
         &guild,
         &message.content,

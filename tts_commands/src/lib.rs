@@ -9,7 +9,6 @@ use serenity::all::{self as serenity, Mentionable as _};
 use tts_core::{
     constants::PREMIUM_NEUTRAL_COLOUR,
     opt_ext::OptionTryUnwrap as _,
-    require_guild,
     structs::{Command, Context, FailurePoint, PartialContext, Result},
     traits::PoiseContextExt,
 };
@@ -71,7 +70,7 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
         guild_info
     );
 
-    let permissions = ctx.author_permissions().await?;
+    let permissions = ctx.author_permissions()?;
     if permissions.send_messages() {
         let builder = poise::CreateReply::default();
         ctx.send({
@@ -162,17 +161,16 @@ pub async fn command_check(ctx: Context<'_>) -> Result<bool> {
         return Ok(true);
     };
 
-    let member = ctx.author_member().await.try_unwrap()?;
-
-    let is_admin = || {
-        let guild = require_guild!(ctx, anyhow::Ok(false));
-        let channel = guild.channels.get(&ctx.channel_id()).try_unwrap()?;
-
-        let permissions = guild.user_permissions_in(channel, &member);
-        Ok(permissions.administrator())
+    let member_roles = match ctx {
+        Context::Application(poise::ApplicationContext { interaction, .. }) => {
+            &interaction.member.as_deref().try_unwrap()?.roles
+        }
+        Context::Prefix(poise::PrefixContext { msg, .. }) => {
+            &msg.member.as_deref().try_unwrap()?.roles
+        }
     };
 
-    if member.roles.contains(&required_role) || is_admin()? {
+    if member_roles.contains(&required_role) || ctx.author_permissions()?.administrator() {
         return Ok(true);
     };
 

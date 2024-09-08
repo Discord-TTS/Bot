@@ -9,6 +9,7 @@ use tts_core::{
     common::{push_permission_names, random_footer},
     constants::RED,
     database_models::GuildRow,
+    opt_ext::OptionTryUnwrap as _,
     require, require_guild,
     structs::{Command, CommandResult, Context, JoinVCToken, Result},
     traits::{PoiseContextExt, SongbirdManagerExt},
@@ -171,13 +172,11 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         }
     };
 
-    let member = {
+    let display_name = {
         let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
-        let (_typing, member, join_vc_result) = tokio::try_join!(
-            ctx.defer_or_broadcast(),
-            guild_id.member(ctx, author.id),
-            async { Ok(data.songbird.join_vc(join_vc_lock, author_vc).await) }
-        )?;
+        let (_typing, join_vc_result) = tokio::try_join!(ctx.defer_or_broadcast(), async {
+            Ok(data.songbird.join_vc(join_vc_lock, author_vc).await)
+        })?;
 
         if let Err(err) = join_vc_result {
             return if let JoinError::TimedOut = err {
@@ -189,14 +188,22 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
             };
         };
 
-        member
+        match ctx {
+            Context::Application(poise::ApplicationContext { interaction, .. }) => {
+                interaction.member.as_deref().try_unwrap()?.display_name()
+            }
+            Context::Prefix(poise::PrefixContext { msg, .. }) => {
+                let member = msg.member.as_deref().try_unwrap()?;
+                member.nick.as_deref().unwrap_or(msg.author.display_name())
+            }
+        }
     };
 
     let embed = serenity::CreateEmbed::default()
         .title("Joined your voice channel!")
         .description("Just type normally and TTS Bot will say your messages!")
         .thumbnail(bot_face)
-        .author(CreateEmbedAuthor::new(member.display_name()).icon_url(author.face()))
+        .author(CreateEmbedAuthor::new(display_name).icon_url(author.face()))
         .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite,
             bot_id,

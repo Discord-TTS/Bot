@@ -22,7 +22,7 @@ pub trait PoiseContextExt<'ctx> {
 
     async fn neutral_colour(&self) -> u32;
     fn author_vc(&self) -> Option<serenity::ChannelId>;
-    async fn author_permissions(&self) -> Result<serenity::Permissions>;
+    fn author_permissions(&self) -> Result<serenity::Permissions>;
 }
 
 impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
@@ -47,7 +47,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
         FREE_NEUTRAL_COLOUR
     }
 
-    async fn author_permissions(&self) -> Result<serenity::Permissions> {
+    fn author_permissions(&self) -> Result<serenity::Permissions> {
         // Handle non-guild call first, to allow try_unwrap calls to be safe.
         if self.guild_id().is_none() {
             return Ok(((serenity::Permissions::from_bits_truncate(
@@ -57,17 +57,18 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
                 - serenity::Permissions::MANAGE_MESSAGES);
         }
 
-        // Accesses guild cache and is asynchronous, must be called first.
-        let member = self.author_member().await.try_unwrap()?;
-
-        // Accesses guild cache, but the member above was cloned out, so safe.
         let guild = self.guild().try_unwrap()?;
-
-        // Does not access cache, but relies on above guild cache reference.
         let channel = guild.channels.get(&self.channel_id()).try_unwrap()?;
-
-        // Does not access cache.
-        Ok(guild.user_permissions_in(channel, &member))
+        match self {
+            poise::Context::Application(poise::ApplicationContext { interaction, .. }) => {
+                let author_member = interaction.member.as_deref().try_unwrap()?;
+                Ok(guild.user_permissions_in(channel, author_member))
+            }
+            poise::Context::Prefix(poise::PrefixContext { msg, .. }) => {
+                let author_member = msg.member.as_deref().try_unwrap()?;
+                Ok(guild.partial_member_permissions_in(channel, msg.author.id, author_member))
+            }
+        }
     }
 
     async fn send_ephemeral(
@@ -106,15 +107,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
                 };
 
                 match channel.guild_id.member(serenity_ctx, author.id).await {
-                    Ok(member) => {
-                        let face = member.face();
-                        let display_name = member
-                            .nick
-                            .or(member.user.global_name)
-                            .unwrap_or(member.user.name);
-
-                        (Cow::Owned(display_name.into_string()), face)
-                    }
+                    Ok(member) => (Cow::Owned(member.display_name().to_owned()), member.face()),
                     Err(_) => (Cow::Borrowed(&*author.name), author.face()),
                 }
             }
