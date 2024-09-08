@@ -10,7 +10,6 @@ use tts_core::{
     common::{dm_generic, random_footer},
     constants::DM_WELCOME_MESSAGE,
     opt_ext::OptionTryUnwrap,
-    require,
     structs::{Data, FrameworkContext, Result},
 };
 
@@ -44,9 +43,12 @@ async fn process_mention_msg(
         return Ok(());
     };
 
+    let Some(guild_id) = message.guild_id else {
+        return Ok(());
+    };
+
     let ctx = framework_ctx.serenity_context;
     let bot_user = ctx.cache.current_user().id;
-    let guild_id = require!(message.guild_id, Ok(()));
     let channel = message.channel(ctx).await?.guild().unwrap();
     let permissions = channel.permissions_for_user(&ctx.cache, bot_user)?;
 
@@ -205,12 +207,18 @@ async fn process_support_response(
     data: &Data,
     channel: serenity::GuildChannel,
 ) -> Result<()> {
-    let reference = require!(&message.message_reference, Ok(()));
     if data.webhooks.dm_logs.channel_id.try_unwrap()? != channel.id {
         return Ok(());
     };
 
-    let resolved_id = require!(reference.message_id, Ok(()));
+    let Some(reference) = &message.message_reference else {
+        return Ok(());
+    };
+
+    let Some(resolved_id) = reference.message_id else {
+        return Ok(());
+    };
+
     let (resolved_author_name, resolved_author_discrim) = {
         let message = ctx.http.get_message(channel.id, resolved_id).await?;
         (message.author.name, message.author.discriminator)
@@ -221,17 +229,22 @@ async fn process_support_response(
     }
 
     let (target, target_tag) = {
-        let re_match = require!(
-            data.regex_cache
-                .id_in_brackets
-                .captures(&resolved_author_name),
-            Ok(())
-        );
+        let Some(re_match) = data
+            .regex_cache
+            .id_in_brackets
+            .captures(&resolved_author_name)
+        else {
+            return Ok(());
+        };
 
-        let target: serenity::UserId = require!(re_match.get(1), Ok(())).as_str().parse()?;
-        let target_tag = target.to_user(ctx).await?.tag();
+        let Some(target_id_match) = re_match.get(1) else {
+            return Ok(());
+        };
 
-        (target, target_tag)
+        let target_id = target_id_match.as_str().parse::<serenity::UserId>()?;
+        let target_tag = target_id.to_user(ctx).await?.tag();
+
+        (target_id, target_tag)
     };
 
     let attachment_url = message.attachments.first().map(|a| a.url.as_str());

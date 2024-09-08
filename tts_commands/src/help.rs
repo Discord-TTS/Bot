@@ -115,14 +115,13 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
             let mut subcommand_iterator = command.split(' ');
 
             let top_level_command = subcommand_iterator.next().unwrap();
-            let (mut command_obj, _, _) = require!(
-                poise::find_command(commands, top_level_command, true, &mut Vec::new()),
-                {
-                    let msg = format!("No command called {top_level_command} found!");
-                    ctx.say(msg).await?;
-                    Ok(())
-                }
-            );
+            let Some((mut command_obj, _, _)) =
+                poise::find_command(commands, top_level_command, true, &mut Vec::new())
+            else {
+                let msg = format!("No command called {top_level_command} found!");
+                ctx.say(msg).await?;
+                return Ok(());
+            };
 
             remaining_args = subcommand_iterator.collect();
             if !remaining_args.is_empty() {

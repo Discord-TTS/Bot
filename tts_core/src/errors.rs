@@ -14,7 +14,6 @@ use crate::{
     common::push_permission_names,
     constants,
     opt_ext::OptionTryUnwrap,
-    require,
     structs::{Context, Data, FrameworkContext},
     traits::PoiseContextExt,
 };
@@ -207,7 +206,9 @@ pub async fn handle_unexpected_default(
     name: &str,
     result: Result<()>,
 ) -> Result<()> {
-    let error = require!(result.err(), Ok(()));
+    let Some(error) = result.err() else {
+        return Ok(());
+    };
 
     handle_unexpected(framework, name, error, [], None, None).await
 }
@@ -218,8 +219,10 @@ pub async fn handle_message(
     message: &serenity::Message,
     result: Result<impl Send + Sync>,
 ) -> Result<()> {
-    let error = require!(result.err(), Ok(()));
     let ctx = poise_context.serenity_context;
+    let Some(error) = result.err() else {
+        return Ok(());
+    };
 
     let mut extra_fields = Vec::with_capacity(3);
     if let Some(guild_id) = message.guild_id {
@@ -249,9 +252,11 @@ pub async fn handle_message(
 pub async fn handle_member(
     framework: FrameworkContext<'_>,
     member: &serenity::Member,
-    result: Result<(), impl Into<Error>>,
+    result: Result<(), Error>,
 ) -> Result<()> {
-    let error = require!(result.err(), Ok(())).into();
+    let Some(error) = result.err() else {
+        return Ok(());
+    };
 
     let extra_fields = [
         ("Guild", Cow::Owned(member.guild_id.to_string()), true),
@@ -268,7 +273,9 @@ pub async fn handle_guild(
     guild: Option<&serenity::Guild>,
     result: Result<()>,
 ) -> Result<()> {
-    let error = require!(result.err(), Ok(()));
+    let Some(error) = result.err() else {
+        return Ok(());
+    };
 
     handle_unexpected(
         framework,

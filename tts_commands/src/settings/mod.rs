@@ -18,7 +18,7 @@ use tts_core::{
     common::{confirm_dialog, random_footer},
     constants::{GTTS_DISABLED_ERROR, OPTION_SEPERATORS, PREMIUM_NEUTRAL_COLOUR},
     database::{self, Compact},
-    require, require_guild,
+    require_guild,
     structs::{
         ApplicationContext, Command, CommandResult, Context, Data, Error, Result, SpeakingRateInfo,
         TTSMode, TTSModeChoice,
@@ -455,7 +455,9 @@ async fn generic_bool_command(
     value: Option<bool>,
     resp: &'static str,
 ) -> CommandResult {
-    let value = require!(bool_button(ctx, value).await?, Ok(()));
+    let Some(value) = bool_button(ctx, value).await? else {
+        return Ok(());
+    };
 
     let guilds_db = &ctx.data().guilds_db;
     let guild_id = ctx.guild_id().unwrap();
@@ -630,16 +632,17 @@ pub async fn required_role(
         }
     };
 
-    let (question, negative) = require!(response, {
-        ctx.say("**Error:** Cannot reset the required role if there isn't one set!")
-            .await?;
-        Ok(())
-    });
+    let Some((question, negative)) = response else {
+        let msg = "**Error:** Cannot reset the required role if there isn't one set!";
+        ctx.say(msg).await?;
+        return Ok(());
+    };
 
-    if require!(
-        confirm_dialog(ctx, question, "Yes, I'm sure.", &negative).await?,
-        Ok(())
-    ) {
+    let Some(response) = confirm_dialog(ctx, question, "Yes, I'm sure.", &negative).await? else {
+        return Ok(());
+    };
+
+    if response {
         ctx.data()
             .guilds_db
             .set_one(
@@ -960,11 +963,11 @@ pub async fn speaking_rate(
     let author = ctx.author();
 
     let (_, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
-    let speaking_rate_info = require!(mode.speaking_rate_info(), {
-        ctx.say(aformat!("**Error**: Cannot set speaking rate for the {mode} mode").as_str())
-            .await?;
-        Ok(())
-    });
+    let Some(speaking_rate_info) = mode.speaking_rate_info() else {
+        let msg = aformat!("**Error**: Cannot set speaking rate for the {mode} mode");
+        ctx.say(&*msg).await?;
+        return Ok(());
+    };
 
     let kind = speaking_rate_info.kind();
     let SpeakingRateInfo { min, max, .. } = speaking_rate_info;

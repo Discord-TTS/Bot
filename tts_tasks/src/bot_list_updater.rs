@@ -6,10 +6,7 @@ use serde_json::{json, to_vec};
 use self::serenity::UserId;
 use serenity::all as serenity;
 
-use tts_core::{
-    require,
-    structs::{BotListTokens, Result},
-};
+use tts_core::structs::{BotListTokens, Result};
 
 pub struct BotListUpdater {
     cache: Arc<serenity::cache::Cache>,
@@ -93,12 +90,10 @@ impl crate::Looper for BotListUpdater {
 
             let request = self.reqwest.post(url).body(body).headers(headers);
 
-            let err = require!(match request.send().await {
-                Ok(resp) => resp.error_for_status().err(),
-                Err(err) => Some(err),
-            });
-
-            tracing::error!("{} Error: {:?}", Self::NAME, err);
+            let resp_res = request.send().await;
+            if let Err(err) = resp_res.and_then(reqwest::Response::error_for_status) {
+                tracing::error!("{} Error: {:?}", Self::NAME, err);
+            };
         };
 
         let shard_count = self.cache.shard_count();

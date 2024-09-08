@@ -8,7 +8,6 @@ use tts_core::{
     database::{GuildRow, UserRow},
     errors,
     opt_ext::OptionTryUnwrap as _,
-    require,
     structs::{FrameworkContext, IsPremium, JoinVCToken, Result, TTSMode},
     traits::SongbirdManagerExt as _,
 };
@@ -20,14 +19,18 @@ pub(crate) async fn process_tts_msg(
     let data = framework_ctx.user_data();
     let ctx = framework_ctx.serenity_context;
 
-    let guild_id = require!(message.guild_id, Ok(()));
+    let Some(guild_id) = message.guild_id else {
+        return Ok(());
+    };
+
     let (guild_row, user_row) = tokio::try_join!(
         data.guilds_db.get(guild_id.into()),
         data.userinfo_db.get(message.author.id.into()),
     )?;
 
-    let (mut content, to_autojoin) =
-        require!(run_checks(ctx, message, &guild_row, &user_row)?, Ok(()));
+    let Some((mut content, to_autojoin)) = run_checks(ctx, message, &guild_row, &user_row)? else {
+        return Ok(());
+    };
 
     let is_premium = data.is_premium_simple(guild_id).await?;
     let (voice, mode) = {
@@ -124,15 +127,10 @@ pub(crate) async fn process_tts_msg(
     };
 
     // Pre-fetch the audio to handle max_length errors
-    let audio = require!(
-        fetch_audio(
-            &data.reqwest,
-            url.clone(),
-            data.config.tts_service_auth_key.as_deref()
-        )
-        .await?,
-        Ok(())
-    );
+    let tts_auth_key = data.config.tts_service_auth_key.as_deref();
+    let Some(audio) = fetch_audio(&data.reqwest, url.clone(), tts_auth_key).await? else {
+        return Ok(());
+    };
 
     let hint = audio
         .headers()
@@ -205,7 +203,10 @@ fn run_checks(
         return Ok(None);
     }
 
-    let guild = require!(message.guild(&ctx.cache), Ok(None));
+    let Some(guild) = message.guild(&ctx.cache) else {
+        return Ok(None);
+    };
+
     if guild_row.channel != Some(message.channel_id) {
         // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
         // checking if the message's channel_id is the author's voice channel_id
@@ -226,7 +227,9 @@ fn run_checks(
     if let Some(required_role) = guild_row.required_role {
         let message_member = message.member.as_deref().try_unwrap()?;
         if !message_member.roles.contains(&required_role) {
-            let channel = require!(guild.channels.get(&message.channel_id), Ok(None));
+            let Some(channel) = guild.channels.get(&message.channel_id) else {
+                return Ok(None);
+            };
 
             let author_permissions =
                 guild.partial_member_permissions_in(channel, message.author.id, message_member);

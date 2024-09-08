@@ -3,10 +3,7 @@ use std::borrow::Cow;
 use poise::serenity_prelude as serenity;
 use serenity::{builder::*, small_fixed_array::FixedString};
 
-use tts_core::{
-    require,
-    structs::{Context, TTSMode},
-};
+use tts_core::structs::{Context, TTSMode};
 
 pub struct MenuPaginator<'a> {
     index: usize,
@@ -105,7 +102,10 @@ impl<'a> MenuPaginator<'a> {
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(self.ctx.author().id);
 
-            let interaction = require!(builder.await, Ok(()));
+            let Some(interaction) = builder.await else {
+                break Ok(());
+            };
+
             match interaction.data.custom_id.as_str() {
                 "⏮️" => {
                     self.index = 0;
