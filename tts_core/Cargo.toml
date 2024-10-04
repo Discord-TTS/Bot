@@ -2,6 +2,7 @@
 name = "tts_core"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.83"
 
 [dependencies]
 rand = "0.8"
@@ -9,6 +10,7 @@ sha2 = "0.10"
 linkify = "0.10"
 bitflags = "2.4.1"
 strum_macros = "0.26"
+chrono = { version = "0.4.38", default-features = false }
 bool_to_bitflags = { version = "0.1", features = ["typesize"] }
 
 sqlx.workspace = true
@@ -26,6 +28,7 @@ arrayvec.workspace = true
 typesize.workspace = true
 songbird.workspace = true
 serenity.workspace = true
+mini-moka.workspace = true
 itertools.workspace = true
 parking_lot.workspace = true
 

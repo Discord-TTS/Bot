@@ -32,7 +32,7 @@ pub(crate) async fn process_tts_msg(
         return Ok(());
     };
 
-    let is_premium = data.is_premium_simple(guild_id).await?;
+    let is_premium = data.is_premium_simple(&ctx.http, guild_id).await?;
     let (voice, mode) = {
         if let Some(channel_id) = to_autojoin {
             let join_vc_lock = JoinVCToken::acquire(&data, guild_id);

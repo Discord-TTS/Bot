@@ -82,7 +82,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         .required_role
         .map(|r| r.mention().to_arraystring());
 
-    let user_mode = if data.is_premium_simple(guild_id).await? {
+    let user_mode = if data.is_premium_simple(ctx.http(), guild_id).await? {
         userinfo_row.premium_voice_mode
     } else {
         userinfo_row.voice_mode
@@ -203,7 +203,11 @@ async fn voice_autocomplete<'a>(
 ) -> Vec<serenity::AutocompleteChoice<'a>> {
     let data = ctx.data();
     let Ok((_, mode)) = data
-        .parse_user_or_guild(ctx.interaction.user.id, ctx.interaction.guild_id)
+        .parse_user_or_guild(
+            ctx.http(),
+            ctx.interaction.user.id,
+            ctx.interaction.guild_id,
+        )
         .await
     else {
         return Vec::new();
@@ -294,11 +298,9 @@ enum Target {
     User,
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn change_mode<'a, CacheKey, RowT>(
     ctx: &'a Context<'a>,
     general_db: &'a database::Handler<CacheKey, RowT>,
-    guild_id: serenity::GuildId,
     identifier: CacheKey,
     mode: Option<TTSMode>,
     target: Target,
@@ -311,13 +313,12 @@ where
     let data = ctx.data();
     if let Some(mode) = mode
         && mode.is_premium()
-        && !data.is_premium_simple(guild_id).await?
+        && !guild_is_premium
     {
         ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
             .thumbnail(data.premium_avatar_url.as_str())
-            .url("https://www.patreon.com/Gnome_the_Bot_Maker")
             .footer(CreateEmbedFooter::new(
                 "If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!"
             ))
@@ -366,7 +367,9 @@ where
     (T, TTSMode): database::CacheKeyTrait,
 {
     let data = ctx.data();
-    let (_, mode) = data.parse_user_or_guild(author_id, Some(guild_id)).await?;
+    let (_, mode) = data
+        .parse_user_or_guild(ctx.http(), author_id, Some(guild_id))
+        .await?;
     Ok(if let Some(voice) = voice {
         if check_valid_voice(&data, &voice, mode) {
             general_db.create_row(key).await?;
@@ -740,7 +743,6 @@ pub async fn server_mode(
     let to_send = change_mode(
         &ctx,
         &data.guilds_db,
-        guild_id,
         guild_id.into(),
         Some(mode),
         Target::Guild,
@@ -962,7 +964,9 @@ pub async fn speaking_rate(
     let data = ctx.data();
     let author = ctx.author();
 
-    let (_, mode) = data.parse_user_or_guild(author.id, ctx.guild_id()).await?;
+    let (_, mode) = data
+        .parse_user_or_guild(ctx.http(), author.id, ctx.guild_id())
+        .await?;
     let Some(speaking_rate_info) = mode.speaking_rate_info() else {
         let msg = aformat!("**Error**: Cannot set speaking rate for the {mode} mode");
         ctx.say(&*msg).await?;
@@ -1081,11 +1085,10 @@ pub async fn mode(
     let to_send = change_mode(
         &ctx,
         &data.userinfo_db,
-        guild_id,
         author_id,
         mode,
         Target::User,
-        data.is_premium_simple(guild_id).await?,
+        data.is_premium_simple(ctx.http(), guild_id).await?,
     )
     .await?;
 
@@ -1189,12 +1192,14 @@ pub async fn voices(
     >,
 ) -> CommandResult {
     let data = ctx.data();
+    let http = ctx.http();
     let cache = ctx.cache();
     let author = ctx.author();
+    let guild_id = ctx.guild_id();
 
     let mode = match mode {
         Some(mode) => TTSMode::from(mode),
-        None => data.parse_user_or_guild(author.id, ctx.guild_id()).await?.1,
+        None => data.parse_user_or_guild(http, author.id, guild_id).await?.1,
     };
 
     let voices = {
@@ -1255,7 +1260,7 @@ async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
     let data = ctx.data();
 
     let (voice_id, mode) = data
-        .parse_user_or_guild(ctx.author().id, ctx.guild_id())
+        .parse_user_or_guild(ctx.http(), ctx.author().id, ctx.guild_id())
         .await?;
     let voice = match mode {
         TTSMode::Polly => {
@@ -1299,7 +1304,7 @@ async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> 
     let data = ctx.data();
 
     let (lang_variant, mode) = data
-        .parse_user_or_guild(ctx.author().id, ctx.guild_id())
+        .parse_user_or_guild(ctx.http(), ctx.author().id, ctx.guild_id())
         .await?;
     let (lang, variant) = match mode {
         TTSMode::gCloud => &lang_variant,

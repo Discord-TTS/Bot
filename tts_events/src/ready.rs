@@ -89,12 +89,15 @@ fn finalize_startup(ctx: &serenity::Context, data: &Data) {
     }
 
     if let Some(website_info) = data.website_info.lock().take() {
+        let premium_config = data.premium_config.as_ref();
+        let patreon_service = premium_config.map(|c| c.patreon_service.clone());
+
         let web_updater = tts_tasks::web_updater::Updater {
-            patreon_service: data.config.patreon_service.clone(),
             reqwest: data.reqwest.clone(),
             cache: ctx.cache.clone(),
             pool: data.pool.clone(),
             config: website_info,
+            patreon_service,
         };
 
         tokio::spawn(web_updater.start());

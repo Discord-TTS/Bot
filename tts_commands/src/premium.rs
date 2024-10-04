@@ -11,6 +11,7 @@ use poise::{
 use tts_core::{
     common::remove_premium,
     constants::PREMIUM_NEUTRAL_COLOUR,
+    opt_ext::OptionTryUnwrap as _,
     structs::{Command, CommandResult, Context, Result, TTSMode},
     traits::PoiseContextExt,
 };
@@ -37,9 +38,35 @@ async fn get_premium_guild_count<'a>(
     Ok(guilds.count().await as i64)
 }
 
+/// Shows how you can help support TTS Bot's development and hosting!
+#[poise::command(
+    category = "Premium",
+    prefix_command,
+    slash_command,
+    required_bot_permissions = "SEND_MESSAGES",
+    aliases("purchase", "donate")
+)]
+pub async fn premium(ctx: Context<'_>) -> CommandResult {
+    let msg = if let Some(premium_config) = &ctx.data().premium_config {
+        let patreon_url = premium_config.patreon_page_url;
+        let application_id = ctx.http().application_id().try_unwrap()?;
+        &aformat!(concat!(
+            "To support the development and hosting of TTS Bot and get access to TTS Bot Premium, ",
+            "including more modes (`/set mode`), many more voices (`/set voice`), ",
+            "and extra options such as TTS translation, follow one of these links:\n",
+            "Patreon: <{patreon_url}>\nDiscord: https://discord.com/application-directory/{application_id}/store"
+        ))
+    } else {
+        "This version of TTS Bot does not have premium features enabled."
+    };
+
+    ctx.say(msg).await?;
+    Ok(())
+}
+
 /// Activates a server for TTS Bot Premium!
 #[poise::command(
-    category = "Premium Management",
+    category = "Premium",
     guild_only,
     prefix_command,
     slash_command,
@@ -50,14 +77,14 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let data = ctx.data();
 
-    if data.is_premium_simple(guild_id).await? {
+    if data.is_premium_simple(ctx.http(), guild_id).await? {
         ctx.say("Hey, this server is already premium!").await?;
         return Ok(());
     }
 
     let author = ctx.author();
     let linked_guilds = get_premium_guild_count(&data.pool, author.id).await?;
-    let error_msg = match data.fetch_patreon_info(author.id).await? {
+    let error_msg = match data.fetch_premium_info(ctx.http(), author.id).await? {
         Some(tier) => {
             if linked_guilds >= tier.entitled_servers.get().into() {
                 Some(Cow::Owned(format!("Hey, you already have {linked_guilds} servers linked, you are only subscribed to the {} tier!", tier.entitled_servers)))
@@ -66,27 +93,22 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
             }
         }
         None => Some(Cow::Borrowed(
-            "Hey, I don't think you are subscribed on Patreon!",
+            "Hey, I don't think you are subscribed to TTS Bot Premium!",
         )),
     };
 
     if let Some(error_msg) = error_msg {
-        ctx.send(CreateReply::default().embed(CreateEmbed::default()
+        let embed = CreateEmbed::default()
             .title("TTS Bot Premium")
             .description(error_msg)
             .thumbnail(data.premium_avatar_url.as_str())
             .colour(PREMIUM_NEUTRAL_COLOUR)
-            .footer(CreateEmbedFooter::new({
-                let line1 = "If you have just subscribed, please wait for up to an hour for the member list to update!\n";
-                let line2 = "If this is incorrect, and you have waited an hour, please contact GnomedDev.";
+            .footer(CreateEmbedFooter::new(concat!(
+                "If you have just subscribed to TTS Bot Premium, please wait up to an hour and try again!\n",
+                "For support, please join the support server via `/invite`."
+            )));
 
-                let mut concat = String::with_capacity(line1.len() + line2.len());
-                concat.push_str(line1);
-                concat.push_str(line2);
-                concat
-            }))
-        )).await?;
-
+        ctx.send(CreateReply::default().embed(embed)).await?;
         return Ok(());
     }
 
@@ -120,15 +142,15 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
 
 /// Lists all servers you activated for TTS Bot Premium
 #[poise::command(
-    category = "Premium Management",
+    category = "Premium",
     prefix_command,
     slash_command,
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
-    let Some(premium_info) = ctx.data().fetch_patreon_info(ctx.author().id).await? else {
-        ctx.say("I cannot confirm you are subscribed on patreon, so you don't have any premium servers!").await?;
+    let Some(premium_info) = data.fetch_premium_info(ctx.http(), ctx.author().id).await? else {
+        ctx.say("I cannot confirm you are subscribed to premium, so you don't have any premium servers!").await?;
         return Ok(());
     };
 
@@ -165,7 +187,7 @@ pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
 
 /// Deactivates a server from TTS Bot Premium.
 #[poise::command(
-    category = "Premium Management",
+    category = "Premium",
     prefix_command,
     slash_command,
     guild_only,
@@ -197,6 +219,11 @@ pub async fn premium_deactivate(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-pub fn commands() -> [Command; 3] {
-    [premium_activate(), list_premium(), premium_deactivate()]
+pub fn commands() -> [Command; 4] {
+    [
+        premium(),
+        premium_activate(),
+        list_premium(),
+        premium_deactivate(),
+    ]
 }

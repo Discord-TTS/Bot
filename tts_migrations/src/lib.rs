@@ -103,18 +103,18 @@ async fn migrate_speaking_rate_to_mode(transaction: &mut Transaction<'_>) -> Res
 }
 
 // I'll use a proper framework for this one day
-async fn run(config: &mut toml::Value, pool: &sqlx::PgPool) -> Result<()> {
+async fn run(config: &mut toml::Table, pool: &sqlx::PgPool) -> Result<()> {
     let starting_conf = config.clone();
-    let mut config_clone = config.clone();
 
+    let stolen_config = std::mem::take(config);
     *config = pool
         .acquire()
         .await?
         .transaction(move |transaction| {
             Box::pin(async move {
-                let main_config = config_clone["Main"].as_table_mut().try_unwrap()?;
-                _run(main_config, transaction).await?;
-                Ok::<_, anyhow::Error>(config_clone)
+                let mut config = stolen_config;
+                _run(&mut config, transaction).await?;
+                anyhow::Ok(config)
             })
         })
         .await?;
@@ -127,13 +127,16 @@ async fn run(config: &mut toml::Value, pool: &sqlx::PgPool) -> Result<()> {
     Ok(())
 }
 
-async fn _run(
-    main_config: &mut toml::value::Table,
-    transaction: &mut Transaction<'_>,
-) -> Result<()> {
+async fn _run(config: &mut toml::Table, transaction: &mut Transaction<'_>) -> Result<()> {
+    let main_config = config["Main"].as_table_mut().try_unwrap()?;
     if main_config.get("setup").is_none() {
         transaction.execute(DB_SETUP_QUERY).await?;
         main_config.insert("setup".into(), true.into());
+    }
+
+    if let Some(patreon_service) = main_config.remove("patreon_service") {
+        let inner = toml::toml!("patreon_service" = patreon_service);
+        config.insert("Premium-Info".into(), toml::Value::Table(inner));
     }
 
     transaction.execute("
@@ -220,7 +223,7 @@ async fn _run(
 }
 
 pub async fn load_db_and_conf() -> Result<(sqlx::PgPool, Config)> {
-    let mut config_toml: toml::Value = std::fs::read_to_string("config.toml")?.parse()?;
+    let mut config_toml: toml::Table = std::fs::read_to_string("config.toml")?.parse()?;
     let postgres: PostgresConfig = toml::Value::try_into(config_toml["PostgreSQL-Info"].clone())?;
 
     let pool_config = sqlx::postgres::PgPoolOptions::new();

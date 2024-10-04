@@ -120,7 +120,7 @@ impl tracing::Subscriber for ArcWrapper<WebhookLogger> {
             string: &'a mut String,
         }
 
-        impl<'a> tracing::field::Visit for StringVisitor<'a> {
+        impl tracing::field::Visit for StringVisitor<'_> {
             fn record_debug(
                 &mut self,
                 _field: &tracing::field::Field,

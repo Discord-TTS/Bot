@@ -2,6 +2,7 @@
 name = "tts_tasks"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.83"
 
 [dependencies]
 serde_json = "1.0.111"

@@ -43,19 +43,22 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     let guild_id = ctx.guild_id();
     let serenity_ctx = ctx.serenity_context();
 
-    let mut main_msg =
-        match data.premium_check(guild_id).await? {
-            None => return Ok(true),
-            Some(FailurePoint::Guild) => Cow::Borrowed("Hey, this is a premium command so it must be run in a server!"),
-            Some(FailurePoint::PremiumUser) => Cow::Borrowed("Hey, this server isn't premium, please purchase TTS Bot Premium via Patreon! (`/donate`)"),
-            Some(FailurePoint::NotSubscribed(premium_user_id)) => {
-                let premium_user = premium_user_id.to_user(serenity_ctx).await?;
-                Cow::Owned(format!(concat!(
-                    "Hey, this server has a premium user setup, however they are not longer a patreon! ",
-                    "Please ask {} to renew their membership."
-                ), premium_user.tag()))
-            }
-        };
+    let mut main_msg = match data.premium_check(ctx.http(), guild_id).await? {
+        None => return Ok(true),
+        Some(FailurePoint::Guild) => {
+            Cow::Borrowed("Hey, this is a premium command so it must be run in a server!")
+        }
+        Some(FailurePoint::PremiumUser) => Cow::Borrowed(
+            "Hey, this server isn't premium, please purchase TTS Bot Premium! (`/premium`)",
+        ),
+        Some(FailurePoint::NotSubscribed(premium_user_id)) => {
+            let premium_user = premium_user_id.to_user(serenity_ctx).await?;
+            Cow::Owned(format!(concat!(
+                "Hey, this server has a premium user setup, however they no longer have a subscription! ",
+                "Please ask {} to renew their membership."
+            ), premium_user.tag()))
+        }
+    };
 
     let author = ctx.author();
     let guild_info = match guild_id.and_then(|g_id| serenity_ctx.cache.guild(g_id)) {

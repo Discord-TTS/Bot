@@ -96,8 +96,9 @@ pub async fn tts(
 async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> CommandResult {
     let attachment = {
         let data = ctx.data();
+        let http = ctx.http();
         let guild_info = if let Some(guild_id) = ctx.guild_id() {
-            Some((guild_id, data.is_premium_simple(guild_id).await?))
+            Some((guild_id, data.is_premium_simple(http, guild_id).await?))
         } else {
             None
         };
@@ -292,22 +293,6 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-/// Shows how you can help support TTS Bot's development and hosting!
-#[poise::command(
-    category = "Extra Commands",
-    prefix_command,
-    slash_command,
-    required_bot_permissions = "SEND_MESSAGES",
-    aliases("purchase", "donate")
-)]
-pub async fn premium(ctx: Context<'_>) -> CommandResult {
-    ctx.say("
-To support the development and hosting of TTS Bot and get access to TTS Bot Premium, including more modes (`/set mode`), many more voices (`/set voice`), and extra options such as TTS translation, see:
-https://www.patreon.com/Gnome_the_Bot_Maker").await?;
-
-    Ok(())
-}
-
 /// Gets current ping to discord!
 #[poise::command(
     category = "Extra Commands",
@@ -360,13 +345,12 @@ pub async fn invite(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-pub fn commands() -> [Command; 9] {
+pub fn commands() -> [Command; 8] {
     [
         tts(),
         uptime(),
         botstats(),
         channel(),
-        premium(),
         ping(),
         invite(),
         tts_speak(),

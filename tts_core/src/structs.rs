@@ -8,18 +8,22 @@ use std::{
     },
 };
 
-use aformat::{aformat, CapStr};
+use aformat::{aformat, ArrayString, CapStr};
 pub use anyhow::{Error, Result};
+use dashmap::DashMap;
 use parking_lot::Mutex;
 use serde::Deserialize as _;
 use strum_macros::IntoStaticStr;
 use tracing::warn;
 use typesize::derive::TypeSize;
 
-use poise::serenity_prelude::{self as serenity};
-use serenity::small_fixed_array::{FixedArray, FixedString};
+use poise::serenity_prelude::{
+    self as serenity,
+    small_fixed_array::{FixedArray, FixedString},
+    ChannelId, GuildId, RoleId, SkuId, UserId,
+};
 
-use crate::{analytics, bool_enum, database};
+use crate::{analytics, bool_enum, common::timestamp_in_future, database};
 
 macro_rules! into_static_display {
     ($struct:ident, max_length($len:literal)) => {
@@ -48,24 +52,24 @@ pub struct Config {
     pub webhooks: WebhookConfigRaw,
     #[serde(rename = "Website-Info")]
     pub website_info: Option<WebsiteInfo>,
+    #[serde(rename = "Premium-Info")]
+    pub premium: Option<PremiumConfig>,
     #[serde(rename = "Bot-List-Tokens")]
-    #[serde(default)]
     pub bot_list_tokens: Option<BotListTokens>,
 }
 
 #[derive(serde::Deserialize)]
 pub struct MainConfig {
-    pub announcements_channel: serenity::ChannelId,
     pub tts_service_auth_key: Option<FixedString>,
-    pub patreon_service: Option<reqwest::Url>,
-    pub invite_channel: serenity::ChannelId,
     pub website_url: Option<reqwest::Url>,
+    pub announcements_channel: ChannelId,
     pub main_server_invite: FixedString,
-    pub main_server: serenity::GuildId,
     pub proxy_url: Option<FixedString>,
-    pub ofs_role: serenity::RoleId,
-    pub tts_service: reqwest::Url,
     pub token: Option<FixedString>,
+    pub invite_channel: ChannelId,
+    pub tts_service: reqwest::Url,
+    pub main_server: GuildId,
+    pub ofs_role: RoleId,
 
     // Only for situations where gTTS has broken
     #[serde(default)]
@@ -101,15 +105,23 @@ pub struct BotListTokens {
     pub bots_on_discord: FixedString,
 }
 
+#[derive(serde::Deserialize)]
+pub struct PremiumConfig {
+    pub patreon_page_url: ArrayString<64>,
+    pub patreon_service: reqwest::Url,
+    pub basic_sku: SkuId,
+    pub extra_sku: SkuId,
+}
+
 pub struct WebhookConfig {
     pub logs: serenity::Webhook,
     pub errors: serenity::Webhook,
     pub dm_logs: serenity::Webhook,
 }
 
-pub struct JoinVCToken(pub serenity::GuildId, pub Arc<tokio::sync::Mutex<()>>);
+pub struct JoinVCToken(pub GuildId, pub Arc<tokio::sync::Mutex<()>>);
 impl JoinVCToken {
-    pub fn acquire(data: &Data, guild_id: serenity::GuildId) -> Self {
+    pub fn acquire(data: &Data, guild_id: GuildId) -> Self {
         let lock = data
             .join_vc_tokens
             .entry(guild_id)
@@ -123,14 +135,43 @@ impl JoinVCToken {
 bool_enum!(IsPremium(No | Yes));
 
 pub enum FailurePoint {
-    NotSubscribed(serenity::UserId),
+    NotSubscribed(UserId),
     PremiumUser,
     Guild,
 }
 
 #[derive(serde::Deserialize, Clone, Copy)]
-pub struct PatreonInfo {
+pub struct PremiumInfo {
     pub entitled_servers: NonZeroU8,
+}
+
+impl PremiumInfo {
+    fn fake() -> Self {
+        Self {
+            entitled_servers: NonZeroU8::MAX,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum CachedEntitlement {
+    Normal(PremiumInfo, serenity::Timestamp),
+    NoExpiry(PremiumInfo),
+    None,
+}
+
+impl CachedEntitlement {
+    fn as_premium_info(self) -> Option<PremiumInfo> {
+        match self {
+            CachedEntitlement::Normal(premium_info, timestamp)
+                if timestamp_in_future(timestamp) =>
+            {
+                Some(premium_info)
+            }
+            CachedEntitlement::NoExpiry(premium_info) => Some(premium_info),
+            CachedEntitlement::Normal(..) | CachedEntitlement::None => None,
+        }
+    }
 }
 
 pub struct RegexCache {
@@ -160,10 +201,10 @@ impl RegexCache {
     }
 }
 
-pub struct LastXsaidInfo(serenity::UserId, std::time::SystemTime);
+pub struct LastXsaidInfo(UserId, std::time::SystemTime);
 
 impl LastXsaidInfo {
-    fn get_vc_member_count(guild: &serenity::Guild, channel_id: serenity::ChannelId) -> usize {
+    fn get_vc_member_count(guild: &serenity::Guild, channel_id: ChannelId) -> usize {
         guild
             .voice_states
             .iter()
@@ -173,11 +214,11 @@ impl LastXsaidInfo {
             .count()
     }
 
-    pub fn new(user: serenity::UserId) -> Self {
+    pub fn new(user: UserId) -> Self {
         Self(user, std::time::SystemTime::now())
     }
 
-    pub fn should_announce_name(&self, guild: &serenity::Guild, user: serenity::UserId) -> bool {
+    pub fn should_announce_name(&self, guild: &serenity::Guild, user: UserId) -> bool {
         let Some(voice_channel_id) = guild.voice_states.get(&user).and_then(|v| v.channel_id)
         else {
             return true;
@@ -202,7 +243,8 @@ pub struct Data {
     pub user_voice_db: database::Handler<(i64, TTSMode), database::UserVoiceRowRaw>,
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRowRaw>,
 
-    pub join_vc_tokens: dashmap::DashMap<serenity::GuildId, Arc<tokio::sync::Mutex<()>>>,
+    pub entitlement_cache: mini_moka::sync::Cache<UserId, CachedEntitlement>,
+    pub join_vc_tokens: DashMap<GuildId, Arc<tokio::sync::Mutex<()>>>,
     pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub premium_avatar_url: FixedString<u16>,
@@ -212,8 +254,10 @@ pub struct Data {
     pub reqwest: reqwest::Client,
     pub regex_cache: RegexCache,
     pub webhooks: WebhookConfig,
-    pub config: MainConfig,
     pub pool: sqlx::PgPool,
+
+    pub config: MainConfig,
+    pub premium_config: Option<PremiumConfig>,
 
     // Startup information
     pub website_info: Mutex<Option<WebsiteInfo>>,
@@ -236,11 +280,7 @@ impl std::fmt::Debug for Data {
 }
 
 impl Data {
-    pub async fn speaking_rate(
-        &self,
-        user_id: serenity::UserId,
-        mode: TTSMode,
-    ) -> Result<Cow<'static, str>> {
+    pub async fn speaking_rate(&self, user_id: UserId, mode: TTSMode) -> Result<Cow<'static, str>> {
         let row = self.user_voice_db.get((user_id.into(), mode)).await?;
 
         Ok(match row.speaking_rate {
@@ -253,11 +293,9 @@ impl Data {
         })
     }
 
-    pub async fn fetch_patreon_info(
-        &self,
-        user_id: serenity::UserId,
-    ) -> Result<Option<PatreonInfo>> {
-        if let Some(mut url) = self.config.patreon_service.clone() {
+    async fn fetch_patreon_info(&self, user_id: UserId) -> Result<Option<PremiumInfo>> {
+        if let Some(config) = &self.premium_config {
+            let mut url = config.patreon_service.clone();
             url.set_path(&aformat!("/members/{user_id}"));
 
             let req = self.reqwest.get(url);
@@ -265,44 +303,119 @@ impl Data {
             Ok(resp)
         } else {
             // Return fake PatreonInfo if `patreon_service` has not been set to simplify self-hosting.
-            Ok(Some(PatreonInfo {
-                entitled_servers: NonZeroU8::MAX,
-            }))
+            Ok(Some(PremiumInfo::fake()))
         }
+    }
+
+    fn get_cached_discord_premium(&self, user_id: &UserId) -> Option<PremiumInfo> {
+        if let Some(cached_entitlement) = self.entitlement_cache.get(user_id) {
+            if let Some(premium_info) = cached_entitlement.as_premium_info() {
+                return Some(premium_info);
+            }
+        }
+
+        None
+    }
+
+    async fn fetch_entitlement_for_user(
+        &self,
+        http: &serenity::Http,
+        user_id: UserId,
+    ) -> Result<Option<PremiumInfo>> {
+        let Some(premium_config) = &self.premium_config else {
+            // Should not be reached, but return fake anyway to simplify self-hosting.
+            return Ok(Some(PremiumInfo::fake()));
+        };
+
+        let entitlements = http
+            .get_entitlements(Some(user_id), None, None, None, None, None, Some(true))
+            .await?;
+
+        let cached_entitlement = if let Some(entitlement) = entitlements
+            .into_iter()
+            .find(|entitlement| entitlement.ends_at.is_none_or(timestamp_in_future))
+        {
+            let entitled_servers = if entitlement.sku_id == premium_config.extra_sku {
+                NonZeroU8::new(5).unwrap()
+            } else if entitlement.sku_id == premium_config.basic_sku {
+                NonZeroU8::new(2).unwrap()
+            } else {
+                anyhow::bail!("Found unknown entitlement sku: {}", entitlement.sku_id);
+            };
+
+            let premium_info = PremiumInfo { entitled_servers };
+            match entitlement.ends_at {
+                Some(expiry) => CachedEntitlement::Normal(premium_info, expiry),
+                None => CachedEntitlement::NoExpiry(premium_info),
+            }
+        } else {
+            CachedEntitlement::None
+        };
+
+        self.entitlement_cache.insert(user_id, cached_entitlement);
+        Ok(cached_entitlement.as_premium_info())
+    }
+
+    pub async fn fetch_premium_info(
+        &self,
+        http: &serenity::Http,
+        user_id: UserId,
+    ) -> Result<Option<PremiumInfo>> {
+        if let Some(premium_info) = self.get_cached_discord_premium(&user_id) {
+            return Ok(Some(premium_info));
+        }
+
+        if let Some(premium_info) = self.fetch_patreon_info(user_id).await? {
+            return Ok(Some(premium_info));
+        }
+
+        if let Some(premium_info) = self.fetch_entitlement_for_user(http, user_id).await? {
+            return Ok(Some(premium_info));
+        }
+
+        Ok(None)
     }
 
     pub async fn premium_check(
         &self,
-        guild_id: Option<serenity::GuildId>,
+        http: &serenity::Http,
+        guild_id: Option<GuildId>,
     ) -> Result<Option<FailurePoint>> {
         let Some(guild_id) = guild_id else {
             return Ok(Some(FailurePoint::Guild));
         };
 
         let guild_row = self.guilds_db.get(guild_id.get() as i64).await?;
-        if let Some(patreon_user_id) = guild_row.premium_user {
-            if self.fetch_patreon_info(patreon_user_id).await?.is_some() {
-                Ok(None)
-            } else {
-                Ok(Some(FailurePoint::NotSubscribed(patreon_user_id)))
-            }
+        let Some(premium_user) = guild_row.premium_user else {
+            return Ok(Some(FailurePoint::PremiumUser));
+        };
+
+        if self.fetch_premium_info(http, premium_user).await?.is_some() {
+            Ok(None)
         } else {
             Ok(Some(FailurePoint::PremiumUser))
         }
     }
 
-    pub async fn is_premium_simple(&self, guild_id: serenity::GuildId) -> Result<bool> {
+    pub async fn is_premium_simple(
+        &self,
+        http: &serenity::Http,
+        guild_id: GuildId,
+    ) -> Result<bool> {
         let guild_id = Some(guild_id);
-        self.premium_check(guild_id).await.map(|o| o.is_none())
+        self.premium_check(http, guild_id)
+            .await
+            .map(|o| o.is_none())
     }
 
     pub async fn parse_user_or_guild(
         &self,
-        author_id: serenity::UserId,
-        guild_id: Option<serenity::GuildId>,
+        http: &serenity::Http,
+        author_id: UserId,
+        guild_id: Option<GuildId>,
     ) -> Result<(Cow<'static, str>, TTSMode)> {
         let info = if let Some(guild_id) = guild_id {
-            Some((guild_id, self.is_premium_simple(guild_id).await?))
+            Some((guild_id, self.is_premium_simple(http, guild_id).await?))
         } else {
             None
         };
@@ -312,8 +425,8 @@ impl Data {
 
     pub async fn parse_user_or_guild_with_premium(
         &self,
-        author_id: serenity::UserId,
-        guild_info: Option<(serenity::GuildId, bool)>,
+        author_id: UserId,
+        guild_info: Option<(GuildId, bool)>,
     ) -> Result<(Cow<'static, str>, TTSMode)> {
         let user_row = self.userinfo_db.get(author_id.into()).await?;
         let (guild_id, guild_is_premium) = match guild_info {
@@ -566,5 +679,5 @@ pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Data, CommandErr
 
 pub type CommandError = Error;
 pub type CommandResult<E = Error> = Result<(), E>;
+pub type LastToXsaidTracker = DashMap<GuildId, LastXsaidInfo>;
 pub type FrameworkContext<'a> = poise::FrameworkContext<'a, Data, CommandError>;
-pub type LastToXsaidTracker = dashmap::DashMap<serenity::GuildId, LastXsaidInfo>;

@@ -11,6 +11,10 @@ use crate::structs::{
     Context, Data, LastToXsaidTracker, LastXsaidInfo, RegexCache, Result, TTSMode, TTSServiceError,
 };
 
+pub(crate) fn timestamp_in_future(ts: serenity::Timestamp) -> bool {
+    *ts > chrono::Utc::now()
+}
+
 pub fn push_permission_names(buffer: &mut String, permissions: serenity::Permissions) {
     let permission_names = permissions.get_permission_names();
     for (i, permission) in permission_names.iter().enumerate() {

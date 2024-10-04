@@ -80,11 +80,11 @@ pub async fn guild_member_removal(
         return Ok(());
     }
 
-    if !data.is_premium_simple(guild_id).await? {
+    let ctx = framework_ctx.serenity_context;
+    if !data.is_premium_simple(&ctx.http, guild_id).await? {
         return Ok(());
     }
 
-    let ctx = framework_ctx.serenity_context;
     let msg = match user.dm(&ctx.http, create_premium_notice()).await {
         Ok(msg) => msg,
         Err(err) => {

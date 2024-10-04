@@ -24,6 +24,7 @@
 use std::{
     collections::BTreeMap,
     sync::{atomic::AtomicBool, Arc},
+    time::Duration,
 };
 
 use anyhow::Ok;
@@ -50,10 +51,10 @@ fn main() -> Result<()> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
-        .block_on(_main(start_time))
+        .block_on(main_(start_time))
 }
 
-async fn _main(start_time: std::time::SystemTime) -> Result<()> {
+async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     println!("Loading and performing migrations");
     let (pool, config) = tts_migrations::load_db_and_conf().await?;
 
@@ -132,6 +133,9 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
         songbird: songbird::Songbird::serenity(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
         update_startup_lock: tokio::sync::Mutex::new(()),
+        entitlement_cache: mini_moka::sync::Cache::builder()
+            .time_to_live(Duration::from_secs(60 * 60))
+            .build(),
 
         gtts_voices,
         espeak_voices,
@@ -142,8 +146,9 @@ async fn _main(start_time: std::time::SystemTime) -> Result<()> {
             .map(|v| (v.id.clone(), v))
             .collect::<BTreeMap<_, _>>(),
 
-        website_info: Mutex::new(config.website_info),
         config: config.main,
+        premium_config: config.premium,
+        website_info: Mutex::new(config.website_info),
         reqwest,
         premium_avatar_url: FixedString::from_string_trunc(premium_user.face()),
         analytics,

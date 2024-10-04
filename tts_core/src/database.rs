@@ -161,12 +161,14 @@ where
         self.cache.extra_size()
     }
 
-    fn get_collection_item_count(&self) -> Option<usize> {
-        self.cache.get_collection_item_count()
-    }
+    typesize::if_typesize_details! {
+        fn get_collection_item_count(&self) -> Option<usize> {
+            self.cache.get_collection_item_count()
+        }
 
-    fn get_size_details(&self) -> Vec<typesize::Field> {
-        self.cache.get_size_details()
+        fn get_size_details(&self) -> Vec<typesize::Field> {
+            self.cache.get_size_details()
+        }
     }
 }
 

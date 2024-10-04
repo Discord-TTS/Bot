@@ -2,6 +2,7 @@
 name = "discord_tts_bot"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.83"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
@@ -17,6 +18,9 @@ members = [
 lto = "thin"
 panic = "abort"
 debug = 2
+
+[profile.dev.package.syn]
+opt-level = 3
 
 [dependencies]
 const_format = "0.2"
@@ -34,6 +38,7 @@ tracing.workspace = true
 reqwest.workspace = true
 dashmap.workspace = true
 songbird.workspace = true
+mini-moka.workspace = true
 parking_lot.workspace = true
 
 tts_core = { path = "tts_core" }
@@ -57,7 +62,9 @@ aformat = "0.1.3"
 itertools = "0.13"
 arrayvec = "0.7.6"
 parking_lot = "0.12"
-typesize = { version = "0.1.2", features = ["arrayvec"] }
+mini-moka = { version = "0.10.3", features = ["sync"] }
+# TODO: Remove `dashmap` once mini_moka releases a breaking version with dashmap 6.
+typesize = { version = "0.1.9", features = ["arrayvec", "dashmap", "details"] }
 
 [workspace.dependencies.sqlx]
 version = "0.8.1"
@@ -74,7 +81,7 @@ version = "1.39.3"
 features = ["rt-multi-thread", "signal", "parking_lot"]
 
 [workspace.dependencies.dashmap]
-version = "5"
+version = "6.1.0"
 default-features = false
 
 [workspace.dependencies.serenity]
