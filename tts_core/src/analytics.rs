@@ -2,6 +2,8 @@ use std::{borrow::Cow, future::Future, pin::Pin};
 
 use dashmap::DashMap;
 
+use serenity::futures;
+
 use crate::{bool_enum, structs::Context};
 
 bool_enum!(EventType(Normal | Command));
@@ -43,7 +45,5 @@ pub fn pre_command(ctx: Context<'_>) -> Pin<Box<dyn Future<Output = ()> + Send +
         false,
     );
 
-    // TODO: Replace with futures::future::always_ready
-    // once https://github.com/rust-lang/futures-rs/pull/2825 is merged.
-    Box::pin(async {})
+    Box::pin(futures::future::always_ready(|| ()))
 }
