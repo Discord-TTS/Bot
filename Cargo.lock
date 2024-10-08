@@ -1737,7 +1737,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.6.1"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#25827eed03e085932a8982cf026a59e5f92531e5"
+source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#e7c92b7a9b7dabb37fb879fabd65fa18bd00aad8"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1755,7 +1755,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.6.1"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#25827eed03e085932a8982cf026a59e5f92531e5"
+source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#e7c92b7a9b7dabb37fb879fabd65fa18bd00aad8"
 dependencies = [
  "darling 0.20.10",
  "proc-macro2",
@@ -2452,7 +2452,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.2"
-source = "git+https://github.com/serenity-rs/serenity?branch=next#27cfaff45d2348257226cdc9060d8d4419ed00f3"
+source = "git+https://github.com/serenity-rs/serenity?branch=next#4d54465e933756dc1cb5d68d9bcec8bb9aade0fc"
 dependencies = [
  "aformat",
  "arrayvec",

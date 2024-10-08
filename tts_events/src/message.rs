@@ -170,19 +170,16 @@ async fn process_support_dm(
             )
         };
 
+        let embeds = [CreateEmbed::default()
+            .title(title.as_str())
+            .description(DM_WELCOME_MESSAGE)
+            .footer(CreateEmbedFooter::new(random_footer(
+                &data.config.main_server_invite,
+                client_id,
+            )))];
+
         let welcome_msg = channel
-            .send_message(
-                &ctx.http,
-                CreateMessage::default().embed(
-                    CreateEmbed::default()
-                        .title(title.as_str())
-                        .description(DM_WELCOME_MESSAGE)
-                        .footer(CreateEmbedFooter::new(random_footer(
-                            &data.config.main_server_invite,
-                            client_id,
-                        ))),
-                ),
-            )
+            .send_message(&ctx.http, CreateMessage::default().embeds(&embeds))
             .await?;
 
         data.userinfo_db
@@ -259,12 +256,11 @@ async fn process_support_response(
     )
     .await?;
 
+    let embeds = [CreateEmbed::from(embed)];
     channel
         .send_message(
             &ctx.http,
-            CreateMessage::default()
-                .content(content)
-                .embed(CreateEmbed::from(embed)),
+            CreateMessage::default().content(content).embeds(&embeds),
         )
         .await?;
 

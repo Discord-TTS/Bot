@@ -82,16 +82,16 @@ async fn insert_traceback(
     traceback: String,
     traceback_hash: Vec<u8>,
 ) -> Result<()> {
-    let button = CreateButton::new(VIEW_TRACEBACK_CUSTOM_ID)
+    let buttons = [CreateButton::new(VIEW_TRACEBACK_CUSTOM_ID)
         .label("View Traceback")
-        .style(serenity::ButtonStyle::Danger);
+        .style(serenity::ButtonStyle::Danger)];
 
     let embeds = [embed];
-    let components = [CreateActionRow::Buttons(vec![button])];
+    let components = [CreateActionRow::buttons(&buttons)];
 
     let builder = serenity::ExecuteWebhook::default()
-        .embeds(embeds.as_slice())
-        .components(components.as_slice());
+        .embeds(&embeds)
+        .components(&components);
 
     let message = data
         .webhooks

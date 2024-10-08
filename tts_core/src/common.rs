@@ -44,20 +44,20 @@ pub async fn dm_generic<'ctx, 'a>(
     attachment_url: Option<&'a str>,
     message: &str,
 ) -> Result<(String, serenity::Embed)> {
+    let mut embed = serenity::CreateEmbed::default();
+    if let Some(url) = attachment_url {
+        embed = embed.image(url);
+    };
+
+    let embeds = [embed
+        .title("Message from the developers:")
+        .description(message)
+        .author(serenity::CreateEmbedAuthor::new(author.tag()).icon_url(author.face()))];
+
     let sent = target
         .dm(
             &ctx.http,
-            serenity::CreateMessage::default().embed({
-                let mut embed = serenity::CreateEmbed::default();
-                if let Some(url) = attachment_url {
-                    embed = embed.image(url);
-                };
-
-                embed
-                    .title("Message from the developers:")
-                    .description(message)
-                    .author(serenity::CreateEmbedAuthor::new(author.tag()).icon_url(author.face()))
-            }),
+            serenity::CreateMessage::default().embeds(&embeds),
         )
         .await?;
 
@@ -384,18 +384,15 @@ pub fn format_message(
     }
 }
 
-pub fn confirm_dialog_components<'a>(
-    positive: &'a str,
-    negative: &'a str,
-) -> Cow<'a, [CreateActionRow<'a>]> {
-    Cow::Owned(vec![CreateActionRow::Buttons(vec![
+pub fn confirm_dialog_buttons<'a>(positive: &'a str, negative: &'a str) -> [CreateButton<'a>; 2] {
+    [
         CreateButton::new("True")
             .style(serenity::ButtonStyle::Success)
             .label(positive),
         CreateButton::new("False")
             .style(serenity::ButtonStyle::Danger)
             .label(negative),
-    ])])
+    ]
 }
 
 pub async fn confirm_dialog_wait(
@@ -427,10 +424,12 @@ pub async fn confirm_dialog(
     positive: &str,
     negative: &str,
 ) -> Result<Option<bool>> {
+    let buttons = confirm_dialog_buttons(positive, negative);
+    let components = [CreateActionRow::buttons(&buttons)];
     let builder = poise::CreateReply::default()
         .content(prompt)
         .ephemeral(true)
-        .components(confirm_dialog_components(positive, negative));
+        .components(&components);
 
     let reply = ctx.send(builder).await?;
     let message = reply.message().await?;

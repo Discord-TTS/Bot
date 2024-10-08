@@ -23,7 +23,7 @@ pub async fn guild_create(
 
     let data = framework_ctx.user_data();
     let title = aformat!("Welcome to {}!", &ctx.cache.current_user().name);
-    match guild.owner_id.dm(&ctx.http, serenity::CreateMessage::default().embed(CreateEmbed::default()
+    let embeds = [CreateEmbed::default()
         .title(title.as_str())
         .description(format!("
 Hello! Someone invited me to your server `{}`!
@@ -39,9 +39,18 @@ You can view all the commands with `/help`
 Ask questions by either responding here or asking on the support server!",
         guild.name))
         .footer(CreateEmbedFooter::new(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
-        .author(CreateEmbedAuthor::new(&owner_tag).icon_url(owner_face))
-    )).await {
-        Err(serenity::Error::Http(error)) if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {},
+        .author(CreateEmbedAuthor::new(&owner_tag).icon_url(owner_face))];
+
+    match guild
+        .owner_id
+        .dm(
+            &ctx.http,
+            serenity::CreateMessage::default().embeds(&embeds),
+        )
+        .await
+    {
+        Err(serenity::Error::Http(error))
+            if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
         Err(error) => return Err(anyhow::Error::from(error)),
         _ => {}
     }

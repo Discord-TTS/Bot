@@ -2,7 +2,7 @@ use poise::serenity_prelude as serenity;
 use reqwest::StatusCode;
 
 use tts_core::{
-    common::{confirm_dialog_components, confirm_dialog_wait, remove_premium},
+    common::{confirm_dialog_buttons, confirm_dialog_wait, remove_premium},
     constants::PREMIUM_NEUTRAL_COLOUR,
     structs::{Data, FrameworkContext, Result},
 };
@@ -45,23 +45,29 @@ pub async fn guild_member_addition(
     Ok(())
 }
 
-fn create_premium_notice() -> serenity::CreateMessage<'static> {
-    let embed = serenity::CreateEmbed::new()
+async fn dm_premium_notice(
+    http: &serenity::Http,
+    user: &serenity::User,
+) -> serenity::Result<serenity::Message> {
+    let embed = [serenity::CreateEmbed::new()
         .colour(PREMIUM_NEUTRAL_COLOUR)
         .title("TTS Bot Premium - Important Message")
         .description(
             "You have just left a server that you have assigned as premium!
 Do you want to remove that server from your assigned slots?",
-        );
+        )];
 
-    let components = confirm_dialog_components(
+    let buttons = confirm_dialog_buttons(
         "Keep premium subscription assigned",
         "Unassign premium subscription",
     );
 
-    serenity::CreateMessage::new()
-        .embed(embed)
-        .components(components)
+    let components = [serenity::CreateActionRow::buttons(&buttons)];
+    let notice = serenity::CreateMessage::new()
+        .embeds(&embed)
+        .components(&components);
+
+    user.dm(http, notice).await
 }
 
 pub async fn guild_member_removal(
@@ -85,7 +91,7 @@ pub async fn guild_member_removal(
         return Ok(());
     }
 
-    let msg = match user.dm(&ctx.http, create_premium_notice()).await {
+    let msg = match dm_premium_notice(&ctx.http, user).await {
         Ok(msg) => msg,
         Err(err) => {
             // We cannot DM this premium user, just remove premium by default.
