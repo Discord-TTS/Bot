@@ -213,44 +213,31 @@ async fn voice_autocomplete<'a>(
         return Vec::new();
     };
 
-    let (mut i1, mut i2, mut i3, mut i4);
     let voices: &mut dyn Iterator<Item = _> = match mode {
-        TTSMode::gTTS => {
-            i1 = data
-                .gtts_voices
-                .iter()
-                .map(|(k, v)| (v.to_string(), k.to_string()));
-            &mut i1
-        }
-        TTSMode::eSpeak => {
-            i2 = data
-                .espeak_voices
-                .iter()
-                .map(|voice| (voice.to_string(), voice.to_string()));
-            &mut i2
-        }
-        TTSMode::Polly => {
-            i3 = data.polly_voices.values().map(|voice| {
-                let name = format!(
-                    "{} - {} ({})",
-                    voice.name, voice.language_name, voice.gender
-                );
+        TTSMode::gTTS => &mut data
+            .gtts_voices
+            .iter()
+            .map(|(k, v)| (v.to_string(), k.to_string())),
+        TTSMode::eSpeak => &mut data
+            .espeak_voices
+            .iter()
+            .map(|voice| (voice.to_string(), voice.to_string())),
+        TTSMode::Polly => &mut data.polly_voices.values().map(|voice| {
+            let name = format!(
+                "{} - {} ({})",
+                voice.name, voice.language_name, voice.gender
+            );
 
-                (name, voice.id.to_string())
-            });
-            &mut i3
-        }
-        TTSMode::gCloud => {
-            i4 = data.gcloud_voices.iter().flat_map(|(language, variants)| {
-                variants.iter().map(move |(variant, gender)| {
-                    (
-                        format!("{language} {variant} ({gender})"),
-                        format!("{language} {variant}"),
-                    )
-                })
-            });
-            &mut i4
-        }
+            (name, voice.id.to_string())
+        }),
+        TTSMode::gCloud => &mut data.gcloud_voices.iter().flat_map(|(language, variants)| {
+            variants.iter().map(move |(variant, gender)| {
+                (
+                    format!("{language} {variant} ({gender})"),
+                    format!("{language} {variant}"),
+                )
+            })
+        }),
     };
 
     let searching_lower = searching.to_lowercase();
