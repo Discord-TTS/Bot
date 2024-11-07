@@ -44,6 +44,7 @@ impl crate::Looper for Updater {
     const NAME: &'static str = "WebUpdater";
     const MILLIS: u64 = 1000 * 60 * 60;
 
+    type Error = anyhow::Error;
     async fn loop_func(&self) -> Result<()> {
         #[derive(sqlx::FromRow)]
         struct AnalyticsQueryResult {

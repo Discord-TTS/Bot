@@ -50,7 +50,8 @@ impl Looper for Arc<WebhookLogger> {
     const NAME: &'static str = "Logging";
     const MILLIS: u64 = 1100;
 
-    async fn loop_func(&self) -> Result<()> {
+    type Error = !;
+    async fn loop_func(&self) -> Result<(), Self::Error> {
         let pending_logs = self.pending_logs.lock().drain().collect::<HashMap<_, _>>();
 
         for (severity, messages) in pending_logs {
@@ -59,7 +60,8 @@ impl Looper for Arc<WebhookLogger> {
 
             for (target, log_message) in messages {
                 for line in log_message.lines() {
-                    writeln!(pre_chunked, "`[{target}]`: {line}")?;
+                    writeln!(pre_chunked, "`[{target}]`: {line}")
+                        .expect("String::write_fmt should never not fail");
                 }
             }
 
@@ -92,11 +94,13 @@ impl Looper for Arc<WebhookLogger> {
 
             for chunk in chunks {
                 let builder = ExecuteWebhook::default()
-                    .content(chunk)
+                    .content(&chunk)
                     .username(webhook_name.as_str())
                     .avatar_url(get_avatar(severity));
 
-                webhook.execute(&self.http, false, builder).await?;
+                if let Err(err) = webhook.execute(&self.http, false, builder).await {
+                    eprintln!("Failed to send log message: {err:?}\n{chunk}");
+                }
             }
         }
 

@@ -81,6 +81,7 @@ impl crate::Looper for BotListUpdater {
     const NAME: &'static str = "Bot List Updater";
     const MILLIS: u64 = 1000 * 60 * 60;
 
+    type Error = anyhow::Error;
     async fn loop_func(&self) -> Result<()> {
         let perform = |BotListReq { url, body, token }| async move {
             let headers = reqwest::header::HeaderMap::from_iter([

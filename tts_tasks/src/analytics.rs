@@ -8,6 +8,7 @@ impl crate::Looper for Arc<analytics::Handler> {
     const NAME: &'static str = "Analytics";
     const MILLIS: u64 = 5000;
 
+    type Error = anyhow::Error;
     async fn loop_func(&self) -> anyhow::Result<()> {
         let log_buffer = self.log_buffer.clone();
         self.log_buffer.clear();
