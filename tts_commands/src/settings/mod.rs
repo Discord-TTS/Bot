@@ -1003,14 +1003,8 @@ pub async fn nick(
     let guild_id = ctx.guild_id().unwrap();
     let user = user.as_ref().unwrap_or(author);
 
-    if author.id != user.id
-        && !guild_id
-            .member(ctx, author.id)
-            .await?
-            .permissions(ctx.cache())?
-            .administrator()
-    {
-        ctx.say("**Error**: You need admin to set other people's nicknames!")
+    if author.id != user.id && !ctx.author_permissions()?.manage_nicknames() {
+        ctx.say("**Error**: You need permission to set other people's nicknames!")
             .await?;
         return Ok(());
     }
