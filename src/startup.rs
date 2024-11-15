@@ -14,8 +14,8 @@ pub async fn get_webhooks(
     webhooks_raw: WebhookConfigRaw,
 ) -> Result<WebhookConfig> {
     let get_webhook = |url: reqwest::Url| async move {
-        let (webhook_id, token) = serenity::parse_webhook(&url).try_unwrap()?;
-        anyhow::Ok(http.get_webhook_with_token(webhook_id, token).await?)
+        let (webhook_id, _) = serenity::parse_webhook(&url).try_unwrap()?;
+        anyhow::Ok(webhook_id.to_webhook(http).await?)
     };
 
     let (logs, errors, dm_logs) = tokio::try_join!(

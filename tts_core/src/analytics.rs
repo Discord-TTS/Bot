@@ -33,7 +33,7 @@ impl Handler {
 pub fn pre_command(ctx: Context<'_>) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
     let analytics_handler = &ctx.data().analytics;
 
-    analytics_handler.log(Cow::Owned(ctx.command().qualified_name.clone()), true);
+    analytics_handler.log(ctx.command().qualified_name.clone(), true);
     analytics_handler.log(
         Cow::Borrowed(match ctx {
             poise::Context::Prefix(_) => "command",

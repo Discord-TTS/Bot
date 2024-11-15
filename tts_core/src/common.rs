@@ -397,10 +397,10 @@ pub fn confirm_dialog_buttons<'a>(positive: &'a str, negative: &'a str) -> [Crea
 
 pub async fn confirm_dialog_wait(
     ctx: &serenity::Context,
-    message: &serenity::Message,
+    message_id: serenity::MessageId,
     author_id: serenity::UserId,
 ) -> Result<Option<bool>> {
-    let interaction = message
+    let interaction = message_id
         .await_component_interaction(ctx.shard.clone())
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(author_id)
@@ -434,5 +434,5 @@ pub async fn confirm_dialog(
     let reply = ctx.send(builder).await?;
     let message = reply.message().await?;
 
-    confirm_dialog_wait(ctx.serenity_context(), &message, ctx.author().id).await
+    confirm_dialog_wait(ctx.serenity_context(), message.id, ctx.author().id).await
 }

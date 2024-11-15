@@ -61,9 +61,16 @@ fn show_group_description(group: &IndexMap<&str, Vec<&Command>>) -> String {
     buf
 }
 
-#[allow(clippy::unused_async)]
-pub async fn autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<String> {
-    fn flatten_commands(result: &mut Vec<String>, commands: &[Command], searching: &str) {
+#[expect(clippy::unused_async)]
+pub async fn autocomplete<'a>(
+    ctx: ApplicationContext<'a>,
+    searching: &'a str,
+) -> serenity::CreateAutocompleteResponse<'a> {
+    fn flatten_commands<'a>(
+        result: &mut Vec<serenity::AutocompleteChoice<'a>>,
+        commands: &'a [Command],
+        searching: &str,
+    ) {
         for command in commands {
             if command.owners_only || command.hide_in_help {
                 continue;
@@ -71,7 +78,10 @@ pub async fn autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<S
 
             if command.subcommands.is_empty() {
                 if command.qualified_name.starts_with(searching) {
-                    result.push(command.qualified_name.clone());
+                    result.push(serenity::AutocompleteChoice::new(
+                        command.qualified_name.as_ref(),
+                        command.qualified_name.as_ref(),
+                    ));
                 }
             } else {
                 flatten_commands(result, &command.subcommands, searching);
@@ -84,8 +94,8 @@ pub async fn autocomplete(ctx: ApplicationContext<'_>, searching: &str) -> Vec<S
 
     flatten_commands(&mut result, commands, searching);
 
-    result.sort_by_key(|a| strsim::levenshtein(a, searching));
-    result
+    result.sort_by_cached_key(|a| strsim::levenshtein(&a.name, searching));
+    serenity::CreateAutocompleteResponse::new().set_choices(result)
 }
 
 /// Shows TTS Bot's commands and descriptions of them

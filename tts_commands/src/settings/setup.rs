@@ -102,9 +102,9 @@ async fn show_channel_select_menu(
         .components(generate_channel_select(&text_channels));
 
     let reply = ctx.send(builder).await?;
-    let interaction = reply
-        .message()
-        .await?
+    let reply_message = reply.message().await?;
+    let interaction = reply_message
+        .id
         .await_component_interaction(ctx.serenity_context().shard.clone())
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(ctx.author().id)

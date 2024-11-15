@@ -200,7 +200,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
 async fn voice_autocomplete<'a>(
     ctx: ApplicationContext<'a>,
     searching: &'a str,
-) -> Vec<serenity::AutocompleteChoice<'a>> {
+) -> serenity::CreateAutocompleteResponse<'a> {
     let data = ctx.data();
     let Ok((_, mode)) = data
         .parse_user_or_guild(
@@ -210,7 +210,7 @@ async fn voice_autocomplete<'a>(
         )
         .await
     else {
-        return Vec::new();
+        return serenity::CreateAutocompleteResponse::new();
     };
 
     let voices: &mut dyn Iterator<Item = _> = match mode {
@@ -247,29 +247,33 @@ async fn voice_autocomplete<'a>(
 
     voices.sort_by_cached_key(|(l_lower, _, _)| strsim::levenshtein(l_lower, &searching_lower));
     voices.sort_by_key(|(l_lower, _, _)| !l_lower.contains(&searching_lower));
-    voices
-        .into_iter()
-        .map(|(_, label, value)| serenity::AutocompleteChoice::new(label, value))
-        .collect()
+
+    serenity::CreateAutocompleteResponse::new().set_choices(
+        voices
+            .into_iter()
+            .map(|(_, label, value)| serenity::AutocompleteChoice::new(label, value))
+            .collect::<Vec<_>>(),
+    )
 }
 
-#[allow(clippy::unused_async)]
+#[expect(clippy::unused_async)]
 async fn translation_languages_autocomplete<'a>(
     ctx: ApplicationContext<'a>,
     searching: &'a str,
-) -> impl Iterator<Item = serenity::AutocompleteChoice<'a>> {
-    let mut filtered_languages = ctx
-        .data()
-        .translation_languages
-        .iter()
+) -> serenity::CreateAutocompleteResponse<'a> {
+    let data = ctx.serenity_context().data_ref::<Data>();
+    let languages = data.translation_languages.iter();
+    let mut filtered_languages: Vec<_> = languages
         .filter(|(_, name)| name.starts_with(searching))
-        .map(|(value, name)| (value.to_string(), name.to_string()))
-        .collect::<Vec<_>>();
+        .collect();
 
-    filtered_languages.sort_by_key(|(label, _)| strsim::levenshtein(label, searching));
-    filtered_languages
-        .into_iter()
-        .map(|(value, name)| serenity::AutocompleteChoice::new(name, value))
+    filtered_languages.sort_by_cached_key(|(label, _)| strsim::levenshtein(label, searching));
+    serenity::CreateAutocompleteResponse::new().set_choices(
+        filtered_languages
+            .into_iter()
+            .map(|(value, name)| serenity::AutocompleteChoice::new(name, value.as_str()))
+            .collect::<Vec<_>>(),
+    )
 }
 
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
@@ -488,7 +492,7 @@ macro_rules! create_bool_command {
 
             Command {
                 prefix_action: prefix_bool().prefix_action,
-                name: String::from(stringify!($name)),
+                name: Cow::Borrowed(stringify!($name)),
                 ..slash_bool()
             }
         }
@@ -1320,7 +1324,7 @@ pub fn commands() -> [Command; 5] {
         poise::Command {
             subcommands: vec![
                 poise::Command {
-                    name: String::from("channel"),
+                    name: Cow::Borrowed("channel"),
                     ..setup::setup()
                 },
                 xsaid(),

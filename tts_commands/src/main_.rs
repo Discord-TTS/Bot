@@ -106,6 +106,10 @@ fn required_role_embed<'a>(
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
+    let required_bot_vc_permissions = serenity::Permissions::VIEW_CHANNEL
+        | serenity::Permissions::CONNECT
+        | serenity::Permissions::SPEAK;
+
     let Some(author_vc) = ctx.author_vc() else {
         let err = "I cannot join your voice channel unless you are in one!";
         ctx.send_error(err).await?;
@@ -122,8 +126,16 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         (current_user.id, current_user.face())
     };
 
-    let bot_member = guild_id.member(ctx, bot_id).await?;
-    if let Some(communication_disabled_until) = bot_member.communication_disabled_until {
+    let (author_vc_bot_perms, communication_disabled_until) = {
+        let guild = require_guild!(ctx);
+        let bot_member = guild.members.get(&bot_id).try_unwrap()?;
+        let author_vc = guild.channels.get(&author_vc).try_unwrap()?;
+
+        let bot_vc_perms = guild.user_permissions_in(author_vc, bot_member);
+        (bot_vc_perms, bot_member.communication_disabled_until)
+    };
+
+    if let Some(communication_disabled_until) = communication_disabled_until {
         if communication_disabled_until > serenity::Timestamp::now() {
             let msg = "I am timed out, please ask a moderator to remove the timeout";
             ctx.send_error(msg).await?;
@@ -131,14 +143,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         }
     }
 
-    let author = ctx.author();
-    let channel = author_vc.to_guild_channel(ctx, Some(guild_id)).await?;
-
-    let missing_permissions = (serenity::Permissions::VIEW_CHANNEL
-        | serenity::Permissions::CONNECT
-        | serenity::Permissions::SPEAK)
-        - channel.permissions_for_user(ctx.cache(), bot_id)?;
-
+    let missing_permissions = required_bot_vc_permissions - author_vc_bot_perms;
     if !missing_permissions.is_empty() {
         let mut msg = String::from("I do not have permission to TTS in your voice channel, please ask a server administrator to give me: ");
         push_permission_names(&mut msg, missing_permissions);
@@ -165,7 +170,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 return Ok(());
             } else {
                 tracing::warn!("Channel {bot_channel_id} didn't exist in {guild_id} in `/join`");
-                data.last_to_xsaid_tracker.remove(&channel.guild_id);
+                data.last_to_xsaid_tracker.remove(&guild_id);
                 data.songbird.remove(guild_id).await?;
             }
         }
@@ -202,7 +207,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         .title("Joined your voice channel!")
         .description("Just type normally and TTS Bot will say your messages!")
         .thumbnail(bot_face)
-        .author(CreateEmbedAuthor::new(display_name).icon_url(author.face()))
+        .author(CreateEmbedAuthor::new(display_name).icon_url(ctx.author().face()))
         .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite,
             bot_id,

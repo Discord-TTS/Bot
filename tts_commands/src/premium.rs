@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Write as _};
+use std::fmt::Write as _;
 
 use aformat::aformat;
 

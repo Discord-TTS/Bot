@@ -65,39 +65,37 @@ impl<'a> MenuPaginator<'a> {
         serenity::CreateActionRow::Buttons(buttons)
     }
 
-    async fn create_message(&self) -> serenity::Result<serenity::Message> {
-        self.ctx
-            .send(
-                poise::CreateReply::default()
-                    .embed(self.create_page(&self.pages[self.index]))
-                    .components(vec![self.create_action_row(false)]),
-            )
-            .await?
-            .into_message()
-            .await
+    async fn create_message(&self) -> serenity::Result<serenity::MessageId> {
+        let components = [self.create_action_row(false)];
+        let builder = poise::CreateReply::default()
+            .embed(self.create_page(&self.pages[self.index]))
+            .components(&components);
+
+        self.ctx.send(builder).await?.message().await.map(|m| m.id)
     }
 
     async fn edit_message(
         &self,
-        message: &mut serenity::Message,
+        message: serenity::MessageId,
         disable: bool,
-    ) -> serenity::Result<()> {
-        message
-            .edit(
-                self.ctx,
-                EditMessage::default()
-                    .embed(self.create_page(&self.pages[self.index]))
-                    .components(vec![self.create_action_row(disable)]),
-            )
-            .await
+    ) -> serenity::Result<serenity::MessageId> {
+        let http = self.ctx.http();
+        let channel_id = self.ctx.channel_id();
+
+        let components = [self.create_action_row(disable)];
+        let builder = EditMessage::default()
+            .embed(self.create_page(&self.pages[self.index]))
+            .components(&components);
+
+        Ok(channel_id.edit_message(http, message, builder).await?.id)
     }
 
     pub async fn start(mut self) -> serenity::Result<()> {
-        let mut message = self.create_message().await?;
+        let mut message_id = self.create_message().await?;
         let serenity_context = self.ctx.serenity_context();
 
         loop {
-            let builder = message
+            let builder = message_id
                 .await_component_interaction(serenity_context.shard.clone())
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(self.ctx.author().id);
@@ -106,26 +104,26 @@ impl<'a> MenuPaginator<'a> {
                 break Ok(());
             };
 
-            match interaction.data.custom_id.as_str() {
+            message_id = match interaction.data.custom_id.as_str() {
                 "⏮️" => {
                     self.index = 0;
-                    self.edit_message(&mut message, false).await?;
+                    self.edit_message(message_id, false).await?
                 }
                 "◀" => {
                     self.index -= 1;
-                    self.edit_message(&mut message, false).await?;
+                    self.edit_message(message_id, false).await?
                 }
                 "⏹️" => {
-                    self.edit_message(&mut message, true).await?;
+                    self.edit_message(message_id, true).await?;
                     return interaction.defer(&serenity_context.http).await;
                 }
                 "▶️" => {
                     self.index += 1;
-                    self.edit_message(&mut message, false).await?;
+                    self.edit_message(message_id, false).await?
                 }
                 "⏭️" => {
                     self.index = self.pages.len() - 1;
-                    self.edit_message(&mut message, false).await?;
+                    self.edit_message(message_id, false).await?
                 }
                 _ => unreachable!(),
             };

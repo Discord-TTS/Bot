@@ -47,7 +47,7 @@ pub async fn guild_member_addition(
 
 async fn dm_premium_notice(
     http: &serenity::Http,
-    user: &serenity::User,
+    user_id: serenity::UserId,
 ) -> serenity::Result<serenity::Message> {
     let embed = [serenity::CreateEmbed::new()
         .colour(PREMIUM_NEUTRAL_COLOUR)
@@ -67,13 +67,13 @@ Do you want to remove that server from your assigned slots?",
         .embeds(&embed)
         .components(&components);
 
-    user.dm(http, notice).await
+    user_id.dm(http, notice).await
 }
 
 pub async fn guild_member_removal(
     framework_ctx: FrameworkContext<'_>,
     guild_id: serenity::GuildId,
-    user: &serenity::User,
+    user_id: serenity::UserId,
 ) -> Result<()> {
     let data = framework_ctx.user_data();
 
@@ -82,7 +82,7 @@ pub async fn guild_member_removal(
         return Ok(());
     };
 
-    if premium_user != user.id {
+    if premium_user != user_id {
         return Ok(());
     }
 
@@ -91,7 +91,7 @@ pub async fn guild_member_removal(
         return Ok(());
     }
 
-    let msg = match dm_premium_notice(&ctx.http, user).await {
+    let msg = match dm_premium_notice(&ctx.http, user_id).await {
         Ok(msg) => msg,
         Err(err) => {
             // We cannot DM this premium user, just remove premium by default.
@@ -111,7 +111,7 @@ pub async fn guild_member_removal(
         None => "<Unknown>",
     };
 
-    let response = match confirm_dialog_wait(ctx, &msg, premium_user).await? {
+    let response = match confirm_dialog_wait(ctx, msg.id, premium_user).await? {
         Some(true) => format!("Okay, kept your premium assigned to {guild_name} ({guild_id})."),
         Some(false) => {
             remove_premium(&data, guild_id).await?;
@@ -123,7 +123,8 @@ pub async fn guild_member_removal(
         }
     };
 
-    user.dm(&ctx.http, serenity::CreateMessage::new().content(response))
+    user_id
+        .dm(&ctx.http, serenity::CreateMessage::new().content(response))
         .await?;
 
     Ok(())

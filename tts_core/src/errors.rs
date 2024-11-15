@@ -311,14 +311,32 @@ async fn handle_cooldown(
             error_message.delete(&ctx_discord.http, None).await?;
 
             let bot_user_id = ctx_discord.cache.current_user().id;
-            let Some(channel) = error_message.channel(ctx_discord).await?.guild() else {
-                return Ok(());
+            let has_permissions = {
+                let Some(guild) = ctx.guild() else {
+                    return Ok(());
+                };
+
+                let bot_member = guild.members.get(&bot_user_id).try_unwrap()?;
+                let permissions =
+                    if let Some(channel) = guild.channels.get(&error_message.channel_id) {
+                        guild.user_permissions_in(channel, bot_member)
+                    } else if let Some(thread) = guild
+                        .threads
+                        .iter()
+                        .find(|th| th.id == error_message.channel_id)
+                    {
+                        let parent_id = thread.parent_id.try_unwrap()?;
+                        let parent = guild.channels.get(&parent_id).try_unwrap()?;
+
+                        guild.user_permissions_in(parent, bot_member)
+                    } else {
+                        return Err(anyhow::anyhow!("Can't find channel for cooldown message"));
+                    };
+
+                permissions.manage_messages()
             };
 
-            if channel
-                .permissions_for_user(&ctx_discord.cache, bot_user_id)?
-                .manage_messages()
-            {
+            if has_permissions {
                 let reason = "Deleting command invocation that hit cooldown";
                 ctx.msg.delete(&ctx_discord.http, Some(reason)).await?;
             }
@@ -388,7 +406,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             let command = ctx.command();
 
             let mut extra_fields = vec![
-                ("Command", Cow::Owned(command.name.clone()), true),
+                ("Command", command.name.clone(), true),
                 (
                     "Slash Command",
                     Cow::Owned(matches!(ctx, poise::Context::Application(..)).to_string()),
@@ -432,6 +450,14 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ctx,
             ..
         } => handle_cooldown(ctx, remaining_cooldown).await?,
+
+        poise::FrameworkError::PermissionFetchFailed { ctx, .. } => {
+            error!(
+                "Could not fetch permissions for channel {} in guild {:?}",
+                ctx.channel_id(),
+                ctx.guild_id()
+            )
+        }
         poise::FrameworkError::MissingBotPermissions {
             missing_permissions,
             ctx,

@@ -49,15 +49,31 @@ async fn process_mention_msg(
 
     let ctx = framework_ctx.serenity_context;
     let bot_user = ctx.cache.current_user().id;
-    let channel = message.channel(ctx).await?.guild().unwrap();
-    let permissions = channel.permissions_for_user(&ctx.cache, bot_user)?;
+    let bot_send_messages = {
+        let Some(guild) = ctx.cache.guild(guild_id) else {
+            return Ok(());
+        };
+
+        let bot_member = guild.members.get(&bot_user).try_unwrap()?;
+        if let Some(ch) = guild.channels.get(&message.channel_id) {
+            guild.user_permissions_in(ch, bot_member).send_messages()
+        } else if let Some(th) = guild.threads.iter().find(|th| th.id == message.channel_id) {
+            let parent_channel_id = th.parent_id.try_unwrap()?;
+            let parent_channel = guild.channels.get(&parent_channel_id).try_unwrap()?;
+            guild
+                .user_permissions_in(parent_channel, bot_member)
+                .send_messages_in_threads()
+        } else {
+            return Ok(());
+        }
+    };
 
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
     let mut prefix = guild_row.prefix.as_str().replace(['`', '\\'], "");
 
-    if permissions.send_messages() {
+    if bot_send_messages {
         prefix.insert_str(0, "Current prefix for this server is: ");
-        channel.say(&ctx.http, prefix).await?;
+        message.channel_id.say(&ctx.http, prefix).await?;
     } else {
         let msg = {
             let guild = ctx.cache.guild(guild_id);
@@ -69,11 +85,8 @@ async fn process_mention_msg(
             format!("My prefix for `{guild_name}` is {prefix} however I do not have permission to send messages so I cannot respond to your commands!")
         };
 
-        match message
-            .author
-            .dm(&ctx.http, CreateMessage::default().content(msg))
-            .await
-        {
+        let msg = CreateMessage::default().content(msg);
+        match message.author.id.dm(&ctx.http, msg).await {
             Err(serenity::Error::Http(error))
                 if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
             Err(error) => return Err(anyhow::Error::from(error)),
@@ -91,12 +104,9 @@ async fn process_support_dm(
     let data = framework_ctx.user_data();
     let ctx = framework_ctx.serenity_context;
 
-    let channel = match message.channel(ctx).await? {
-        serenity::Channel::Guild(channel) => {
-            return process_support_response(ctx, message, &data, channel).await
-        }
-        serenity::Channel::Private(channel) => channel,
-        _ => return Ok(()),
+    let channel_id = message.channel_id;
+    if message.guild_id.is_some() {
+        return process_support_response(ctx, message, &data, channel_id).await;
     };
 
     if message.author.bot() || message.content.starts_with('-') {
@@ -120,9 +130,9 @@ async fn process_support_dm(
                 )
             };
 
-            channel.say(&ctx.http, content).await?;
+            channel_id.say(&ctx.http, content).await?;
         } else if content.as_str() == "help" {
-            channel.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
+            channel_id.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
         } else if !userinfo.dm_blocked() {
             let webhook_username = {
                 let mut tag = message.author.tag();
@@ -178,14 +188,14 @@ async fn process_support_dm(
                 client_id,
             )))];
 
-        let welcome_msg = channel
+        let welcome_msg = channel_id
             .send_message(&ctx.http, CreateMessage::default().embeds(&embeds))
             .await?;
 
         data.userinfo_db
             .set_one(message.author.id.into(), "dm_welcomed", &true)
             .await?;
-        if channel.pins(&ctx.http).await?.len() < 50 {
+        if channel_id.pins(&ctx.http).await?.len() < 50 {
             welcome_msg.pin(&ctx.http, None).await?;
         }
 
@@ -202,9 +212,9 @@ async fn process_support_response(
     ctx: &serenity::Context,
     message: &serenity::Message,
     data: &Data,
-    channel: serenity::GuildChannel,
+    channel_id: serenity::ChannelId,
 ) -> Result<()> {
-    if data.webhooks.dm_logs.channel_id.try_unwrap()? != channel.id {
+    if data.webhooks.dm_logs.channel_id.try_unwrap()? != channel_id {
         return Ok(());
     };
 
@@ -217,7 +227,7 @@ async fn process_support_response(
     };
 
     let (resolved_author_name, resolved_author_discrim) = {
-        let message = ctx.http.get_message(channel.id, resolved_id).await?;
+        let message = channel_id.message(ctx, resolved_id).await?;
         (message.author.name, message.author.discriminator)
     };
 
@@ -257,7 +267,7 @@ async fn process_support_response(
     .await?;
 
     let embeds = [CreateEmbed::from(embed)];
-    channel
+    channel_id
         .send_message(
             &ctx.http,
             CreateMessage::default().content(content).embeds(&embeds),

@@ -48,25 +48,28 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
     }
 
     fn author_permissions(&self) -> Result<serenity::Permissions> {
-        // Handle non-guild call first, to allow try_unwrap calls to be safe.
-        if self.guild_id().is_none() {
-            return Ok(((serenity::Permissions::from_bits_truncate(
-                0b111_1100_1000_0000_0000_0111_1111_1000_0100_0000,
-            ) | serenity::Permissions::SEND_MESSAGES)
-                - serenity::Permissions::SEND_TTS_MESSAGES)
-                - serenity::Permissions::MANAGE_MESSAGES);
-        }
-
-        let guild = self.guild().try_unwrap()?;
-        let channel = guild.channels.get(&self.channel_id()).try_unwrap()?;
         match self {
             poise::Context::Application(poise::ApplicationContext { interaction, .. }) => {
+                let channel = interaction.channel.as_ref().try_unwrap()?;
                 let author_member = interaction.member.as_deref().try_unwrap()?;
-                Ok(guild.user_permissions_in(channel, author_member))
+
+                let mut permissions = author_member.permissions.try_unwrap()?;
+                if matches!(
+                    channel.kind,
+                    serenity::ChannelType::NewsThread
+                        | serenity::ChannelType::PublicThread
+                        | serenity::ChannelType::PrivateThread
+                ) {
+                    permissions.set(
+                        serenity::Permissions::SEND_MESSAGES,
+                        permissions.send_messages_in_threads(),
+                    );
+                }
+
+                Ok(permissions)
             }
             poise::Context::Prefix(poise::PrefixContext { msg, .. }) => {
-                let author_member = msg.member.as_deref().try_unwrap()?;
-                Ok(guild.partial_member_permissions_in(channel, msg.author.id, author_member))
+                msg.author_permissions(self.cache()).try_unwrap()
             }
         }
     }
@@ -88,27 +91,29 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
         let author = self.author();
         let guild_id = self.guild_id();
         let serenity_ctx = self.serenity_context();
-        let serernity_cache = &serenity_ctx.cache;
 
         let (name, avatar_url) = match self.channel_id().to_channel(serenity_ctx, guild_id).await? {
             serenity::Channel::Guild(channel) => {
-                let permissions = channel
-                    .permissions_for_user(serernity_cache, serernity_cache.current_user().id)?;
+                if !self.author_permissions()?.embed_links() {
+                    self.send(poise::CreateReply::new()
+                        .content("An Error Occurred! Please give me embed links permissions so I can tell you more!")
+                        .ephemeral(true)
+                    ).await?;
 
-                if !permissions.send_messages() {
                     return Ok(None);
                 };
 
-                if !permissions.embed_links() {
-                    return self.send(poise::CreateReply::default()
-                        .ephemeral(true)
-                        .content("An Error Occurred! Please give me embed links permissions so I can tell you more!")
-                    ).await.map(Some).map_err(Into::into);
+                let member = match self {
+                    Self::Application(ctx) => ctx.interaction.member.as_deref().map(Cow::Borrowed),
+                    Self::Prefix(_) => {
+                        let member = channel.guild_id.member(serenity_ctx, author.id).await;
+                        member.ok().map(Cow::Owned)
+                    }
                 };
 
-                match channel.guild_id.member(serenity_ctx, author.id).await {
-                    Ok(member) => (Cow::Owned(member.display_name().to_owned()), member.face()),
-                    Err(_) => (Cow::Borrowed(&*author.name), author.face()),
+                match member {
+                    Some(m) => (Cow::Owned(m.display_name().to_owned()), m.face()),
+                    None => (Cow::Borrowed(&*author.name), author.face()),
                 }
             }
             serenity::Channel::Private(_) => (Cow::Borrowed(&*author.name), author.face()),

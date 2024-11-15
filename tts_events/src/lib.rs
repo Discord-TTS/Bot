@@ -43,7 +43,7 @@ pub async fn listen(framework_ctx: FrameworkContext<'_>, event: &Event) -> Resul
             guild_member_addition(framework_ctx, new_member).await
         }
         Event::GuildMemberRemoval { guild_id, user, .. } => {
-            guild_member_removal(framework_ctx, *guild_id, user).await
+            guild_member_removal(framework_ctx, *guild_id, user.id).await
         }
         Event::VoiceStateUpdate { old, new } => {
             voice_state_update(framework_ctx, old.as_ref(), new).await
