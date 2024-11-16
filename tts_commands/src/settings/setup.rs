@@ -36,19 +36,18 @@ fn can_send_partial(
     can_send_generic(guild.partial_member_permissions_in(channel, user_id, partial_member))
 }
 
-type U64ArrayString = <u64 as ToArrayString>::ArrayString;
-type EligibleSetupChannel = (
-    serenity::ChannelId,
-    U64ArrayString,
-    FixedString<u16>,
-    u16,
-    bool,
-);
+struct ChannelMenuEntry {
+    id: serenity::ChannelId,
+    id_str: <u64 as ToArrayString>::ArrayString,
+    name: FixedString<u16>,
+    position: u16,
+    has_webhook_perms: bool,
+}
 
 fn get_eligible_channels(
     ctx: Context<'_>,
     bot_member: &serenity::Member,
-) -> Result<Option<Vec<EligibleSetupChannel>>> {
+) -> Result<Option<Vec<ChannelMenuEntry>>> {
     let guild = require_guild!(ctx, Ok(None));
     let author_can_send: &dyn Fn(_) -> _ = match ctx {
         Context::Application(poise::ApplicationContext { interaction, .. }) => {
@@ -69,10 +68,12 @@ fn get_eligible_channels(
                 && can_send(&guild, c, bot_member)
                 && author_can_send(c)
         })
-        .map(|c| {
-            let has_webhook_perms = guild.user_permissions_in(c, bot_member).manage_webhooks();
-            let id_str = c.id.get().to_arraystring();
-            (c.id, id_str, c.name.clone(), c.position, has_webhook_perms)
+        .map(|c| ChannelMenuEntry {
+            id: c.id,
+            id_str: c.id.to_arraystring(),
+            name: c.name.clone(),
+            position: c.position,
+            has_webhook_perms: guild.user_permissions_in(c, bot_member).manage_webhooks(),
         })
         .collect();
 
@@ -95,7 +96,7 @@ async fn show_channel_select_menu(
         return Ok(None);
     };
 
-    text_channels.sort_by(|(_, _, _, f, _), (_, _, _, s, _)| Ord::cmp(&f, &s));
+    text_channels.sort_by(|c1, c2| Ord::cmp(&c1.position, &c2.position));
 
     let builder = poise::CreateReply::default()
         .content("Select a channel!")
@@ -122,15 +123,15 @@ async fn show_channel_select_menu(
     };
 
     let selected_id: serenity::ChannelId = values[0].parse()?;
-    let (_, _, _, _, has_webhook_perms) = text_channels
+    let selected_entry = text_channels
         .into_iter()
-        .find(|(c_id, _, _, _, _)| *c_id == selected_id)
+        .find(|entry| entry.id == selected_id)
         .unwrap();
 
-    Ok(Some((selected_id, has_webhook_perms)))
+    Ok(Some((selected_id, selected_entry.has_webhook_perms)))
 }
 
-fn generate_channel_select(text_channels: &[EligibleSetupChannel]) -> Vec<CreateActionRow<'_>> {
+fn generate_channel_select(text_channels: &[ChannelMenuEntry]) -> Vec<CreateActionRow<'_>> {
     text_channels
         .chunks(25)
         .enumerate()
@@ -140,9 +141,7 @@ fn generate_channel_select(text_channels: &[EligibleSetupChannel]) -> Vec<Create
                 CreateSelectMenuKind::String {
                     options: chunked_channels
                         .iter()
-                        .map(|(_, id_str, name, _, _)| {
-                            CreateSelectMenuOption::new(&**name, &**id_str)
-                        })
+                        .map(|entry| CreateSelectMenuOption::new(&*entry.name, &*entry.id_str))
                         .collect(),
                 },
             ))
