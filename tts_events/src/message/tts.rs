@@ -224,18 +224,19 @@ fn run_checks(
         }
     }
 
-    if let Some(required_role) = guild_row.required_role {
-        let message_member = message.member.as_deref().try_unwrap()?;
-        if !message_member.roles.contains(&required_role) {
-            let Some(channel) = guild.channels.get(&message.channel_id) else {
-                return Ok(None);
-            };
+    if let Some(required_role) = guild_row.required_role
+        && let Some(message_member) = &message.member
+        && !message_member.roles.contains(&required_role)
+    {
+        let Some(channel) = guild.channels.get(&message.channel_id) else {
+            return Ok(None);
+        };
 
-            let author_permissions =
-                guild.partial_member_permissions_in(channel, message.author.id, message_member);
-            if !author_permissions.administrator() {
-                return Ok(None);
-            }
+        if !guild
+            .partial_member_permissions_in(channel, message.author.id, message_member)
+            .administrator()
+        {
+            return Ok(None);
         }
     }
 

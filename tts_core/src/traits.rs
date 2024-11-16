@@ -51,7 +51,9 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
         match self {
             poise::Context::Application(poise::ApplicationContext { interaction, .. }) => {
                 let channel = interaction.channel.as_ref().try_unwrap()?;
-                let author_member = interaction.member.as_deref().try_unwrap()?;
+                let Some(author_member) = interaction.member.as_deref() else {
+                    return Ok(serenity::Permissions::dm_permissions());
+                };
 
                 let mut permissions = author_member.permissions.try_unwrap()?;
                 if matches!(
