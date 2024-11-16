@@ -107,6 +107,7 @@ pub struct BotListTokens {
 
 #[derive(serde::Deserialize)]
 pub struct PremiumConfig {
+    pub discord_monetisation_enabled: Option<bool>,
     pub patreon_page_url: ArrayString<64>,
     pub patreon_service: reqwest::Url,
     pub basic_sku: SkuId,

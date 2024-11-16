@@ -1,6 +1,6 @@
 use std::fmt::Write as _;
 
-use aformat::aformat;
+use aformat::{aformat, aformat_into, ArrayString};
 
 use poise::{
     futures_util::{stream::BoxStream, StreamExt as _},
@@ -47,15 +47,27 @@ async fn get_premium_guild_count<'a>(
     aliases("purchase", "donate")
 )]
 pub async fn premium(ctx: Context<'_>) -> CommandResult {
+    let mut out = ArrayString::<377>::new();
     let msg = if let Some(premium_config) = &ctx.data().premium_config {
         let patreon_url = premium_config.patreon_page_url;
-        let application_id = ctx.http().application_id().try_unwrap()?;
-        &aformat!(concat!(
-            "To support the development and hosting of TTS Bot and get access to TTS Bot Premium, ",
-            "including more modes (`/set mode`), many more voices (`/set voice`), ",
-            "and extra options such as TTS translation, follow one of these links:\n",
-            "Patreon: <{patreon_url}>\nDiscord: https://discord.com/application-directory/{application_id}/store"
-        ))
+        if premium_config.discord_monetisation_enabled == Some(true) {
+            let application_id = ctx.http().application_id().try_unwrap()?;
+            aformat_into!(out, concat!(
+                "To support the development and hosting of TTS Bot and get access to TTS Bot Premium, ",
+                "including more modes (`/set mode`), many more voices (`/set voice`), ",
+                "and extra options such as TTS translation, follow one of these links:\n",
+                "Patreon: <{patreon_url}>\nDiscord: https://discord.com/application-directory/{application_id}/store"
+            ));
+        } else {
+            aformat_into!(out, concat!(
+                "To support the development and hosting of TTS Bot and get access to TTS Bot Premium, ",
+                "including more modes (`/set mode`), many more voices (`/set voice`), ",
+                "and extra options such as TTS translation, subscribe on Patreon\n!\n",
+                "<{patreon_url}>"
+            ));
+        }
+
+        &out
     } else {
         "This version of TTS Bot does not have premium features enabled."
     };
