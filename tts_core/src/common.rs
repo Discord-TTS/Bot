@@ -36,12 +36,12 @@ pub async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<
     Ok(())
 }
 
-pub async fn dm_generic<'ctx, 'a>(
-    ctx: &'ctx serenity::Context,
+pub async fn dm_generic(
+    ctx: &serenity::Context,
     author: &serenity::User,
     target: serenity::UserId,
     mut target_tag: String,
-    attachment_url: Option<&'a str>,
+    attachment_url: Option<&str>,
     message: &str,
 ) -> Result<(String, serenity::Embed)> {
     let mut embed = serenity::CreateEmbed::default();

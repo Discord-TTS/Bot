@@ -1,5 +1,6 @@
-use std::{borrow::Cow, fmt::Write};
+use std::{borrow::Cow, fmt::Write, ops::ControlFlow};
 
+use arrayvec::ArrayVec;
 use indexmap::IndexMap;
 
 use self::serenity::CreateEmbed;
@@ -67,10 +68,10 @@ pub async fn autocomplete<'a>(
     searching: &'a str,
 ) -> serenity::CreateAutocompleteResponse<'a> {
     fn flatten_commands<'a>(
-        result: &mut Vec<serenity::AutocompleteChoice<'a>>,
+        result: &mut ArrayVec<serenity::AutocompleteChoice<'a>, 25>,
         commands: &'a [Command],
         searching: &str,
-    ) {
+    ) -> ControlFlow<()> {
         for command in commands {
             if command.owners_only || command.hide_in_help {
                 continue;
@@ -78,24 +79,30 @@ pub async fn autocomplete<'a>(
 
             if command.subcommands.is_empty() {
                 if command.qualified_name.starts_with(searching) {
-                    result.push(serenity::AutocompleteChoice::new(
+                    let choice = serenity::AutocompleteChoice::new(
                         command.qualified_name.as_ref(),
                         command.qualified_name.as_ref(),
-                    ));
+                    );
+
+                    if result.try_push(choice).is_err() {
+                        return ControlFlow::Break(());
+                    };
                 }
             } else {
-                flatten_commands(result, &command.subcommands, searching);
+                flatten_commands(result, &command.subcommands, searching)?;
             }
         }
+
+        ControlFlow::Continue(())
     }
 
     let commands = &ctx.framework.options().commands;
-    let mut result = Vec::with_capacity(commands.len());
+    let mut result = ArrayVec::<_, 25>::new();
 
     flatten_commands(&mut result, commands, searching);
 
     result.sort_by_cached_key(|a| strsim::levenshtein(&a.name, searching));
-    serenity::CreateAutocompleteResponse::new().set_choices(result)
+    serenity::CreateAutocompleteResponse::new().set_choices(result.into_iter().collect::<Vec<_>>())
 }
 
 /// Shows TTS Bot's commands and descriptions of them

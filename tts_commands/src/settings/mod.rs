@@ -251,6 +251,7 @@ async fn voice_autocomplete<'a>(
     serenity::CreateAutocompleteResponse::new().set_choices(
         voices
             .into_iter()
+            .take(25)
             .map(|(_, label, value)| serenity::AutocompleteChoice::new(label, value))
             .collect::<Vec<_>>(),
     )
@@ -271,6 +272,7 @@ async fn translation_languages_autocomplete<'a>(
     serenity::CreateAutocompleteResponse::new().set_choices(
         filtered_languages
             .into_iter()
+            .take(25)
             .map(|(value, name)| serenity::AutocompleteChoice::new(name, value.as_str()))
             .collect::<Vec<_>>(),
     )
