@@ -456,7 +456,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
                 "Could not fetch permissions for channel {} in guild {:?}",
                 ctx.channel_id(),
                 ctx.guild_id()
-            )
+            );
         }
         poise::FrameworkError::MissingBotPermissions {
             missing_permissions,

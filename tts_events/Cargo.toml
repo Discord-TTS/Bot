@@ -19,3 +19,6 @@ songbird.workspace = true
 
 tts_core = { path = "../tts_core" }
 tts_tasks = { path = "../tts_tasks" }
+
+[lints]
+workspace = true

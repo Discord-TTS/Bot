@@ -32,6 +32,9 @@ mini-moka.workspace = true
 itertools.workspace = true
 parking_lot.workspace = true
 
+[lints]
+workspace = true
+
 [package.metadata.cargo-machete]
 ignored = [
     "bitflags", # Used in `bool_to_bitflags`

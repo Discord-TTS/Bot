@@ -25,11 +25,11 @@ fn count_members<'a>(guilds: impl Iterator<Item = serenity::cache::GuildRef<'a>>
 
 #[derive(serde::Serialize)]
 struct Statistics {
-    premium_guild_count: u32,
-    premium_user_count: u64,
-    message_count: u64,
-    guild_count: u32,
-    user_count: u64,
+    premium_guild: u32,
+    premium_user: u64,
+    message: u64,
+    guild: u32,
+    user: u64,
 }
 
 pub struct Updater {
@@ -107,19 +107,19 @@ impl crate::Looper for Updater {
         let guild_ids = self.cache.guilds();
 
         let guild_ref_iter = guild_ids.iter().filter_map(|g| self.cache.guild(*g));
-        let user_count = count_members(guild_ref_iter.clone());
+        let user = count_members(guild_ref_iter.clone());
 
         let premium_guild_ref_iter =
             guild_ref_iter.filter(|g| premium_guild_ids.contains(&(g.id.get() as i64)));
-        let premium_user_count = count_members(premium_guild_ref_iter.clone());
+        let premium_user = count_members(premium_guild_ref_iter.clone());
         let premium_guild_count = premium_guild_ref_iter.count();
 
         let stats = Statistics {
-            user_count,
-            premium_user_count,
-            message_count: message_count as u64,
-            guild_count: guild_ids.len() as u32,
-            premium_guild_count: premium_guild_count as u32,
+            user,
+            premium_user,
+            message: message_count as u64,
+            guild: guild_ids.len() as u32,
+            premium_guild: premium_guild_count as u32,
         };
 
         let url = {

@@ -145,8 +145,8 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
     let require_voice = guild_row.require_voice();
     let text_in_voice = guild_row.text_in_voice();
     let audience_ignore = guild_row.audience_ignore();
+    let voice_mode = user_mode.map(Into::into).unwrap_or(none_str);
     let role_mention = required_role.as_deref().unwrap_or(none_str);
-    let voice_mode = user_mode.map(|m| m.into()).unwrap_or(none_str);
     let required_prefix = guild_row.required_prefix.as_deref().unwrap_or(none_str);
     let repeated_chars = match guild_row.repeated_chars {
         Some(chars) => &chars.to_arraystring(),

@@ -1,25 +1,4 @@
-#![allow(stable_features)]
 #![feature(let_chains)]
-#![warn(
-    rust_2018_idioms,
-    missing_copy_implementations,
-    noop_method_call,
-    unused
-)]
-#![warn(clippy::pedantic)]
-// clippy::pedantic complains about u64 -> i64 and back when db conversion, however it is fine
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::cast_possible_wrap,
-    clippy::cast_lossless,
-    clippy::cast_possible_truncation
-)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::wildcard_imports,
-    clippy::too_many_lines,
-    clippy::similar_names
-)]
 
 use std::{
     collections::BTreeMap,

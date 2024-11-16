@@ -113,7 +113,7 @@ async fn run(config: &mut toml::Table, pool: &sqlx::PgPool) -> Result<()> {
         .transaction(move |transaction| {
             Box::pin(async move {
                 let mut config = stolen_config;
-                _run(&mut config, transaction).await?;
+                run_(&mut config, transaction).await?;
                 anyhow::Ok(config)
             })
         })
@@ -127,7 +127,7 @@ async fn run(config: &mut toml::Table, pool: &sqlx::PgPool) -> Result<()> {
     Ok(())
 }
 
-async fn _run(config: &mut toml::Table, transaction: &mut Transaction<'_>) -> Result<()> {
+async fn run_(config: &mut toml::Table, transaction: &mut Transaction<'_>) -> Result<()> {
     let main_config = config["Main"].as_table_mut().try_unwrap()?;
     if main_config.get("setup").is_none() {
         transaction.execute(DB_SETUP_QUERY).await?;

@@ -20,6 +20,7 @@ mod owner;
 mod premium;
 mod settings;
 
+#[must_use]
 pub fn commands() -> Vec<Command> {
     main_::commands()
         .into_iter()

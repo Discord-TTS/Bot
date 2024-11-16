@@ -28,7 +28,7 @@ pub(crate) async fn process_tts_msg(
         data.userinfo_db.get(message.author.id.into()),
     )?;
 
-    let Some((mut content, to_autojoin)) = run_checks(ctx, message, &guild_row, &user_row)? else {
+    let Some((mut content, to_autojoin)) = run_checks(ctx, message, &guild_row, *user_row)? else {
         return Ok(());
     };
 
@@ -197,7 +197,7 @@ fn run_checks(
     ctx: &serenity::Context,
     message: &serenity::Message,
     guild_row: &GuildRow,
-    user_row: &UserRow,
+    user_row: UserRow,
 ) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
     if user_row.bot_banned() {
         return Ok(None);

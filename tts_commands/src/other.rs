@@ -89,11 +89,11 @@ pub async fn tts(
             .await?;
         Ok(())
     } else {
-        _tts(ctx, ctx.author(), &message).await
+        tts_(ctx, ctx.author(), &message).await
     }
 }
 
-async fn _tts(ctx: Context<'_>, author: &serenity::User, message: &str) -> CommandResult {
+async fn tts_(ctx: Context<'_>, author: &serenity::User, message: &str) -> CommandResult {
     let attachment = {
         let data = ctx.data();
         let http = ctx.http();
@@ -171,7 +171,7 @@ pub async fn tts_speak_as(
     ctx: ApplicationContext<'_>,
     message: serenity::Message,
 ) -> CommandResult {
-    _tts(ctx.into(), &message.author, &message.content).await
+    tts_(ctx.into(), &message.author, &message.content).await
 }
 
 #[poise::command(
@@ -180,7 +180,7 @@ pub async fn tts_speak_as(
     context_menu_command = "Speak with your voice!"
 )]
 pub async fn tts_speak(ctx: ApplicationContext<'_>, message: serenity::Message) -> CommandResult {
-    _tts(ctx.into(), &ctx.interaction.user, &message.content).await
+    tts_(ctx.into(), &ctx.interaction.user, &message.content).await
 }
 
 /// Shows various different stats

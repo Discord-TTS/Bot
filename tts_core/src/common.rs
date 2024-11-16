@@ -91,6 +91,7 @@ pub async fn fetch_audio(
     }
 }
 
+#[must_use]
 pub fn prepare_url(
     mut tts_service: reqwest::Url,
     content: &str,
@@ -120,6 +121,7 @@ pub fn prepare_url(
     tts_service
 }
 
+#[must_use]
 pub fn random_footer(server_invite: &str, client_id: serenity::UserId) -> Cow<'static, str> {
     match rand::thread_rng().gen_range(0..5) {
         0 => Cow::Owned(format!("If you find a bug or want to ask a question, join the support server: {server_invite}")),

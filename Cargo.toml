@@ -22,6 +22,9 @@ debug = 2
 [profile.dev.package.syn]
 opt-level = 3
 
+[lints]
+workspace = true
+
 [dependencies]
 const_format = "0.2"
 small-fixed-array = { version = "0.4.5", features = [
@@ -99,6 +102,25 @@ branch = "serenity-next"
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "serenity-next"
+
+[workspace.lints.rust]
+rust_2018_idioms = "warn"
+missing_copy_implementations = "warn"
+noop_method_call = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+cast_lossless = "allow"
+cast_possible_truncation = "allow"
+unreadable_literal = "allow"
+wildcard_imports = "allow"
+too_many_lines = "allow"
+similar_names = "allow"
+missing_panics_doc = "allow"
+missing_errors_doc = "allow"
+map_unwrap_or = "allow"
 
 [package.metadata.cargo-machete]
 ignored = [

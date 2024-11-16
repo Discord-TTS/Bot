@@ -49,7 +49,7 @@ pub struct GuildRowRaw {
 }
 
 #[bool_to_bitflags::bool_to_bitflags(owning_setters)]
-#[derive(Debug, typesize::derive::TypeSize)]
+#[derive(Debug, Clone, Copy, typesize::derive::TypeSize)]
 pub struct GuildRow {
     pub channel: Option<ChannelId>,
     pub premium_user: Option<UserId>,
@@ -71,6 +71,7 @@ pub struct GuildRow {
 }
 
 impl GuildRow {
+    #[must_use]
     pub fn target_lang(&self, is_premium: IsPremium) -> Option<&str> {
         if let Some(target_lang) = &self.target_lang
             && self.to_translate()
@@ -113,7 +114,11 @@ impl Compact for GuildRowRaw {
     }
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Clone, Copy)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "raw version of compacted type"
+)]
 pub struct UserRowRaw {
     pub dm_blocked: bool,
     pub dm_welcomed: bool,
@@ -124,7 +129,7 @@ pub struct UserRowRaw {
 }
 
 #[bool_to_bitflags::bool_to_bitflags(owning_setters)]
-#[derive(Debug, typesize::derive::TypeSize)]
+#[derive(Debug, Clone, Copy, typesize::derive::TypeSize)]
 pub struct UserRow {
     pub dm_blocked: bool,
     pub dm_welcomed: bool,
@@ -156,7 +161,7 @@ pub struct GuildVoiceRowRaw {
     pub voice: String,
 }
 
-#[derive(Debug, TypeSize)]
+#[derive(Debug, Clone, Copy, TypeSize)]
 
 pub struct GuildVoiceRow {
     pub guild_id: Option<GuildId>,
@@ -183,7 +188,7 @@ pub struct UserVoiceRowRaw {
     pub speaking_rate: Option<f32>,
 }
 
-#[derive(Debug, TypeSize)]
+#[derive(Debug, Clone, Copy, TypeSize)]
 pub struct UserVoiceRow {
     pub user_id: Option<UserId>,
     pub mode: TTSMode,

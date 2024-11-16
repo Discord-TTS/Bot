@@ -47,7 +47,7 @@ type EligibleSetupChannel = (
 
 fn get_eligible_channels(
     ctx: Context<'_>,
-    bot_member: serenity::Member,
+    bot_member: &serenity::Member,
 ) -> Result<Option<Vec<EligibleSetupChannel>>> {
     let guild = require_guild!(ctx, Ok(None));
     let author_can_send: &dyn Fn(_) -> _ = match ctx {
@@ -66,11 +66,11 @@ fn get_eligible_channels(
         .iter()
         .filter(|c| {
             c.kind == serenity::ChannelType::Text
-                && can_send(&guild, c, &bot_member)
+                && can_send(&guild, c, bot_member)
                 && author_can_send(c)
         })
         .map(|c| {
-            let has_webhook_perms = guild.user_permissions_in(c, &bot_member).manage_webhooks();
+            let has_webhook_perms = guild.user_permissions_in(c, bot_member).manage_webhooks();
             let id_str = c.id.get().to_arraystring();
             (c.id, id_str, c.name.clone(), c.position, has_webhook_perms)
         })
@@ -81,7 +81,7 @@ fn get_eligible_channels(
 
 async fn show_channel_select_menu(
     ctx: Context<'_>,
-    bot_member: serenity::Member,
+    bot_member: &serenity::Member,
 ) -> Result<Option<(serenity::ChannelId, bool)>> {
     let Some(mut text_channels) = get_eligible_channels(ctx, bot_member)? else {
         return Ok(None);
@@ -185,7 +185,7 @@ pub async fn setup(
             let chan_perms = require_guild!(ctx).user_permissions_in(&channel, &bot_member);
             (channel.id, chan_perms.manage_webhooks())
         } else {
-            require!(show_channel_select_menu(ctx, bot_member).await?, Ok(()))
+            require!(show_channel_select_menu(ctx, &bot_member).await?, Ok(()))
         };
 
         (channel, has_webhook_perms)

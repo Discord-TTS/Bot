@@ -168,11 +168,11 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 let msg = aformat!("I am already in <#{bot_channel_id}>!");
                 ctx.say(msg.as_str()).await?;
                 return Ok(());
-            } else {
-                tracing::warn!("Channel {bot_channel_id} didn't exist in {guild_id} in `/join`");
-                data.last_to_xsaid_tracker.remove(&guild_id);
-                data.songbird.remove(guild_id).await?;
             }
+
+            tracing::warn!("Channel {bot_channel_id} didn't exist in {guild_id} in `/join`");
+            data.last_to_xsaid_tracker.remove(&guild_id);
+            data.songbird.remove(guild_id).await?;
         }
     };
 

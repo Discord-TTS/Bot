@@ -134,6 +134,7 @@ impl JoinVCToken {
 
 bool_enum!(IsPremium(No | Yes));
 
+#[derive(Clone, Copy)]
 pub enum FailurePoint {
     NotSubscribed(UserId),
     PremiumUser,
@@ -201,6 +202,7 @@ impl RegexCache {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct LastXsaidInfo(UserId, std::time::SystemTime);
 
 impl LastXsaidInfo {
@@ -214,10 +216,12 @@ impl LastXsaidInfo {
             .count()
     }
 
+    #[must_use]
     pub fn new(user: UserId) -> Self {
         Self(user, std::time::SystemTime::now())
     }
 
+    #[must_use]
     pub fn should_announce_name(&self, guild: &serenity::Guild, user: UserId) -> bool {
         let Some(voice_channel_id) = guild.voice_states.get(&user).and_then(|v| v.channel_id)
         else {
@@ -307,8 +311,8 @@ impl Data {
         }
     }
 
-    fn get_cached_discord_premium(&self, user_id: &UserId) -> Option<PremiumInfo> {
-        if let Some(cached_entitlement) = self.entitlement_cache.get(user_id) {
+    fn get_cached_discord_premium(&self, user_id: UserId) -> Option<PremiumInfo> {
+        if let Some(cached_entitlement) = self.entitlement_cache.get(&user_id) {
             if let Some(premium_info) = cached_entitlement.as_premium_info() {
                 return Some(premium_info);
             }
@@ -361,7 +365,7 @@ impl Data {
         http: &serenity::Http,
         user_id: UserId,
     ) -> Result<Option<PremiumInfo>> {
-        if let Some(premium_info) = self.get_cached_discord_premium(&user_id) {
+        if let Some(premium_info) = self.get_cached_discord_premium(user_id) {
             return Ok(Some(premium_info));
         }
 
@@ -509,7 +513,7 @@ pub struct SpeakingRateInfo {
 }
 
 impl SpeakingRateInfo {
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     const fn new(min: f32, default: &'static str, max: f32, kind: &'static str) -> Option<Self> {
         Some(Self {
             min,
@@ -519,7 +523,8 @@ impl SpeakingRateInfo {
         })
     }
 
-    pub fn kind(&self) -> CapStr<32> {
+    #[must_use]
+    pub fn kind(&self) -> CapStr<'static, 32> {
         CapStr(self.kind)
     }
 }
@@ -537,6 +542,7 @@ pub enum TTSMode {
 }
 
 impl TTSMode {
+    #[must_use]
     pub const fn is_premium(self) -> bool {
         match self {
             Self::gTTS | Self::eSpeak => false,
@@ -544,6 +550,7 @@ impl TTSMode {
         }
     }
 
+    #[must_use]
     pub const fn default_voice(self) -> &'static str {
         match self {
             Self::gTTS => "en",
@@ -553,6 +560,7 @@ impl TTSMode {
         }
     }
 
+    #[must_use]
     pub const fn speaking_rate_info(self) -> Option<SpeakingRateInfo> {
         match self {
             Self::gTTS => None,
@@ -643,7 +651,7 @@ fn deserialize_error_code<'de, D: serde::Deserializer<'de>>(
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum TTSServiceErrorCode {
     Unknown,
     UnknownVoice,
@@ -652,6 +660,7 @@ pub enum TTSServiceErrorCode {
 }
 
 impl TTSServiceErrorCode {
+    #[must_use]
     pub const fn should_ignore(self) -> bool {
         matches!(self, Self::AudioTooLong)
     }

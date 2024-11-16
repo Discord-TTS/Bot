@@ -22,6 +22,7 @@ use serenity::FullEvent as Event;
 
 use tts_core::structs::{FrameworkContext, Result};
 
+#[must_use]
 pub fn get_intents() -> serenity::GatewayIntents {
     serenity::GatewayIntents::GUILDS
         | serenity::GatewayIntents::GUILD_MESSAGES

@@ -22,3 +22,6 @@ songbird.workspace = true
 arrayvec.workspace = true
 
 tts_core = { path = "../tts_core" }
+
+[lints]
+workspace = true

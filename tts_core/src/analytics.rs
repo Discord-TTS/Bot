@@ -30,6 +30,7 @@ impl Handler {
     }
 }
 
+#[must_use]
 pub fn pre_command(ctx: Context<'_>) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
     let analytics_handler = &ctx.data().analytics;
 

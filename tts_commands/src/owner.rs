@@ -1,4 +1,4 @@
-use std::{borrow::Cow, hash::Hash, sync::Arc};
+use std::{borrow::Cow, hash::Hash};
 
 use aformat::aformat;
 use num_format::{Locale, ToFormattedString};
@@ -152,16 +152,16 @@ pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
     subcommands("info", "leave")
 )]
 pub async fn debug(ctx: Context<'_>) -> CommandResult {
-    _info(ctx).await
+    info_(ctx).await
 }
 
 /// Shows debug information including voice info and database info.
 #[poise::command(prefix_command, slash_command, guild_only)]
 pub async fn info(ctx: Context<'_>) -> CommandResult {
-    _info(ctx).await
+    info_(ctx).await
 }
 
-pub async fn _info(ctx: Context<'_>) -> CommandResult {
+pub async fn info_(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let guild_id_db: i64 = guild_id.into();
 
@@ -279,20 +279,20 @@ struct Field {
 }
 
 fn process_cache_info(
-    serenity_cache: Arc<serenity::Cache>,
-    kind: Option<String>,
+    serenity_cache: &serenity::Cache,
+    kind: Option<&str>,
     db_info: Option<Vec<typesize::Field>>,
 ) -> Option<Vec<Field>> {
-    let cache_stats = match kind.as_deref() {
+    let cache_stats = match kind {
         Some("db") => Some(db_info.expect("if kind is db, db_info should be filled")),
         Some("guild") => Some(average_details(
-            guild_iter(&serenity_cache).map(|g| g.get_size_details()),
+            guild_iter(serenity_cache).map(|g| g.get_size_details()),
         )),
         Some("channel") => Some(average_details(
-            guild_iter(&serenity_cache).flat_map(|g| details_iter(g.channels.iter())),
+            guild_iter(serenity_cache).flat_map(|g| details_iter(g.channels.iter())),
         )),
         Some("role") => Some(average_details(
-            guild_iter(&serenity_cache).flat_map(|g| details_iter(g.roles.iter())),
+            guild_iter(serenity_cache).flat_map(|g| details_iter(g.roles.iter())),
         )),
         Some(_) => None,
         None => Some(serenity_cache.get_size_details()),
@@ -353,7 +353,7 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
     };
 
     let cache = ctx.serenity_context().cache.clone();
-    let get_cache_info = move || process_cache_info(cache, kind, db_info);
+    let get_cache_info = move || process_cache_info(&cache, kind.as_deref(), db_info);
     let Some(fields) = tokio::task::spawn_blocking(get_cache_info).await.unwrap() else {
         ctx.say("Unknown cache!").await?;
         return Ok(());
