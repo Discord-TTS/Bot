@@ -1,5 +1,6 @@
 use std::{borrow::Cow, sync::Arc};
 
+use ::serenity::all::GenericGuildChannelRef;
 use anyhow::{Error, Result};
 use sha2::Digest;
 use tracing::error;
@@ -317,21 +318,16 @@ async fn handle_cooldown(
                 };
 
                 let bot_member = guild.members.get(&bot_user_id).try_unwrap()?;
-                let permissions =
-                    if let Some(channel) = guild.channels.get(&error_message.channel_id) {
+                let permissions = match guild.channel(error_message.channel_id) {
+                    Some(GenericGuildChannelRef::Channel(channel)) => {
                         guild.user_permissions_in(channel, bot_member)
-                    } else if let Some(thread) = guild
-                        .threads
-                        .iter()
-                        .find(|th| th.id == error_message.channel_id)
-                    {
-                        let parent_id = thread.parent_id.try_unwrap()?;
-                        let parent = guild.channels.get(&parent_id).try_unwrap()?;
-
+                    }
+                    Some(GenericGuildChannelRef::Thread(thread)) => {
+                        let parent = guild.channels.get(&thread.parent_id).try_unwrap()?;
                         guild.user_permissions_in(parent, bot_member)
-                    } else {
-                        return Err(anyhow::anyhow!("Can't find channel for cooldown message"));
-                    };
+                    }
+                    None => return Err(anyhow::anyhow!("Can't find channel for cooldown message")),
+                };
 
                 permissions.manage_messages()
             };
@@ -383,7 +379,7 @@ const fn channel_type(channel: &serenity::Channel) -> &'static str {
     use self::serenity::{Channel, ChannelType};
 
     match channel {
-        Channel::Guild(channel) => match channel.kind {
+        Channel::Guild(channel) => match channel.base.kind {
             ChannelType::Text | ChannelType::News => "Text Channel",
             ChannelType::Voice => "Voice Channel",
             ChannelType::NewsThread => "News Thread Channel",

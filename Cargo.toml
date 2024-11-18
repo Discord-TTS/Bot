@@ -88,20 +88,24 @@ version = "6.1.0"
 default-features = false
 
 [workspace.dependencies.serenity]
-git = "https://github.com/serenity-rs/serenity"
+git = "https://github.com/GnomedDev/serenity"
 features = ["typesize", "temp_cache"]
 default-features = false
-branch = "next"
+branch = "thread-split"
 
 [workspace.dependencies.poise]
-git = "https://github.com/serenity-rs/poise"
+git = "https://github.com/GnomedDev/poise"
 features = ["cache"]
-branch = "serenity-next"
+branch = "thread-split"
 
 [workspace.dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "serenity-next"
+
+[patch."https://github.com/serenity-rs/serenity".serenity]
+git = "https://github.com/GnomedDev/serenity"
+branch = "thread-split"
 
 [workspace.lints.rust]
 rust_2018_idioms = "warn"

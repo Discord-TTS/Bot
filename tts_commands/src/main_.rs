@@ -23,7 +23,7 @@ async fn channel_check(
     let guild_id = ctx.guild_id().unwrap();
     let guild_row = ctx.data().guilds_db.get(guild_id.into()).await?;
 
-    let channel_id = Some(ctx.channel_id());
+    let channel_id = Some(ctx.channel_id().expect_channel());
     if guild_row.channel == channel_id || author_vc == channel_id {
         return Ok(Some(guild_row));
     }
