@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     collections::BTreeMap,
-    num::NonZeroU8,
+    num::{NonZeroU16, NonZeroU8},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, OnceLock,
@@ -258,6 +258,7 @@ pub struct Data {
     pub songbird: Arc<songbird::Songbird>,
     pub reqwest: reqwest::Client,
     pub regex_cache: RegexCache,
+    pub shard_count: NonZeroU16,
     pub webhooks: WebhookConfig,
     pub pool: sqlx::PgPool,
 

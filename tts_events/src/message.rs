@@ -10,31 +10,25 @@ use tts_core::{
     common::{dm_generic, random_footer},
     constants::DM_WELCOME_MESSAGE,
     opt_ext::OptionTryUnwrap,
-    structs::{Data, FrameworkContext, Result},
+    structs::{Data, Result},
 };
 
 use tts::process_tts_msg;
 
 mod tts;
 
-pub async fn message(
-    framework_ctx: FrameworkContext<'_>,
-    new_message: &serenity::Message,
-) -> Result<()> {
+pub async fn message(ctx: &serenity::Context, new_message: &serenity::Message) -> Result<()> {
     tokio::try_join!(
-        process_tts_msg(framework_ctx, new_message),
-        process_support_dm(framework_ctx, new_message),
-        process_mention_msg(framework_ctx, new_message),
+        process_tts_msg(ctx, new_message),
+        process_support_dm(ctx, new_message),
+        process_mention_msg(ctx, new_message),
     )?;
 
     Ok(())
 }
 
-async fn process_mention_msg(
-    framework_ctx: FrameworkContext<'_>,
-    message: &serenity::Message,
-) -> Result<()> {
-    let data = framework_ctx.user_data();
+async fn process_mention_msg(ctx: &serenity::Context, message: &serenity::Message) -> Result<()> {
+    let data = ctx.data_ref::<Data>();
     let Some(bot_mention_regex) = data.regex_cache.bot_mention.get() else {
         return Ok(());
     };
@@ -47,7 +41,6 @@ async fn process_mention_msg(
         return Ok(());
     };
 
-    let ctx = framework_ctx.serenity_context;
     let bot_user = ctx.cache.current_user().id;
     let bot_send_messages = {
         let Some(guild) = ctx.cache.guild(guild_id) else {
@@ -97,16 +90,11 @@ async fn process_mention_msg(
     Ok(())
 }
 
-async fn process_support_dm(
-    framework_ctx: FrameworkContext<'_>,
-    message: &serenity::Message,
-) -> Result<()> {
-    let data = framework_ctx.user_data();
-    let ctx = framework_ctx.serenity_context;
-
+async fn process_support_dm(ctx: &serenity::Context, message: &serenity::Message) -> Result<()> {
+    let data = ctx.data_ref::<Data>();
     let channel_id = message.channel_id;
     if message.guild_id.is_some() {
-        return process_support_response(ctx, message, &data, channel_id).await;
+        return process_support_response(ctx, message, data, channel_id).await;
     }
 
     if message.author.bot() || message.content.starts_with('-') {

@@ -66,6 +66,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         gcloud_voices,
         polly_voices,
         translation_languages,
+        shard_count,
         premium_user,
     ) = tokio::try_join!(
         get_webhooks(&http, config.webhooks),
@@ -79,6 +80,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         fetch_voices(&reqwest, tts_service(), auth_key, TTSMode::gCloud),
         fetch_voices::<Vec<PollyVoice>>(&reqwest, tts_service(), auth_key, TTSMode::Polly),
         fetch_translation_languages(&reqwest, tts_service(), auth_key),
+        async { Ok(http.get_bot_gateway().await?.shards) },
         async {
             let res = serenity::UserId::new(802632257658683442)
                 .to_user(&http)
@@ -141,6 +143,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         nickname_db,
         user_voice_db,
         guild_voice_db,
+        shard_count,
     });
 
     let framework_options = poise::FrameworkOptions {
@@ -181,7 +184,10 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         shard_manager.shutdown_all().await;
     });
 
-    client.start_autosharded().await.map_err(Into::into)
+    client
+        .start_shards(shard_count.get())
+        .await
+        .map_err(Into::into)
 }
 
 #[cfg(unix)]

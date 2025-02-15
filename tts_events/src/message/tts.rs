@@ -8,17 +8,15 @@ use tts_core::{
     database::{GuildRow, UserRow},
     errors,
     opt_ext::OptionTryUnwrap as _,
-    structs::{FrameworkContext, IsPremium, JoinVCToken, Result, TTSMode},
+    structs::{Data, IsPremium, JoinVCToken, Result, TTSMode},
     traits::SongbirdManagerExt as _,
 };
 
 pub(crate) async fn process_tts_msg(
-    framework_ctx: FrameworkContext<'_>,
+    ctx: &serenity::Context,
     message: &serenity::Message,
 ) -> Result<()> {
-    let data = framework_ctx.user_data();
-    let ctx = framework_ctx.serenity_context;
-
+    let data = ctx.data_ref::<Data>();
     let Some(guild_id) = message.guild_id else {
         return Ok(());
     };
@@ -35,7 +33,7 @@ pub(crate) async fn process_tts_msg(
     let is_premium = data.is_premium_simple(&ctx.http, guild_id).await?;
     let (voice, mode) = {
         if let Some(channel_id) = to_autojoin {
-            let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
+            let join_vc_lock = JoinVCToken::acquire(data, guild_id);
             match data.songbird.join_vc(join_vc_lock, channel_id).await {
                 Ok(call) => call,
                 Err(songbird::error::JoinError::TimedOut) => return Ok(()),
@@ -118,7 +116,7 @@ pub(crate) async fn process_tts_msg(
                 .try_unwrap()?
         };
 
-        let join_vc_token = JoinVCToken::acquire(&data, guild_id);
+        let join_vc_token = JoinVCToken::acquire(data, guild_id);
         match data.songbird.join_vc(join_vc_token, voice_channel_id).await {
             Ok(call) => call,
             Err(songbird::error::JoinError::TimedOut) => return Ok(()),
@@ -162,12 +160,12 @@ pub(crate) async fn process_tts_msg(
         false,
     );
 
-    let guild = ctx.cache.guild(guild_id).try_unwrap()?;
+    let guild_name = ctx.cache.guild(guild_id).try_unwrap()?.name.to_string();
     let (blank_name, blank_value, blank_inline) = errors::blank_field();
 
     let extra_fields = [
-        ("Guild Name", Cow::Owned(guild.name.to_string()), true),
-        ("Guild ID", Cow::Owned(guild.id.to_string()), true),
+        ("Guild Name", Cow::Owned(guild_name), true),
+        ("Guild ID", Cow::Owned(guild_id.to_string()), true),
         (blank_name, blank_value, blank_inline),
         (
             "Message length",
@@ -178,13 +176,11 @@ pub(crate) async fn process_tts_msg(
         ("Mode", Cow::Owned(mode.to_string()), true),
     ];
 
-    let shard_manager = framework_ctx.shard_manager.clone();
     let author_name = message.author.name.clone();
     let icon_url = message.author.face();
 
     errors::handle_track(
         ctx.clone(),
-        shard_manager,
         extra_fields,
         author_name,
         icon_url,
