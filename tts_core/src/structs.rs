@@ -65,9 +65,9 @@ pub struct MainConfig {
     pub announcements_channel: ChannelId,
     pub main_server_invite: FixedString,
     pub proxy_url: Option<FixedString>,
-    pub token: Option<FixedString>,
     pub invite_channel: ChannelId,
     pub tts_service: reqwest::Url,
+    pub token: serenity::Token,
     pub main_server: GuildId,
     pub ofs_role: RoleId,
 

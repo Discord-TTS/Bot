@@ -163,7 +163,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 if author_vc == bot_channel_id {
                     ctx.say("I am already in your voice channel!").await?;
                     return Ok(());
-                };
+                }
 
                 let msg = aformat!("I am already in <#{bot_channel_id}>!");
                 ctx.say(msg.as_str()).await?;
@@ -174,7 +174,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
             data.last_to_xsaid_tracker.remove(&guild_id);
             data.songbird.remove(guild_id).await?;
         }
-    };
+    }
 
     let display_name = {
         let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
@@ -190,7 +190,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
             } else {
                 Err(err.into())
             };
-        };
+        }
 
         match ctx {
             Context::Application(poise::ApplicationContext { interaction, .. }) => {
@@ -312,7 +312,7 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
         }
     } else {
         ctx.say("**Error**: I am not in a voice channel!").await?;
-    };
+    }
 
     Ok(())
 }

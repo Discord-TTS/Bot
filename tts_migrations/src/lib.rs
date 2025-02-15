@@ -61,7 +61,7 @@ async fn migrate_single_to_modes(
         transaction
             .execute(&*format!("ALTER TABLE {table} DROP COLUMN {old_column}"))
             .await?;
-    };
+    }
 
     Ok(())
 }
@@ -97,7 +97,7 @@ async fn migrate_speaking_rate_to_mode(transaction: &mut Transaction<'_>) -> Res
         transaction
             .execute("ALTER TABLE userinfo DROP COLUMN speaking_rate")
             .await?;
-    };
+    }
 
     Ok(())
 }
@@ -122,7 +122,7 @@ async fn run(config: &mut toml::Table, pool: &sqlx::PgPool) -> Result<()> {
     if &starting_conf != config {
         let mut config_file = std::fs::File::create("config.toml")?;
         config_file.write_all(toml::to_string_pretty(&config)?.as_bytes())?;
-    };
+    }
 
     Ok(())
 }

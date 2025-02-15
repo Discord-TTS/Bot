@@ -291,23 +291,20 @@ enum Target {
     User,
 }
 
-async fn change_mode<'a, CacheKey, RowT>(
-    ctx: &'a Context<'a>,
-    general_db: &'a database::Handler<CacheKey, RowT>,
-    identifier: CacheKey,
+async fn can_change_mode(
+    ctx: &Context<'_>,
     mode: Option<TTSMode>,
-    target: Target,
     guild_is_premium: bool,
-) -> Result<Option<Cow<'a, str>>, Error>
-where
-    CacheKey: database::CacheKeyTrait + Default + Send + Sync + Copy,
-    RowT: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Compact + Send + Sync + Unpin,
-{
+) -> Result<bool> {
     let data = ctx.data();
-    if let Some(mode) = mode
-        && mode.is_premium()
-        && !guild_is_premium
-    {
+    let Some(mode) = mode else { return Ok(true) };
+
+    if data.config.gtts_disabled.load(Ordering::Relaxed) && mode == TTSMode::gTTS {
+        ctx.send_error(GTTS_DISABLED_ERROR).await?;
+        return Ok(false);
+    }
+
+    if mode.is_premium() && !guild_is_premium {
         ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
@@ -319,25 +316,10 @@ where
                 The `{mode}` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
             ").as_str())
         )).await?;
-        Ok(None)
-    } else {
-        let key = if guild_is_premium {
-            "premium_voice_mode"
-        } else {
-            "voice_mode"
-        };
 
-        general_db.set_one(identifier, key, &mode).await?;
-        Ok(Some(match mode {
-            Some(mode) => Cow::Owned(match target {
-                Target::Guild => format!("Changed the server TTS Mode to: {mode}"),
-                Target::User => format!("Changed your TTS Mode to: {mode}"),
-            }),
-            None => Cow::Borrowed(match target {
-                Target::Guild => "Reset the server mode",
-                Target::User => "Reset your mode",
-            }),
-        }))
+        Ok(false)
+    } else {
+        Ok(true)
     }
 }
 
@@ -398,7 +380,7 @@ fn format_languages<'a>(mut iter: impl Iterator<Item = &'a FixedString<u8>>) -> 
             buf.push_str(elt);
             buf.push('`');
         }
-    };
+    }
 
     buf
 }
@@ -722,30 +704,28 @@ async fn required_prefix(
 )]
 pub async fn server_mode(
     ctx: Context<'_>,
-    #[description = "The TTS Mode to change to"] mode: TTSModeChoice,
+    #[description = "The TTS Mode to change to"] mode: Option<TTSModeChoice>,
 ) -> CommandResult {
     let data = ctx.data();
     let guild_id = ctx.guild_id().unwrap();
 
-    let mode = TTSMode::from(mode);
-    if data.config.gtts_disabled.load(Ordering::Relaxed) && mode == TTSMode::gTTS {
-        ctx.send_error(GTTS_DISABLED_ERROR).await?;
+    let mode = mode.map(TTSMode::from);
+    let guild_is_premium = data.is_premium_simple(ctx.http(), guild_id).await?;
+    if !can_change_mode(&ctx, mode, guild_is_premium).await? {
         return Ok(());
     }
 
-    let to_send = change_mode(
-        &ctx,
-        &data.guilds_db,
-        guild_id.into(),
-        Some(mode),
-        Target::Guild,
-        false,
-    )
-    .await?;
+    data.guilds_db
+        .set_one(guild_id.into(), "voice_mode", mode)
+        .await?;
 
-    if let Some(to_send) = to_send {
-        ctx.say(to_send).await?;
+    let response = if let Some(mode) = mode {
+        &aformat!("Set your server's voice mode to: {mode}")
+    } else {
+        "Reset your server's voice mode"
     };
+
+    ctx.say(response).await?;
     Ok(())
 }
 
@@ -822,7 +802,7 @@ pub async fn translation_lang(
             let mut to_say = format!("The target translation language is now: `{target_lang}`");
             if !data.guilds_db.get(guild_id).await?.to_translate() {
                 to_say.push_str("\nYou may want to enable translation with `/set translation on`");
-            };
+            }
 
             Cow::Owned(to_say)
         } else {
@@ -1060,32 +1040,35 @@ pub async fn mode(
     >,
 ) -> CommandResult {
     let data = ctx.data();
-    let author_id = ctx.author().id.into();
     let guild_id = ctx.guild_id().unwrap();
 
     let mode = mode.map(TTSMode::from);
-    if data.config.gtts_disabled.load(Ordering::Relaxed) && mode == Some(TTSMode::gTTS) {
-        ctx.send_error(GTTS_DISABLED_ERROR).await?;
+    let guild_is_premium = data.is_premium_simple(ctx.http(), guild_id).await?;
+    if !can_change_mode(&ctx, mode, guild_is_premium).await? {
         return Ok(());
     }
 
-    let to_send = change_mode(
-        &ctx,
-        &data.userinfo_db,
-        author_id,
-        mode,
-        Target::User,
-        data.is_premium_simple(ctx.http(), guild_id).await?,
-    )
-    .await?;
-
-    if let Some(to_send) = to_send {
-        ctx.say(to_send).await?;
+    let key = if guild_is_premium {
+        "premium_voice_mode"
+    } else {
+        "voice_mode"
     };
+
+    data.userinfo_db
+        .set_one(ctx.author().id.into(), key, mode)
+        .await?;
+
+    let response = if let Some(mode) = mode {
+        &aformat!("Set your voice mode to: {mode}")
+    } else {
+        "Reset your voice mode"
+    };
+
+    ctx.say(response).await?;
     Ok(())
 }
 
-/// Changes the voice your messages are read in, full list in `-voices`
+/// Changes the voice your messages are read in, full list in `/voices`
 #[poise::command(
     guild_only,
     category = "Settings",

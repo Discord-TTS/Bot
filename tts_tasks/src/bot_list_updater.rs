@@ -94,7 +94,7 @@ impl crate::Looper for BotListUpdater {
             let resp_res = request.send().await;
             if let Err(err) = resp_res.and_then(reqwest::Response::error_for_status) {
                 tracing::error!("{} Error: {:?}", Self::NAME, err);
-            };
+            }
         };
 
         let shard_count = self.cache.shard_count();

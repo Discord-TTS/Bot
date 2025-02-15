@@ -60,9 +60,9 @@ regex = "1"
 anyhow = "1"
 serde = "1.0.209"
 tracing = "0.1"
-sysinfo = "0.31.3"
+sysinfo = "0.33"
 aformat = "0.1.3"
-itertools = "0.13"
+itertools = "0.14"
 arrayvec = "0.7.6"
 parking_lot = "0.12"
 mini-moka = { version = "0.10.3", features = ["sync"] }
@@ -89,7 +89,7 @@ default-features = false
 
 [workspace.dependencies.serenity]
 git = "https://github.com/serenity-rs/serenity"
-features = ["typesize", "temp_cache"]
+features = ["typesize", "temp_cache", "transport_compression_zstd"]
 default-features = false
 branch = "next"
 

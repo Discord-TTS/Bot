@@ -86,7 +86,7 @@ pub async fn autocomplete<'a>(
 
                     if result.try_push(choice).is_err() {
                         return ControlFlow::Break(());
-                    };
+                    }
                 }
             } else {
                 flatten_commands(result, &command.subcommands, searching)?;
@@ -157,7 +157,7 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                         Ok(())
                     }
                 );
-            };
+            }
 
             if command_obj.owners_only && !framework_options.owners.contains(&ctx.author().id) {
                 ctx.say("This command is only available to the bot owner!")
@@ -203,7 +203,7 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                         let description = p.description.as_deref().unwrap_or("no description");
                         writeln!(msg, "`{name}`: {description}").unwrap();
                     });
-                };
+                }
 
                 msg
             }

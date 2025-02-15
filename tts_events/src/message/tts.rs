@@ -245,8 +245,7 @@ fn run_checks(
         &message.content,
         serenity::ContentSafeOptions::default()
             .clean_here(false)
-            .clean_everyone(false)
-            .show_discriminator(false),
+            .clean_everyone(false),
         &message.mentions,
     );
 
@@ -292,7 +291,7 @@ fn run_checks(
             to_autojoin = Some(voice_state.channel_id.try_unwrap()?);
         } else {
             return Ok(None); // Bot not in vc
-        };
+        }
 
         if guild_row.require_voice() {
             let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;

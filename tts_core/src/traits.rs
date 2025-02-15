@@ -36,10 +36,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
     async fn neutral_colour(&self) -> u32 {
         if let Some(guild_id) = self.guild_id() {
             let row = self.data().guilds_db.get(guild_id.get() as i64).await;
-            if row
-                .map(|row| row.voice_mode)
-                .map_or(false, TTSMode::is_premium)
-            {
+            if row.map(|row| row.voice_mode).is_ok_and(TTSMode::is_premium) {
                 return PREMIUM_NEUTRAL_COLOUR;
             }
         }
@@ -103,7 +100,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
                     ).await?;
 
                     return Ok(None);
-                };
+                }
 
                 let member = match self {
                     Self::Application(ctx) => ctx.interaction.member.as_deref().map(Cow::Borrowed),

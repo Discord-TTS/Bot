@@ -13,7 +13,7 @@ pub async fn guild_create(
 ) -> Result<()> {
     if !is_new.unwrap() {
         return Ok(());
-    };
+    }
 
     let ctx = framework_ctx.serenity_context;
     let (owner_tag, owner_face) = {

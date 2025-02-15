@@ -326,7 +326,7 @@ fn process_cache_info(
                 is_collection: false,
                 value: format!("Size: `{size}b`"),
             });
-        };
+        }
     }
 
     fields.sort_by_key(|field| field.size);

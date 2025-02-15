@@ -41,7 +41,8 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     let reqwest = reqwest::Client::new();
     let auth_key = config.main.tts_service_auth_key.as_deref();
 
-    let mut http_builder = serenity::HttpBuilder::new(config.main.token.as_deref().unwrap());
+    let token = config.main.token.clone();
+    let mut http_builder = serenity::HttpBuilder::new(token.clone());
     if let Some(proxy) = &config.main.proxy_url {
         println!("Connecting via proxy");
         http_builder = http_builder
@@ -165,7 +166,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         ..poise::FrameworkOptions::default()
     };
 
-    let mut client = serenity::ClientBuilder::new_with_http(http, tts_events::get_intents())
+    let mut client = serenity::ClientBuilder::new_with_http(token, http, tts_events::get_intents())
         .voice_manager::<songbird::Songbird>(data.songbird.clone())
         .framework(poise::Framework::new(framework_options))
         .data(data as _)

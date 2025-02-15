@@ -147,7 +147,7 @@ You may have:
 pub async fn command_check(ctx: Context<'_>) -> Result<bool> {
     if ctx.author().bot() {
         return Ok(false);
-    };
+    }
 
     let data = ctx.data();
     let user_row = data.userinfo_db.get(ctx.author().id.into()).await?;
@@ -176,7 +176,7 @@ pub async fn command_check(ctx: Context<'_>) -> Result<bool> {
 
     if member_roles.contains(&required_role) || ctx.author_permissions()?.administrator() {
         return Ok(true);
-    };
+    }
 
     let msg = aformat!(
         "You do not have the required role to use this bot, ask a server administrator for {}.",

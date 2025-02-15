@@ -5,7 +5,7 @@ use itertools::Itertools;
 use rand::Rng as _;
 
 use serenity::all as serenity;
-use serenity::{CreateActionRow, CreateButton};
+use serenity::{CollectComponentInteractions, CreateActionRow, CreateButton};
 
 use crate::structs::{
     Context, Data, LastToXsaidTracker, LastXsaidInfo, RegexCache, Result, TTSMode, TTSServiceError,
@@ -47,7 +47,7 @@ pub async fn dm_generic(
     let mut embed = serenity::CreateEmbed::default();
     if let Some(url) = attachment_url {
         embed = embed.image(url);
-    };
+    }
 
     let embeds = [embed
         .title("Message from the developers:")
@@ -123,7 +123,7 @@ pub fn prepare_url(
 
 #[must_use]
 pub fn random_footer(server_invite: &str, client_id: serenity::UserId) -> Cow<'static, str> {
-    match rand::thread_rng().gen_range(0..5) {
+    match rand::rng().random_range(0..5) {
         0 => Cow::Owned(format!("If you find a bug or want to ask a question, join the support server: {server_invite}")),
         1 => Cow::Owned(format!("You can vote for me or review me on wumpus.store!\nhttps://wumpus.store/bot/{client_id}?ref=tts")),
         2 => Cow::Owned(format!("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}")),
@@ -188,7 +188,7 @@ fn attachments_to_format(attachments: &[serenity::Attachment]) -> Option<&'stati
         return Some("multiple files");
     }
 
-    let extension = attachments.first()?.filename.split('.').last()?;
+    let extension = attachments.first()?.filename.split('.').next_back()?;
     match extension {
         "bmp" | "gif" | "ico" | "png" | "psd" | "svg" | "jpg" => Some("an image file"),
         "mid" | "midi" | "mp3" | "ogg" | "wav" | "wma" => Some("an audio file"),
@@ -403,7 +403,7 @@ pub async fn confirm_dialog_wait(
     author_id: serenity::UserId,
 ) -> Result<Option<bool>> {
     let interaction = message_id
-        .await_component_interaction(ctx.shard.clone())
+        .collect_component_interactions(ctx.shard.clone())
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(author_id)
         .await;

@@ -3,7 +3,8 @@ use anyhow::bail;
 
 use poise::serenity_prelude as serenity;
 use serenity::{
-    builder::*, small_fixed_array::FixedString, ComponentInteractionDataKind, Permissions,
+    builder::*, small_fixed_array::FixedString, CollectComponentInteractions,
+    ComponentInteractionDataKind, Permissions,
 };
 
 use tts_core::{
@@ -94,7 +95,7 @@ async fn show_channel_select_menu(
     } else if text_channels.len() >= (25 * 5) {
         ctx.say("**Error**: This server has too many text channels to show in a menu! Please run `/setup #channel`").await?;
         return Ok(None);
-    };
+    }
 
     text_channels.sort_by(|c1, c2| Ord::cmp(&c1.position, &c2.position));
 
@@ -106,7 +107,7 @@ async fn show_channel_select_menu(
     let reply_message = reply.message().await?;
     let interaction = reply_message
         .id
-        .await_component_interaction(ctx.serenity_context().shard.clone())
+        .collect_component_interactions(ctx.serenity_context().shard.clone())
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(ctx.author().id)
         .await;

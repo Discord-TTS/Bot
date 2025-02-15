@@ -145,7 +145,8 @@ pub async fn handle_unexpected<'a>(
     let (cpu_usage, mem_usage) = {
         let mut system = data.system_info.lock();
         system.refresh_specifics(
-            sysinfo::RefreshKind::new().with_memory(sysinfo::MemoryRefreshKind::new().with_ram()),
+            sysinfo::RefreshKind::nothing()
+                .with_memory(sysinfo::MemoryRefreshKind::nothing().with_ram()),
         );
 
         (
@@ -184,7 +185,7 @@ pub async fn handle_unexpected<'a>(
             let value = value.to_mut();
             value.insert(0, '`');
             value.push('`');
-        };
+        }
 
         embed = embed.field(title, value, inline);
     }
@@ -341,7 +342,7 @@ async fn handle_cooldown(
                 ctx.msg.delete(&ctx_discord.http, Some(reason)).await?;
             }
         }
-    };
+    }
 
     Ok(())
 }
@@ -556,8 +557,8 @@ pub async fn interaction_create(
     if let serenity::Interaction::Component(interaction) = interaction {
         if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
             handle_traceback_button(framework, interaction).await?;
-        };
-    };
+        }
+    }
 
     Ok(())
 }

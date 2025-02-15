@@ -41,7 +41,7 @@ async fn process_mention_msg(
 
     if !bot_mention_regex.is_match(&message.content) {
         return Ok(());
-    };
+    }
 
     let Some(guild_id) = message.guild_id else {
         return Ok(());
@@ -107,7 +107,7 @@ async fn process_support_dm(
     let channel_id = message.channel_id;
     if message.guild_id.is_some() {
         return process_support_response(ctx, message, &data, channel_id).await;
-    };
+    }
 
     if message.author.bot() || message.content.starts_with('-') {
         return Ok(());
@@ -203,7 +203,7 @@ async fn process_support_dm(
             "{} just got the 'Welcome to support DMs' message",
             message.author.tag(),
         );
-    };
+    }
 
     Ok(())
 }
@@ -216,7 +216,7 @@ async fn process_support_response(
 ) -> Result<()> {
     if data.webhooks.dm_logs.channel_id.try_unwrap()? != channel_id {
         return Ok(());
-    };
+    }
 
     let Some(reference) = &message.message_reference else {
         return Ok(());

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
-use serenity::{builder::*, small_fixed_array::FixedString};
+use serenity::{builder::*, small_fixed_array::FixedString, CollectComponentInteractions};
 
 use tts_core::structs::{Context, TTSMode};
 
@@ -96,7 +96,7 @@ impl<'a> MenuPaginator<'a> {
 
         loop {
             let builder = message_id
-                .await_component_interaction(serenity_context.shard.clone())
+                .collect_component_interactions(serenity_context.shard.clone())
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(self.ctx.author().id);
 

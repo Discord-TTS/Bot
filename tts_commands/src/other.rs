@@ -221,8 +221,8 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
     let ram_usage = {
         let mut system_info = data.system_info.lock();
         system_info.refresh_specifics(
-            sysinfo::RefreshKind::new()
-                .with_processes(sysinfo::ProcessRefreshKind::new().with_memory()),
+            sysinfo::RefreshKind::nothing()
+                .with_processes(sysinfo::ProcessRefreshKind::nothing().with_memory()),
         );
 
         let pid = sysinfo::get_current_pid().unwrap();
