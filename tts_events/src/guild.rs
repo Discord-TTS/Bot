@@ -4,10 +4,10 @@ use tracing::info;
 
 use serenity::{all as serenity, builder::*};
 
-use tts_core::structs::{FrameworkContext, Result};
+use tts_core::structs::{Data, Result};
 
 pub async fn guild_create(
-    framework_ctx: FrameworkContext<'_>,
+    ctx: &serenity::Context,
     guild: &serenity::Guild,
     is_new: Option<bool>,
 ) -> Result<()> {
@@ -15,13 +15,12 @@ pub async fn guild_create(
         return Ok(());
     }
 
-    let ctx = framework_ctx.serenity_context;
     let (owner_tag, owner_face) = {
         let owner = guild.owner_id.to_user(&ctx).await?;
         (owner.tag(), owner.face())
     };
 
-    let data = framework_ctx.user_data();
+    let data = ctx.data_ref::<Data>();
     let title = aformat!("Welcome to {}!", &ctx.cache.current_user().name);
     let embeds = [CreateEmbed::default()
         .title(title.as_str())
@@ -80,7 +79,7 @@ Ask questions by either responding here or asking on the support server!",
 }
 
 pub async fn guild_delete(
-    framework_ctx: FrameworkContext<'_>,
+    ctx: &serenity::Context,
     incomplete: &serenity::UnavailableGuild,
     full: Option<&serenity::Guild>,
 ) -> Result<()> {
@@ -88,12 +87,11 @@ pub async fn guild_delete(
         return Ok(());
     }
 
-    let data = framework_ctx.user_data();
+    let data = ctx.data_ref::<Data>();
     data.guilds_db.delete(incomplete.id.into()).await?;
 
     let Some(guild) = full else { return Ok(()) };
 
-    let ctx = framework_ctx.serenity_context;
     let owner_of_other_server = ctx
         .cache
         .guilds()

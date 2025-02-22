@@ -1,6 +1,6 @@
 use poise::serenity_prelude as serenity;
 
-use tts_core::structs::{FrameworkContext, Result};
+use tts_core::structs::{Data, Result};
 
 async fn guild_call_channel_id(
     songbird: &songbird::Songbird,
@@ -16,10 +16,10 @@ async fn guild_call_channel_id(
 
 // Check if the channel the bot was in was deleted.
 pub async fn channel_delete(
-    framework_ctx: FrameworkContext<'_>,
+    ctx: &serenity::Context,
     channel: &serenity::GuildChannel,
 ) -> Result<()> {
-    let data = framework_ctx.user_data();
+    let data = ctx.data_ref::<Data>();
 
     let call_channel_id = guild_call_channel_id(&data.songbird, channel.guild_id).await;
     if call_channel_id == Some(channel.id) {

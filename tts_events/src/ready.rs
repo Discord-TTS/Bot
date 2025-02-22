@@ -7,7 +7,7 @@ use poise::serenity_prelude as serenity;
 
 use tts_core::{
     constants::FREE_NEUTRAL_COLOUR,
-    structs::{Data, FrameworkContext, Result},
+    structs::{Data, Result},
 };
 use tts_tasks::Looper;
 
@@ -108,22 +108,19 @@ fn finalize_startup(ctx: &serenity::Context, data: &Data) {
     clear_allocator_cache();
 }
 
-pub async fn ready(
-    framework_ctx: FrameworkContext<'_>,
-    data_about_bot: &serenity::Ready,
-) -> Result<()> {
-    let data = framework_ctx.user_data();
-    let ctx = framework_ctx.serenity_context;
+pub async fn ready(ctx: &serenity::Context, data_about_bot: &serenity::Ready) -> Result<()> {
+    let data = ctx.data_ref::<Data>();
 
     let shard_count = ctx.cache.shard_count();
     let is_last_shard = (ctx.shard_id.0 + 1) == shard_count.get();
 
     // Don't update the welcome message for concurrent shard startups.
     if let Ok(_guard) = data.update_startup_lock.try_lock() {
-        let status = generate_status(&*framework_ctx.shard_manager.runners.lock().await);
+        let shard_manager = data.shard_manager.get().unwrap();
+        let status = generate_status(&*shard_manager.runners.lock().await);
         let shard_count = (!is_last_shard).then_some(shard_count);
 
-        update_startup_message(ctx, &data, &data_about_bot.user.name, status, shard_count).await?;
+        update_startup_message(ctx, data, &data_about_bot.user.name, status, shard_count).await?;
     }
 
     data.regex_cache
@@ -131,7 +128,7 @@ pub async fn ready(
         .get_or_init(|| regex::Regex::new(&aformat!("^<@!?{}>$", data_about_bot.user.id)).unwrap());
 
     if is_last_shard && !data.fully_started.swap(true, Ordering::SeqCst) {
-        finalize_startup(ctx, &data);
+        finalize_startup(ctx, data);
     }
 
     Ok(())

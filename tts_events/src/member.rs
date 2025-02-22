@@ -4,7 +4,7 @@ use reqwest::StatusCode;
 use tts_core::{
     common::{confirm_dialog_buttons, confirm_dialog_wait, remove_premium},
     constants::PREMIUM_NEUTRAL_COLOUR,
-    structs::{Data, FrameworkContext, Result},
+    structs::{Data, Result},
 };
 
 fn is_guild_owner(cache: &serenity::Cache, user_id: serenity::UserId) -> bool {
@@ -32,14 +32,12 @@ async fn add_ofs_role(data: &Data, http: &serenity::Http, user_id: serenity::Use
 }
 
 pub async fn guild_member_addition(
-    framework_ctx: FrameworkContext<'_>,
+    ctx: &serenity::Context,
     member: &serenity::Member,
 ) -> Result<()> {
-    let data = framework_ctx.user_data();
-    let ctx = framework_ctx.serenity_context;
-
+    let data = ctx.data_ref::<Data>();
     if member.guild_id == data.config.main_server && is_guild_owner(&ctx.cache, member.user.id) {
-        add_ofs_role(&data, &ctx.http, member.user.id).await?;
+        add_ofs_role(data, &ctx.http, member.user.id).await?;
     }
 
     Ok(())
@@ -71,11 +69,11 @@ Do you want to remove that server from your assigned slots?",
 }
 
 pub async fn guild_member_removal(
-    framework_ctx: FrameworkContext<'_>,
+    ctx: &serenity::Context,
     guild_id: serenity::GuildId,
     user_id: serenity::UserId,
 ) -> Result<()> {
-    let data = framework_ctx.user_data();
+    let data = ctx.data_ref::<Data>();
 
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
     let Some(premium_user) = guild_row.premium_user else {
@@ -86,7 +84,6 @@ pub async fn guild_member_removal(
         return Ok(());
     }
 
-    let ctx = framework_ctx.serenity_context;
     if !data.is_premium_simple(&ctx.http, guild_id).await? {
         return Ok(());
     }
@@ -95,7 +92,7 @@ pub async fn guild_member_removal(
         Ok(msg) => msg,
         Err(err) => {
             // We cannot DM this premium user, just remove premium by default.
-            remove_premium(&data, guild_id).await?;
+            remove_premium(data, guild_id).await?;
             if let serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(err)) = &err
                 && err.status_code == StatusCode::FORBIDDEN
             {
@@ -114,11 +111,11 @@ pub async fn guild_member_removal(
     let response = match confirm_dialog_wait(ctx, msg.id, premium_user).await? {
         Some(true) => format!("Okay, kept your premium assigned to {guild_name} ({guild_id})."),
         Some(false) => {
-            remove_premium(&data, guild_id).await?;
+            remove_premium(data, guild_id).await?;
             format!("Okay, removed your premium assignment from {guild_name} ({guild_id}).")
         }
         None => {
-            remove_premium(&data, guild_id).await?;
+            remove_premium(data, guild_id).await?;
             format!("You did not respond to whether or not to remove premium assignment from {guild_name} ({guild_id}), so it has been unassigned.")
         }
     };

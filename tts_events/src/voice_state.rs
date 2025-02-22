@@ -2,18 +2,18 @@ use poise::serenity_prelude as serenity;
 
 use tts_core::{
     opt_ext::OptionTryUnwrap,
-    structs::{FrameworkContext, Result},
+    structs::{Data, Result},
 };
 
 pub async fn voice_state_update(
-    framework_ctx: FrameworkContext<'_>,
+    ctx: &serenity::Context,
     old: Option<&serenity::VoiceState>,
     new: &serenity::VoiceState,
 ) -> Result<()> {
     // User left vc
     let Some(old) = old else { return Ok(()) };
 
-    let data = framework_ctx.user_data();
+    let data = ctx.data_ref::<Data>();
 
     // Bot is in vc on server
     let guild_id = new.guild_id.try_unwrap()?;
@@ -22,7 +22,6 @@ pub async fn voice_state_update(
     }
 
     // Check if the bot is leaving
-    let ctx = framework_ctx.serenity_context;
     let bot_id = ctx.cache.current_user().id;
     let leave_vc = match &new.member {
         // songbird does not clean up state on VC disconnections, so we have to do it here

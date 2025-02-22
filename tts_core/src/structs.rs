@@ -255,12 +255,14 @@ pub struct Data {
     pub premium_avatar_url: FixedString<u16>,
     pub system_info: Mutex<sysinfo::System>,
     pub start_time: std::time::SystemTime,
-    pub songbird: Arc<songbird::Songbird>,
     pub reqwest: reqwest::Client,
     pub regex_cache: RegexCache,
     pub shard_count: NonZeroU16,
     pub webhooks: WebhookConfig,
     pub pool: sqlx::PgPool,
+
+    pub songbird: Arc<songbird::Songbird>,
+    pub shard_manager: OnceLock<Arc<serenity::ShardManager>>,
 
     pub config: MainConfig,
     pub premium_config: Option<PremiumConfig>,

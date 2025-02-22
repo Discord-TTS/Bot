@@ -537,12 +537,12 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
 }
 
 pub async fn interaction_create(
-    framework: FrameworkContext<'_>,
+    ctx: &serenity::Context,
     interaction: &serenity::Interaction,
 ) -> Result<(), Error> {
     if let serenity::Interaction::Component(interaction) = interaction {
         if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
-            handle_traceback_button(framework, interaction).await?;
+            handle_traceback_button(ctx, interaction).await?;
         }
     }
 
@@ -550,13 +550,14 @@ pub async fn interaction_create(
 }
 
 pub async fn handle_traceback_button(
-    framework: FrameworkContext<'_>,
+    ctx: &serenity::Context,
     interaction: &serenity::ComponentInteraction,
 ) -> Result<(), Error> {
+    let data = ctx.data_ref::<Data>();
     let row: Option<TracebackRow> =
         sqlx::query_as("SELECT traceback FROM errors WHERE message_id = $1")
             .bind(interaction.message.id.get() as i64)
-            .fetch_optional(&framework.user_data().pool)
+            .fetch_optional(&data.pool)
             .await?;
 
     let mut response_data = serenity::CreateInteractionResponseMessage::default().ephemeral(true);
@@ -570,10 +571,7 @@ pub async fn handle_traceback_button(
     };
 
     interaction
-        .create_response(
-            &framework.serenity_context.http,
-            CreateInteractionResponse::Message(response_data),
-        )
+        .create_response(&ctx.http, CreateInteractionResponse::Message(response_data))
         .await?;
     Ok(())
 }
