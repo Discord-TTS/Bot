@@ -108,7 +108,7 @@ fn finalize_startup(ctx: &serenity::Context, data: &Data) {
     clear_allocator_cache();
 }
 
-pub async fn ready(ctx: &serenity::Context, data_about_bot: &serenity::Ready) -> Result<()> {
+pub async fn handle(ctx: &serenity::Context, data_about_bot: serenity::Ready) -> Result<()> {
     let data = ctx.data_ref::<Data>();
 
     let shard_count = ctx.cache.shard_count();

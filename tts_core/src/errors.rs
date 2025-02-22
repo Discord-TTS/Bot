@@ -7,7 +7,6 @@ use tracing::error;
 
 use self::serenity::{
     small_fixed_array::FixedString, CreateActionRow, CreateButton, CreateInteractionResponse,
-    FullEvent as Event,
 };
 use poise::serenity_prelude as serenity;
 
@@ -15,7 +14,7 @@ use crate::{
     common::push_permission_names,
     constants,
     opt_ext::OptionTryUnwrap,
-    structs::{Context, Data, FrameworkContext},
+    structs::{Context, Data},
     traits::PoiseContextExt,
 };
 
@@ -185,12 +184,8 @@ pub async fn handle_unexpected<'a>(
 pub async fn handle_unexpected_default(
     ctx: &serenity::Context,
     name: &str,
-    result: Result<()>,
+    error: Error,
 ) -> Result<()> {
-    let Some(error) = result.err() else {
-        return Ok(());
-    };
-
     handle_unexpected(ctx, name, error, &mut std::iter::empty(), None, None).await
 }
 
@@ -198,12 +193,8 @@ pub async fn handle_unexpected_default(
 pub async fn handle_message(
     ctx: &serenity::Context,
     message: &serenity::Message,
-    result: Result<()>,
+    error: Error,
 ) -> Result<()> {
-    let Some(error) = result.err() else {
-        return Ok(());
-    };
-
     let mut extra_fields = ArrayVec::<_, 3>::new();
     if let Some(guild_id) = message.guild_id {
         let guild = ctx.cache.guild(guild_id);
@@ -234,12 +225,8 @@ pub async fn handle_message(
 pub async fn handle_member(
     ctx: &serenity::Context,
     member: &serenity::Member,
-    result: Result<(), Error>,
+    error: Error,
 ) -> Result<()> {
-    let Some(error) = result.err() else {
-        return Ok(());
-    };
-
     let extra_fields = [
         ("Guild", Cow::Owned(member.guild_id.to_string()), true),
         ("Guild ID", Cow::Owned(member.guild_id.to_string()), true),
@@ -261,12 +248,8 @@ pub async fn handle_guild(
     name: &str,
     ctx: &serenity::Context,
     guild: Option<&serenity::Guild>,
-    result: Result<()>,
+    error: Error,
 ) -> Result<()> {
-    let Some(error) = result.err() else {
-        return Ok(());
-    };
-
     handle_unexpected(
         ctx,
         name,
@@ -483,41 +466,6 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             }
         }
 
-        poise::FrameworkError::EventHandler {
-            error,
-            event,
-            framework:
-                FrameworkContext {
-                    serenity_context: ctx,
-                    ..
-                },
-            ..
-        } => match event {
-            Event::Message { new_message } => {
-                handle_message(ctx, new_message, Err(error)).await?;
-            }
-            Event::GuildMemberAddition { new_member } => {
-                handle_member(ctx, new_member, Err(error)).await?;
-            }
-            Event::GuildCreate { guild, .. } => {
-                handle_guild("GuildCreate", ctx, Some(guild), Err(error)).await?;
-            }
-            Event::GuildDelete { full, .. } => {
-                handle_guild("GuildDelete", ctx, full.as_ref(), Err(error)).await?;
-            }
-            Event::VoiceStateUpdate { .. } => {
-                handle_unexpected_default(ctx, "VoiceStateUpdate", Err(error)).await?;
-            }
-            Event::InteractionCreate { .. } => {
-                handle_unexpected_default(ctx, "InteractionCreate", Err(error)).await?;
-            }
-            Event::Ready { .. } => {
-                handle_unexpected_default(ctx, "Ready", Err(error)).await?;
-            }
-            _ => {
-                tracing::warn!("Unhandled {} error: {:?}", event.snake_case_name(), error);
-            }
-        },
         poise::FrameworkError::CommandStructureMismatch { .. }
         | poise::FrameworkError::DmOnly { .. }
         | poise::FrameworkError::NsfwOnly { .. }

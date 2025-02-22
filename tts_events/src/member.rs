@@ -31,10 +31,7 @@ async fn add_ofs_role(data: &Data, http: &serenity::Http, user_id: serenity::Use
     }
 }
 
-pub async fn guild_member_addition(
-    ctx: &serenity::Context,
-    member: &serenity::Member,
-) -> Result<()> {
+pub async fn handle_addition(ctx: &serenity::Context, member: &serenity::Member) -> Result<()> {
     let data = ctx.data_ref::<Data>();
     if member.guild_id == data.config.main_server && is_guild_owner(&ctx.cache, member.user.id) {
         add_ofs_role(data, &ctx.http, member.user.id).await?;
@@ -68,7 +65,7 @@ Do you want to remove that server from your assigned slots?",
     user_id.dm(http, notice).await
 }
 
-pub async fn guild_member_removal(
+pub async fn handle_removal(
     ctx: &serenity::Context,
     guild_id: serenity::GuildId,
     user_id: serenity::UserId,

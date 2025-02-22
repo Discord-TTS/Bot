@@ -16,6 +16,7 @@ use tts_core::{
     analytics, create_db_handler, database,
     structs::{Data, PollyVoice, RegexCache, Result, TTSMode},
 };
+use tts_events::EventHandler;
 use tts_tasks::Looper as _;
 
 mod startup;
@@ -149,7 +150,6 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
 
     let framework_options = poise::FrameworkOptions {
         commands: tts_commands::commands(),
-        event_handler: |fw_ctx, event| Box::pin(tts_events::listen(fw_ctx.serenity_context, event)),
         on_error: |error| {
             Box::pin(async move {
                 let res = tts_core::errors::handle(error).await;
@@ -173,6 +173,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     let mut client = serenity::ClientBuilder::new_with_http(token, http, tts_events::get_intents())
         .voice_manager::<songbird::Songbird>(data.songbird.clone())
         .framework(poise::Framework::new(framework_options))
+        .event_handler::<EventHandler>(EventHandler)
         .data(data as _)
         .await?;
 

@@ -15,7 +15,7 @@ async fn guild_call_channel_id(
 }
 
 // Check if the channel the bot was in was deleted.
-pub async fn channel_delete(
+pub async fn handle_delete(
     ctx: &serenity::Context,
     channel: &serenity::GuildChannel,
 ) -> Result<()> {

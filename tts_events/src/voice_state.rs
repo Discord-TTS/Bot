@@ -5,7 +5,7 @@ use tts_core::{
     structs::{Data, Result},
 };
 
-pub async fn voice_state_update(
+pub async fn handle(
     ctx: &serenity::Context,
     old: Option<&serenity::VoiceState>,
     new: &serenity::VoiceState,

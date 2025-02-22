@@ -6,7 +6,7 @@ use serenity::{all as serenity, builder::*};
 
 use tts_core::structs::{Data, Result};
 
-pub async fn guild_create(
+pub async fn handle_create(
     ctx: &serenity::Context,
     guild: &serenity::Guild,
     is_new: Option<bool>,
@@ -78,9 +78,9 @@ Ask questions by either responding here or asking on the support server!",
     Ok(())
 }
 
-pub async fn guild_delete(
+pub async fn handle_delete(
     ctx: &serenity::Context,
-    incomplete: &serenity::UnavailableGuild,
+    incomplete: serenity::UnavailableGuild,
     full: Option<&serenity::Guild>,
 ) -> Result<()> {
     if incomplete.unavailable {

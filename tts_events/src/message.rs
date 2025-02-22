@@ -17,7 +17,7 @@ use tts::process_tts_msg;
 
 mod tts;
 
-pub async fn message(ctx: &serenity::Context, new_message: &serenity::Message) -> Result<()> {
+pub async fn handle(ctx: &serenity::Context, new_message: &serenity::Message) -> Result<()> {
     tokio::try_join!(
         process_tts_msg(ctx, new_message),
         process_support_dm(ctx, new_message),
