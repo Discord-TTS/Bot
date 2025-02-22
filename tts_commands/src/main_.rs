@@ -11,8 +11,9 @@ use tts_core::{
     database_models::GuildRow,
     opt_ext::OptionTryUnwrap as _,
     require_guild,
-    structs::{Command, CommandResult, Context, JoinVCToken, Result},
-    traits::{PoiseContextExt, SongbirdManagerExt},
+    songbird::{JoinVCToken, ManagerExt as _},
+    structs::{Command, CommandResult, Context, Result},
+    traits::PoiseContextExt,
 };
 
 /// Returns Some(GuildRow) on correct channel, otherwise None.

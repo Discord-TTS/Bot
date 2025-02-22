@@ -21,37 +21,39 @@ pub async fn handle_create(
     };
 
     let data = ctx.data_ref::<Data>();
-    let title = aformat!("Welcome to {}!", &ctx.cache.current_user().name);
-    let embeds = [CreateEmbed::default()
-        .title(title.as_str())
-        .description(format!("
-Hello! Someone invited me to your server `{}`!
-TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
+    if !cfg!(debug_assertions) {
+        let title = aformat!("Welcome to {}!", &ctx.cache.current_user().name);
+        let embeds = [CreateEmbed::default()
+            .title(title.as_str())
+            .description(format!("
+    Hello! Someone invited me to your server `{}`!
+    TTS Bot is a text to speech bot, as in, it reads messages from a text channel and speaks it into a voice channel
+    
+    **Most commands need to be done on your server, such as `/setup` and `/join`**
+    
+    I need someone with the administrator permission to do `/setup #channel`
+    You can then do `/join` in that channel and I will join your voice channel!
+    Then, you can just type normal messages and I will say them, like magic!
+    
+    You can view all the commands with `/help`
+    Ask questions by either responding here or asking on the support server!",
+            guild.name))
+            .footer(CreateEmbedFooter::new(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
+            .author(CreateEmbedAuthor::new(&owner_tag).icon_url(owner_face))];
 
-**Most commands need to be done on your server, such as `/setup` and `/join`**
-
-I need someone with the administrator permission to do `/setup #channel`
-You can then do `/join` in that channel and I will join your voice channel!
-Then, you can just type normal messages and I will say them, like magic!
-
-You can view all the commands with `/help`
-Ask questions by either responding here or asking on the support server!",
-        guild.name))
-        .footer(CreateEmbedFooter::new(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
-        .author(CreateEmbedAuthor::new(&owner_tag).icon_url(owner_face))];
-
-    match guild
-        .owner_id
-        .dm(
-            &ctx.http,
-            serenity::CreateMessage::default().embeds(&embeds),
-        )
-        .await
-    {
-        Err(serenity::Error::Http(error))
-            if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
-        Err(error) => return Err(anyhow::Error::from(error)),
-        _ => {}
+        match guild
+            .owner_id
+            .dm(
+                &ctx.http,
+                serenity::CreateMessage::default().embeds(&embeds),
+            )
+            .await
+        {
+            Err(serenity::Error::Http(error))
+                if error.status_code() == Some(serenity::StatusCode::FORBIDDEN) => {}
+            Err(error) => return Err(anyhow::Error::from(error)),
+            _ => {}
+        }
     }
 
     match ctx

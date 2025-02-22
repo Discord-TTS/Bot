@@ -8,8 +8,8 @@ use tts_core::{
     database::{GuildRow, UserRow},
     errors,
     opt_ext::OptionTryUnwrap as _,
-    structs::{Data, IsPremium, JoinVCToken, Result, TTSMode},
-    traits::SongbirdManagerExt as _,
+    songbird::{JoinVCToken, ManagerExt as _},
+    structs::{Data, IsPremium, Result, TTSMode},
 };
 
 pub(crate) async fn process_tts_msg(

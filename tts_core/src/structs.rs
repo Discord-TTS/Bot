@@ -120,19 +120,6 @@ pub struct WebhookConfig {
     pub dm_logs: serenity::Webhook,
 }
 
-pub struct JoinVCToken(pub GuildId, pub Arc<tokio::sync::Mutex<()>>);
-impl JoinVCToken {
-    pub fn acquire(data: &Data, guild_id: GuildId) -> Self {
-        let lock = data
-            .join_vc_tokens
-            .entry(guild_id)
-            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
-            .clone();
-
-        Self(guild_id, lock)
-    }
-}
-
 bool_enum!(IsPremium(No | Yes));
 
 #[derive(Clone, Copy)]

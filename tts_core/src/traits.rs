@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
 
@@ -7,7 +7,7 @@ use crate::{
     constants::{FREE_NEUTRAL_COLOUR, PREMIUM_NEUTRAL_COLOUR},
     opt_ext::OptionTryUnwrap,
     require_guild,
-    structs::{Context, JoinVCToken, Result, TTSMode},
+    structs::{Context, Result, TTSMode},
 };
 
 pub trait PoiseContextExt<'ctx> {
@@ -137,33 +137,6 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
         {
             Ok(handle) => Ok(Some(handle)),
             Err(_) => Ok(None),
-        }
-    }
-}
-
-pub trait SongbirdManagerExt {
-    async fn join_vc(
-        &self,
-        guild_id: JoinVCToken,
-        channel_id: serenity::ChannelId,
-    ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>, songbird::error::JoinError>;
-}
-
-impl SongbirdManagerExt for songbird::Songbird {
-    async fn join_vc(
-        &self,
-        JoinVCToken(guild_id, lock): JoinVCToken,
-        channel_id: serenity::ChannelId,
-    ) -> Result<Arc<tokio::sync::Mutex<songbird::Call>>, songbird::error::JoinError> {
-        let _guard = lock.lock().await;
-        match self.join(guild_id, channel_id).await {
-            Ok(call) => Ok(call),
-            Err(err) => {
-                // On error, the Call is left in a semi-connected state.
-                // We need to correct this by removing the call from the manager.
-                drop(self.leave(guild_id).await);
-                Err(err)
-            }
         }
     }
 }

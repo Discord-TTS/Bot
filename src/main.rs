@@ -106,15 +106,19 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     let analytics = Arc::new(analytics::Handler::new(pool.clone()));
     tokio::spawn(analytics.clone().start());
 
+    let songbird = songbird::Songbird::serenity_from_config(
+        songbird::Config::default().decode_mode(songbird::driver::DecodeMode::Pass),
+    );
+
     let data = Arc::new(Data {
         pool,
+        songbird,
         shard_manager: OnceLock::new(),
         system_info: Mutex::new(sysinfo::System::new()),
         bot_list_tokens: Mutex::new(config.bot_list_tokens),
 
         fully_started: AtomicBool::new(false),
         join_vc_tokens: dashmap::DashMap::new(),
-        songbird: songbird::Songbird::serenity(),
         last_to_xsaid_tracker: dashmap::DashMap::new(),
         update_startup_lock: tokio::sync::Mutex::new(()),
         entitlement_cache: mini_moka::sync::Cache::builder()

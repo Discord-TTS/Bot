@@ -10,10 +10,13 @@ pub async fn handle(
     old: Option<&serenity::VoiceState>,
     new: &serenity::VoiceState,
 ) -> Result<()> {
+    println!("voice state update");
     // User left vc
     let Some(old) = old else { return Ok(()) };
 
     let data = ctx.data_ref::<Data>();
+
+    println!("user left");
 
     // Bot is in vc on server
     let guild_id = new.guild_id.try_unwrap()?;
@@ -21,16 +24,22 @@ pub async fn handle(
         return Ok(());
     }
 
+    println!("bot in vc");
+
     // Check if the bot is leaving
     let bot_id = ctx.cache.current_user().id;
     let leave_vc = match &new.member {
         // songbird does not clean up state on VC disconnections, so we have to do it here
-        Some(member) if member.user.id == bot_id => true,
+        Some(member) if member.user.id == bot_id => {
+            println!("bot left vc");
+            true
+        }
         Some(_) => check_is_lonely(ctx, bot_id, guild_id, old)?,
         None => false,
     };
 
     if leave_vc {
+        println!("leaving");
         data.last_to_xsaid_tracker.remove(&guild_id);
         data.songbird.remove(guild_id).await?;
     }
@@ -63,6 +72,8 @@ fn check_is_lonely(
     if channel_members.any(|m| !m.user.bot()) {
         return Ok(false);
     }
+
+    println!("bot is lonely");
 
     Ok(true)
 }

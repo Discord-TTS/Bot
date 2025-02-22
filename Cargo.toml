@@ -100,7 +100,7 @@ branch = "serenity-next"
 
 [workspace.dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
-features = ["builtin-queue"]
+features = ["builtin-queue", "receive"]
 branch = "serenity-next"
 
 [workspace.lints.rust]
