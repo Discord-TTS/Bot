@@ -108,7 +108,6 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
 
     let data = Arc::new(Data {
         pool,
-        shard_manager: OnceLock::new(),
         system_info: Mutex::new(sysinfo::System::new()),
         bot_list_tokens: Mutex::new(config.bot_list_tokens),
 
@@ -145,7 +144,6 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         nickname_db,
         user_voice_db,
         guild_voice_db,
-        shard_count,
     });
 
     let framework_options = poise::FrameworkOptions {
@@ -176,13 +174,6 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         .event_handler::<EventHandler>(EventHandler)
         .data(data as _)
         .await?;
-
-    let shard_manager = client.shard_manager.clone();
-    client
-        .data::<Data>()
-        .shard_manager
-        .set(shard_manager.clone())
-        .expect("shard manager should not be set already");
 
     tokio::spawn(async move {
         wait_until_shutdown().await;

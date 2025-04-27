@@ -20,12 +20,13 @@ pub async fn handle_delete(
     channel: &serenity::GuildChannel,
 ) -> Result<()> {
     let data = ctx.data_ref::<Data>();
+    let guild_id = channel.base.guild_id;
 
-    let call_channel_id = guild_call_channel_id(&data.songbird, channel.guild_id).await;
+    let call_channel_id = guild_call_channel_id(&data.songbird, guild_id).await;
     if call_channel_id == Some(channel.id) {
         // Ignore errors from leaving the channel, probably already left.
-        let _ = data.songbird.remove(channel.guild_id).await;
-        data.last_to_xsaid_tracker.remove(&channel.guild_id);
+        let _ = data.songbird.remove(guild_id).await;
+        data.last_to_xsaid_tracker.remove(&guild_id);
     }
 
     Ok(())

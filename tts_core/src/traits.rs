@@ -53,12 +53,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
                 };
 
                 let mut permissions = author_member.permissions.try_unwrap()?;
-                if matches!(
-                    channel.kind,
-                    serenity::ChannelType::NewsThread
-                        | serenity::ChannelType::PublicThread
-                        | serenity::ChannelType::PrivateThread
-                ) {
+                if matches!(channel, serenity::GenericInteractionChannel::Thread(_)) {
                     permissions.set(
                         serenity::Permissions::SEND_MESSAGES,
                         permissions.send_messages_in_threads(),
@@ -105,7 +100,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
                 let member = match self {
                     Self::Application(ctx) => ctx.interaction.member.as_deref().map(Cow::Borrowed),
                     Self::Prefix(_) => {
-                        let member = channel.guild_id.member(serenity_ctx, author.id).await;
+                        let member = channel.base.guild_id.member(serenity_ctx, author.id).await;
                         member.ok().map(Cow::Owned)
                     }
                 };

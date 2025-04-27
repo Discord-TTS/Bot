@@ -65,14 +65,14 @@ fn get_eligible_channels(
         .channels
         .iter()
         .filter(|c| {
-            c.kind == serenity::ChannelType::Text
+            c.base.kind == serenity::ChannelType::Text
                 && can_send(&guild, c, bot_member)
                 && author_can_send(c)
         })
         .map(|c| ChannelMenuEntry {
             id: c.id,
             id_str: c.id.to_arraystring(),
-            name: c.name.clone(),
+            name: c.base.name.clone(),
             position: c.position,
             has_webhook_perms: guild.user_permissions_in(c, bot_member).manage_webhooks(),
         })
@@ -107,7 +107,7 @@ async fn show_channel_select_menu(
     let reply_message = reply.message().await?;
     let interaction = reply_message
         .id
-        .collect_component_interactions(ctx.serenity_context().shard.clone())
+        .collect_component_interactions(ctx.serenity_context())
         .timeout(std::time::Duration::from_secs(60 * 5))
         .author_id(ctx.author().id)
         .await;
