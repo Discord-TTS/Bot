@@ -76,7 +76,7 @@ pub async fn tts(
 
         if author_voice_cid.is_some() && author_voice_cid == bot_voice_cid {
             let setup_channel = ctx.data().guilds_db.get(guild_id.into()).await?.channel;
-            if setup_channel == Some(ctx.channel_id()) {
+            if setup_channel == Some(ctx.channel_id().expect_channel()) {
                 return Ok(true);
             }
         }
@@ -280,7 +280,7 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
     let msg = if let Some(channel) = guild_row.channel
         && require_guild!(ctx).channels.contains_key(&channel)
     {
-        if channel == ctx.channel_id() {
+        if channel.widen() == ctx.channel_id() {
             "You are in the setup channel already!"
         } else {
             &aformat!("The current setup channel is: <#{channel}>")
@@ -337,7 +337,7 @@ pub async fn invite(ctx: Context<'_>) -> CommandResult {
 
         &format!(
             "Join {} and look in #{} to invite {bot_mention}",
-            config.main_server_invite, channel.name,
+            config.main_server_invite, channel.base.name,
         )
     };
 

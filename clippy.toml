@@ -3,5 +3,4 @@ disallowed-methods = [
     "std::option::Option::map_or",
     "std::option::Option::map_or_else",
     "serenity::builder::create_message::CreateMessage::embed",
-    "serenity::builder::create_message::CreateMessage::component",
 ]

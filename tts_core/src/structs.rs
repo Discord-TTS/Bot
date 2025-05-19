@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     collections::BTreeMap,
-    num::{NonZeroU16, NonZeroU8},
+    num::NonZeroU8,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, OnceLock,
@@ -257,12 +257,10 @@ pub struct Data {
     pub start_time: std::time::SystemTime,
     pub reqwest: reqwest::Client,
     pub regex_cache: RegexCache,
-    pub shard_count: NonZeroU16,
     pub webhooks: WebhookConfig,
     pub pool: sqlx::PgPool,
 
     pub songbird: Arc<songbird::Songbird>,
-    pub shard_manager: OnceLock<Arc<serenity::ShardManager>>,
 
     pub config: MainConfig,
     pub premium_config: Option<PremiumConfig>,

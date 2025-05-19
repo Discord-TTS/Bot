@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Write, num::NonZeroU16, sync::atomic::Ordering};
+use std::{fmt::Write, num::NonZeroU16, sync::atomic::Ordering};
 
 use aformat::aformat;
 
@@ -21,15 +21,18 @@ fn clear_allocator_cache() {
 #[cfg(not(unix))]
 fn clear_allocator_cache() {}
 
-fn generate_status(shards: &HashMap<serenity::ShardId, serenity::ShardRunnerInfo>) -> String {
+fn generate_status(
+    shards: &dashmap::DashMap<serenity::ShardId, (serenity::ShardRunnerInfo, impl Sized)>,
+) -> String {
     let mut shards: Vec<_> = shards.iter().collect();
-    shards.sort_by_key(|(id, _)| *id);
+    shards.sort_by_key(|entry| *entry.key());
 
     let mut run_start = 0;
     let mut last_stage = None;
     let mut status = String::with_capacity(shards.len());
 
-    for (i, (id, info)) in shards.iter().enumerate() {
+    for (i, entry) in shards.iter().enumerate() {
+        let (id, (info, _)) = entry.pair();
         if Some(info.stage) == last_stage && i != (shards.len() - 1) {
             continue;
         }
@@ -108,7 +111,7 @@ fn finalize_startup(ctx: &serenity::Context, data: &Data) {
     clear_allocator_cache();
 }
 
-pub async fn handle(ctx: &serenity::Context, data_about_bot: serenity::Ready) -> Result<()> {
+pub async fn handle(ctx: &serenity::Context, data_about_bot: &serenity::Ready) -> Result<()> {
     let data = ctx.data_ref::<Data>();
 
     let shard_count = ctx.cache.shard_count();
@@ -116,8 +119,7 @@ pub async fn handle(ctx: &serenity::Context, data_about_bot: serenity::Ready) ->
 
     // Don't update the welcome message for concurrent shard startups.
     if let Ok(_guard) = data.update_startup_lock.try_lock() {
-        let shard_manager = data.shard_manager.get().unwrap();
-        let status = generate_status(&*shard_manager.runners.lock().await);
+        let status = generate_status(&ctx.runners);
         let shard_count = (!is_last_shard).then_some(shard_count);
 
         update_startup_message(ctx, data, &data_about_bot.user.name, status, shard_count).await?;

@@ -7,6 +7,7 @@ use tracing::error;
 
 use self::serenity::{
     small_fixed_array::FixedString, CreateActionRow, CreateButton, CreateInteractionResponse,
+    GenericGuildChannelRef,
 };
 use poise::serenity_prelude as serenity;
 
@@ -105,7 +106,7 @@ pub async fn handle_unexpected<'a>(
         ("System Memory Usage", Cow::Owned(mem_usage), true),
         (
             "Shard Count",
-            Cow::Owned(data.shard_count.to_string()),
+            Cow::Owned(ctx.runners.len().to_string()),
             true,
         ),
     ];
@@ -290,21 +291,17 @@ async fn handle_cooldown(
                 };
 
                 let bot_member = guild.members.get(&bot_user_id).try_unwrap()?;
-                let permissions =
-                    if let Some(channel) = guild.channels.get(&error_message.channel_id) {
-                        guild.user_permissions_in(channel, bot_member)
-                    } else if let Some(thread) = guild
-                        .threads
-                        .iter()
-                        .find(|th| th.id == error_message.channel_id)
-                    {
-                        let parent_id = thread.parent_id.try_unwrap()?;
-                        let parent = guild.channels.get(&parent_id).try_unwrap()?;
-
+                let permissions = match guild.channel(error_message.channel_id) {
+                    Some(GenericGuildChannelRef::Channel(ch)) => {
+                        guild.user_permissions_in(ch, bot_member)
+                    }
+                    Some(GenericGuildChannelRef::Thread(th)) => {
+                        let parent = guild.channels.get(&th.parent_id).try_unwrap()?;
                         guild.user_permissions_in(parent, bot_member)
-                    } else {
-                        return Err(anyhow::anyhow!("Can't find channel for cooldown message"));
-                    };
+                    }
+
+                    _ => return Err(anyhow::anyhow!("Can't find channel for cooldown message")),
+                };
 
                 permissions.manage_messages()
             };
@@ -356,12 +353,15 @@ const fn channel_type(channel: &serenity::Channel) -> &'static str {
     use self::serenity::{Channel, ChannelType};
 
     match channel {
-        Channel::Guild(channel) => match channel.kind {
+        Channel::Guild(channel) => match channel.base.kind {
             ChannelType::Text | ChannelType::News => "Text Channel",
             ChannelType::Voice => "Voice Channel",
-            ChannelType::NewsThread => "News Thread Channel",
+            _ => "Unknown Channel Type",
+        },
+        Channel::GuildThread(thread) => match thread.base.kind {
             ChannelType::PublicThread => "Public Thread Channel",
             ChannelType::PrivateThread => "Private Thread Channel",
+            ChannelType::NewsThread => "News Thread Channel",
             _ => "Unknown Channel Type",
         },
         Channel::Private(_) => "Private Channel",

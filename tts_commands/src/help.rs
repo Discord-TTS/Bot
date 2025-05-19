@@ -99,7 +99,7 @@ pub async fn autocomplete<'a>(
     let commands = &ctx.framework.options().commands;
     let mut result = ArrayVec::<_, 25>::new();
 
-    flatten_commands(&mut result, commands, searching);
+    let _ = flatten_commands(&mut result, commands, searching);
 
     result.sort_by_cached_key(|a| strsim::levenshtein(&a.name, searching));
     serenity::CreateAutocompleteResponse::new().set_choices(result.into_iter().collect::<Vec<_>>())

@@ -11,6 +11,7 @@ poise.workspace = true
 tokio.workspace = true
 regex.workspace = true
 anyhow.workspace = true
+dashmap.workspace = true
 tracing.workspace = true
 reqwest.workspace = true
 aformat.workspace = true

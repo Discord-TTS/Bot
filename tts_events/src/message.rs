@@ -3,7 +3,10 @@ use std::borrow::Cow;
 use aformat::aformat;
 use tracing::info;
 
-use self::serenity::{CreateEmbed, CreateEmbedFooter, CreateMessage, ExecuteWebhook, Mentionable};
+use self::serenity::{
+    CreateEmbed, CreateEmbedFooter, CreateMessage, ExecuteWebhook, GenericGuildChannelRef,
+    Mentionable,
+};
 use poise::serenity_prelude as serenity;
 
 use tts_core::{
@@ -48,16 +51,17 @@ async fn process_mention_msg(ctx: &serenity::Context, message: &serenity::Messag
         };
 
         let bot_member = guild.members.get(&bot_user).try_unwrap()?;
-        if let Some(ch) = guild.channels.get(&message.channel_id) {
-            guild.user_permissions_in(ch, bot_member).send_messages()
-        } else if let Some(th) = guild.threads.iter().find(|th| th.id == message.channel_id) {
-            let parent_channel_id = th.parent_id.try_unwrap()?;
-            let parent_channel = guild.channels.get(&parent_channel_id).try_unwrap()?;
-            guild
-                .user_permissions_in(parent_channel, bot_member)
-                .send_messages_in_threads()
-        } else {
-            return Ok(());
+        match guild.channel(message.channel_id) {
+            Some(GenericGuildChannelRef::Channel(ch)) => {
+                guild.user_permissions_in(ch, bot_member).send_messages()
+            }
+            Some(GenericGuildChannelRef::Thread(th)) => {
+                let parent_channel = guild.channels.get(&th.parent_id).try_unwrap()?;
+                guild
+                    .user_permissions_in(parent_channel, bot_member)
+                    .send_messages_in_threads()
+            }
+            None => return Ok(()),
         }
     };
 
@@ -200,9 +204,9 @@ async fn process_support_response(
     ctx: &serenity::Context,
     message: &serenity::Message,
     data: &Data,
-    channel_id: serenity::ChannelId,
+    channel_id: serenity::GenericChannelId,
 ) -> Result<()> {
-    if data.webhooks.dm_logs.channel_id.try_unwrap()? != channel_id {
+    if data.webhooks.dm_logs.channel_id.try_unwrap()? != channel_id.expect_channel() {
         return Ok(());
     }
 

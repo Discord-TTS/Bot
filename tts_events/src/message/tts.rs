@@ -203,7 +203,9 @@ fn run_checks(
         return Ok(None);
     };
 
-    if guild_row.channel != Some(message.channel_id) {
+    // `expect_channel` is fine as we are checking if the message is in the setup channel, or a voice channel.
+    let channel_id = message.channel_id.expect_channel();
+    if guild_row.channel != Some(channel_id) {
         // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
         // checking if the message's channel_id is the author's voice channel_id
         if !guild_row.text_in_voice() {
@@ -215,7 +217,7 @@ fn run_checks(
             .get(&message.author.id)
             .and_then(|c| c.channel_id);
 
-        if author_vc.is_none_or(|author_vc| author_vc != message.channel_id) {
+        if author_vc.is_none_or(|author_vc| author_vc != channel_id) {
             return Ok(None);
         }
     }
@@ -224,7 +226,7 @@ fn run_checks(
         && let Some(message_member) = &message.member
         && !message_member.roles.contains(&required_role)
     {
-        let Some(channel) = guild.channels.get(&message.channel_id) else {
+        let Some(channel) = guild.channels.get(&channel_id) else {
             return Ok(None);
         };
 
@@ -293,7 +295,7 @@ fn run_checks(
             let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
             let channel = guild.channels.get(&voice_channel).try_unwrap()?;
 
-            if channel.kind == serenity::ChannelType::Stage
+            if channel.base.kind == serenity::ChannelType::Stage
                 && voice_state.is_some_and(serenity::VoiceState::suppress)
                 && guild_row.audience_ignore()
             {

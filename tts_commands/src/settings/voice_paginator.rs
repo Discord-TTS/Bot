@@ -96,7 +96,7 @@ impl<'a> MenuPaginator<'a> {
 
         loop {
             let builder = message_id
-                .collect_component_interactions(serenity_context.shard.clone())
+                .collect_component_interactions(serenity_context)
                 .timeout(std::time::Duration::from_secs(60 * 5))
                 .author_id(self.ctx.author().id);
 
