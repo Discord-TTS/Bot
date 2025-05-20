@@ -3,7 +3,6 @@ name = "discord_tts_bot"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.83"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
 members = [

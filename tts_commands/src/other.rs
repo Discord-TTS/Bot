@@ -203,7 +203,7 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
         let guilds: Vec<_> = guild_ids.iter().filter_map(|id| cache.guild(*id)).collect();
 
         (
-            guilds.len().to_arraystring(),
+            guilds.len().to_formatted_string(&Locale::en),
             guilds
                 .iter()
                 .filter(|g| g.voice_states.contains_key(&bot_user_id))
@@ -226,7 +226,9 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
         );
 
         let pid = sysinfo::get_current_pid().unwrap();
-        system_info.process(pid).unwrap().memory() / 1024 / 1024
+        let process_memory = system_info.process(pid).unwrap().memory();
+
+        (process_memory / 1024 / 1024).to_formatted_string(&Locale::en)
     };
 
     let neutral_colour = ctx.neutral_colour().await;
@@ -257,7 +259,7 @@ Repository: https://github.com/Discord-TTS/Bot",
 {sep2} {total_guild_count} servers
 Currently using:
 {sep1} {shard_count} shards
-{sep1} {ram_usage:.1}MB of RAM
+{sep1} {ram_usage}MB of RAM
 and can be used by {total_members} people!",
         ));
 
