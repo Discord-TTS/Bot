@@ -83,11 +83,10 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
         error_message: impl Into<Cow<'ctx, str>>,
     ) -> Result<Option<poise::ReplyHandle<'ctx>>> {
         let author = self.author();
-        let guild_id = self.guild_id();
         let serenity_ctx = self.serenity_context();
 
-        let (name, avatar_url) = match self.channel_id().to_channel(serenity_ctx, guild_id).await? {
-            serenity::Channel::Guild(channel) => {
+        let (name, avatar_url) = match self.guild_id() {
+            Some(guild_id) => {
                 if !self.author_permissions()?.embed_links() {
                     self.send(poise::CreateReply::new()
                         .content("An Error Occurred! Please give me embed links permissions so I can tell you more!")
@@ -100,7 +99,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
                 let member = match self {
                     Self::Application(ctx) => ctx.interaction.member.as_deref().map(Cow::Borrowed),
                     Self::Prefix(_) => {
-                        let member = channel.base.guild_id.member(serenity_ctx, author.id).await;
+                        let member = guild_id.member(serenity_ctx, author.id).await;
                         member.ok().map(Cow::Owned)
                     }
                 };
@@ -110,8 +109,7 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
                     None => (Cow::Borrowed(&*author.name), author.face()),
                 }
             }
-            serenity::Channel::Private(_) => (Cow::Borrowed(&*author.name), author.face()),
-            _ => unreachable!(),
+            None => (Cow::Borrowed(&*author.name), author.face()),
         };
 
         match self
