@@ -274,9 +274,6 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
 
             ctx.say("Left voice channel!").await?;
         }
-    } else {
-        ctx.say("Error: How do I leave a voice channel if I am not in one?")
-            .await?;
     }
 
     Ok(())
