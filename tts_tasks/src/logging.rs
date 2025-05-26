@@ -153,7 +153,7 @@ impl tracing::Subscriber for ArcWrapper<WebhookLogger> {
 
     fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
         let target = metadata.target();
-        if target.starts_with(env!("CARGO_CRATE_NAME")) {
+        if target.starts_with("tts_") {
             tracing::Level::INFO >= *metadata.level()
         } else {
             tracing::Level::WARN >= *metadata.level()

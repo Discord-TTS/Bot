@@ -1,4 +1,4 @@
-#![feature(let_chains)]
+#![feature(let_chains, debug_closure_helpers)]
 
 use std::borrow::Cow;
 
@@ -19,6 +19,13 @@ mod other;
 mod owner;
 mod premium;
 mod settings;
+
+const REQUIRED_SETUP_PERMISSIONS: serenity::Permissions =
+    serenity::Permissions::VIEW_CHANNEL.union(serenity::Permissions::SEND_MESSAGES);
+
+const REQUIRED_VC_PERMISSIONS: serenity::Permissions = serenity::Permissions::VIEW_CHANNEL
+    .union(serenity::Permissions::CONNECT)
+    .union(serenity::Permissions::SPEAK);
 
 #[must_use]
 pub fn commands() -> Vec<Command> {

@@ -15,6 +15,8 @@ use tts_core::{
     traits::{PoiseContextExt, SongbirdManagerExt},
 };
 
+use crate::REQUIRED_VC_PERMISSIONS;
+
 /// Returns Some(GuildRow) on correct channel, otherwise None.
 async fn channel_check(
     ctx: &Context<'_>,
@@ -106,10 +108,6 @@ fn required_role_embed<'a>(
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
 pub async fn join(ctx: Context<'_>) -> CommandResult {
-    let required_bot_vc_permissions = serenity::Permissions::VIEW_CHANNEL
-        | serenity::Permissions::CONNECT
-        | serenity::Permissions::SPEAK;
-
     let Some(author_vc) = ctx.author_vc() else {
         let err = "I cannot join your voice channel unless you are in one!";
         ctx.send_error(err).await?;
@@ -143,7 +141,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         }
     }
 
-    let missing_permissions = required_bot_vc_permissions - author_vc_bot_perms;
+    let missing_permissions = REQUIRED_VC_PERMISSIONS - author_vc_bot_perms;
     if !missing_permissions.is_empty() {
         let mut msg = String::from("I do not have permission to TTS in your voice channel, please ask a server administrator to give me: ");
         push_permission_names(&mut msg, missing_permissions);

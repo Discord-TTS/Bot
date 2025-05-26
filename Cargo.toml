@@ -1,5 +1,5 @@
 [package]
-name = "discord_tts_bot"
+name = "tts_bot"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.83"

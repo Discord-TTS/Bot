@@ -1,10 +1,17 @@
-use std::{borrow::Cow, hash::Hash};
+use std::{borrow::Cow, fmt::Write, hash::Hash, time::Duration};
 
-use aformat::aformat;
+use aformat::{aformat, ToArrayString};
+use futures_channel::mpsc::UnboundedSender;
 use num_format::{Locale, ToFormattedString};
 use typesize::TypeSize;
 
-use self::serenity::{builder::*, small_fixed_array::FixedString};
+use crate::{REQUIRED_SETUP_PERMISSIONS, REQUIRED_VC_PERMISSIONS};
+
+use self::serenity::{
+    builder::*,
+    small_fixed_array::{FixedArray, FixedString},
+    CollectComponentInteractions,
+};
 use poise::{serenity_prelude as serenity, CreateReply};
 
 use tts_core::{
@@ -367,7 +374,157 @@ pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult
     Ok(())
 }
 
-pub fn commands() -> [Command; 6] {
+fn filter_channels_by<'a>(
+    guild: &'a serenity::Guild,
+    bot_member: &'a serenity::Member,
+    kind: serenity::ChannelType,
+    required_permissions: serenity::Permissions,
+) -> impl Iterator<Item = &'a serenity::GuildChannel> + use<'a> {
+    guild
+        .channels
+        .iter()
+        .filter(move |c| c.base.kind == kind)
+        .filter(move |c| {
+            let channel_permissions = guild.user_permissions_in(c, bot_member);
+            (required_permissions - channel_permissions).is_empty()
+        })
+}
+
+fn format_channels<'a>(channels: impl Iterator<Item = &'a serenity::GuildChannel>) -> String {
+    let mut out = String::new();
+    for channel in channels {
+        writeln!(out, "`{}`: {}", channel.id, channel.base.name).unwrap();
+    }
+
+    out
+}
+
+fn get_runner_channel(
+    ctx: &serenity::Context,
+    shard_id: serenity::ShardId,
+) -> Option<UnboundedSender<serenity::ShardRunnerMessage>> {
+    ctx.runners.get(&shard_id).map(|entry| entry.1.clone())
+}
+
+#[poise::command(prefix_command, owners_only)]
+pub async fn guild_info(ctx: Context<'_>, guild_id: Option<serenity::GuildId>) -> CommandResult {
+    let cache = ctx.cache();
+    let Some(guild_id) = guild_id.or(ctx.guild_id()) else {
+        ctx.say("Missing guild id!").await?;
+        return Ok(());
+    };
+
+    let guild_shard_id = guild_id.shard_id(cache.shard_count());
+
+    let title = aformat!("Guild Report for {guild_id}");
+    let footer = aformat!("Guild Shard Id: {guild_shard_id}");
+
+    let mut embed = CreateEmbed::new()
+        .footer(CreateEmbedFooter::new(&*footer))
+        .title(&*title);
+
+    let permissions_formatted;
+    let mut guild_cached = false;
+    if let Some(guild) = cache.guild(guild_id) {
+        guild_cached = true;
+        if let Some(member) = guild.members.get(&cache.current_user().id) {
+            let permissions = guild.member_permissions(member);
+            let permissions = if permissions.administrator() {
+                "Administrator"
+            } else {
+                permissions_formatted = permissions.to_string();
+                &permissions_formatted
+            };
+
+            let visible_text_channels = format_channels(filter_channels_by(
+                &guild,
+                member,
+                serenity::ChannelType::Text,
+                REQUIRED_SETUP_PERMISSIONS,
+            ));
+
+            let usable_voice_channels = format_channels(filter_channels_by(
+                &guild,
+                member,
+                serenity::ChannelType::Voice,
+                REQUIRED_VC_PERMISSIONS,
+            ));
+
+            embed = embed
+                .field("Guild Permissions", permissions, false)
+                .field("Visible Text Channels", visible_text_channels, true)
+                .field("Usable Voice Channels", usable_voice_channels, true);
+        } else {
+            embed = embed.description("Guild is cached, but has no bot member");
+        };
+    }
+
+    if !guild_cached {
+        let guild_fetchable = ctx.http().get_guild(guild_id).await.is_ok();
+
+        embed = embed.description(if guild_fetchable {
+            "Guild is fetchable, but not in cache"
+        } else {
+            "Guild is not in cache and not fetchable, is TTS Bot in this guild?"
+        });
+    }
+
+    let custom_id = uuid::Uuid::now_v7().to_u128_le().to_arraystring();
+    let custom_ids = FixedArray::from_vec_trunc(vec![FixedString::from_str_trunc(&custom_id)]);
+
+    let restart_button = CreateButton::new(&*custom_id)
+        .style(serenity::ButtonStyle::Danger)
+        .label("Restart Shard")
+        .emoji('♻');
+
+    let action_row = CreateActionRow::buttons(std::slice::from_ref(&restart_button));
+    let components = std::slice::from_ref(&action_row);
+
+    let reply = CreateReply::new().embed(embed).components(components);
+    ctx.send(reply).await?;
+
+    let response = ctx
+        .channel_id()
+        .collect_component_interactions(ctx.serenity_context())
+        .timeout(Duration::from_secs(60 * 5))
+        .author_id(ctx.author().id)
+        .custom_ids(custom_ids)
+        .await;
+
+    let Some(interaction) = response else {
+        return Ok(());
+    };
+
+    let http = ctx.http();
+    let _ = interaction.defer(http).await;
+
+    let shard_id = serenity::ShardId(guild_shard_id);
+    let Some(channel) = get_runner_channel(ctx.serenity_context(), shard_id) else {
+        let message = CreateInteractionResponseFollowup::new()
+            .content("No shard runner found in runners map, cannot restart!");
+
+        interaction.create_followup(http, message).await?;
+        return Ok(());
+    };
+
+    let restart_msg = serenity::ShardRunnerMessage::Restart;
+    if channel.unbounded_send(restart_msg).is_err() {
+        let message = CreateInteractionResponseFollowup::new()
+            .content("Shard runner channel does not exist anymore");
+
+        interaction.create_followup(http, message).await?;
+        return Ok(());
+    }
+
+    let message = CreateInteractionResponseFollowup::new()
+        .content("Shard has been told to restart, let's see what happens.");
+
+    interaction.create_followup(http, message).await?;
+
+    Ok(())
+}
+
+pub fn commands() -> [Command; 7] {
     [
         dm(),
         debug(),
@@ -375,5 +532,6 @@ pub fn commands() -> [Command; 6] {
         remove_cache(),
         refresh_ofs(),
         cache_info(),
+        guild_info(),
     ]
 }

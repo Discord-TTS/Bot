@@ -131,6 +131,8 @@ pub async fn handle(ctx: &serenity::Context, data_about_bot: &serenity::Ready) -
 
     if is_last_shard && !data.fully_started.swap(true, Ordering::SeqCst) {
         finalize_startup(ctx, data);
+    } else if data.fully_started.load(Ordering::SeqCst) {
+        tracing::info!("Shard {} is now ready", ctx.shard_id);
     }
 
     Ok(())

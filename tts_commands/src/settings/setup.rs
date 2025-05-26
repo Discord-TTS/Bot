@@ -14,10 +14,10 @@ use tts_core::{
     structs::{CommandResult, Context, Result},
 };
 
-fn can_send_generic(permissions: Permissions) -> bool {
-    let required_permissions = Permissions::SEND_MESSAGES | Permissions::VIEW_CHANNEL;
+use crate::REQUIRED_SETUP_PERMISSIONS;
 
-    (required_permissions - permissions).is_empty()
+fn can_send_generic(permissions: Permissions) -> bool {
+    (REQUIRED_SETUP_PERMISSIONS - permissions).is_empty()
 }
 
 fn can_send(

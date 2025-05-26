@@ -8,6 +8,8 @@ use tts_core::{
 };
 
 pub fn resume(ctx: &serenity::Context) {
+    tracing::info!("Shard {} has resumed", ctx.shard_id);
+
     let data = ctx.data_ref::<Data>();
     data.analytics.log(Cow::Borrowed("resumed"), false);
 }
