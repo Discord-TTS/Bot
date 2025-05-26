@@ -26,6 +26,7 @@ workspace = true
 
 [dependencies]
 const_format = "0.2"
+jemallocator = "0.5.4"
 small-fixed-array = { version = "0.4.5", features = [
     "nightly",
     "to-arraystring",

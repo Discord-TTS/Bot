@@ -23,6 +23,9 @@ mod startup;
 
 use startup::*;
 
+#[global_allocator]
+static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 fn main() -> Result<()> {
     let start_time = std::time::SystemTime::now();
 
