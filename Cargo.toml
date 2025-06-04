@@ -127,3 +127,7 @@ ignored = [
     "const_format", # Used by database initialisation in macro
     "symphonia",    # Enabled for the features
 ]
+
+[patch."https://github.com/serenity-rs/serenity".serenity]
+git = "https://github.com/GnomedDev/serenity"
+branch = "no-waiting-for-shutdown"

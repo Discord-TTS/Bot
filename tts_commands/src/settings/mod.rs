@@ -8,11 +8,7 @@ use aformat::{aformat, ToArrayString};
 use arrayvec::ArrayString;
 
 use poise::serenity_prelude as serenity;
-use serenity::{
-    builder::*,
-    small_fixed_array::{FixedString, TruncatingInto},
-    Mentionable,
-};
+use serenity::{builder::*, small_fixed_array::FixedString, Mentionable};
 
 use tts_core::{
     common::{confirm_dialog, random_footer},
@@ -1082,7 +1078,7 @@ pub async fn voice(
     #[description = "The voice to read messages in, leave blank to reset"]
     #[autocomplete = "voice_autocomplete"]
     #[rest]
-    voice: Option<String>,
+    voice: Option<FixedString<u8>>,
 ) -> CommandResult {
     let data = ctx.data();
     let author_id = ctx.author().id;
@@ -1095,7 +1091,7 @@ pub async fn voice(
         author_id,
         guild_id,
         author_id.into(),
-        voice.map(String::trunc_into),
+        voice,
         Target::User,
     )
     .await?;
@@ -1104,7 +1100,7 @@ pub async fn voice(
     Ok(())
 }
 
-/// Lists all the languages that TTS bot accepts for DeepL translation
+/// Lists all the languages that TTS bot accepts for Deepl translation
 #[poise::command(
     category = "Settings",
     prefix_command,
