@@ -12,7 +12,7 @@ use self::serenity::{
 use poise::serenity_prelude as serenity;
 
 use crate::{
-    common::push_permission_names,
+    common::{push_permission_names, safe_truncate},
     constants,
     opt_ext::OptionTryUnwrap,
     structs::{Context, Data},
@@ -40,19 +40,6 @@ fn hash(data: &[u8]) -> Vec<u8> {
     let mut hasher = sha2::Sha256::new();
     hasher.update(data);
     Vec::from(&*hasher.finalize())
-}
-
-fn truncate_error(error: &Error) -> String {
-    let mut long_err = error.to_string();
-
-    // Avoid char boundary panics with utf8 chars
-    let mut new_len = 256;
-    while !long_err.is_char_boundary(new_len) {
-        new_len -= 1;
-    }
-
-    long_err.truncate(new_len);
-    long_err
 }
 
 pub async fn handle_unexpected<'a>(
@@ -112,8 +99,12 @@ pub async fn handle_unexpected<'a>(
     ];
 
     let mut embed = serenity::CreateEmbed::default()
-        .title(truncate_error(&error))
-        .colour(constants::RED);
+        .colour(constants::RED)
+        .title({
+            let mut error_str = error.to_string();
+            safe_truncate(&mut error_str, 256);
+            error_str
+        });
 
     for (title, mut value, inline) in before_fields
         .into_iter()

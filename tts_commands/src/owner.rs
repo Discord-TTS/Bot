@@ -15,7 +15,7 @@ use self::serenity::{
 use poise::{serenity_prelude as serenity, CreateReply};
 
 use tts_core::{
-    common::dm_generic,
+    common::{dm_generic, safe_truncate},
     database,
     database_models::Compact,
     structs::{Command, CommandResult, Context, PrefixContext, TTSModeChoice},
@@ -342,7 +342,7 @@ fn process_cache_info(
     Some(fields)
 }
 
-#[poise::command(prefix_command, owners_only)]
+#[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn cache_info(ctx: Context<'_>, kind: Option<String>) -> CommandResult {
     ctx.defer().await?;
 
@@ -394,8 +394,12 @@ fn format_channels<'a>(channels: impl Iterator<Item = &'a serenity::GuildChannel
     let mut out = String::new();
     for channel in channels {
         writeln!(out, "`{}`: {}", channel.id, channel.base.name).unwrap();
+        if out.len() >= 1024 {
+            break;
+        }
     }
 
+    safe_truncate(&mut out, 1024);
     out
 }
 
@@ -406,7 +410,7 @@ fn get_runner_channel(
     ctx.runners.get(&shard_id).map(|entry| entry.1.clone())
 }
 
-#[poise::command(prefix_command, owners_only)]
+#[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn guild_info(ctx: Context<'_>, guild_id: Option<serenity::GuildId>) -> CommandResult {
     let cache = ctx.cache();
     let Some(guild_id) = guild_id.or(ctx.guild_id()) else {
@@ -423,7 +427,7 @@ pub async fn guild_info(ctx: Context<'_>, guild_id: Option<serenity::GuildId>) -
         .footer(CreateEmbedFooter::new(&*footer))
         .title(&*title);
 
-    let permissions_formatted;
+    let mut permissions_formatted;
     let mut guild_cached = false;
     if let Some(guild) = cache.guild(guild_id) {
         guild_cached = true;
@@ -433,6 +437,7 @@ pub async fn guild_info(ctx: Context<'_>, guild_id: Option<serenity::GuildId>) -
                 "Administrator"
             } else {
                 permissions_formatted = permissions.to_string();
+                safe_truncate(&mut permissions_formatted, 256);
                 &permissions_formatted
             };
 

@@ -438,3 +438,18 @@ pub async fn confirm_dialog(
 
     confirm_dialog_wait(ctx.serenity_context(), message.id, ctx.author().id).await
 }
+
+/// Avoid char boundary panics with utf8 chars
+pub fn safe_truncate(string: &mut String, mut new_len: usize) {
+    if string.len() <= new_len {
+        return;
+    }
+
+    new_len -= 3;
+    while !string.is_char_boundary(new_len) {
+        new_len -= 1;
+    }
+
+    string.truncate(new_len);
+    string.push_str("...");
+}
