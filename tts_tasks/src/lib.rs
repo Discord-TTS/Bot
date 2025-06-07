@@ -1,5 +1,5 @@
 #![allow(async_fn_in_trait)]
-#![feature(never_type)]
+#![feature(never_type, trait_alias)]
 
 mod analytics;
 pub mod bot_list_updater;

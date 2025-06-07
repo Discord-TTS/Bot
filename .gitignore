@@ -1,10 +1,5 @@
 .vscode
 *.hidden
-config.ini
-keydb.conf
-config.toml
 docker-compose.yml
-*~
-# Added by cargo
-
+/config.toml
 /target

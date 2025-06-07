@@ -17,7 +17,7 @@ use tts_core::{
     structs::{Data, PollyVoice, RegexCache, Result, TTSMode},
 };
 use tts_events::EventHandler;
-use tts_tasks::Looper as _;
+use tts_tasks::{logging::Layer, Looper as _};
 
 mod startup;
 
@@ -28,16 +28,17 @@ static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 fn main() -> Result<()> {
     let start_time = std::time::SystemTime::now();
+    let console_layer = console_subscriber::spawn();
 
     println!("Starting tokio runtime");
     std::env::set_var("RUST_LIB_BACKTRACE", "1");
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
-        .block_on(main_(start_time))
+        .block_on(main_(console_layer, start_time))
 }
 
-async fn main_(start_time: std::time::SystemTime) -> Result<()> {
+async fn main_(console_layer: impl Layer, start_time: std::time::SystemTime) -> Result<()> {
     println!("Loading and performing migrations");
     let (pool, config) = tts_migrations::load_db_and_conf().await?;
 
@@ -97,6 +98,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
 
     println!("Setting up webhook logging");
     tts_tasks::logging::WebhookLogger::init(
+        console_layer,
         http.clone(),
         webhooks.logs.clone(),
         webhooks.errors.clone(),

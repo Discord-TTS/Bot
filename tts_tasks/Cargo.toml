@@ -17,6 +17,8 @@ aformat.workspace = true
 serenity.workspace = true
 itertools.workspace = true
 parking_lot.workspace = true
+tracing-subscriber.workspace = true
+console-subscriber.workspace = true
 
 tts_core = { path = "../tts_core" }
 

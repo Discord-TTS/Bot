@@ -4,12 +4,14 @@ use aformat::{aformat, CapStr};
 use anyhow::Result;
 use itertools::Itertools as _;
 use parking_lot::Mutex;
+use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _, Registry};
 
 use serenity::all::{ExecuteWebhook, Http, Webhook};
 
 use crate::Looper;
 
 type LogMessage = (&'static str, String);
+pub trait Layer = tracing_subscriber::Layer<Registry> + Send + Sync + 'static;
 
 fn get_avatar(level: tracing::Level) -> &'static str {
     match level {
@@ -32,7 +34,12 @@ pub struct WebhookLogger {
 }
 
 impl WebhookLogger {
-    pub fn init(http: Arc<Http>, normal_logs: Webhook, error_logs: Webhook) {
+    pub fn init(
+        console_layer: impl Layer,
+        http: Arc<Http>,
+        normal_logs: Webhook,
+        error_logs: Webhook,
+    ) {
         let logger = ArcWrapper(Arc::new(Self {
             http,
             normal_logs,
@@ -41,7 +48,11 @@ impl WebhookLogger {
             pending_logs: Mutex::default(),
         }));
 
-        tracing::subscriber::set_global_default(logger.clone()).unwrap();
+        tracing_subscriber::registry()
+            .with(console_layer)
+            .with(logger.clone())
+            .init();
+
         tokio::spawn(logger.0.start());
     }
 }
@@ -108,34 +119,31 @@ impl Looper for Arc<WebhookLogger> {
     }
 }
 
-impl tracing::Subscriber for ArcWrapper<WebhookLogger> {
-    // Hopefully this works
-    fn new_span(&self, _span: &tracing::span::Attributes<'_>) -> tracing::span::Id {
-        tracing::span::Id::from_u64(1)
+pub struct StringVisitor<'a> {
+    string: &'a mut String,
+}
+
+impl tracing::field::Visit for StringVisitor<'_> {
+    fn record_debug(&mut self, _field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        write!(self.string, "{value:?}").unwrap();
     }
 
-    fn record_follows_from(&self, _span: &tracing::span::Id, _follows: &tracing::span::Id) {}
-    fn record(&self, _span: &tracing::span::Id, _values: &tracing::span::Record<'_>) {}
-    fn enter(&self, _span: &tracing::span::Id) {}
-    fn exit(&self, _span: &tracing::span::Id) {}
+    fn record_str(&mut self, _field: &tracing::field::Field, value: &str) {
+        self.string.push_str(value);
+    }
+}
 
-    fn event(&self, event: &tracing::Event<'_>) {
-        pub struct StringVisitor<'a> {
-            string: &'a mut String,
-        }
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for ArcWrapper<WebhookLogger> {
+    fn on_event(&self, event: &tracing::Event<'_>, _: tracing_subscriber::layer::Context<'_, S>) {
+        let metadata = event.metadata();
+        let enabled = if metadata.target().starts_with("tts_") {
+            tracing::Level::INFO >= *metadata.level()
+        } else {
+            tracing::Level::WARN >= *metadata.level()
+        };
 
-        impl tracing::field::Visit for StringVisitor<'_> {
-            fn record_debug(
-                &mut self,
-                _field: &tracing::field::Field,
-                value: &dyn std::fmt::Debug,
-            ) {
-                write!(self.string, "{value:?}").unwrap();
-            }
-
-            fn record_str(&mut self, _field: &tracing::field::Field, value: &str) {
-                self.string.push_str(value);
-            }
+        if !enabled {
+            return;
         }
 
         let mut message = String::new();
@@ -143,21 +151,11 @@ impl tracing::Subscriber for ArcWrapper<WebhookLogger> {
             string: &mut message,
         });
 
-        let metadata = event.metadata();
         self.pending_logs
             .lock()
             .entry(*metadata.level())
             .or_default()
             .push((metadata.target(), message));
-    }
-
-    fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
-        let target = metadata.target();
-        if target.starts_with("tts_") {
-            tracing::Level::INFO >= *metadata.level()
-        } else {
-            tracing::Level::WARN >= *metadata.level()
-        }
     }
 }
 
