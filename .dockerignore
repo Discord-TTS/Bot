@@ -1,5 +1,7 @@
-.*
 target
+.github
+.gitignore
+.gitattributes
 
 # These files shouldn't be sent into the container as it causes a rebuild
 # on simple config changes/development 
