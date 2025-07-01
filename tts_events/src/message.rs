@@ -21,11 +21,11 @@ use tts::process_tts_msg;
 mod tts;
 
 pub async fn handle(ctx: &serenity::Context, new_message: &serenity::Message) -> Result<()> {
-    tokio::try_join!(
-        process_tts_msg(ctx, new_message),
-        process_support_dm(ctx, new_message),
-        process_mention_msg(ctx, new_message),
-    )?;
+    tokio::try_join!(process_tts_msg(ctx, new_message), async {
+        process_support_dm(ctx, new_message).await?;
+        process_mention_msg(ctx, new_message).await?;
+        Ok(())
+    })?;
 
     Ok(())
 }
