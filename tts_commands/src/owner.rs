@@ -213,11 +213,7 @@ Guild Voice Data: `{guild_voice_row:?}`
 #[poise::command(prefix_command, guild_only, hide_in_help)]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
-    ctx.data()
-        .songbird
-        .remove(guild_id)
-        .await
-        .map_err(Into::into)
+    ctx.data().leave_vc(guild_id).await.map_err(Into::into)
 }
 
 fn get_db_info<CacheKey, RowT>(

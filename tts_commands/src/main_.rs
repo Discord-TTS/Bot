@@ -1,4 +1,7 @@
-use std::sync::{atomic::Ordering, Arc};
+use std::{
+    ops::ControlFlow,
+    sync::{atomic::Ordering, Arc},
+};
 
 use aformat::{aformat, ArrayString};
 
@@ -43,6 +46,53 @@ async fn channel_check(
 
     ctx.send_error(msg).await?;
     Ok(None)
+}
+
+async fn handle_vc_mismatch(
+    ctx: Context<'_>,
+    guild_id: serenity::GuildId,
+    author_vc: serenity::ChannelId,
+    bot_id: serenity::UserId,
+    bot_channel_id: songbird::id::ChannelId,
+) -> Result<ControlFlow<()>> {
+    let data = ctx.data();
+
+    let bot_channel_id = serenity::ChannelId::new(bot_channel_id.get());
+    let (channel_exists, voice_state_matches) = {
+        let Some(guild) = ctx.guild() else {
+            return Ok(ControlFlow::Break(()));
+        };
+
+        let voice_state = guild.voice_states.get(&bot_id);
+
+        (
+            guild.channels.contains_key(&bot_channel_id),
+            voice_state.is_some_and(|vs| vs.channel_id == Some(bot_channel_id)),
+        )
+    };
+
+    match (channel_exists, voice_state_matches) {
+        (true, true) => {
+            if author_vc == bot_channel_id {
+                ctx.say("I am already in your voice channel!").await?;
+            } else {
+                let msg = aformat!("I am already in <#{bot_channel_id}>!");
+                ctx.say(msg.as_str()).await?;
+            }
+
+            Ok(ControlFlow::Break(()))
+        }
+        (false, _) => {
+            tracing::warn!("Channel {bot_channel_id} didn't exist in {guild_id} in `/join`");
+            data.leave_vc(guild_id).await?;
+            Ok(ControlFlow::Continue(()))
+        }
+        (_, false) => {
+            tracing::warn!("Songbird thought it was in the wrong channel in {guild_id} in `/join`");
+            data.leave_vc(guild_id).await?;
+            Ok(ControlFlow::Continue(()))
+        }
+    }
 }
 
 fn create_warning_embed<'a>(title: &'a str, footer: &'a str) -> serenity::CreateEmbed<'a> {
@@ -154,23 +204,12 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     if let Some(bot_vc) = data.songbird.get(guild_id) {
         let bot_channel_id = bot_vc.lock().await.current_channel();
         if let Some(bot_channel_id) = bot_channel_id {
-            let bot_channel_id = serenity::ChannelId::new(bot_channel_id.get());
-            let channel_exists = require_guild!(ctx).channels.contains_key(&bot_channel_id);
+            let result =
+                handle_vc_mismatch(ctx, guild_id, author_vc, bot_id, bot_channel_id).await?;
 
-            if channel_exists {
-                if author_vc == bot_channel_id {
-                    ctx.say("I am already in your voice channel!").await?;
-                    return Ok(());
-                }
-
-                let msg = aformat!("I am already in <#{bot_channel_id}>!");
-                ctx.say(msg.as_str()).await?;
+            if result.is_break() {
                 return Ok(());
             }
-
-            tracing::warn!("Channel {bot_channel_id} didn't exist in {guild_id} in `/join`");
-            data.last_to_xsaid_tracker.remove(&guild_id);
-            data.songbird.remove(guild_id).await?;
         }
     }
 
@@ -267,9 +306,7 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
             ctx.say("Error: You need to be in the same voice channel as me to make me leave!")
                 .await?;
         } else {
-            data.last_to_xsaid_tracker.remove(&guild_id);
-            data.songbird.remove(guild_id).await?;
-
+            data.leave_vc(guild_id).await?;
             ctx.say("Left voice channel!").await?;
         }
     }

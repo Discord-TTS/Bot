@@ -286,6 +286,12 @@ impl std::fmt::Debug for Data {
 }
 
 impl Data {
+    #[expect(clippy::disallowed_methods, reason = "We are Data::leave_vc")]
+    pub async fn leave_vc(&self, guild_id: serenity::GuildId) -> songbird::error::JoinResult<()> {
+        self.last_to_xsaid_tracker.remove(&guild_id);
+        self.songbird.remove(guild_id).await
+    }
+
     pub async fn speaking_rate(&self, user_id: UserId, mode: TTSMode) -> Result<Cow<'static, str>> {
         let row = self.user_voice_db.get((user_id.into(), mode)).await?;
 

@@ -31,8 +31,7 @@ pub async fn handle(
     };
 
     if leave_vc {
-        data.last_to_xsaid_tracker.remove(&guild_id);
-        data.songbird.remove(guild_id).await?;
+        data.leave_vc(guild_id).await?;
     }
 
     Ok(())

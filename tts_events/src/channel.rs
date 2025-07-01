@@ -25,8 +25,7 @@ pub async fn handle_delete(
     let call_channel_id = guild_call_channel_id(&data.songbird, guild_id).await;
     if call_channel_id == Some(channel.id) {
         // Ignore errors from leaving the channel, probably already left.
-        let _ = data.songbird.remove(guild_id).await;
-        data.last_to_xsaid_tracker.remove(&guild_id);
+        let _ = data.leave_vc(guild_id).await;
     }
 
     Ok(())
