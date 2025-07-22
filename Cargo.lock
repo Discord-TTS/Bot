@@ -3993,7 +3993,6 @@ dependencies = [
  "sysinfo",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "tts_commands",
  "tts_core",
  "tts_events",
@@ -4090,7 +4089,6 @@ version = "0.1.0"
 dependencies = [
  "aformat",
  "anyhow",
- "console-subscriber",
  "itertools",
  "parking_lot",
  "reqwest",

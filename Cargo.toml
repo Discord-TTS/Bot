@@ -43,8 +43,7 @@ dashmap.workspace = true
 songbird.workspace = true
 mini-moka.workspace = true
 parking_lot.workspace = true
-tracing-subscriber.workspace = true
-console-subscriber.workspace = true
+console-subscriber = { version = "0.4.1", features = ['parking_lot'] }
 
 tts_core = { path = "tts_core" }
 tts_tasks = { path = "tts_tasks" }
@@ -68,8 +67,6 @@ itertools = "0.14"
 arrayvec = "0.7.6"
 parking_lot = "0.12"
 mini-moka = { version = "0.10.3", features = ["sync"] }
-console-subscriber = { version = "0.4.1", features = ['parking_lot'] }
-tracing-subscriber = { version = "0.3.19", features = ["parking_lot"] }
 # TODO: Remove `dashmap` once mini_moka releases a breaking version with dashmap 6.
 typesize = { version = "0.1.9", features = ["arrayvec", "dashmap", "details"] }
 
