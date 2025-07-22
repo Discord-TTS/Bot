@@ -6,8 +6,8 @@ use sha2::Digest;
 use tracing::error;
 
 use self::serenity::{
-    CreateActionRow, CreateButton, CreateInteractionResponse, GenericGuildChannelRef,
-    small_fixed_array::FixedString,
+    CreateActionRow, CreateButton, CreateComponent, CreateInteractionResponse,
+    GenericGuildChannelRef, small_fixed_array::FixedString,
 };
 use poise::serenity_prelude as serenity;
 
@@ -134,11 +134,11 @@ pub async fn handle_unexpected<'a>(
         .style(serenity::ButtonStyle::Danger)];
 
     let embeds = [embed];
-    let components = [CreateActionRow::buttons(&buttons)];
+    let components = CreateComponent::ActionRow(CreateActionRow::buttons(&buttons));
 
     let builder = serenity::ExecuteWebhook::default()
         .embeds(&embeds)
-        .components(&components);
+        .components(std::slice::from_ref(&components));
 
     let message = data
         .webhooks

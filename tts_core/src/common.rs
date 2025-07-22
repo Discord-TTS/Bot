@@ -5,7 +5,7 @@ use itertools::Itertools;
 use rand::Rng as _;
 
 use serenity::all as serenity;
-use serenity::{CollectComponentInteractions, CreateActionRow, CreateButton};
+use serenity::{CollectComponentInteractions, CreateActionRow, CreateButton, CreateComponent};
 
 use crate::structs::{
     Context, Data, LastToXsaidTracker, LastXsaidInfo, RegexCache, Result, TTSMode, TTSServiceError,
@@ -432,11 +432,11 @@ pub async fn confirm_dialog(
     negative: &str,
 ) -> Result<Option<bool>> {
     let buttons = confirm_dialog_buttons(positive, negative);
-    let components = [CreateActionRow::buttons(&buttons)];
+    let components = CreateComponent::ActionRow(CreateActionRow::buttons(&buttons));
     let builder = poise::CreateReply::default()
         .content(prompt)
         .ephemeral(true)
-        .components(&components);
+        .components(std::slice::from_ref(&components));
 
     let reply = ctx.send(builder).await?;
     let message = reply.message().await?;

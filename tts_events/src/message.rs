@@ -129,7 +129,7 @@ async fn process_support_dm(ctx: &serenity::Context, message: &serenity::Message
             channel_id.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
         } else if !userinfo.dm_blocked() {
             let webhook_username = {
-                let mut tag = message.author.tag();
+                let mut tag = message.author.tag().into_owned();
                 tag.push_str(&aformat!(" ({})", message.author.id));
                 tag
             };
@@ -243,7 +243,7 @@ async fn process_support_response(
         };
 
         let target_id = target_id_match.as_str().parse::<serenity::UserId>()?;
-        let target_tag = target_id.to_user(ctx).await?.tag();
+        let target_tag = target_id.to_user(ctx).await?.tag().into_owned();
 
         (target_id, target_tag)
     };

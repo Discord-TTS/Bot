@@ -38,7 +38,7 @@ pub async fn dm(
         ctx.serenity_context(),
         &ctx.msg.author,
         todm.id,
-        todm.tag(),
+        todm.tag().into_owned(),
         attachment_url,
         &message,
     )
@@ -479,9 +479,12 @@ pub async fn guild_info(ctx: Context<'_>, guild_id: Option<serenity::GuildId>) -
         .emoji('♻');
 
     let action_row = CreateActionRow::buttons(std::slice::from_ref(&restart_button));
-    let components = std::slice::from_ref(&action_row);
+    let components = CreateComponent::ActionRow(action_row);
 
-    let reply = CreateReply::new().embed(embed).components(components);
+    let reply = CreateReply::new()
+        .embed(embed)
+        .components(std::slice::from_ref(&components));
+
     ctx.send(reply).await?;
 
     let response = ctx

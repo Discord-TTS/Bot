@@ -44,7 +44,7 @@ impl<'a> MenuPaginator<'a> {
             .footer(CreateEmbedFooter::new(self.footer.as_ref()))
     }
 
-    fn create_action_row(&self, disabled: bool) -> serenity::CreateActionRow<'_> {
+    fn create_action_row(&self, disabled: bool) -> serenity::CreateComponent<'_> {
         let buttons = ["⏮️", "◀", "⏹️", "▶️", "⏭️"]
             .into_iter()
             .map(|emoji| {
@@ -62,7 +62,7 @@ impl<'a> MenuPaginator<'a> {
             })
             .collect();
 
-        serenity::CreateActionRow::Buttons(buttons)
+        CreateComponent::ActionRow(CreateActionRow::Buttons(buttons))
     }
 
     async fn create_message(&self) -> serenity::Result<serenity::MessageId> {

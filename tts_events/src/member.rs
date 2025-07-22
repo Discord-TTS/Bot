@@ -57,10 +57,11 @@ Do you want to remove that server from your assigned slots?",
         "Unassign premium subscription",
     );
 
-    let components = [serenity::CreateActionRow::buttons(&buttons)];
+    let components =
+        serenity::CreateComponent::ActionRow(serenity::CreateActionRow::buttons(&buttons));
     let notice = serenity::CreateMessage::new()
         .embeds(&embed)
-        .components(&components);
+        .components(std::slice::from_ref(&components));
 
     user_id.dm(http, notice).await
 }

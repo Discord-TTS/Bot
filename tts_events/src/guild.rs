@@ -15,10 +15,8 @@ pub async fn handle_create(
         return Ok(());
     }
 
-    let (owner_tag, owner_face) = {
-        let owner = guild.owner_id.to_user(&ctx).await?;
-        (owner.tag(), owner.face())
-    };
+    let owner = guild.owner_id.to_user(&ctx).await?;
+    let owner_tag = owner.tag();
 
     let data = ctx.data_ref::<Data>();
     let title = aformat!("Welcome to {}!", &ctx.cache.current_user().name);
@@ -38,7 +36,7 @@ You can view all the commands with `/help`
 Ask questions by either responding here or asking on the support server!",
         guild.name))
         .footer(CreateEmbedFooter::new(format!("Support Server: {} | Bot Invite: https://bit.ly/TTSBotSlash", data.config.main_server_invite)))
-        .author(CreateEmbedAuthor::new(&owner_tag).icon_url(owner_face))];
+        .author(CreateEmbedAuthor::new(owner_tag.as_ref()).icon_url(owner.face()))];
 
     match guild
         .owner_id
@@ -73,7 +71,7 @@ Ask questions by either responding here or asking on the support server!",
         Result::Ok(()) => (),
     }
 
-    info!("Added OFS role to {}", owner_tag);
+    info!("Added OFS role to {owner_tag}");
 
     Ok(())
 }

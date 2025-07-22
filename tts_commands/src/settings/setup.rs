@@ -132,12 +132,12 @@ async fn show_channel_select_menu(
     Ok(Some((selected_id, selected_entry.has_webhook_perms)))
 }
 
-fn generate_channel_select(text_channels: &[ChannelMenuEntry]) -> Vec<CreateActionRow<'_>> {
+fn generate_channel_select(text_channels: &[ChannelMenuEntry]) -> Vec<CreateComponent<'_>> {
     text_channels
         .chunks(25)
         .enumerate()
         .map(|(i, chunked_channels)| {
-            CreateActionRow::SelectMenu(CreateSelectMenu::new(
+            CreateComponent::ActionRow(CreateActionRow::SelectMenu(CreateSelectMenu::new(
                 format!("select::channels::{i}"),
                 CreateSelectMenuKind::String {
                     options: chunked_channels
@@ -145,7 +145,7 @@ fn generate_channel_select(text_channels: &[ChannelMenuEntry]) -> Vec<CreateActi
                         .map(|entry| CreateSelectMenuOption::new(&*entry.name, &*entry.id_str))
                         .collect(),
                 },
-            ))
+            )))
         })
         .collect::<Vec<_>>()
 }
