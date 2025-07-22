@@ -1,8 +1,8 @@
 [package]
 name = "tts_events"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.83"
+edition = "2024"
+rust-version = "1.88"
 
 [dependencies]
 libc = "0.2.152"

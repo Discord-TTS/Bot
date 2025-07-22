@@ -1,9 +1,9 @@
 use std::{
     ops::ControlFlow,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
 };
 
-use aformat::{aformat, ArrayString};
+use aformat::{ArrayString, aformat};
 
 use poise::serenity_prelude::{self as serenity, builder::*, colours::branding::YELLOW};
 use songbird::error::JoinError;
@@ -183,17 +183,19 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
         (bot_vc_perms, bot_member.communication_disabled_until)
     };
 
-    if let Some(communication_disabled_until) = communication_disabled_until {
-        if communication_disabled_until > serenity::Timestamp::now() {
-            let msg = "I am timed out, please ask a moderator to remove the timeout";
-            ctx.send_error(msg).await?;
-            return Ok(());
-        }
+    if let Some(communication_disabled_until) = communication_disabled_until
+        && communication_disabled_until > serenity::Timestamp::now()
+    {
+        let msg = "I am timed out, please ask a moderator to remove the timeout";
+        ctx.send_error(msg).await?;
+        return Ok(());
     }
 
     let missing_permissions = REQUIRED_VC_PERMISSIONS - author_vc_bot_perms;
     if !missing_permissions.is_empty() {
-        let mut msg = String::from("I do not have permission to TTS in your voice channel, please ask a server administrator to give me: ");
+        let mut msg = String::from(
+            "I do not have permission to TTS in your voice channel, please ask a server administrator to give me: ",
+        );
         push_permission_names(&mut msg, missing_permissions);
 
         ctx.send_error(msg).await?;

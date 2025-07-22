@@ -79,7 +79,9 @@ async fn process_mention_msg(ctx: &serenity::Context, message: &serenity::Messag
                 None => "Unknown Server",
             };
 
-            format!("My prefix for `{guild_name}` is {prefix} however I do not have permission to send messages so I cannot respond to your commands!")
+            format!(
+                "My prefix for `{guild_name}` is {prefix} however I do not have permission to send messages so I cannot respond to your commands!"
+            )
         };
 
         let msg = CreateMessage::default().content(msg);

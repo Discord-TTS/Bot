@@ -4,11 +4,11 @@ mod voice_paginator;
 
 use std::{borrow::Cow, collections::HashMap, fmt::Write, sync::atomic::Ordering};
 
-use aformat::{aformat, ToArrayString};
+use aformat::{ToArrayString, aformat};
 use arrayvec::ArrayString;
 
 use poise::serenity_prelude as serenity;
-use serenity::{builder::*, small_fixed_array::FixedString, Mentionable};
+use serenity::{Mentionable, builder::*, small_fixed_array::FixedString};
 
 use tts_core::{
     common::{confirm_dialog, random_footer},
@@ -333,7 +333,6 @@ async fn change_voice<'a, T, RowT1, RowT2>(
 where
     RowT1: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Compact + Send + Sync + Unpin,
     RowT2: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> + Compact + Send + Sync + Unpin,
-
     T: database::CacheKeyTrait + Default + Send + Sync + Copy,
     (T, TTSMode): database::CacheKeyTrait,
 {

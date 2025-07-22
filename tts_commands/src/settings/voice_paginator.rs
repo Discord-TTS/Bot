@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
-use serenity::{builder::*, small_fixed_array::FixedString, CollectComponentInteractions};
+use serenity::{CollectComponentInteractions, builder::*, small_fixed_array::FixedString};
 
 use tts_core::structs::{Context, TTSMode};
 

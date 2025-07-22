@@ -3,10 +3,10 @@ use anyhow::Error;
 use num_format::{Locale, ToFormattedString};
 
 use poise::{
-    serenity_prelude::{
-        self as serenity, builder::*, small_fixed_array::FixedString, Mentionable as _,
-    },
     CreateReply,
+    serenity_prelude::{
+        self as serenity, Mentionable as _, builder::*, small_fixed_array::FixedString,
+    },
 };
 
 use aformat::ToArrayString;

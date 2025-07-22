@@ -113,7 +113,9 @@ pub async fn handle_removal(
         }
         None => {
             remove_premium(data, guild_id).await?;
-            format!("You did not respond to whether or not to remove premium assignment from {guild_name} ({guild_id}), so it has been unassigned.")
+            format!(
+                "You did not respond to whether or not to remove premium assignment from {guild_name} ({guild_id}), so it has been unassigned."
+            )
         }
     };
 

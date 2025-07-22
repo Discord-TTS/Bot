@@ -1,10 +1,10 @@
-use aformat::{aformat, astr, ToArrayString};
+use aformat::{ToArrayString, aformat, astr};
 use anyhow::bail;
 
 use poise::serenity_prelude as serenity;
 use serenity::{
-    builder::*, small_fixed_array::FixedString, CollectComponentInteractions,
-    ComponentInteractionDataKind, Permissions,
+    CollectComponentInteractions, ComponentInteractionDataKind, Permissions, builder::*,
+    small_fixed_array::FixedString,
 };
 
 use tts_core::{

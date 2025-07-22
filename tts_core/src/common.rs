@@ -123,13 +123,18 @@ pub fn prepare_url(
 
 #[must_use]
 pub fn random_footer(server_invite: &str, client_id: serenity::UserId) -> Cow<'static, str> {
-    match rand::rng().random_range(0..5) {
-        0 => Cow::Owned(format!("If you find a bug or want to ask a question, join the support server: {server_invite}")),
-        1 => Cow::Owned(format!("You can vote for me or review me on wumpus.store!\nhttps://wumpus.store/bot/{client_id}?ref=tts")),
-        2 => Cow::Owned(format!("You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}")),
-        3 => Cow::Borrowed("If you want to support the development and hosting of TTS Bot, check out `/premium`!"),
-        4 => Cow::Borrowed("There are loads of customizable settings, check out `/help set`"),
-        _ => unreachable!()
+    match rand::rng().random_range(0..4) {
+        0 => Cow::Owned(format!(
+            "If you find a bug or want to ask a question, join the support server: {server_invite}"
+        )),
+        1 => Cow::Owned(format!(
+            "You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}"
+        )),
+        2 => Cow::Borrowed(
+            "If you want to support the development and hosting of TTS Bot, check out `/premium`!",
+        ),
+        3 => Cow::Borrowed("There are loads of customizable settings, check out `/help set`"),
+        _ => unreachable!(),
     }
 }
 

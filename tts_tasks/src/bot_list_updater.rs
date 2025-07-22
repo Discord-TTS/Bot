@@ -1,6 +1,6 @@
 use std::{num::NonZeroU16, sync::Arc};
 
-use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue};
 use serde_json::{json, to_vec};
 
 use self::serenity::UserId;

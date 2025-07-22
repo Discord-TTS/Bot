@@ -1,8 +1,8 @@
 [package]
 name = "tts_core"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.83"
+edition = "2024"
+rust-version = "1.88"
 
 [dependencies]
 rand = "0.9"

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Write, hash::Hash, time::Duration};
 
-use aformat::{aformat, ToArrayString};
+use aformat::{ToArrayString, aformat};
 use futures_channel::mpsc::UnboundedSender;
 use num_format::{Locale, ToFormattedString};
 use typesize::TypeSize;
@@ -8,11 +8,11 @@ use typesize::TypeSize;
 use crate::{REQUIRED_SETUP_PERMISSIONS, REQUIRED_VC_PERMISSIONS};
 
 use self::serenity::{
+    CollectComponentInteractions,
     builder::*,
     small_fixed_array::{FixedArray, FixedString},
-    CollectComponentInteractions,
 };
-use poise::{serenity_prelude as serenity, CreateReply};
+use poise::{CreateReply, serenity_prelude as serenity};
 
 use tts_core::{
     common::{dm_generic, safe_truncate},
@@ -457,7 +457,7 @@ pub async fn guild_info(ctx: Context<'_>, guild_id: Option<serenity::GuildId>) -
                 .field("Usable Voice Channels", usable_voice_channels, true);
         } else {
             embed = embed.description("Guild is cached, but has no bot member");
-        };
+        }
     }
 
     if !guild_cached {

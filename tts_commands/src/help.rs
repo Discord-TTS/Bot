@@ -151,7 +151,9 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
                     ),
                     {
                         let group_name = &command_obj.name;
-                        let msg = format!("The group {group_name} does not have a subcommand called {remaining_args}!");
+                        let msg = format!(
+                            "The group {group_name} does not have a subcommand called {remaining_args}!"
+                        );
 
                         ctx.say(msg).await?;
                         Ok(())

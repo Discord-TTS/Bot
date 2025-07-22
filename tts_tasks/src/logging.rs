@@ -1,10 +1,10 @@
 use std::{collections::HashMap, fmt::Write, sync::Arc};
 
-use aformat::{aformat, CapStr};
+use aformat::{CapStr, aformat};
 use anyhow::Result;
 use itertools::Itertools as _;
 use parking_lot::Mutex;
-use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _, Registry};
+use tracing_subscriber::{Registry, layer::SubscriberExt as _, util::SubscriberInitExt as _};
 
 use serenity::all::{ExecuteWebhook, Http, Webhook};
 

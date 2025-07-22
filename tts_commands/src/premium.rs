@@ -1,11 +1,11 @@
 use std::fmt::Write as _;
 
-use aformat::{aformat, aformat_into, ArrayString};
+use aformat::{ArrayString, aformat, aformat_into};
 
 use poise::{
-    futures_util::{stream::BoxStream, StreamExt as _},
-    serenity_prelude::{self as serenity, builder::*},
     CreateReply,
+    futures_util::{StreamExt as _, stream::BoxStream},
+    serenity_prelude::{self as serenity, builder::*},
 };
 
 use tts_core::{
@@ -52,19 +52,25 @@ pub async fn premium(ctx: Context<'_>) -> CommandResult {
         let patreon_url = premium_config.patreon_page_url;
         if premium_config.discord_monetisation_enabled == Some(true) {
             let application_id = ctx.http().application_id().try_unwrap()?;
-            aformat_into!(out, concat!(
-                "To support the development and hosting of TTS Bot and get access to TTS Bot Premium, ",
-                "including more modes (`/set mode`), many more voices (`/set voice`), ",
-                "and extra options such as TTS translation, follow one of these links:\n",
-                "Patreon: <{patreon_url}>\nDiscord: https://discord.com/application-directory/{application_id}/store"
-            ));
+            aformat_into!(
+                out,
+                concat!(
+                    "To support the development and hosting of TTS Bot and get access to TTS Bot Premium, ",
+                    "including more modes (`/set mode`), many more voices (`/set voice`), ",
+                    "and extra options such as TTS translation, follow one of these links:\n",
+                    "Patreon: <{patreon_url}>\nDiscord: https://discord.com/application-directory/{application_id}/store"
+                )
+            );
         } else {
-            aformat_into!(out, concat!(
-                "To support the development and hosting of TTS Bot and get access to TTS Bot Premium, ",
-                "including more modes (`/set mode`), many more voices (`/set voice`), ",
-                "and extra options such as TTS translation, subscribe on Patreon\n!\n",
-                "<{patreon_url}>"
-            ));
+            aformat_into!(
+                out,
+                concat!(
+                    "To support the development and hosting of TTS Bot and get access to TTS Bot Premium, ",
+                    "including more modes (`/set mode`), many more voices (`/set voice`), ",
+                    "and extra options such as TTS translation, subscribe on Patreon\n!\n",
+                    "<{patreon_url}>"
+                )
+            );
         }
 
         &out
@@ -99,7 +105,10 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     let error_msg = match data.fetch_premium_info(ctx.http(), author.id).await? {
         Some(tier) => {
             if linked_guilds >= tier.entitled_servers.get().into() {
-                Some(Cow::Owned(format!("Hey, you already have {linked_guilds} servers linked, you are only subscribed to the {} tier!", tier.entitled_servers)))
+                Some(Cow::Owned(format!(
+                    "Hey, you already have {linked_guilds} servers linked, you are only subscribed to the {} tier!",
+                    tier.entitled_servers
+                )))
             } else {
                 None
             }

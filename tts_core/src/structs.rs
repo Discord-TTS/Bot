@@ -3,12 +3,12 @@ use std::{
     collections::BTreeMap,
     num::NonZeroU8,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, OnceLock,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
-use aformat::{aformat, ArrayString, CapStr};
+use aformat::{ArrayString, CapStr, aformat};
 pub use anyhow::{Error, Result};
 use dashmap::DashMap;
 use parking_lot::Mutex;
@@ -18,9 +18,8 @@ use tracing::warn;
 use typesize::derive::TypeSize;
 
 use poise::serenity_prelude::{
-    self as serenity,
+    self as serenity, ChannelId, GuildId, RoleId, SkuId, UserId,
     small_fixed_array::{FixedArray, FixedString},
-    ChannelId, GuildId, RoleId, SkuId, UserId,
 };
 
 use crate::{analytics, bool_enum, common::timestamp_in_future, database};
@@ -320,10 +319,10 @@ impl Data {
     }
 
     fn get_cached_discord_premium(&self, user_id: UserId) -> Option<PremiumInfo> {
-        if let Some(cached_entitlement) = self.entitlement_cache.get(&user_id) {
-            if let Some(premium_info) = cached_entitlement.as_premium_info() {
-                return Some(premium_info);
-            }
+        if let Some(cached_entitlement) = self.entitlement_cache.get(&user_id)
+            && let Some(premium_info) = cached_entitlement.as_premium_info()
+        {
+            return Some(premium_info);
         }
 
         None
@@ -482,12 +481,16 @@ impl Data {
                 && let Some(guild_row) = guild_row
                 && guild_row.voice_mode.is_premium()
             {
-                warn!("Guild ID {guild_id}'s voice mode is set to a premium mode without being premium! Resetting.");
+                warn!(
+                    "Guild ID {guild_id}'s voice mode is set to a premium mode without being premium! Resetting."
+                );
                 self.guilds_db
                     .set_one(guild_id.into(), "voice_mode", mode)
                     .await?;
             } else {
-                warn!("Guild {guild_id:?} - User {author_id} has a mode set to premium without being premium!");
+                warn!(
+                    "Guild {guild_id:?} - User {author_id} has a mode set to premium without being premium!"
+                );
             }
         }
 

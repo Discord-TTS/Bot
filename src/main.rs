@@ -1,8 +1,6 @@
-#![feature(let_chains)]
-
 use std::{
     collections::BTreeMap,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     time::Duration,
 };
 
@@ -17,7 +15,7 @@ use tts_core::{
     structs::{Data, PollyVoice, RegexCache, Result, TTSMode},
 };
 use tts_events::EventHandler;
-use tts_tasks::{logging::Layer, Looper as _};
+use tts_tasks::{Looper as _, logging::Layer};
 
 mod startup;
 
@@ -27,11 +25,13 @@ use startup::*;
 static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 fn main() -> Result<()> {
+    // SAFETY: No other threads have been spawned.
+    unsafe { std::env::set_var("RUST_LIB_BACKTRACE", "1") };
+
     let start_time = std::time::SystemTime::now();
     let console_layer = console_subscriber::spawn();
 
     println!("Starting tokio runtime");
-    std::env::set_var("RUST_LIB_BACKTRACE", "1");
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?

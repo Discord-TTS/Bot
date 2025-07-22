@@ -6,8 +6,8 @@ use sha2::Digest;
 use tracing::error;
 
 use self::serenity::{
-    small_fixed_array::FixedString, CreateActionRow, CreateButton, CreateInteractionResponse,
-    GenericGuildChannelRef,
+    CreateActionRow, CreateButton, CreateInteractionResponse, GenericGuildChannelRef,
+    small_fixed_array::FixedString,
 };
 use poise::serenity_prelude as serenity;
 
@@ -266,41 +266,41 @@ async fn handle_cooldown(
 
     let cooldown_response = ctx.send_error(msg).await?;
 
-    if let poise::Context::Prefix(ctx) = ctx {
-        if let Some(error_reply) = cooldown_response {
-            // Never actually fetches, as Prefix already has message.
-            let error_message = error_reply.into_message().await?;
-            tokio::time::sleep(remaining_cooldown).await;
+    if let poise::Context::Prefix(ctx) = ctx
+        && let Some(error_reply) = cooldown_response
+    {
+        // Never actually fetches, as Prefix already has message.
+        let error_message = error_reply.into_message().await?;
+        tokio::time::sleep(remaining_cooldown).await;
 
-            let ctx_discord = ctx.serenity_context();
-            error_message.delete(&ctx_discord.http, None).await?;
+        let ctx_discord = ctx.serenity_context();
+        error_message.delete(&ctx_discord.http, None).await?;
 
-            let bot_user_id = ctx_discord.cache.current_user().id;
-            let has_permissions = {
-                let Some(guild) = ctx.guild() else {
-                    return Ok(());
-                };
-
-                let bot_member = guild.members.get(&bot_user_id).try_unwrap()?;
-                let permissions = match guild.channel(error_message.channel_id) {
-                    Some(GenericGuildChannelRef::Channel(ch)) => {
-                        guild.user_permissions_in(ch, bot_member)
-                    }
-                    Some(GenericGuildChannelRef::Thread(th)) => {
-                        let parent = guild.channels.get(&th.parent_id).try_unwrap()?;
-                        guild.user_permissions_in(parent, bot_member)
-                    }
-
-                    _ => return Err(anyhow::anyhow!("Can't find channel for cooldown message")),
-                };
-
-                permissions.manage_messages()
+        let bot_user_id = ctx_discord.cache.current_user().id;
+        let has_permissions = {
+            let Some(guild) = ctx.guild() else {
+                return Ok(());
             };
 
-            if has_permissions {
-                let reason = "Deleting command invocation that hit cooldown";
-                ctx.msg.delete(&ctx_discord.http, Some(reason)).await?;
-            }
+            let bot_member = guild.members.get(&bot_user_id).try_unwrap()?;
+            let permissions = match guild.channel(error_message.channel_id) {
+                Some(GenericGuildChannelRef::Channel(ch)) => {
+                    guild.user_permissions_in(ch, bot_member)
+                }
+                Some(GenericGuildChannelRef::Thread(th)) => {
+                    let parent = guild.channels.get(&th.parent_id).try_unwrap()?;
+                    guild.user_permissions_in(parent, bot_member)
+                }
+
+                _ => return Err(anyhow::anyhow!("Can't find channel for cooldown message")),
+            };
+
+            permissions.manage_messages()
+        };
+
+        if has_permissions {
+            let reason = "Deleting command invocation that hit cooldown";
+            ctx.msg.delete(&ctx_discord.http, Some(reason)).await?;
         }
     }
 
@@ -427,7 +427,9 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ctx,
             ..
         } => {
-            let mut msg = String::from("I cannot run this command as I am missing permissions, please ask an administrator of the server to give me: ");
+            let mut msg = String::from(
+                "I cannot run this command as I am missing permissions, please ask an administrator of the server to give me: ",
+            );
             push_permission_names(&mut msg, missing_permissions);
 
             ctx.send_error(msg).await?;
@@ -438,7 +440,9 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ..
         } => {
             let msg = if let Some(missing_permissions) = missing_permissions {
-                let mut msg = String::from("You cannot run this command as you are missing permissions, please ask an administrator of the server to give you: ");
+                let mut msg = String::from(
+                    "You cannot run this command as you are missing permissions, please ask an administrator of the server to give you: ",
+                );
                 push_permission_names(&mut msg, missing_permissions);
                 Cow::Owned(msg)
             } else {
@@ -466,7 +470,10 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
         | poise::FrameworkError::UnknownCommand { .. }
         | poise::FrameworkError::NonCommandMessage { .. } => {}
         poise::FrameworkError::GuildOnly { ctx, .. } => {
-            let error = format!("`/{}` cannot be used in private messages, please run this command in a server channel.", ctx.command().qualified_name);
+            let error = format!(
+                "`/{}` cannot be used in private messages, please run this command in a server channel.",
+                ctx.command().qualified_name
+            );
             ctx.send_error(error).await?;
         }
         poise::FrameworkError::CommandPanic { .. } => panic!("Command panicked!"),
@@ -479,10 +486,10 @@ pub async fn interaction_create(
     ctx: &serenity::Context,
     interaction: &serenity::Interaction,
 ) -> Result<(), Error> {
-    if let serenity::Interaction::Component(interaction) = interaction {
-        if interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID {
-            handle_traceback_button(ctx, interaction).await?;
-        }
+    if let serenity::Interaction::Component(interaction) = interaction
+        && interaction.data.custom_id == VIEW_TRACEBACK_CUSTOM_ID
+    {
+        handle_traceback_button(ctx, interaction).await?;
     }
 
     Ok(())
@@ -525,25 +532,25 @@ struct TrackErrorHandler {
 #[serenity::async_trait]
 impl songbird::EventHandler for TrackErrorHandler {
     async fn act(&self, ctx: &songbird::EventContext<'_>) -> Option<songbird::Event> {
-        if let songbird::EventContext::Track([(state, _)]) = ctx {
-            if let songbird::tracks::PlayMode::Errored(error) = state.playing.clone() {
-                let mut extra_fields_iter = self.extra_fields.iter().cloned();
-                let author_name = Some(self.author_name.as_str());
-                let icon_url = Some(self.icon_url.as_str());
+        if let songbird::EventContext::Track([(state, _)]) = ctx
+            && let songbird::tracks::PlayMode::Errored(error) = state.playing.clone()
+        {
+            let mut extra_fields_iter = self.extra_fields.iter().cloned();
+            let author_name = Some(self.author_name.as_str());
+            let icon_url = Some(self.icon_url.as_str());
 
-                let result = handle_unexpected(
-                    &self.ctx,
-                    "TrackError",
-                    error.into(),
-                    extra_fields_iter.by_ref(),
-                    author_name,
-                    icon_url,
-                )
-                .await;
+            let result = handle_unexpected(
+                &self.ctx,
+                "TrackError",
+                error.into(),
+                extra_fields_iter.by_ref(),
+                author_name,
+                icon_url,
+            )
+            .await;
 
-                if let Err(err_err) = result {
-                    tracing::error!("Songbird unhandled track error: {err_err}");
-                }
+            if let Err(err_err) = result {
+                tracing::error!("Songbird unhandled track error: {err_err}");
             }
         }
 

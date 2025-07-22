@@ -1,4 +1,4 @@
-#![feature(let_chains, debug_closure_helpers)]
+#![feature(debug_closure_helpers)]
 
 use std::borrow::Cow;
 
@@ -40,11 +40,11 @@ pub fn commands() -> Vec<Command> {
 }
 
 pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
-    if let Context::Application(ctx) = ctx {
-        if ctx.interaction_type == poise::CommandInteractionType::Autocomplete {
-            // Ignore the premium check during autocomplete.
-            return Ok(true);
-        }
+    if let Context::Application(ctx) = ctx
+        && ctx.interaction_type == poise::CommandInteractionType::Autocomplete
+    {
+        // Ignore the premium check during autocomplete.
+        return Ok(true);
     }
 
     let data = ctx.data();
@@ -61,10 +61,13 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
         ),
         Some(FailurePoint::NotSubscribed(premium_user_id)) => {
             let premium_user = premium_user_id.to_user(serenity_ctx).await?;
-            Cow::Owned(format!(concat!(
-                "Hey, this server has a premium user setup, however they no longer have a subscription! ",
-                "Please ask {} to renew their membership."
-            ), premium_user.tag()))
+            Cow::Owned(format!(
+                concat!(
+                    "Hey, this server has a premium user setup, however they no longer have a subscription! ",
+                    "Please ask {} to renew their membership."
+                ),
+                premium_user.tag()
+            ))
         }
     };
 
