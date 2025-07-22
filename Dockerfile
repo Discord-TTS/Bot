@@ -1,9 +1,8 @@
 FROM rustlang/rust:nightly as builder
-ENV RUSTFLAGS="-C target-cpu=skylake"
 
 WORKDIR /bot
 
-RUN apt-get update && apt-get install -y cmake && apt-get clean
+RUN apt-get update && apt-get install -y cmake mold && apt-get clean
 
 COPY . .
 RUN cargo build --release
