@@ -43,7 +43,6 @@ dashmap.workspace = true
 songbird.workspace = true
 mini-moka.workspace = true
 parking_lot.workspace = true
-console-subscriber = { version = "0.4.1", features = ['parking_lot'] }
 
 tts_core = { path = "tts_core" }
 tts_tasks = { path = "tts_tasks" }

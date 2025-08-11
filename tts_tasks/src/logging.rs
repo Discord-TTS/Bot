@@ -4,14 +4,13 @@ use aformat::{CapStr, aformat};
 use anyhow::Result;
 use itertools::Itertools as _;
 use parking_lot::Mutex;
-use tracing_subscriber::{Registry, layer::SubscriberExt as _, util::SubscriberInitExt as _};
+use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _};
 
 use serenity::all::{ExecuteWebhook, Http, Webhook};
 
 use crate::Looper;
 
 type LogMessage = (&'static str, String);
-pub trait Layer = tracing_subscriber::Layer<Registry> + Send + Sync + 'static;
 
 fn get_avatar(level: tracing::Level) -> &'static str {
     match level {
@@ -34,12 +33,7 @@ pub struct WebhookLogger {
 }
 
 impl WebhookLogger {
-    pub fn init(
-        console_layer: impl Layer,
-        http: Arc<Http>,
-        normal_logs: Webhook,
-        error_logs: Webhook,
-    ) {
+    pub fn init(http: Arc<Http>, normal_logs: Webhook, error_logs: Webhook) {
         let logger = ArcWrapper(Arc::new(Self {
             http,
             normal_logs,
@@ -48,11 +42,7 @@ impl WebhookLogger {
             pending_logs: Mutex::default(),
         }));
 
-        tracing_subscriber::registry()
-            .with(console_layer)
-            .with(logger.clone())
-            .init();
-
+        tracing_subscriber::registry().with(logger.clone()).init();
         tokio::spawn(logger.0.start());
     }
 }

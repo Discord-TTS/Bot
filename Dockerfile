@@ -8,7 +8,7 @@ COPY . .
 RUN cargo build --release
 
 # Now make the runtime container
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y ca-certificates mold && rm -rf /var/lib/apt/lists/*
 
