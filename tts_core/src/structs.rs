@@ -196,7 +196,7 @@ impl RegexCache {
             ],
             id_in_brackets: regex::Regex::new(r"\((\d+)\)")?,
             emoji_captures: regex::Regex::new(r"<(a?):([^<>]+):\d+>")?,
-            emoji_filter: regex::Regex::new(r"(?s:<a?:[^<>]+:\d+>)|\p{Emoji}")?,
+            emoji_filter: regex::Regex::new(r"(?s:<a?:[^<>]+:\d+>)|\p{Emoji_Presentation}")?,
             bot_mention: OnceLock::new(),
         })
     }
