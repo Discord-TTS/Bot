@@ -164,7 +164,9 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         ),
         pre_command: analytics::pre_command,
         prefix_options: poise::PrefixFrameworkOptions {
-            dynamic_prefix: Some(|ctx| Box::pin(tts_commands::get_prefix(ctx))),
+            stripped_dynamic_prefix: Some(|ctx, message, _| {
+                Box::pin(tts_commands::try_strip_prefix(ctx, message))
+            }),
             ..poise::PrefixFrameworkOptions::default()
         },
         command_check: Some(|ctx| Box::pin(tts_commands::command_check(ctx))),
