@@ -9,7 +9,7 @@ use serenity::all::{self as serenity, Mentionable as _};
 use tts_core::{
     constants::PREMIUM_NEUTRAL_COLOUR,
     opt_ext::OptionTryUnwrap as _,
-    structs::{Command, Context, FailurePoint, PartialContext, Result},
+    structs::{Command, Context, Data, FailurePoint, Result},
     traits::PoiseContextExt,
 };
 
@@ -111,22 +111,26 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     Ok(false)
 }
 
-pub async fn get_prefix(ctx: PartialContext<'_>) -> Result<Option<Cow<'static, str>>> {
-    let Some(guild_id) = ctx.guild_id else {
-        return Ok(Some(Cow::Borrowed("-")));
+pub async fn try_strip_prefix<'a>(
+    ctx: &serenity::Context,
+    message: &'a serenity::Message,
+) -> Result<Option<(&'a str, &'a str)>> {
+    let Some(guild_id) = message.guild_id else {
+        if message.content.starts_with('-') {
+            return Ok(Some(message.content.split_at("-".len())));
+        }
+        return Ok(None);
     };
 
-    let data = ctx.framework.user_data();
+    let data = ctx.data_ref::<Data>();
     let row = data.guilds_db.get(guild_id.into()).await?;
 
     let prefix = row.prefix.as_str();
-    let prefix = if prefix == "-" {
-        Cow::Borrowed("-")
-    } else {
-        Cow::Owned(String::from(prefix))
-    };
+    if message.content.starts_with(prefix) {
+        return Ok(Some(message.content.split_at(prefix.len())));
+    }
 
-    Ok(Some(prefix))
+    Ok(None)
 }
 
 #[cold]
