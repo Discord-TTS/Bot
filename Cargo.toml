@@ -55,6 +55,9 @@ features = ["mp3", "ogg", "wav", "pcm"]
 default-features = false
 version = "0.5.3"
 
+[patch.crates-io]
+audiopus_sys = { git = 'https://github.com/sevenc-nanashi/audiopus_sys', rev = '00e9d16' }
+
 [workspace.dependencies]
 regex = "1"
 anyhow = "1"

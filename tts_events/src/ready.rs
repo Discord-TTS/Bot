@@ -11,14 +11,14 @@ use tts_core::{
 };
 use tts_tasks::Looper;
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn clear_allocator_cache() {
     unsafe {
         libc::malloc_trim(0);
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(not(target_os = "linux"))]
 fn clear_allocator_cache() {}
 
 fn generate_status(
