@@ -25,7 +25,7 @@ pub async fn handle(
     let bot_id = ctx.cache.current_user().id;
     let leave_vc = match &new.member {
         // songbird does not clean up state on VC disconnections, so we have to do it here
-        Some(member) if member.user.id == bot_id => true,
+        Some(member) if member.user.id == bot_id && new.channel_id.is_none() => true,
         Some(_) => check_is_lonely(ctx, bot_id, guild_id, old)?,
         None => false,
     };
