@@ -231,7 +231,6 @@ pub fn clean_msg(
     skip_emoji: bool,
     repeated_limit: Option<NonZeroU8>,
     nickname: Option<&str>,
-    use_new_formatting: bool,
 
     regex_cache: &RegexCache,
     last_to_xsaid_tracker: &LastToXsaidTracker,
@@ -278,11 +277,7 @@ pub fn clean_msg(
             .unwrap_or(&user.name)
     });
 
-    if use_new_formatting {
-        format_message(&mut content, said_name, contained_url, attached_file_format);
-    } else {
-        format_message_legacy(&mut content, said_name, contained_url, attached_file_format);
-    }
+    format_message(&mut content, said_name, contained_url, attached_file_format);
 
     if xsaid {
         last_to_xsaid_tracker.insert(guild_id, LastXsaidInfo::new(user.id));
@@ -293,41 +288,6 @@ pub fn clean_msg(
     }
 
     content
-}
-
-pub fn format_message_legacy(
-    content: &mut String,
-    said_name: Option<&str>,
-    contained_url: bool,
-    attached_file_format: Option<&str>,
-) {
-    use std::fmt::Write;
-
-    if let Some(said_name) = said_name {
-        if contained_url {
-            let suffix = if content.is_empty() {
-                "a link."
-            } else {
-                "and sent a link"
-            };
-
-            write!(content, " {suffix}",).unwrap();
-        }
-
-        *content = match attached_file_format {
-            Some(file_format) if content.is_empty() => format!("{said_name} sent {file_format}"),
-            Some(file_format) => format!("{said_name} sent {file_format} and said {content}"),
-            None => format!("{said_name} said: {content}"),
-        }
-    } else if contained_url {
-        let suffix = if content.is_empty() {
-            " a link."
-        } else {
-            ". This message contained a link"
-        };
-
-        write!(content, "{suffix}",).unwrap();
-    }
 }
 
 pub fn format_message(

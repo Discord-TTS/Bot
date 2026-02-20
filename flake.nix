@@ -29,6 +29,7 @@
 
             mold
             cmake
+            rust-analyzer
           ];
 
           hardeningDisable = [ "fortify" ];

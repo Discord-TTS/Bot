@@ -76,7 +76,6 @@ pub(crate) async fn process_tts_msg(
             guild_row.skip_emoji(),
             guild_row.repeated_chars,
             nickname_row.name.as_deref(),
-            user_row.use_new_formatting(),
             &data.regex_cache,
             &data.last_to_xsaid_tracker,
         );

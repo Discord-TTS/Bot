@@ -181,7 +181,7 @@ async fn run_(config: &mut toml::Table, transaction: &mut Transaction<'_>) -> Re
             ADD COLUMN IF NOT EXISTS voice_mode          TTSMode,
             ADD COLUMN IF NOT EXISTS premium_voice_mode  TTSMode,
             ADD COLUMN IF NOT EXISTS bot_banned          bool     DEFAULT False,
-            ADD COLUMN IF NOT EXISTS use_new_formatting  bool     DEFAULT False;
+            DROP COLUMN IF EXISTS use_new_formatting;
         ALTER TABLE guilds
             ADD COLUMN IF NOT EXISTS audience_ignore  bool       DEFAULT True,
             ADD COLUMN IF NOT EXISTS voice_mode       TTSMode    DEFAULT 'gtts',

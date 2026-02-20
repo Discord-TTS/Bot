@@ -528,26 +528,6 @@ create_bool_command!(
     check = "crate::premium_command_check",
 );
 
-/// Enables the experimental new message formatting
-#[poise::command(
-    prefix_command,
-    slash_command,
-    required_bot_permissions = "SEND_MESSAGES"
-)]
-async fn use_new_formatting(
-    ctx: Context<'_>,
-    #[description = "Whether to use the experimental new message formatting"] value: bool,
-) -> CommandResult {
-    let id = ctx.author().id.into();
-    let userinfo = &ctx.data().userinfo_db;
-
-    userinfo.set_one(id, "use_new_formatting", value).await?;
-
-    let resp = "Experimental new message formatting is now: {}";
-    ctx.say(replace_bool(resp, value)).await?;
-    Ok(())
-}
-
 /// Changes the required role to use the bot.
 #[poise::command(
     guild_only,
@@ -1330,7 +1310,6 @@ pub fn commands() -> [Command; 5] {
                 owner::block(),
                 owner::bot_ban(),
                 owner::gtts_disabled(),
-                use_new_formatting(),
             ],
             ..set()
         },
