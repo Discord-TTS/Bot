@@ -8,7 +8,7 @@ use tts_core::{
     database::{GuildRow, UserRow},
     errors,
     opt_ext::OptionTryUnwrap as _,
-    process_msg,
+    process_msg::{self, MessageContent, TTSMessageKind},
     structs::{Data, IsPremium, JoinVCToken, Result, TTSMode},
     traits::SongbirdManagerExt as _,
 };
@@ -65,13 +65,12 @@ pub(crate) async fn process_tts_msg(
             .get([guild_id.into(), message.author.id.into()])
             .await?;
 
-        content = process_msg::clean(
-            &content,
+        process_msg::clean(
+            &mut content,
             &message.author,
             &ctx.cache,
             guild_id,
             member_nick,
-            &message.attachments,
             &voice,
             guild_row.xsaid(),
             guild_row.skip_emoji(),
@@ -85,16 +84,14 @@ pub(crate) async fn process_tts_msg(
     };
 
     // Final check, make sure we aren't sending an empty message or just symbols.
-    let mut removed_chars_content = content.clone();
-    removed_chars_content.retain(|c| !" ?.)'!\":".contains(c));
-    if removed_chars_content.is_empty() {
+    if content.text.find(|c| !" ?.)'!\":".contains(c)).is_none() {
         return Ok(());
     }
 
     let speaking_rate = data.speaking_rate(message.author.id, mode).await?;
     let url = prepare_url(
         data.config.tts_service.clone(),
-        &content,
+        &content.text,
         &voice,
         mode,
         &speaking_rate,
@@ -169,7 +166,7 @@ pub(crate) async fn process_tts_msg(
         (blank_name, blank_value, blank_inline),
         (
             "Message length",
-            Cow::Owned(content.len().to_string()),
+            Cow::Owned(content.text.len().to_string()),
             true,
         ),
         ("Voice", voice, true),
@@ -189,12 +186,12 @@ pub(crate) async fn process_tts_msg(
     .map_err(Into::into)
 }
 
-fn run_checks(
+fn run_checks<'c>(
     ctx: &serenity::Context,
-    message: &serenity::Message,
+    message: &'c serenity::Message,
     guild_row: &GuildRow,
     user_row: UserRow,
-) -> Result<Option<(String, Option<serenity::ChannelId>)>> {
+) -> Result<Option<(MessageContent<'c>, Option<serenity::ChannelId>)>> {
     if user_row.bot_banned() {
         return Ok(None);
     }
@@ -238,14 +235,36 @@ fn run_checks(
         }
     }
 
-    let mut content = serenity::content_safe(
-        &guild,
-        &message.content,
-        serenity::ContentSafeOptions::default()
+    // "A forwarded message can be identified by looking at its message_reference.type field"
+    let kind = match &message.message_reference {
+        Some(reference) if reference.kind == serenity::MessageReferenceKind::Forward => {
+            TTSMessageKind::Forward
+        }
+        _ => TTSMessageKind::Default,
+    };
+
+    let content;
+    let mentions;
+    let attachments;
+    if kind == TTSMessageKind::Forward {
+        // "message_snapshots will be the message data associated with the forward. Currently we support only 1 snapshot."
+        let snapshot = message.message_snapshots.first().try_unwrap()?;
+        content = &*snapshot.content;
+        mentions = &*snapshot.mentions;
+        attachments = &*snapshot.attachments;
+    } else {
+        content = &*message.content;
+        mentions = &*message.mentions;
+        attachments = &*message.attachments;
+    };
+
+    let mut content = {
+        let options = serenity::ContentSafeOptions::default()
             .clean_here(false)
-            .clean_everyone(false),
-        &message.mentions,
-    );
+            .clean_everyone(false);
+
+        serenity::content_safe(&guild, &content, options, &mentions)
+    };
 
     if content.len() >= 1500 {
         return Ok(None);
@@ -254,7 +273,9 @@ fn run_checks(
     content = content.to_lowercase();
 
     if let Some(required_prefix) = &guild_row.required_prefix {
-        if let Some(stripped_content) = content.strip_prefix(required_prefix.as_str()) {
+        if let Some(stripped_content) = content.strip_prefix(required_prefix.as_str())
+            && kind != TTSMessageKind::Forward
+        {
             content = String::from(stripped_content);
         } else {
             return Ok(None);
@@ -304,5 +325,12 @@ fn run_checks(
         }
     }
 
-    Ok(Some((content, to_autojoin)))
+    Ok(Some((
+        MessageContent {
+            text: content,
+            kind,
+            attachments,
+        },
+        to_autojoin,
+    )))
 }

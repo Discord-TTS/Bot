@@ -25,6 +25,26 @@ fn make_emoji_readable<'c>(regex_cache: &RegexCache, content: &'c str) -> Cow<'c
         })
 }
 
+fn run_regex_replacements<'c>(
+    regex_cache: &RegexCache,
+    content: &'c str,
+    skip_emoji: bool,
+) -> Cow<'c, str> {
+    let mut content = if skip_emoji {
+        strip_emoji(regex_cache, content)
+    } else {
+        make_emoji_readable(regex_cache, content)
+    };
+
+    for (regex, replacement) in &regex_cache.replacements {
+        if let Cow::Owned(replaced) = regex.replace_all(&content, *replacement) {
+            content = Cow::Owned(replaced);
+        }
+    }
+
+    content
+}
+
 fn parse_acronyms(original: &str) -> String {
     original
         .split(' ')
@@ -83,75 +103,147 @@ fn remove_repeated_chars(content: &str, limit: u8) -> String {
 }
 
 fn format_message(
-    content: &mut String,
+    content: &mut MessageContent<'_>,
     said_name: Option<&str>,
     contained_url: bool,
     attached_file_format: Option<&str>,
 ) {
-    match (
+    let new_content = match (
         said_name,
-        content.trim(),
+        content.text.trim(),
         contained_url,
         attached_file_format,
+        content.kind,
     ) {
-        (Some(said_name), "", true, Some(format)) => {
-            *content = format!("{said_name} sent a link and attached {format}");
+        (Some(said_name), "", true, Some(format), TTSMessageKind::Default) => {
+            format!("{said_name} sent a link and attached {format}").into()
         }
-        (Some(said_name), "", true, None) => {
-            *content = format!("{said_name} sent a link");
+        (Some(said_name), "", true, Some(format), TTSMessageKind::Forward) => {
+            format!("{said_name} forwarded a message with a link and {format}").into()
         }
-        (Some(said_name), "", false, Some(format)) => {
-            *content = format!("{said_name} sent {format}");
+        (Some(said_name), "", true, None, TTSMessageKind::Default) => {
+            format!("{said_name} sent a link").into()
+        }
+        (Some(said_name), "", true, None, TTSMessageKind::Forward) => {
+            format!("{said_name} forwarded a message with a link").into()
+        }
+        (Some(said_name), "", false, Some(format), TTSMessageKind::Default) => {
+            format!("{said_name} sent {format}").into()
+        }
+        (Some(said_name), "", false, Some(format), TTSMessageKind::Forward) => {
+            format!("{said_name} forwarded a message with {format}").into()
         }
         // Fallback, this shouldn't occur
-        (Some(said_name), "", false, None) => {
-            *content = format!("{said_name} sent a message");
+        (Some(said_name), "", false, None, TTSMessageKind::Default) => {
+            format!("{said_name} sent a message").into()
         }
-        (Some(said_name), msg, true, Some(format)) => {
-            *content = format!("{said_name} sent a link, attached {format}, and said {msg}");
+        (Some(said_name), "", false, None, TTSMessageKind::Forward) => {
+            format!("{said_name} forwarded a message").into()
         }
-        (Some(said_name), msg, true, None) => {
-            *content = format!("{said_name} sent a link and said {msg}");
+        (Some(said_name), msg, true, Some(format), TTSMessageKind::Default) => {
+            format!("{said_name} sent a link, attached {format}, and said {msg}").into()
         }
-        (Some(said_name), msg, false, Some(format)) => {
-            *content = format!("{said_name} sent {format} and said {msg}");
+        (Some(said_name), msg, true, Some(format), TTSMessageKind::Forward) => {
+            format!("{said_name} forwarded a message with a link, {format}, and that says {msg}")
+                .into()
         }
-        (Some(said_name), msg, false, None) => {
-            *content = format!("{said_name} said: {msg}");
+        (Some(said_name), msg, true, None, TTSMessageKind::Default) => {
+            format!("{said_name} sent a link and said {msg}").into()
         }
-        (None, "", true, Some(format)) => {
-            *content = format!("A link and {format}");
+        (Some(said_name), msg, true, None, TTSMessageKind::Forward) => {
+            format!("{said_name} forwarded a message with a link that says {msg}").into()
         }
-        (None, "", true, None) => {
-            "A link".clone_into(content);
+        (Some(said_name), msg, false, Some(format), TTSMessageKind::Default) => {
+            format!("{said_name} sent {format} and said {msg}").into()
         }
-        (None, "", false, Some(format)) => {
-            format.clone_into(content);
+        (Some(said_name), msg, false, Some(format), TTSMessageKind::Forward) => {
+            format!("{said_name} forwarded a message with {format} that says {msg}").into()
+        }
+        (Some(said_name), msg, false, None, TTSMessageKind::Default) => {
+            format!("{said_name} said {msg}").into()
+        }
+        (Some(said_name), msg, false, None, TTSMessageKind::Forward) => {
+            format!("{said_name} forwarded a message that says {msg}").into()
+        }
+        (None, "", true, Some(format), TTSMessageKind::Default) => {
+            format!("a link and {format}").into()
+        }
+        (None, "", true, Some(format), TTSMessageKind::Forward) => {
+            format!("forwarded message with a link and {format}").into()
+        }
+        (None, "", true, None, TTSMessageKind::Default) => Cow::Borrowed("a link"),
+        (None, "", true, None, TTSMessageKind::Forward) => {
+            Cow::Borrowed("forwarded message with a link")
+        }
+        (None, "", false, Some(format), TTSMessageKind::Default) => Cow::Borrowed(format),
+        (None, "", false, Some(format), TTSMessageKind::Forward) => {
+            format!("forwarded message with {format}").into()
         }
         // Again, fallback, there is nothing to say
-        (None, "", false, None) => {}
-        (None, msg, true, Some(format)) => {
-            *content = format!("{msg} with {format} and a link");
+        (None, "", false, None, TTSMessageKind::Default) => Cow::Borrowed(""),
+        (None, "", false, None, TTSMessageKind::Forward) => Cow::Borrowed("forwarded message"),
+        (None, msg, true, Some(format), TTSMessageKind::Default) => {
+            format!("{msg} with {format} and a link").into()
         }
-        (None, msg, true, None) => {
-            *content = format!("{msg} with a link");
+        (None, msg, true, Some(format), TTSMessageKind::Forward) => {
+            format!("forwarded message that says {msg} with {format} and a link").into()
         }
-        (None, msg, false, Some(format)) => {
-            *content = format!("{msg} with {format}");
+        (None, msg, true, None, TTSMessageKind::Default) => format!("{msg} with a link").into(),
+        (None, msg, true, None, TTSMessageKind::Forward) => {
+            format!("forwarded message that says {msg} with a link").into()
         }
-        (None, _msg, false, None) => {}
+        (None, msg, false, Some(format), TTSMessageKind::Default) => {
+            format!("{msg} with {format}").into()
+        }
+        (None, msg, false, Some(format), TTSMessageKind::Forward) => {
+            format!("forwarded message that says {msg} with {format}").into()
+        }
+        (None, _msg, false, None, TTSMessageKind::Default) => return,
+        (None, msg, false, None, TTSMessageKind::Forward) => {
+            format!("forwarded message that says {msg}").into()
+        }
+    };
+
+    match new_content {
+        Cow::Owned(new_content) => new_content.maybe_clone_into(&mut content.text),
+        Cow::Borrowed(new_content) => new_content.clone_into(&mut content.text),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TTSMessageKind {
+    Forward,
+    Default,
+}
+
+pub struct MessageContent<'a> {
+    pub text: String,
+    pub kind: TTSMessageKind,
+    pub attachments: &'a [serenity::Attachment],
+}
+
+trait ToOwnedExt {
+    fn maybe_clone_into(self, target: &mut Self);
+}
+
+impl ToOwnedExt for String {
+    fn maybe_clone_into(self, target: &mut Self) {
+        if self.capacity() > target.capacity() {
+            *target = self
+        } else {
+            self.clone_into(target)
+        }
+    }
+}
+
+#[expect(clippy::too_many_arguments)]
 pub fn clean(
-    content: &str,
+    content: &mut MessageContent<'_>,
 
     user: &serenity::User,
     cache: &serenity::Cache,
     guild_id: serenity::GuildId,
     member_nick: Option<&str>,
-    attachments: &[serenity::Attachment],
 
     voice: &str,
     xsaid: bool,
@@ -161,33 +253,32 @@ pub fn clean(
 
     regex_cache: &RegexCache,
     last_to_xsaid_tracker: &LastToXsaidTracker,
-) -> String {
-    let (contained_url, mut content) = if content == "?" {
-        (false, String::from("what"))
+) {
+    let contained_url;
+    if content.text == "?" {
+        "what".clone_into(&mut content.text);
+        contained_url = false;
     } else {
-        let mut content = if skip_emoji {
-            strip_emoji(regex_cache, content)
-        } else {
-            make_emoji_readable(regex_cache, content)
-        };
-
-        for (regex, replacement) in &regex_cache.replacements {
-            if let Cow::Owned(replaced) = regex.replace_all(&content, *replacement) {
-                content = Cow::Owned(replaced);
-            }
+        if let Cow::Owned(new_content) =
+            run_regex_replacements(regex_cache, &content.text, skip_emoji)
+        {
+            new_content.maybe_clone_into(&mut content.text);
         }
 
         if voice.starts_with("en") {
-            content = Cow::Owned(parse_acronyms(&content));
+            parse_acronyms(&content.text).maybe_clone_into(&mut content.text);
         }
 
         let filtered_content: String = linkify::LinkFinder::new()
-            .spans(&content)
+            .spans(&content.text)
             .filter(|span| span.kind().is_none())
             .map(|span| span.as_str())
             .collect();
 
-        (content != filtered_content, filtered_content)
+        contained_url = content.text != filtered_content;
+        if contained_url {
+            filtered_content.maybe_clone_into(&mut content.text);
+        }
     };
 
     let announce_name = xsaid
@@ -196,7 +287,7 @@ pub fn clean(
             state.should_announce_name(&guild, user.id)
         });
 
-    let attached_file_format = attachments_to_format(attachments);
+    let attached_file_format = attachments_to_format(content.attachments);
     let said_name = announce_name.then(|| {
         nickname
             .or(member_nick)
@@ -204,15 +295,14 @@ pub fn clean(
             .unwrap_or(&user.name)
     });
 
-    format_message(&mut content, said_name, contained_url, attached_file_format);
+    format_message(content, said_name, contained_url, attached_file_format);
 
     if xsaid {
         last_to_xsaid_tracker.insert(guild_id, LastXsaidInfo::new(user.id));
     }
 
     if let Some(repeated_limit) = repeated_limit {
-        content = remove_repeated_chars(&content, repeated_limit.get());
+        remove_repeated_chars(&content.text, repeated_limit.get())
+            .maybe_clone_into(&mut content.text);
     }
-
-    content
 }

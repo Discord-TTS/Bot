@@ -26,10 +26,11 @@
             cargo
             clippy
             rustfmt
+            rust-analyzer
 
             mold
             cmake
-            rust-analyzer
+            libopus
           ];
 
           hardeningDisable = [ "fortify" ];
