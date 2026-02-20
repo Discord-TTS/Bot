@@ -4,10 +4,11 @@ use aformat::ToArrayString as _;
 use poise::serenity_prelude as serenity;
 
 use tts_core::{
-    common::{clean_msg, fetch_audio, prepare_url},
+    common::{fetch_audio, prepare_url},
     database::{GuildRow, UserRow},
     errors,
     opt_ext::OptionTryUnwrap as _,
+    process_msg,
     structs::{Data, IsPremium, JoinVCToken, Result, TTSMode},
     traits::SongbirdManagerExt as _,
 };
@@ -64,7 +65,7 @@ pub(crate) async fn process_tts_msg(
             .get([guild_id.into(), message.author.id.into()])
             .await?;
 
-        content = clean_msg(
+        content = process_msg::clean(
             &content,
             &message.author,
             &ctx.cache,

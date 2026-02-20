@@ -8,5 +8,6 @@ pub mod database_models;
 pub mod errors;
 pub mod macros;
 pub mod opt_ext;
+pub mod process_msg;
 pub mod structs;
 pub mod traits;
