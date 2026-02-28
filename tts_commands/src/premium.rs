@@ -67,7 +67,7 @@ pub async fn premium(ctx: Context<'_>) -> CommandResult {
                 concat!(
                     "To support the development and hosting of TTS Bot and get access to TTS Bot Premium, ",
                     "including more modes (`/set mode`), many more voices (`/set voice`), ",
-                    "and extra options such as TTS translation, subscribe on Patreon\n!\n",
+                    "and extra options such as TTS translation, subscribe on Patreon!\n",
                     "<{patreon_url}>"
                 )
             );
