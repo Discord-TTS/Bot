@@ -5,12 +5,11 @@ use tracing::info;
 
 use self::serenity::{
     CreateEmbed, CreateEmbedFooter, CreateMessage, ExecuteWebhook, GenericGuildChannelRef,
-    Mentionable,
 };
 use poise::serenity_prelude as serenity;
 
 use tts_core::{
-    common::{dm_generic, random_footer},
+    common::{build_invite_components, dm_generic, random_footer},
     constants::DM_WELCOME_MESSAGE,
     opt_ext::OptionTryUnwrap,
     structs::{Data, Result},
@@ -114,19 +113,14 @@ async fn process_support_dm(ctx: &serenity::Context, message: &serenity::Message
         let content = message.content.to_lowercase();
 
         if content.contains("discord.gg") {
-            let content = {
-                let current_user = ctx.cache.current_user();
-                format!(
-                    "Join {} and look in {} to invite <@{}>!",
-                    data.config.main_server_invite,
-                    data.config.invite_channel.mention(),
-                    current_user.id
-                )
-            };
+            let bot_id = ctx.cache.current_user().id;
 
-            channel_id.say(&ctx.http, content).await?;
+            let components = build_invite_components(bot_id, &data.config.main_server_invite);
+            let reply = CreateMessage::new().components(std::slice::from_ref(&components));
+
+            channel_id.send_message(&ctx.http, reply).await?;
         } else if content.as_str() == "help" {
-            channel_id.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `-help`!").await?;
+            channel_id.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `/help`!").await?;
         } else if !userinfo.dm_blocked() {
             let webhook_username = {
                 let mut tag = message.author.tag().into_owned();

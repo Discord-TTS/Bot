@@ -1,4 +1,4 @@
-#![allow(async_fn_in_trait)]
+#![expect(async_fn_in_trait)]
 
 pub mod analytics;
 pub mod common;

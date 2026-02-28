@@ -11,6 +11,35 @@ pub(crate) fn timestamp_in_future(ts: serenity::Timestamp) -> bool {
     *ts > chrono::Utc::now()
 }
 
+/// Builds components for invite command and invite link in DMs
+///
+/// This has to allocate internally due to lifetime issues with trying CPS.
+pub fn build_invite_components(
+    bot_id: serenity::UserId,
+    main_server_invite: &str,
+) -> serenity::CreateComponent<'_> {
+    let suggested_bot_permissions = serenity::Permissions::VIEW_CHANNEL
+        | serenity::Permissions::SEND_MESSAGES
+        | serenity::Permissions::ADD_REACTIONS
+        | serenity::Permissions::ATTACH_FILES
+        | serenity::Permissions::EMBED_LINKS
+        | serenity::Permissions::CONNECT
+        | serenity::Permissions::SPEAK
+        | serenity::Permissions::USE_VAD;
+
+    let bot_invite_link = format!(
+        "https://discord.com/oauth2/authorize?client_id={bot_id}&permissions={}&scope=bot%20applications.commands",
+        suggested_bot_permissions.bits()
+    );
+
+    let buttons = vec![
+        CreateButton::new_link(bot_invite_link).label("Invite the Bot!"),
+        CreateButton::new_link(main_server_invite).label("Get Support!"),
+    ];
+
+    CreateComponent::ActionRow(CreateActionRow::buttons(buttons))
+}
+
 pub fn push_permission_names(buffer: &mut String, permissions: serenity::Permissions) {
     let permission_names = permissions.get_permission_names();
     for (i, permission) in permission_names.iter().enumerate() {

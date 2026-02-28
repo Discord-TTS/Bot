@@ -11,7 +11,7 @@ use poise::{
 
 use aformat::ToArrayString;
 use tts_core::{
-    common::{fetch_audio, prepare_url},
+    common::{build_invite_components, fetch_audio, prepare_url},
     constants::OPTION_SEPERATORS,
     opt_ext::OptionTryUnwrap,
     require_guild,
@@ -324,26 +324,13 @@ pub async fn ping(ctx: Context<'_>) -> CommandResult {
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn invite(ctx: Context<'_>) -> CommandResult {
-    let cache = ctx.cache();
-    let config = &ctx.data().config;
+    let data = ctx.data();
+    let bot_id = ctx.cache().current_user().id;
 
-    let bot_mention = cache.current_user().id.mention();
-    let msg = if ctx.guild_id() == Some(config.main_server) {
-        &*aformat!(
-            "Check out {} to invite {bot_mention}!",
-            config.invite_channel.mention(),
-        )
-    } else {
-        let guild = cache.guild(config.main_server).try_unwrap()?;
-        let channel = guild.channels.get(&config.invite_channel).try_unwrap()?;
+    let components = build_invite_components(bot_id, &data.config.main_server_invite);
+    ctx.send(CreateReply::new().components(std::slice::from_ref(&components)))
+        .await?;
 
-        &format!(
-            "Join {} and look in #{} to invite {bot_mention}",
-            config.main_server_invite, channel.base.name,
-        )
-    };
-
-    ctx.say(msg).await?;
     Ok(())
 }
 
