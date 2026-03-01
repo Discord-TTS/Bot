@@ -108,9 +108,9 @@ features = ["cache"]
 branch = "serenity-next"
 
 [workspace.dependencies.songbird]
-git = "https://github.com/serenity-rs/songbird"
+git = "https://github.com/jtscuba/songbird" # https://github.com/serenity-rs/songbird/pull/291 applied to serenity-next
 features = ["builtin-queue"]
-branch = "serenity-next"
+branch = "davey"
 
 [patch."https://github.com/serenity-rs/serenity".serenity]
 git = "https://github.com/GnomedDev/serenity"
