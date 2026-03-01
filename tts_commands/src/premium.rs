@@ -88,10 +88,9 @@ pub async fn premium(ctx: Context<'_>) -> CommandResult {
     guild_only,
     prefix_command,
     slash_command,
-    aliases("activate"),
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
-pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
+pub async fn activate(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let data = ctx.data();
 
@@ -168,7 +167,7 @@ pub async fn premium_activate(ctx: Context<'_>) -> CommandResult {
     slash_command,
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
-pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
+pub async fn list(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
     let Some(premium_info) = data.fetch_premium_info(ctx.http(), ctx.author().id).await? else {
         ctx.say("I cannot confirm you are subscribed to premium, so you don't have any premium servers!").await?;
@@ -191,7 +190,7 @@ pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
     let author = ctx.author();
     let remaining_guilds = premium_info.entitled_servers.get() - premium_guilds;
     if embed_desc.is_empty() {
-        embed_desc = Cow::Borrowed("None... set some servers with `/premium_activate`!");
+        embed_desc = Cow::Borrowed("None... set some servers with `/premium activate`!");
     }
 
     let footer = aformat!("You have {remaining_guilds} server(s) remaining for premium activation");
@@ -212,10 +211,9 @@ pub async fn list_premium(ctx: Context<'_>) -> CommandResult {
     prefix_command,
     slash_command,
     guild_only,
-    aliases("premium_remove", "premium_delete"),
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
-pub async fn premium_deactivate(ctx: Context<'_>) -> CommandResult {
+pub async fn deactivate(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
     let author = ctx.author();
     let guild_id = ctx.guild_id().unwrap();
@@ -240,11 +238,17 @@ pub async fn premium_deactivate(ctx: Context<'_>) -> CommandResult {
     Ok(())
 }
 
-pub fn commands() -> [Command; 4] {
-    [
-        premium(),
-        premium_activate(),
-        list_premium(),
-        premium_deactivate(),
-    ]
+pub fn commands() -> [Command; 1] {
+    [Command {
+        subcommands: vec![
+            Command {
+                name: "info".into(),
+                ..premium()
+            },
+            list(),
+            activate(),
+            deactivate(),
+        ],
+        ..premium()
+    }]
 }

@@ -306,10 +306,10 @@ async fn can_change_mode(
             .colour(PREMIUM_NEUTRAL_COLOUR)
             .thumbnail(data.premium_avatar_url.as_str())
             .footer(CreateEmbedFooter::new(
-                "If this server has purchased premium, please run the `/premium_activate` command to link yourself to this server!"
+                "If this server has purchased premium, please run the `/premium activate` command to link yourself to this server!"
             ))
             .description(aformat!("
-                The `{mode}` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium` command!
+                The `{mode}` TTS Mode is only for TTS Bot Premium subscribers, please check out the `/premium info` command!
             ").as_str())
         )).await?;
 

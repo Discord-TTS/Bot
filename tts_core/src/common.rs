@@ -156,7 +156,7 @@ pub fn random_footer(server_invite: &str, client_id: serenity::UserId) -> Cow<'s
             "You can vote for me or review me on top.gg!\nhttps://top.gg/bot/{client_id}"
         )),
         2 => Cow::Borrowed(
-            "If you want to support the development and hosting of TTS Bot, check out `/premium`!",
+            "If you want to support the development and hosting of TTS Bot, check out `/premium info`!",
         ),
         3 => Cow::Borrowed("There are loads of customizable settings, check out `/help set`"),
         _ => unreachable!(),
