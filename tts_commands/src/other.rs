@@ -4,9 +4,7 @@ use num_format::{Locale, ToFormattedString};
 
 use poise::{
     CreateReply,
-    serenity_prelude::{
-        self as serenity, Mentionable as _, builder::*, small_fixed_array::FixedString,
-    },
+    serenity_prelude::{self as serenity, Mentionable as _, builder::*},
 };
 
 use aformat::ToArrayString;
@@ -49,7 +47,7 @@ pub async fn tts(
     ctx: Context<'_>,
     #[description = "The text to TTS"]
     #[rest]
-    message: FixedString<u16>,
+    message: String,
 ) -> CommandResult {
     let is_unnecessary_command_invoke = async {
         if !matches!(ctx, poise::Context::Prefix(_)) {

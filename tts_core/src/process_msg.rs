@@ -229,9 +229,9 @@ trait ToOwnedExt {
 impl ToOwnedExt for String {
     fn maybe_clone_into(self, target: &mut Self) {
         if self.capacity() > target.capacity() {
-            *target = self
+            *target = self;
         } else {
-            self.clone_into(target)
+            self.clone_into(target);
         }
     }
 }
@@ -279,7 +279,7 @@ pub fn clean(
         if contained_url {
             filtered_content.maybe_clone_into(&mut content.text);
         }
-    };
+    }
 
     let announce_name = xsaid
         && last_to_xsaid_tracker.get(&guild_id).is_none_or(|state| {

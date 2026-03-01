@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    sync::{Arc, atomic::AtomicBool},
+    sync::{Arc, OnceLock, atomic::AtomicBool},
     time::Duration,
 };
 
@@ -38,6 +38,11 @@ fn main() -> Result<()> {
 }
 
 async fn main_(start_time: std::time::SystemTime) -> Result<()> {
+    println!("Initialising Rustls");
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
     println!("Loading and performing migrations");
     let (pool, config) = tts_migrations::load_db_and_conf().await?;
 
@@ -114,6 +119,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         system_info: Mutex::new(sysinfo::System::new()),
         bot_list_tokens: Mutex::new(config.bot_list_tokens),
 
+        runners: OnceLock::new(), // Filled in later
         fully_started: AtomicBool::new(false),
         join_vc_tokens: dashmap::DashMap::new(),
         songbird: songbird::Songbird::serenity(),
@@ -173,12 +179,18 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         ..poise::FrameworkOptions::default()
     };
 
+    let data_clone = Arc::clone(&data);
     let mut client = serenity::ClientBuilder::new_with_http(token, http, tts_events::get_intents())
-        .voice_manager::<songbird::Songbird>(data.songbird.clone())
-        .framework(poise::Framework::new(framework_options))
-        .event_handler::<EventHandler>(EventHandler)
+        .framework(Box::new(poise::Framework::new(framework_options)))
+        .event_handler(Arc::new(EventHandler))
+        .voice_manager(data.songbird.clone())
         .data(data as _)
         .await?;
+
+    let shard_runners = Arc::clone(&client.shard_manager.runners);
+    if data_clone.runners.set(shard_runners).is_err() {
+        unreachable!()
+    }
 
     let shutdown_trigger = client.shard_manager.get_shutdown_trigger();
     tokio::spawn(async move {

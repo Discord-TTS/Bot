@@ -2,7 +2,7 @@
 name = "tts_bot"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.93"
 
 [workspace]
 members = [
@@ -27,6 +27,7 @@ workspace = true
 [dependencies]
 const_format = "0.2"
 jemallocator = "0.5.4"
+rustls = { version = "0.23.37", default-features = false }
 small-fixed-array = { version = "0.4.5", features = [
     "nightly",
     "to-arraystring",
@@ -78,9 +79,9 @@ default-features = false
 features = ["macros", "postgres", "runtime-tokio-rustls"]
 
 [workspace.dependencies.reqwest]
-version = "0.12.7"
+version = "0.13"
 default-features = false
-features = ["rustls-tls"]
+features = ["rustls"]
 
 [workspace.dependencies.tokio]
 version = "1.39.3"
@@ -110,6 +111,10 @@ branch = "serenity-next"
 git = "https://github.com/serenity-rs/songbird"
 features = ["builtin-queue"]
 branch = "serenity-next"
+
+[patch."https://github.com/serenity-rs/serenity".serenity]
+git = "https://github.com/GnomedDev/serenity"
+branch = "public-shard-runner"
 
 [workspace.lints.rust]
 rust_2018_idioms = "warn"

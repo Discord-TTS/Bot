@@ -259,6 +259,7 @@ pub struct Data {
     pub pool: sqlx::PgPool,
 
     pub songbird: Arc<songbird::Songbird>,
+    pub runners: OnceLock<Arc<DashMap<serenity::ShardId, serenity::ShardRunnerMetadata>>>,
 
     pub config: MainConfig,
     pub premium_config: Option<PremiumConfig>,

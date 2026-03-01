@@ -22,7 +22,7 @@ fn clear_allocator_cache() {
 fn clear_allocator_cache() {}
 
 fn generate_status(
-    shards: &dashmap::DashMap<serenity::ShardId, (serenity::ShardRunnerInfo, impl Sized)>,
+    shards: &dashmap::DashMap<serenity::ShardId, serenity::ShardRunnerMetadata>,
 ) -> String {
     let mut shards: Vec<_> = shards.iter().collect();
     shards.sort_by_key(|entry| *entry.key());
@@ -32,8 +32,9 @@ fn generate_status(
     let mut status = String::with_capacity(shards.len());
 
     for (i, entry) in shards.iter().enumerate() {
-        let (id, (info, _)) = entry.pair();
-        if Some(info.stage) == last_stage && i != (shards.len() - 1) {
+        let (id, meta) = entry.pair();
+        let stage = meta.info.read().stage;
+        if Some(stage) == last_stage && i != (shards.len() - 1) {
             continue;
         }
 
@@ -41,7 +42,7 @@ fn generate_status(
             writeln!(status, "Shards {run_start}-{id}: {last_stage}").unwrap();
         }
 
-        last_stage = Some(info.stage);
+        last_stage = Some(stage);
         run_start = id.0;
     }
 
@@ -119,7 +120,7 @@ pub async fn handle(ctx: &serenity::Context, data_about_bot: &serenity::Ready) -
 
     // Don't update the welcome message for concurrent shard startups.
     if let Ok(_guard) = data.update_startup_lock.try_lock() {
-        let status = generate_status(&ctx.runners);
+        let status = generate_status(data.runners.get().unwrap());
         let shard_count = (!is_last_shard).then_some(shard_count);
 
         update_startup_message(ctx, data, &data_about_bot.user.name, status, shard_count).await?;

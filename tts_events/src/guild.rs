@@ -6,11 +6,13 @@ use serenity::{all as serenity, builder::*};
 
 use tts_core::structs::{Data, Result};
 
+#[expect(unreachable_code, unused_variables)]
 pub async fn handle_create(
     ctx: &serenity::Context,
     guild: &serenity::Guild,
     is_new: Option<bool>,
 ) -> Result<()> {
+    return Ok(()); // Seems like is_new is buggy again?
     if !is_new.unwrap() {
         return Ok(());
     }

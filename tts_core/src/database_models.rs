@@ -115,10 +115,6 @@ impl Compact for GuildRowRaw {
 }
 
 #[derive(sqlx::FromRow, Clone, Copy)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "raw version of compacted type"
-)]
 pub struct UserRowRaw {
     pub dm_blocked: bool,
     pub dm_welcomed: bool,

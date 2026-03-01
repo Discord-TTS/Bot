@@ -256,14 +256,14 @@ fn run_checks<'c>(
         content = &*message.content;
         mentions = &*message.mentions;
         attachments = &*message.attachments;
-    };
+    }
 
     let mut content = {
         let options = serenity::ContentSafeOptions::default()
             .clean_here(false)
             .clean_everyone(false);
 
-        serenity::content_safe(&guild, &content, options, &mentions)
+        serenity::content_safe(&guild, content, options, mentions)
     };
 
     if content.len() >= 1500 {

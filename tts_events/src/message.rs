@@ -183,8 +183,14 @@ async fn process_support_dm(ctx: &serenity::Context, message: &serenity::Message
         data.userinfo_db
             .set_one(message.author.id.into(), "dm_welcomed", &true)
             .await?;
-        if channel_id.pins(&ctx.http).await?.len() < 50 {
-            welcome_msg.pin(&ctx.http, None).await?;
+
+        if let Err(pin_err) = welcome_msg.pin(&ctx.http, None).await {
+            if let serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(resp)) = &pin_err
+                && resp.error.code == serenity::JsonErrorCode::MaxPinsReached
+            {
+            } else {
+                return Err(pin_err.into());
+            }
         }
 
         info!(

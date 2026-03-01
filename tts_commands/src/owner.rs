@@ -18,7 +18,7 @@ use tts_core::{
     common::{dm_generic, safe_truncate},
     database,
     database_models::Compact,
-    structs::{Command, CommandResult, Context, PrefixContext, TTSModeChoice},
+    structs::{Command, CommandResult, Context, Data, PrefixContext, TTSModeChoice},
 };
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
@@ -31,7 +31,7 @@ pub async fn register(ctx: Context<'_>) -> CommandResult {
 pub async fn dm(
     ctx: PrefixContext<'_>,
     todm: serenity::User,
-    #[rest] message: FixedString<u16>,
+    #[rest] message: String,
 ) -> CommandResult {
     let attachment_url = ctx.msg.attachments.first().map(|a| a.url.as_str());
     let (content, embed) = dm_generic(
@@ -400,10 +400,11 @@ fn format_channels<'a>(channels: impl Iterator<Item = &'a serenity::GuildChannel
 }
 
 fn get_runner_channel(
-    ctx: &serenity::Context,
+    data: &Data,
     shard_id: serenity::ShardId,
 ) -> Option<UnboundedSender<serenity::ShardRunnerMessage>> {
-    ctx.runners.get(&shard_id).map(|entry| entry.1.clone())
+    let runners = data.runners.get().unwrap();
+    runners.get(&shard_id).map(|entry| entry.tx.clone())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
@@ -503,7 +504,7 @@ pub async fn guild_info(ctx: Context<'_>, guild_id: Option<serenity::GuildId>) -
     let _ = interaction.defer(http).await;
 
     let shard_id = serenity::ShardId(guild_shard_id);
-    let Some(channel) = get_runner_channel(ctx.serenity_context(), shard_id) else {
+    let Some(channel) = get_runner_channel(&ctx.data(), shard_id) else {
         let message = CreateInteractionResponseFollowup::new()
             .content("No shard runner found in runners map, cannot restart!");
 
