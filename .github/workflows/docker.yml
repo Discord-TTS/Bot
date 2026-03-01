@@ -6,24 +6,10 @@ on:
       - 'master'
 
 jobs:
-  docker:
-    runs-on: ubuntu-latest
-    steps:
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      -
-        name: Login to DockerHub
-        uses: docker/login-action@v1 
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      -
-        name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            gnomeddev/discord-tts-bot:latest
-            gnomeddev/discord-tts-bot:${{ github.sha }}
+  build-and-push-docker-images:
+    uses: Discord-TTS/shared-workflows/.github/workflows/docker.yml@v1
+    with:
+      repo-name: discord-tts-bot
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

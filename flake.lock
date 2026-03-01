@@ -20,11 +20,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1772239479,
-        "narHash": "sha256-/l1kqmrtK8X3RnM9ayl5g3ZK5dU7C8zRxe+DmQz4V+s=",
+        "lastModified": 1772370856,
+        "narHash": "sha256-OXf9tB+s1EPCzIBR4eIQTm1dbbfVgjPNEGChgwEvvIU=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "f5b24530896e3b8867f25e6fa45f3945dcffb6f9",
+        "rev": "80c8eb1779ca2aa3a84a9c553dd1ef1e3430867b",
         "type": "github"
       },
       "original": {
@@ -37,7 +37,8 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "tts-utils": "tts-utils"
       }
     },
     "systems": {
@@ -52,6 +53,21 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "tts-utils": {
+      "locked": {
+        "lastModified": 1772402796,
+        "narHash": "sha256-xmXDDXINq1gDWGdNWkBuW8B4jsfq4krui26Ejsv3CdU=",
+        "owner": "Discord-TTS",
+        "repo": "shared-workflows",
+        "rev": "04abc70cf16f332b3428be16ec8359e51720eeac",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Discord-TTS",
+        "repo": "shared-workflows",
         "type": "github"
       }
     }
