@@ -724,7 +724,7 @@ pub async fn server_voice(
     ctx: Context<'_>,
     #[description = "The default voice to read messages in"]
     #[autocomplete = "voice_autocomplete"]
-    #[rest]
+    #[string]
     voice: FixedString<u8>,
 ) -> CommandResult {
     let data = ctx.data();
@@ -802,7 +802,7 @@ pub async fn translation_lang(
 pub async fn command_prefix(
     ctx: Context<'_>,
     #[description = "The prefix to be used before commands"]
-    #[rest]
+    #[string]
     prefix: FixedString<u8>,
 ) -> CommandResult {
     let to_send = match check_prefix(&prefix) {
@@ -948,7 +948,7 @@ pub async fn speaking_rate(
 #[poise::command(
     guild_only,
     category = "Settings",
-    prefix_command,
+    // TODO: Not a prefix command as two arguments are annoying to provide manually.
     slash_command,
     required_bot_permissions = "SEND_MESSAGES",
     aliases("nick_name", "nickname", "name")
@@ -956,9 +956,7 @@ pub async fn speaking_rate(
 pub async fn nick(
     ctx: Context<'_>,
     #[description = "The user to set the nick for, defaults to you"] user: Option<serenity::User>,
-    #[description = "The nickname to set, leave blank to reset"]
-    #[rest]
-    nickname: Option<String>,
+    #[description = "The nickname to set, leave blank to reset"] nickname: Option<String>,
 ) -> CommandResult {
     let author = ctx.author();
     let guild_id = ctx.guild_id().unwrap();
@@ -1056,8 +1054,7 @@ pub async fn voice(
     ctx: Context<'_>,
     #[description = "The voice to read messages in, leave blank to reset"]
     #[autocomplete = "voice_autocomplete"]
-    #[rest]
-    voice: Option<FixedString<u8>>,
+    voice: Option<String>,
 ) -> CommandResult {
     let data = ctx.data();
     let author_id = ctx.author().id;
@@ -1070,7 +1067,8 @@ pub async fn voice(
         author_id,
         guild_id,
         author_id.into(),
-        voice,
+        // TODO: Fix `Option<FixedString>` in arguments.
+        voice.map(FixedString::from_string_trunc),
         Target::User,
     )
     .await?;

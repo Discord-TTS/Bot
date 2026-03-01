@@ -1,0 +1,1 @@
+1. Does `/help` work with spaces in command name and no `#[rest]`

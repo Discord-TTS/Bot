@@ -47,9 +47,7 @@ pub async fn uptime(ctx: Context<'_>) -> CommandResult {
 )]
 pub async fn tts(
     ctx: Context<'_>,
-    #[description = "The text to TTS"]
-    #[rest]
-    message: FixedString<u16>,
+    #[description = "The text to TTS"] message: FixedString<u16>,
 ) -> CommandResult {
     let is_unnecessary_command_invoke = async {
         if !matches!(ctx, poise::Context::Prefix(_)) {

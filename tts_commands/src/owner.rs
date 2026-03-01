@@ -31,7 +31,7 @@ pub async fn register(ctx: Context<'_>) -> CommandResult {
 pub async fn dm(
     ctx: PrefixContext<'_>,
     todm: serenity::User,
-    #[rest] message: FixedString<u16>,
+    message: FixedString<u16>,
 ) -> CommandResult {
     let attachment_url = ctx.msg.attachments.first().map(|a| a.url.as_str());
     let (content, embed) = dm_generic(
@@ -397,13 +397,6 @@ fn format_channels<'a>(channels: impl Iterator<Item = &'a serenity::GuildChannel
 
     safe_truncate(&mut out, 1024);
     out
-}
-
-fn get_runner_channel(
-    ctx: &serenity::Context,
-    shard_id: serenity::ShardId,
-) -> Option<UnboundedSender<serenity::ShardRunnerMessage>> {
-    ctx.runners.get(&shard_id).map(|entry| entry.1.clone())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]

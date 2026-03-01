@@ -174,9 +174,9 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     };
 
     let mut client = serenity::ClientBuilder::new_with_http(token, http, tts_events::get_intents())
+        .framework(Box::new(poise::Framework::new(framework_options)))
         .voice_manager::<songbird::Songbird>(data.songbird.clone())
-        .framework(poise::Framework::new(framework_options))
-        .event_handler::<EventHandler>(EventHandler)
+        .event_handler(Arc::new(EventHandler))
         .data(data as _)
         .await?;
 

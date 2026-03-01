@@ -113,7 +113,6 @@ pub async fn autocomplete<'a>(
 )]
 async fn help(
     ctx: Context<'_>,
-    #[rest]
     #[description = "The command to get help with"]
     #[autocomplete = "autocomplete"]
     command: Option<String>,

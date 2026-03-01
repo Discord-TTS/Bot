@@ -93,7 +93,7 @@ pub async fn handle_unexpected<'a>(
         ("System Memory Usage", Cow::Owned(mem_usage), true),
         (
             "Shard Count",
-            Cow::Owned(ctx.runners.len().to_string()),
+            Cow::Borrowed("0"), // TODO: Figure out how to get shard count again
             true,
         ),
     ];
@@ -313,13 +313,8 @@ async fn handle_argparse(
     input: Option<String>,
 ) -> Result<(), Error> {
     let reason = if let Some(input) = input {
-        let reason = if error.is::<serenity::MemberParseError>() {
-            "I cannot find the member: `{}`"
-        } else if error.is::<serenity::GuildParseError>() {
-            "I cannot find the server: `{}`"
-        } else if error.is::<serenity::GuildChannelParseError>() {
-            "I cannot find the channel: `{}`"
-        } else if error.is::<std::num::ParseIntError>() {
+        // TODO: Reimplement Member/Guild/GuildChannel Parse error warnings
+        let reason = if error.is::<std::num::ParseIntError>() {
             "I cannot convert `{}` to a number"
         } else if error.is::<std::str::ParseBoolError>() {
             "I cannot convert `{}` to True/False"

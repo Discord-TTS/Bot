@@ -2,7 +2,7 @@
 name = "tts_bot"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.93"
 
 [workspace]
 members = [
@@ -78,9 +78,9 @@ default-features = false
 features = ["macros", "postgres", "runtime-tokio-rustls"]
 
 [workspace.dependencies.reqwest]
-version = "0.12.7"
+version = "0.13"
 default-features = false
-features = ["rustls-tls"]
+features = ["rustls"]
 
 [workspace.dependencies.tokio]
 version = "1.39.3"
