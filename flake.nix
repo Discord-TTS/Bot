@@ -46,6 +46,7 @@
             cmake
           ];
 
+          doCheck = false;
           hardeningDisable = [ "fortify" ];
         };
       in
@@ -53,6 +54,7 @@
         inherit pkgs;
         package = botPkg;
         disableFortify = true;
+        extraDockerContents = with pkgs; [ dockerTools.caCertificates ];
         extraDevTools = with pkgs; [
           clippy
           rustfmt
