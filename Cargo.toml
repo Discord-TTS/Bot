@@ -114,7 +114,11 @@ branch = "davey"
 
 [patch."https://github.com/serenity-rs/serenity".serenity]
 git = "https://github.com/GnomedDev/serenity"
-branch = "public-shard-runner"
+branch = "revert-shardmanager-rework"
+
+[patch."https://github.com/serenity-rs/poise".poise]
+git = "https://github.com/GnomedDev/poise"
+branch = "serenity-next-no-shardrunner"
 
 [workspace.lints.rust]
 rust_2018_idioms = "warn"

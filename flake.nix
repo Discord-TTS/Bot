@@ -30,8 +30,8 @@
             lockFile = ./Cargo.lock;
             outputHashes = {
               "audiopus_sys-0.2.2" = "sha256-epzB54105Iihrfyj1HZNGSLOaihLw4rUZsT+rw/sXZs=";
-              "poise-0.6.1" = "sha256-Cg8Nq4wlun5wksI+5zxYbinrx43IAwB7eA8BcTf+1sE=";
-              "serenity-0.12.5" = "sha256-C4CpG/dD7RYapr5OEN01U1AFLZA6jFiQ0jqR9ixx3W0=";
+              "poise-0.6.1" = "sha256-peu1Lwo062iaEZz7J+o8WNqWNC8vDBUsbRH4IaXcFwU=";
+              "serenity-0.12.5" = "sha256-rKzUL9hHlZUp0Fo4zenDgMQDKliBWjS51xdEgfCqfmw=";
               "serenity-voice-model-0.2.1" = "sha256-X8KEdROcWC3qFTfbLd9iCWmkurB+6CRRzBfTzxEcIDk=";
               "songbird-0.5.0" = "sha256-wacSNkIjA1rsENNPbo/KVDfoMXllrr+vA2pmPxsNzEs=";
             };

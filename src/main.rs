@@ -119,7 +119,6 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         system_info: Mutex::new(sysinfo::System::new()),
         bot_list_tokens: Mutex::new(config.bot_list_tokens),
 
-        runners: OnceLock::new(), // Filled in later
         fully_started: AtomicBool::new(false),
         join_vc_tokens: dashmap::DashMap::new(),
         songbird: songbird::Songbird::serenity(),
@@ -186,11 +185,6 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         .voice_manager(data.songbird.clone())
         .data(data as _)
         .await?;
-
-    let shard_runners = Arc::clone(&client.shard_manager.runners);
-    if data_clone.runners.set(shard_runners).is_err() {
-        unreachable!()
-    }
 
     let shutdown_trigger = client.shard_manager.get_shutdown_trigger();
     tokio::spawn(async move {

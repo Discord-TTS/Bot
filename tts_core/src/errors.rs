@@ -91,11 +91,7 @@ pub async fn handle_unexpected<'a>(
     let after_fields = [
         ("CPU Usage (5 minutes)", Cow::Owned(cpu_usage), true),
         ("System Memory Usage", Cow::Owned(mem_usage), true),
-        (
-            "Shard Count",
-            Cow::Owned(data.runners.get().unwrap().len().to_string()),
-            true,
-        ),
+        ("Shard Count", Cow::Borrowed("0"), true),
     ];
 
     let mut embed = serenity::CreateEmbed::default()

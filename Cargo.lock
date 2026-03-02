@@ -2703,7 +2703,7 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.6.1"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#17e247cb727e29a5718235e1ad15af22dfb23396"
+source = "git+https://github.com/GnomedDev/poise?branch=serenity-next-no-shardrunner#0ca5c40f7fe6d4a7b74ac8090e78dba93a3688dd"
 dependencies = [
  "async-trait",
  "derivative",
@@ -2721,7 +2721,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.6.1"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#17e247cb727e29a5718235e1ad15af22dfb23396"
+source = "git+https://github.com/GnomedDev/poise?branch=serenity-next-no-shardrunner#0ca5c40f7fe6d4a7b74ac8090e78dba93a3688dd"
 dependencies = [
  "darling 0.20.11",
  "proc-macro2",
@@ -3593,7 +3593,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.5"
-source = "git+https://github.com/GnomedDev/serenity?branch=public-shard-runner#a281a00029122cee6e58e80e26faddf2fdb6ee08"
+source = "git+https://github.com/GnomedDev/serenity?branch=revert-shardmanager-rework#75f7bbcd37e393fff923ce4c465dbdba8f2a8231"
 dependencies = [
  "aformat",
  "arrayvec",
