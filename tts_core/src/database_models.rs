@@ -114,36 +114,17 @@ impl Compact for GuildRowRaw {
     }
 }
 
-#[derive(sqlx::FromRow, Clone, Copy)]
-pub struct UserRowRaw {
-    pub dm_blocked: bool,
-    pub dm_welcomed: bool,
-    pub bot_banned: bool,
-    pub voice_mode: Option<TTSMode>,
-    pub premium_voice_mode: Option<TTSMode>,
-}
-
-#[bool_to_bitflags::bool_to_bitflags(owning_setters)]
-#[derive(Debug, Clone, Copy, typesize::derive::TypeSize)]
+#[derive(Debug, Clone, Copy, sqlx::FromRow, typesize::derive::TypeSize)]
 pub struct UserRow {
-    pub dm_blocked: bool,
-    pub dm_welcomed: bool,
     pub bot_banned: bool,
     pub voice_mode: Option<TTSMode>,
     pub premium_voice_mode: Option<TTSMode>,
 }
 
-impl Compact for UserRowRaw {
-    type Compacted = UserRow;
+impl Compact for UserRow {
+    type Compacted = Self;
     fn compact(self) -> Self::Compacted {
-        Self::Compacted {
-            voice_mode: self.voice_mode,
-            premium_voice_mode: self.premium_voice_mode,
-            __generated_flags: UserRowGeneratedFlags::empty(),
-        }
-        .set_dm_blocked(self.dm_blocked)
-        .set_dm_welcomed(self.dm_welcomed)
-        .set_bot_banned(self.bot_banned)
+        self
     }
 }
 

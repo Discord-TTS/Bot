@@ -12,16 +12,6 @@ pub const OPTION_SEPERATORS: [&str; 4] = [
 pub const GTTS_DISABLED_ERROR: &str =
     "The `gTTS` voice mode is currently disabled due to maintenance so cannot be used.";
 
-pub const DM_WELCOME_MESSAGE: &str = "
-**All messages after this will be sent to a private channel where we can assist you.**
-**DO NOT SEND PERSONAL INFORMATION TO ANY DISCORD BOT, BOT DEVELOPERS CAN SEE THE MESSAGES.**
-Please keep in mind that we aren't always online and get a lot of messages, so if you don't get a response within a day repeat your message.
-There are some basic rules if you want to get help though:
-`1.` Ask your question, don't just ask for help
-`2.` Don't spam, troll, or send random stuff (including server invites)
-`3.` Many questions are answered in `-help`, try that first (also the default prefix is `-`)
-";
-
 pub const DB_SETUP_QUERY: &str = "
     CREATE type TTSMode AS ENUM (
         'gtts',
@@ -32,7 +22,6 @@ pub const DB_SETUP_QUERY: &str = "
 
     CREATE TABLE userinfo (
         user_id             bigint     PRIMARY KEY,
-        dm_blocked          bool       DEFAULT False,
         dm_welcomed         bool       DEFAULT false,
         voice_mode          TTSMode,
         premium_voice_mode  TTSMode

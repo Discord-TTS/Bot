@@ -93,7 +93,6 @@ pub struct WebsiteInfo {
 pub struct WebhookConfigRaw {
     pub logs: reqwest::Url,
     pub errors: reqwest::Url,
-    pub dm_logs: reqwest::Url,
 }
 
 #[derive(serde::Deserialize)]
@@ -115,7 +114,6 @@ pub struct PremiumConfig {
 pub struct WebhookConfig {
     pub logs: serenity::Webhook,
     pub errors: serenity::Webhook,
-    pub dm_logs: serenity::Webhook,
 }
 
 pub struct JoinVCToken(pub GuildId, pub Arc<tokio::sync::Mutex<()>>);
@@ -241,7 +239,7 @@ impl LastXsaidInfo {
 pub struct Data {
     pub analytics: Arc<analytics::Handler>,
     pub guilds_db: database::Handler<i64, database::GuildRowRaw>,
-    pub userinfo_db: database::Handler<i64, database::UserRowRaw>,
+    pub userinfo_db: database::Handler<i64, database::UserRow>,
     pub nickname_db: database::Handler<[i64; 2], database::NicknameRowRaw>,
     pub user_voice_db: database::Handler<(i64, TTSMode), database::UserVoiceRowRaw>,
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRowRaw>,

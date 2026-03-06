@@ -1,16 +1,7 @@
-use std::borrow::Cow;
-
-use aformat::aformat;
-use tracing::info;
-
-use self::serenity::{
-    CreateEmbed, CreateEmbedFooter, CreateMessage, ExecuteWebhook, GenericGuildChannelRef,
-};
+use self::serenity::{CreateMessage, GenericGuildChannelRef};
 use poise::serenity_prelude as serenity;
 
 use tts_core::{
-    common::{build_invite_components, dm_generic, random_footer},
-    constants::DM_WELCOME_MESSAGE,
     opt_ext::OptionTryUnwrap,
     structs::{Data, Result},
 };
@@ -20,11 +11,10 @@ use tts::process_tts_msg;
 mod tts;
 
 pub async fn handle(ctx: &serenity::Context, new_message: &serenity::Message) -> Result<()> {
-    tokio::try_join!(process_tts_msg(ctx, new_message), async {
-        process_support_dm(ctx, new_message).await?;
-        process_mention_msg(ctx, new_message).await?;
-        Ok(())
-    })?;
+    tokio::try_join!(
+        process_tts_msg(ctx, new_message),
+        process_mention_msg(ctx, new_message)
+    )?;
 
     Ok(())
 }
@@ -91,182 +81,6 @@ async fn process_mention_msg(ctx: &serenity::Context, message: &serenity::Messag
             _ => {}
         }
     }
-
-    Ok(())
-}
-
-async fn process_support_dm(ctx: &serenity::Context, message: &serenity::Message) -> Result<()> {
-    let data = ctx.data_ref::<Data>();
-    let channel_id = message.channel_id;
-    if message.guild_id.is_some() {
-        return process_support_response(ctx, message, data, channel_id).await;
-    }
-
-    if message.author.bot() || message.content.starts_with('-') {
-        return Ok(());
-    }
-
-    data.analytics.log(Cow::Borrowed("dm"), false);
-
-    let userinfo = data.userinfo_db.get(message.author.id.into()).await?;
-    if userinfo.dm_welcomed() {
-        let content = message.content.to_lowercase();
-
-        if content.contains("discord.gg") {
-            let bot_id = ctx.cache.current_user().id;
-
-            let components = build_invite_components(bot_id, &data.config.main_server_invite);
-            let reply = CreateMessage::new().components(std::slice::from_ref(&components));
-
-            channel_id.send_message(&ctx.http, reply).await?;
-        } else if content.as_str() == "help" {
-            channel_id.say(&ctx.http, "We cannot help you unless you ask a question, if you want the help command just do `/help`!").await?;
-        } else if !userinfo.dm_blocked() {
-            let webhook_username = {
-                let mut tag = message.author.tag().into_owned();
-                tag.push_str(&aformat!(" ({})", message.author.id));
-                tag
-            };
-
-            let mut attachments = Vec::new();
-            for attachment in &message.attachments {
-                let attachment_builder = serenity::CreateAttachment::url(
-                    &ctx.http,
-                    attachment.url.as_str(),
-                    attachment.filename.to_string(),
-                )
-                .await?;
-                attachments.push(attachment_builder);
-            }
-
-            let builder = ExecuteWebhook::default()
-                .files(attachments)
-                .content(message.content.as_str())
-                .username(webhook_username)
-                .avatar_url(message.author.face())
-                .allowed_mentions(serenity::CreateAllowedMentions::new())
-                .embeds(
-                    message
-                        .embeds
-                        .iter()
-                        .cloned()
-                        .map(Into::into)
-                        .collect::<Vec<_>>(),
-                );
-
-            data.webhooks
-                .dm_logs
-                .execute(&ctx.http, false, builder)
-                .await?;
-        }
-    } else {
-        let (client_id, title) = {
-            let current_user = ctx.cache.current_user();
-            (
-                current_user.id,
-                aformat!("Welcome to {} Support DMs!", &current_user.name),
-            )
-        };
-
-        let embeds = [CreateEmbed::default()
-            .title(title.as_str())
-            .description(DM_WELCOME_MESSAGE)
-            .footer(CreateEmbedFooter::new(random_footer(
-                &data.config.main_server_invite,
-                client_id,
-            )))];
-
-        let welcome_msg = channel_id
-            .send_message(&ctx.http, CreateMessage::default().embeds(&embeds))
-            .await?;
-
-        data.userinfo_db
-            .set_one(message.author.id.into(), "dm_welcomed", &true)
-            .await?;
-
-        if let Err(pin_err) = welcome_msg.pin(&ctx.http, None).await {
-            if let serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(resp)) = &pin_err
-                && resp.error.code == serenity::JsonErrorCode::MaxPinsReached
-            {
-            } else {
-                return Err(pin_err.into());
-            }
-        }
-
-        info!(
-            "{} just got the 'Welcome to support DMs' message",
-            message.author.tag(),
-        );
-    }
-
-    Ok(())
-}
-
-async fn process_support_response(
-    ctx: &serenity::Context,
-    message: &serenity::Message,
-    data: &Data,
-    channel_id: serenity::GenericChannelId,
-) -> Result<()> {
-    if data.webhooks.dm_logs.channel_id.try_unwrap()? != channel_id.expect_channel() {
-        return Ok(());
-    }
-
-    let Some(reference) = &message.message_reference else {
-        return Ok(());
-    };
-
-    let Some(resolved_id) = reference.message_id else {
-        return Ok(());
-    };
-
-    let (resolved_author_name, resolved_author_discrim) = {
-        let message = channel_id.message(ctx, resolved_id).await?;
-        (message.author.name, message.author.discriminator)
-    };
-
-    if resolved_author_discrim.is_some() {
-        return Ok(());
-    }
-
-    let (target, target_tag) = {
-        let Some(re_match) = data
-            .regex_cache
-            .id_in_brackets
-            .captures(&resolved_author_name)
-        else {
-            return Ok(());
-        };
-
-        let Some(target_id_match) = re_match.get(1) else {
-            return Ok(());
-        };
-
-        let target_id = target_id_match.as_str().parse::<serenity::UserId>()?;
-        let target_tag = target_id.to_user(ctx).await?.tag().into_owned();
-
-        (target_id, target_tag)
-    };
-
-    let attachment_url = message.attachments.first().map(|a| a.url.as_str());
-
-    let (content, embed) = dm_generic(
-        ctx,
-        &message.author,
-        target,
-        target_tag,
-        attachment_url,
-        &message.content,
-    )
-    .await?;
-
-    let embeds = [CreateEmbed::from(embed)];
-    channel_id
-        .send_message(
-            &ctx.http,
-            CreateMessage::default().content(content).embeds(&embeds),
-        )
-        .await?;
 
     Ok(())
 }

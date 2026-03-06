@@ -1305,7 +1305,6 @@ pub fn commands() -> [Command; 5] {
                 command_prefix(),
                 text_in_voice(),
                 skip_emoji(),
-                owner::block(),
                 owner::bot_ban(),
                 owner::gtts_disabled(),
             ],

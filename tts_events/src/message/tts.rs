@@ -192,7 +192,7 @@ fn run_checks<'c>(
     guild_row: &GuildRow,
     user_row: UserRow,
 ) -> Result<Option<(MessageContent<'c>, Option<serenity::ChannelId>)>> {
-    if user_row.bot_banned() {
+    if user_row.bot_banned {
         return Ok(None);
     }
 

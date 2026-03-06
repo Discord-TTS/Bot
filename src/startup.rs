@@ -18,18 +18,13 @@ pub async fn get_webhooks(
         anyhow::Ok(webhook_id.to_webhook(http).await?)
     };
 
-    let (logs, errors, dm_logs) = tokio::try_join!(
+    let (logs, errors) = tokio::try_join!(
         get_webhook(webhooks_raw.logs),
         get_webhook(webhooks_raw.errors),
-        get_webhook(webhooks_raw.dm_logs),
     )?;
 
     println!("Fetched webhooks");
-    Ok(WebhookConfig {
-        logs,
-        errors,
-        dm_logs,
-    })
+    Ok(WebhookConfig { logs, errors })
 }
 
 async fn fetch_json<T>(reqwest: &reqwest::Client, url: reqwest::Url, auth_header: &str) -> Result<T>

@@ -18,7 +18,6 @@ user = 'tts'
 # Each URL will look like 'https://discord.com/api/webhooks/830137192985788457/nCrFLCz-2tJRFUoBrFx1nN9cvUZdhdW0860ek0zNosf0DfCaMTbyM_oFdf9RidC_mcPp'
 #logs = 
 #errors = 
-#dm_logs = 
 #servers = 
 #analytics = 
 #suggestions =

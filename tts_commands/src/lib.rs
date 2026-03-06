@@ -163,7 +163,7 @@ pub async fn command_check(ctx: Context<'_>) -> Result<bool> {
 
     let data = ctx.data();
     let user_row = data.userinfo_db.get(ctx.author().id.into()).await?;
-    if user_row.bot_banned() {
+    if user_row.bot_banned {
         notify_banned(ctx).await?;
         return Ok(false);
     }
