@@ -6,6 +6,7 @@ rust-version = "1.93"
 
 [dependencies]
 libc = "0.2.152"
+extract_map = "0.3.1"
 
 poise.workspace = true
 tokio.workspace = true

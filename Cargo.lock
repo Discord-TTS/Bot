@@ -4849,6 +4849,7 @@ dependencies = [
  "aformat",
  "anyhow",
  "dashmap 6.1.0",
+ "extract_map",
  "libc",
  "poise",
  "regex",
