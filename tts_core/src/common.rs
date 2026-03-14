@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rand::Rng as _;
+use rand::RngExt as _;
 
 use serenity::all as serenity;
 use serenity::{CollectComponentInteractions, CreateActionRow, CreateButton, CreateComponent};

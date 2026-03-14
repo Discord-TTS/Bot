@@ -403,7 +403,8 @@ fn get_runner_channel(
     data: &Data,
     shard_id: serenity::ShardId,
 ) -> Option<UnboundedSender<serenity::ShardRunnerMessage>> {
-    None
+    let runners = data.runners.get().unwrap();
+    runners.get(&shard_id).map(|entry| entry.tx.clone())
 }
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]

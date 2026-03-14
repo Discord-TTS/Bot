@@ -5,11 +5,11 @@ edition = "2024"
 rust-version = "1.93"
 
 [dependencies]
-indexmap = "2"
-strsim = "0.11"
-num-format = "0.4"
-futures-channel = "0.3.31"
-uuid = { version = "1.17.0", features = ["v7"] }
+indexmap = "2.13.0"
+strsim = "0.11.1"
+num-format = "0.4.4"
+futures-channel = "0.3.32"
+uuid = { version = "1.22.0", features = ["v7"] }
 
 sqlx.workspace = true
 tokio.workspace = true

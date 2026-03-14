@@ -64,7 +64,7 @@ regex = "1"
 anyhow = "1"
 serde = "1.0.209"
 tracing = "0.1"
-sysinfo = "0.36"
+sysinfo = "0.38"
 aformat = "0.1.3"
 itertools = "0.14"
 arrayvec = "0.7.6"
@@ -111,14 +111,6 @@ branch = "serenity-next"
 git = "https://github.com/jtscuba/songbird" # https://github.com/serenity-rs/songbird/pull/291 applied to serenity-next
 features = ["builtin-queue"]
 branch = "davey"
-
-[patch."https://github.com/serenity-rs/serenity".serenity]
-git = "https://github.com/GnomedDev/serenity"
-branch = "revert-shardmanager-rework"
-
-[patch."https://github.com/serenity-rs/poise".poise]
-git = "https://github.com/GnomedDev/poise"
-branch = "serenity-next-no-shardrunner"
 
 [workspace.lints.rust]
 rust_2018_idioms = "warn"

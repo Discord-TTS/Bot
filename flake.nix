@@ -30,9 +30,9 @@
             lockFile = ./Cargo.lock;
             outputHashes = {
               "audiopus_sys-0.2.2" = "sha256-epzB54105Iihrfyj1HZNGSLOaihLw4rUZsT+rw/sXZs=";
-              "poise-0.6.1" = "sha256-peu1Lwo062iaEZz7J+o8WNqWNC8vDBUsbRH4IaXcFwU=";
-              "serenity-0.12.5" = "sha256-rKzUL9hHlZUp0Fo4zenDgMQDKliBWjS51xdEgfCqfmw=";
-              "serenity-voice-model-0.2.1" = "sha256-X8KEdROcWC3qFTfbLd9iCWmkurB+6CRRzBfTzxEcIDk=";
+              "poise-0.6.1" = "sha256-qCTEkOWCpKgEXCt7apg+tiScE+X0Br0giTNNBxqNCs0=";
+              "serenity-0.12.5" = "sha256-hZ5/42VjPoMqCW6+dPNMb7Awn4CUXvvn/j8PabJtGSg=";
+              "serenity-voice-model-0.2.1" = "sha256-atagMk8lVxIO5lt1QBBqofBAEGpCRgW0VqPgtdCJ/zM=";
               "songbird-0.5.0" = "sha256-wacSNkIjA1rsENNPbo/KVDfoMXllrr+vA2pmPxsNzEs=";
             };
           };
@@ -58,6 +58,7 @@
         extraDevTools = with pkgs; [
           clippy
           rustfmt
+          cargo-edit
           rust-analyzer
         ];
       }
