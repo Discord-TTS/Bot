@@ -81,7 +81,7 @@ features = ["macros", "postgres", "runtime-tokio-rustls"]
 [workspace.dependencies.reqwest]
 version = "0.13"
 default-features = false
-features = ["rustls"]
+features = ["rustls", "http2", "gzip", "brotli", "zstd", "deflate"]
 
 [workspace.dependencies.tokio]
 version = "1.39.3"
