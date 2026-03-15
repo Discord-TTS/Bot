@@ -182,6 +182,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     let data_clone = Arc::clone(&data);
     let mut client = serenity::ClientBuilder::new_with_http(token, http, tts_events::get_intents())
         .framework(Box::new(poise::Framework::new(framework_options)))
+        .compression(serenity::TransportCompression::Zstd)
         .event_handler(Arc::new(EventHandler))
         .voice_manager(data.songbird.clone())
         .data(data as _)
