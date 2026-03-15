@@ -250,10 +250,7 @@ pub async fn handle_guild(
 }
 
 // Command Error handlers
-async fn handle_cooldown(
-    ctx: Context<'_>,
-    remaining_cooldown: std::time::Duration,
-) -> Result<(), Error> {
+async fn handle_cooldown(ctx: Context<'_>, remaining_cooldown: std::time::Duration) -> Result<()> {
     let msg = format!(
         "`/{}` is on cooldown, please try again in {:.1} seconds!",
         ctx.command().name,
@@ -351,6 +348,34 @@ const fn channel_type(channel: &serenity::Channel) -> &'static str {
     }
 }
 
+fn handle_bot_permissions(missing_permissions: serenity::Permissions) -> String {
+    let mut msg = String::from(
+        "I am missing permissions, please ask an owner/administrator of the server to give me: ",
+    );
+    push_permission_names(&mut msg, missing_permissions);
+    msg
+}
+
+fn handle_user_permissions(
+    missing_permissions: Option<serenity::Permissions>,
+) -> Cow<'static, str> {
+    if let Some(missing_permissions) = missing_permissions {
+        if missing_permissions.contains(serenity::Permissions::ADMINISTRATOR) {
+            Cow::Borrowed(
+                "You cannot run this command as you are not an owner/administrator of the server.",
+            )
+        } else {
+            let mut msg = String::from(
+                "You cannot run this command as you are missing permissions, please ask an owner/administrator of the server to give you: ",
+            );
+            push_permission_names(&mut msg, missing_permissions);
+            Cow::Owned(msg)
+        }
+    } else {
+        Cow::Borrowed("You cannot run this command as you are missing permissions.")
+    }
+}
+
 pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()> {
     match error {
         poise::FrameworkError::DynamicPrefix { error, .. } => {
@@ -418,11 +443,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ctx,
             ..
         } => {
-            let mut msg = String::from(
-                "I cannot run this command as I am missing permissions, please ask an administrator of the server to give me: ",
-            );
-            push_permission_names(&mut msg, missing_permissions);
-
+            let msg = handle_bot_permissions(missing_permissions);
             ctx.send_error(msg).await?;
         }
         poise::FrameworkError::MissingUserPermissions {
@@ -430,16 +451,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
             ctx,
             ..
         } => {
-            let msg = if let Some(missing_permissions) = missing_permissions {
-                let mut msg = String::from(
-                    "You cannot run this command as you are missing permissions, please ask an administrator of the server to give you: ",
-                );
-                push_permission_names(&mut msg, missing_permissions);
-                Cow::Owned(msg)
-            } else {
-                Cow::Borrowed("You cannot run this command as you are missing permissions.")
-            };
-
+            let msg = handle_user_permissions(missing_permissions);
             ctx.send_error(msg).await?;
         }
 
@@ -448,7 +460,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
                 error!("Premium Check Error: {:?}", error);
 
                 let msg = "An unknown error occurred during the premium check, please report this on the support server!";
-                ctx.send_error(msg).await?;
+                ctx.send_error(Cow::Borrowed(msg)).await?;
             }
         }
 

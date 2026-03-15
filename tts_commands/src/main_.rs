@@ -186,7 +186,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     if let Some(communication_disabled_until) = communication_disabled_until
         && communication_disabled_until > serenity::Timestamp::now()
     {
-        let msg = "I am timed out, please ask a moderator to remove the timeout";
+        let msg = "I am timed out, please ask a moderator to remove the timeout.";
         ctx.send_error(msg).await?;
         return Ok(());
     }

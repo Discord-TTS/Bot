@@ -88,10 +88,12 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
         let (name, avatar_url) = match self.guild_id() {
             Some(guild_id) => {
                 if !self.author_permissions()?.embed_links() {
-                    self.send(poise::CreateReply::new()
-                        .content("An Error Occurred! Please give me embed links permissions so I can tell you more!")
-                        .ephemeral(true)
-                    ).await?;
+                    self.send(
+                        poise::CreateReply::new()
+                            .content(format!("**An error occurred:** {}", error_message.into()))
+                            .ephemeral(true),
+                    )
+                    .await?;
 
                     return Ok(None);
                 }
