@@ -133,9 +133,7 @@ async fn tts_(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
         let auth_key = data.config.tts_service_auth_key.as_deref();
         let audio = fetch_audio(&data.reqwest, url, auth_key)
             .await?
-            .try_unwrap()?
-            .bytes()
-            .await?;
+            .try_unwrap()?;
 
         let mut file_name = author_name;
         file_name.push_str(&aformat!(
@@ -147,7 +145,7 @@ async fn tts_(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             }
         ));
 
-        serenity::CreateAttachment::bytes(audio.to_vec(), file_name)
+        serenity::CreateAttachment::bytes(audio, file_name)
     };
 
     ctx.send(

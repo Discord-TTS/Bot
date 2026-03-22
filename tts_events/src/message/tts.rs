@@ -1,8 +1,9 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use aformat::ToArrayString as _;
 use poise::serenity_prelude as serenity;
 
+use songbird::input::{AudioStream, AudioStreamError, core::io::MediaSource};
 use tts_core::{
     common::{fetch_audio, prepare_url},
     database::{GuildRow, UserRow},
@@ -121,29 +122,16 @@ pub(crate) async fn process_tts_msg(
         }
     };
 
-    // Pre-fetch the audio to handle max_length errors
-    let tts_auth_key = data.config.tts_service_auth_key.as_deref();
-    let Some(audio) = fetch_audio(&data.reqwest, url.clone(), tts_auth_key).await? else {
-        return Ok(());
-    };
-
-    let hint = audio
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .map(|ct| {
-            let mut hint = songbird::input::core::probe::Hint::new();
-            hint.mime_type(ct.to_str()?);
-            Ok::<_, anyhow::Error>(hint)
-        })
-        .transpose()?;
-
-    let input = Box::new(std::io::Cursor::new(audio.bytes().await?));
-    let wrapped_audio =
-        songbird::input::LiveInput::Raw(songbird::input::AudioStream { input, hint });
+    let tts_auth_key = data.config.tts_service_auth_key.clone();
+    let request_builder = Box::new(TTSRequestBuilder {
+        reqwest: data.reqwest.clone(),
+        auth_key: tts_auth_key,
+        url,
+    });
 
     let track_handle = {
         let mut call = call_lock.lock().await;
-        call.enqueue_input(songbird::input::Input::Live(wrapped_audio, None))
+        call.enqueue_input(songbird::input::Input::Lazy(request_builder))
             .await
     };
 
@@ -333,4 +321,34 @@ fn run_checks<'c>(
         },
         to_autojoin,
     )))
+}
+
+struct TTSRequestBuilder {
+    reqwest: reqwest::Client,
+    url: reqwest::Url,
+    auth_key: Option<Arc<str>>,
+}
+
+#[serenity::async_trait]
+impl songbird::input::Compose for TTSRequestBuilder {
+    fn should_create_async(&self) -> bool {
+        true
+    }
+
+    fn create(&mut self) -> Result<AudioStream<Box<dyn MediaSource>>, AudioStreamError> {
+        Err(AudioStreamError::Unsupported)
+    }
+
+    async fn create_async(
+        &mut self,
+    ) -> Result<AudioStream<Box<dyn MediaSource>>, AudioStreamError> {
+        match fetch_audio(&self.reqwest, self.url.clone(), self.auth_key.as_deref()).await {
+            Ok(Some(audio)) => {
+                let input = Box::new(std::io::Cursor::new(audio));
+                Ok(AudioStream { input, hint: None })
+            }
+            Err(err) => Err(AudioStreamError::Fail(err.into())),
+            Ok(None) => Err(AudioStreamError::Unsupported),
+        }
+    }
 }

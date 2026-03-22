@@ -532,31 +532,46 @@ struct TrackErrorHandler {
     icon_url: String,
 }
 
+impl TrackErrorHandler {
+    async fn log_if_error(&self, ctx: &songbird::EventContext<'_>) {
+        let songbird::EventContext::Track([(state, _)]) = ctx else {
+            return;
+        };
+
+        let songbird::tracks::PlayMode::Errored(error) = state.playing.clone() else {
+            return;
+        };
+
+        if let songbird::error::PlayError::Create(create_error) = &error
+            && let songbird::input::AudioStreamError::Unsupported = **create_error
+        {
+            return;
+        }
+
+        let mut extra_fields_iter = self.extra_fields.iter().cloned();
+        let author_name = Some(self.author_name.as_str());
+        let icon_url = Some(self.icon_url.as_str());
+
+        let result = handle_unexpected(
+            &self.ctx,
+            "TrackError",
+            error.into(),
+            extra_fields_iter.by_ref(),
+            author_name,
+            icon_url,
+        )
+        .await;
+
+        if let Err(err_err) = result {
+            tracing::error!("Songbird unhandled track error: {err_err}");
+        }
+    }
+}
+
 #[serenity::async_trait]
 impl songbird::EventHandler for TrackErrorHandler {
     async fn act(&self, ctx: &songbird::EventContext<'_>) -> Option<songbird::Event> {
-        if let songbird::EventContext::Track([(state, _)]) = ctx
-            && let songbird::tracks::PlayMode::Errored(error) = state.playing.clone()
-        {
-            let mut extra_fields_iter = self.extra_fields.iter().cloned();
-            let author_name = Some(self.author_name.as_str());
-            let icon_url = Some(self.icon_url.as_str());
-
-            let result = handle_unexpected(
-                &self.ctx,
-                "TrackError",
-                error.into(),
-                extra_fields_iter.by_ref(),
-                author_name,
-                icon_url,
-            )
-            .await;
-
-            if let Err(err_err) = result {
-                tracing::error!("Songbird unhandled track error: {err_err}");
-            }
-        }
-
+        self.log_if_error(ctx).await;
         Some(songbird::Event::Cancel)
     }
 }

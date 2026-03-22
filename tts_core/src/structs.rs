@@ -59,7 +59,7 @@ pub struct Config {
 
 #[derive(serde::Deserialize)]
 pub struct MainConfig {
-    pub tts_service_auth_key: Option<FixedString>,
+    pub tts_service_auth_key: Option<Arc<str>>,
     pub website_url: Option<reqwest::Url>,
     pub announcements_channel: ChannelId,
     pub main_server_invite: FixedString,

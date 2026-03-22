@@ -94,7 +94,7 @@ pub async fn fetch_audio(
     reqwest: &reqwest::Client,
     url: reqwest::Url,
     auth_key: Option<&str>,
-) -> Result<Option<reqwest::Response>> {
+) -> Result<Option<bytes::Bytes>> {
     let resp = reqwest
         .get(url)
         .header(reqwest::header::AUTHORIZATION, auth_key.unwrap_or(""))
@@ -102,7 +102,7 @@ pub async fn fetch_audio(
         .await?;
 
     match resp.error_for_status_ref() {
-        Ok(_) => Ok(Some(resp)),
+        Ok(_) => Ok(Some(resp.bytes().await?)),
         Err(backup_err) => match resp.json::<TTSServiceError>().await {
             Ok(err) => {
                 if err.code.should_ignore() {

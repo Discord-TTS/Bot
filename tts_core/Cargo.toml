@@ -2,11 +2,12 @@
 name = "tts_core"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.93"
+rust-version = "1.94"
 
 [dependencies]
 rand = "0.10"
 sha2 = "0.10.9"
+bytes = "1.11.1"
 linkify = "0.10"
 bitflags = "2.11.0"
 strum_macros = "0.28"

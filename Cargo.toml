@@ -2,7 +2,7 @@
 name = "tts_bot"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.93"
+rust-version = "1.94"
 
 [workspace]
 members = [
@@ -18,8 +18,9 @@ lto = "thin"
 panic = "abort"
 debug = 2
 
-[profile.dev.package.syn]
-opt-level = 3
+[profile.dev]
+panic = "abort"
+package = { syn = { opt-level = 3 } }
 
 [lints]
 workspace = true
