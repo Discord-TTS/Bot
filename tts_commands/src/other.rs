@@ -125,7 +125,7 @@ async fn tts_(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             message,
             &voice,
             mode,
-            &speaking_rate,
+            &speaking_rate.to_arraystring(),
             &u64::MAX.to_arraystring(),
             translation_lang,
         );

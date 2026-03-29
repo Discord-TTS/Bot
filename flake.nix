@@ -29,21 +29,14 @@
           cargoLock = {
             lockFile = ./Cargo.lock;
             outputHashes = {
-              "audiopus_sys-0.2.2" = "sha256-epzB54105Iihrfyj1HZNGSLOaihLw4rUZsT+rw/sXZs=";
               "poise-0.6.1" = "sha256-qCTEkOWCpKgEXCt7apg+tiScE+X0Br0giTNNBxqNCs0=";
-              "serenity-0.12.5" = "sha256-8I9rGKL/a8jwbLnDYV/jZEi+rDuLAn6Nk/QAJr00Kxo=";
-              "serenity-voice-model-0.3.0" = "sha256-ZGwzX+saQ7RY8BtpuxzCC24vc/uQWuRWoi88ZzuJL1o=";
-              "songbird-0.5.0" = "sha256-wacSNkIjA1rsENNPbo/KVDfoMXllrr+vA2pmPxsNzEs=";
+              "serenity-0.12.5" = "sha256-xlBuX0qdTclrKaZkAwK3kXZdurxFT3UVYC7Eh/f+emA=";
             };
           };
 
           env.RUSTC_BOOTSTRAP = "1";
-          buildInputs = with pkgs; [
-            libopus
-          ];
           nativeBuildInputs = with pkgs; [
             mold
-            cmake
           ];
 
           doCheck = false;

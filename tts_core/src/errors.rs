@@ -7,7 +7,7 @@ use tracing::error;
 
 use self::serenity::{
     CreateActionRow, CreateButton, CreateComponent, CreateInteractionResponse,
-    GenericGuildChannelRef, small_fixed_array::FixedString,
+    GenericGuildChannelRef,
 };
 use poise::serenity_prelude as serenity;
 
@@ -523,76 +523,4 @@ pub async fn handle_traceback_button(
         .create_response(&ctx.http, CreateInteractionResponse::Message(response_data))
         .await?;
     Ok(())
-}
-
-struct TrackErrorHandler {
-    ctx: serenity::Context,
-    extra_fields: [(&'static str, Cow<'static, str>, bool); 6],
-    author_name: FixedString<u8>,
-    icon_url: String,
-}
-
-impl TrackErrorHandler {
-    async fn log_if_error(&self, ctx: &songbird::EventContext<'_>) {
-        let songbird::EventContext::Track([(state, _)]) = ctx else {
-            return;
-        };
-
-        let songbird::tracks::PlayMode::Errored(error) = state.playing.clone() else {
-            return;
-        };
-
-        if let songbird::error::PlayError::Create(create_error) = &error
-            && let songbird::input::AudioStreamError::Unsupported = **create_error
-        {
-            return;
-        }
-
-        let mut extra_fields_iter = self.extra_fields.iter().cloned();
-        let author_name = Some(self.author_name.as_str());
-        let icon_url = Some(self.icon_url.as_str());
-
-        let result = handle_unexpected(
-            &self.ctx,
-            "TrackError",
-            error.into(),
-            extra_fields_iter.by_ref(),
-            author_name,
-            icon_url,
-        )
-        .await;
-
-        if let Err(err_err) = result {
-            tracing::error!("Songbird unhandled track error: {err_err}");
-        }
-    }
-}
-
-#[serenity::async_trait]
-impl songbird::EventHandler for TrackErrorHandler {
-    async fn act(&self, ctx: &songbird::EventContext<'_>) -> Option<songbird::Event> {
-        self.log_if_error(ctx).await;
-        Some(songbird::Event::Cancel)
-    }
-}
-
-/// Registers a track to be handled by the error handler, arguments other than the
-/// track are passed to [`handle_unexpected`] if the track errors.
-pub fn handle_track(
-    ctx: serenity::Context,
-    extra_fields: [(&'static str, Cow<'static, str>, bool); 6],
-    author_name: FixedString<u8>,
-    icon_url: String,
-
-    track: &songbird::tracks::TrackHandle,
-) -> Result<(), songbird::error::ControlError> {
-    track.add_event(
-        songbird::Event::Track(songbird::TrackEvent::Error),
-        TrackErrorHandler {
-            ctx,
-            extra_fields,
-            author_name,
-            icon_url,
-        },
-    )
 }

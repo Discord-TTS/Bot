@@ -1,6 +1,5 @@
 #![allow(clippy::module_name_repetitions)]
 
-mod channel;
 mod guild;
 mod member;
 mod message;
@@ -73,16 +72,11 @@ impl serenity::EventHandler for EventHandler {
                 }
             }
             serenity::FullEvent::VoiceStateUpdate { old, new, .. } => {
-                if let Err(err) = voice_state::handle(ctx, old.as_ref(), new).await
+                if let Err(err) = voice_state::handle(ctx, old.as_ref(), new)
                     && let Err(err) =
                         errors::handle_unexpected_default(ctx, "VoiceStateUpdate", err).await
                 {
                     tracing::error!("Error in voice state update handler: {err:?}");
-                }
-            }
-            serenity::FullEvent::ChannelDelete { channel, .. } => {
-                if let Err(err) = channel::handle_delete(ctx, channel).await {
-                    tracing::error!("Error in channel delete handler: {err:?}");
                 }
             }
             serenity::FullEvent::InteractionCreate { interaction, .. } => {

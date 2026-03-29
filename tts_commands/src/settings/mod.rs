@@ -114,18 +114,12 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         let user_voice_row = data.user_voice_db.get((author_id.into(), mode)).await?;
         let (default, kind) = match mode.speaking_rate_info() {
             Some(info) => (info.default, info.kind),
-            None => ("1.0", "x"),
+            None => (1.0, "x"),
         };
 
-        (
-            user_voice_row
-                .speaking_rate
-                .map(f32::to_arraystring)
-                .unwrap_or(ArrayString::from(default)?),
-            kind,
-        )
+        (user_voice_row.speaking_rate.unwrap_or(default), kind)
     } else {
-        (ArrayString::from("1.0").unwrap(), "x")
+        (1.0, "x")
     };
 
     let neutral_colour = ctx.neutral_colour().await;

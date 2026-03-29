@@ -5,7 +5,7 @@ use tts_core::{
     structs::{Data, Result},
 };
 
-pub async fn handle(
+pub fn handle(
     ctx: &serenity::Context,
     old: Option<&serenity::VoiceState>,
     new: &serenity::VoiceState,
@@ -17,7 +17,7 @@ pub async fn handle(
 
     // Bot is in vc on server
     let guild_id = new.guild_id.try_unwrap()?;
-    if data.songbird.get(guild_id).is_none() {
+    if !data.voice_connections.lock().contains_key(&guild_id) {
         return Ok(());
     }
 
@@ -31,7 +31,7 @@ pub async fn handle(
     };
 
     if leave_vc {
-        data.leave_vc(guild_id).await?;
+        data.voice_connections.lock().remove(&guild_id);
     }
 
     Ok(())

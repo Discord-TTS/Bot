@@ -1,12 +1,11 @@
-use std::{
-    ops::ControlFlow,
-    sync::{Arc, atomic::Ordering},
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
 };
 
 use aformat::{ArrayString, aformat};
 
 use poise::serenity_prelude::{self as serenity, builder::*, colours::branding::YELLOW};
-use songbird::error::JoinError;
 
 use tts_core::{
     common::{push_permission_names, random_footer},
@@ -14,8 +13,9 @@ use tts_core::{
     database_models::GuildRow,
     opt_ext::OptionTryUnwrap as _,
     require_guild,
-    structs::{Command, CommandResult, Context, JoinVCToken, Result},
-    traits::{PoiseContextExt, SongbirdManagerExt},
+    structs::{Command, CommandResult, Context, Result},
+    traits::PoiseContextExt,
+    voice,
 };
 
 use crate::REQUIRED_VC_PERMISSIONS;
@@ -53,14 +53,12 @@ async fn handle_vc_mismatch(
     guild_id: serenity::GuildId,
     author_vc: serenity::ChannelId,
     bot_id: serenity::UserId,
-    bot_channel_id: songbird::id::ChannelId,
-) -> Result<ControlFlow<()>> {
+    bot_channel_id: serenity::ChannelId,
+) -> Result<()> {
     let data = ctx.data();
-
-    let bot_channel_id = serenity::ChannelId::new(bot_channel_id.get());
     let (channel_exists, voice_state_matches) = {
         let Some(guild) = ctx.guild() else {
-            return Ok(ControlFlow::Break(()));
+            return Ok(());
         };
 
         let voice_state = guild.voice_states.get(&bot_id);
@@ -71,28 +69,28 @@ async fn handle_vc_mismatch(
         )
     };
 
-    match (channel_exists, voice_state_matches) {
+    let msg = match (channel_exists, voice_state_matches) {
         (true, true) => {
             if author_vc == bot_channel_id {
-                ctx.say("I am already in your voice channel!").await?;
+                "I am already in your voice channel!"
             } else {
-                let msg = aformat!("I am already in <#{bot_channel_id}>!");
-                ctx.say(msg.as_str()).await?;
+                &*aformat!("I am already in <#{bot_channel_id}>!")
             }
-
-            Ok(ControlFlow::Break(()))
         }
         (false, _) => {
             tracing::warn!("Channel {bot_channel_id} didn't exist in {guild_id} in `/join`");
-            data.leave_vc(guild_id).await?;
-            Ok(ControlFlow::Continue(()))
+            data.voice_connections.lock().remove(&guild_id);
+            "I was in a deleted voice channel, but I have left now. Please try again."
         }
         (_, false) => {
-            tracing::warn!("Songbird thought it was in the wrong channel in {guild_id} in `/join`");
-            data.leave_vc(guild_id).await?;
-            Ok(ControlFlow::Continue(()))
+            tracing::warn!("Voice task was in the wrong channel in {guild_id} in `/join`");
+            data.voice_connections.lock().remove(&guild_id);
+            "I was confused about what voice channel I was in, but I have left now. Please try again."
         }
-    }
+    };
+
+    ctx.send_error(msg).await?;
+    Ok(())
 }
 
 fn create_warning_embed<'a>(title: &'a str, footer: &'a str) -> serenity::CreateEmbed<'a> {
@@ -203,32 +201,28 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     }
 
     let data = ctx.data();
-    if let Some(bot_vc) = data.songbird.get(guild_id) {
-        let bot_channel_id = bot_vc.lock().await.current_channel();
-        if let Some(bot_channel_id) = bot_channel_id {
-            let result =
-                handle_vc_mismatch(ctx, guild_id, author_vc, bot_id, bot_channel_id).await?;
+    let display_name = {
+        let voice_context = voice::VCContext {
+            tts_service: data.config.tts_service.clone(),
+            serenity: ctx.serenity_context().clone(),
+            channel_id: Arc::new(AtomicU64::new(author_vc.get())),
+            guild_id,
+            bot_id,
+        };
 
-            if result.is_break() {
+        match voice::start_connection(&data, voice_context).await {
+            voice::StartConnectionResult::Started(_) => {}
+            voice::StartConnectionResult::AlreadyIn((_, bot_channel_id, _)) => {
+                let bot_channel_id =
+                    serenity::ChannelId::new(bot_channel_id.load(Ordering::SeqCst));
+                handle_vc_mismatch(ctx, guild_id, author_vc, bot_id, bot_channel_id).await?;
                 return Ok(());
             }
-        }
-    }
-
-    let display_name = {
-        let join_vc_lock = JoinVCToken::acquire(&data, guild_id);
-        let (_typing, join_vc_result) = tokio::try_join!(ctx.defer_or_broadcast(), async {
-            Ok(data.songbird.join_vc(join_vc_lock, author_vc).await)
-        })?;
-
-        if let Err(err) = join_vc_result {
-            return if let JoinError::TimedOut = err {
+            voice::StartConnectionResult::TimedOut => {
                 let msg = "I failed to join your voice channel, please check I have the right permissions and try again!";
                 ctx.send_error(msg).await?;
-                Ok(())
-            } else {
-                Err(err.into())
-            };
+                return Ok(());
+            }
         }
 
         match ctx {
@@ -293,12 +287,10 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
     };
 
     let data = ctx.data();
-    let bot_vc = {
-        if let Some(handler) = data.songbird.get(guild_id) {
-            handler.lock().await.current_channel()
-        } else {
-            None
-        }
+    let bot_vc = if let Some((_, channel_id, _)) = data.voice_connections.lock().get(&guild_id) {
+        Some(serenity::ChannelId::new(channel_id.load(Ordering::SeqCst)))
+    } else {
+        None
     };
 
     if let Some(bot_vc) = bot_vc
@@ -308,7 +300,7 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
             ctx.say("Error: You need to be in the same voice channel as me to make me leave!")
                 .await?;
         } else {
-            data.leave_vc(guild_id).await?;
+            data.voice_connections.lock().remove(&guild_id);
             ctx.say("Left voice channel!").await?;
         }
     }
@@ -331,9 +323,14 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     }
 
     let guild_id = ctx.guild_id().unwrap();
-    if let Some(call_lock) = ctx.data().songbird.get(guild_id) {
-        call_lock.lock().await.queue().stop();
+    let success = if let Some((tx, _, _)) = ctx.data().voice_connections.lock().get(&guild_id) {
+        tx.unbounded_send(voice::InterconnectMessage::ClearQueue)
+            .is_ok()
+    } else {
+        false
+    };
 
+    if success {
         match ctx {
             poise::Context::Prefix(ctx) => {
                 // Prefixed command, just add a thumbsup reaction
