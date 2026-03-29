@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     num::NonZeroU8,
     sync::{
         Arc, OnceLock,
@@ -14,6 +14,7 @@ use dashmap::DashMap;
 use parking_lot::Mutex;
 use serde::Deserialize as _;
 use strum_macros::IntoStaticStr;
+use tokio::sync::Mutex as TMutex;
 use tracing::warn;
 use typesize::derive::TypeSize;
 
@@ -22,7 +23,7 @@ use poise::serenity_prelude::{
     small_fixed_array::{FixedArray, FixedString},
 };
 
-use crate::{analytics, bool_enum, common::timestamp_in_future, database};
+use crate::{analytics, bool_enum, common::timestamp_in_future, database, voice};
 
 macro_rules! into_static_display {
     ($struct:ident, max_length($len:literal)) => {
@@ -116,19 +117,6 @@ pub struct WebhookConfig {
     pub errors: serenity::Webhook,
 }
 
-pub struct JoinVCToken(pub GuildId, pub Arc<tokio::sync::Mutex<()>>);
-impl JoinVCToken {
-    pub fn acquire(data: &Data, guild_id: GuildId) -> Self {
-        let lock = data
-            .join_vc_tokens
-            .entry(guild_id)
-            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
-            .clone();
-
-        Self(guild_id, lock)
-    }
-}
-
 bool_enum!(IsPremium(No | Yes));
 
 #[derive(Clone, Copy)]
@@ -200,7 +188,13 @@ impl RegexCache {
 }
 
 #[derive(Clone, Copy)]
-pub struct LastXsaidInfo(UserId, std::time::SystemTime);
+pub struct LastXsaidInfo(Option<UserId>, std::time::Instant);
+
+impl Default for LastXsaidInfo {
+    fn default() -> Self {
+        Self(None, std::time::Instant::now())
+    }
+}
 
 impl LastXsaidInfo {
     fn get_vc_member_count(guild: &serenity::Guild, channel_id: ChannelId) -> usize {
@@ -214,22 +208,21 @@ impl LastXsaidInfo {
     }
 
     #[must_use]
-    pub fn new(user: UserId) -> Self {
-        Self(user, std::time::SystemTime::now())
-    }
-
-    #[must_use]
     pub fn should_announce_name(&self, guild: &serenity::Guild, user: UserId) -> bool {
         let Some(voice_channel_id) = guild.voice_states.get(&user).and_then(|v| v.channel_id)
         else {
             return true;
         };
 
-        if user != self.0 {
+        let Some(last_user_id) = self.0 else {
+            return true;
+        };
+
+        if user != last_user_id {
             return true;
         }
 
-        let has_been_min = self.1.elapsed().unwrap().as_secs() > 60;
+        let has_been_min = self.1.elapsed().as_secs() > 60;
         let is_only_author = Self::get_vc_member_count(guild, voice_channel_id) <= 1;
 
         has_been_min || is_only_author
@@ -245,8 +238,6 @@ pub struct Data {
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRowRaw>,
 
     pub entitlement_cache: mini_moka::sync::Cache<UserId, CachedEntitlement>,
-    pub join_vc_tokens: DashMap<GuildId, Arc<tokio::sync::Mutex<()>>>,
-    pub last_to_xsaid_tracker: LastToXsaidTracker,
     pub startup_message: serenity::MessageId,
     pub premium_avatar_url: FixedString<u16>,
     pub system_info: Mutex<sysinfo::System>,
@@ -256,7 +247,7 @@ pub struct Data {
     pub webhooks: WebhookConfig,
     pub pool: sqlx::PgPool,
 
-    pub songbird: Arc<songbird::Songbird>,
+    pub voice_connections: Mutex<HashMap<serenity::GuildId, voice::ConnectionEntry>>,
     pub runners: OnceLock<Arc<DashMap<serenity::ShardId, serenity::ShardRunnerMetadata>>>,
     pub config: MainConfig,
     pub premium_config: Option<PremiumConfig>,
@@ -265,7 +256,7 @@ pub struct Data {
     pub website_info: Mutex<Option<WebsiteInfo>>,
     pub bot_list_tokens: Mutex<Option<BotListTokens>>,
     pub fully_started: std::sync::atomic::AtomicBool,
-    pub update_startup_lock: tokio::sync::Mutex<()>,
+    pub update_startup_lock: TMutex<()>,
 
     pub espeak_voices: FixedArray<FixedString<u8>>,
     pub gtts_voices: BTreeMap<FixedString<u8>, FixedString<u8>>,
@@ -282,22 +273,15 @@ impl std::fmt::Debug for Data {
 }
 
 impl Data {
-    #[expect(clippy::disallowed_methods, reason = "We are Data::leave_vc")]
-    pub async fn leave_vc(&self, guild_id: serenity::GuildId) -> songbird::error::JoinResult<()> {
-        self.last_to_xsaid_tracker.remove(&guild_id);
-        self.songbird.remove(guild_id).await
-    }
-
-    pub async fn speaking_rate(&self, user_id: UserId, mode: TTSMode) -> Result<Cow<'static, str>> {
+    pub async fn speaking_rate(&self, user_id: UserId, mode: TTSMode) -> Result<f32> {
         let row = self.user_voice_db.get((user_id.into(), mode)).await?;
 
         Ok(match row.speaking_rate {
-            Some(r) => Cow::Owned(r.to_string()),
-            None => Cow::Borrowed(
-                mode.speaking_rate_info()
-                    .map(|info| info.default)
-                    .unwrap_or("1.0"),
-            ),
+            Some(r) => r,
+            None => mode
+                .speaking_rate_info()
+                .map(|info| info.default)
+                .unwrap_or(1.0),
         })
     }
 
@@ -516,13 +500,13 @@ impl Data {
 pub struct SpeakingRateInfo {
     pub min: f32,
     pub max: f32,
-    pub default: &'static str,
+    pub default: f32,
     pub kind: &'static str,
 }
 
 impl SpeakingRateInfo {
     #[expect(clippy::unnecessary_wraps)]
-    const fn new(min: f32, default: &'static str, max: f32, kind: &'static str) -> Option<Self> {
+    const fn new(min: f32, default: f32, max: f32, kind: &'static str) -> Option<Self> {
         Some(Self {
             min,
             max,
@@ -537,7 +521,8 @@ impl SpeakingRateInfo {
     }
 }
 
-#[derive(IntoStaticStr, sqlx::Type, TypeSize, Debug, Default, Hash, PartialEq, Eq, Copy, Clone)]
+#[derive(IntoStaticStr, sqlx::Type, TypeSize, Debug, Default, Hash, PartialEq, Eq, Copy, Clone)] //
+#[derive(serde::Serialize)]
 #[allow(non_camel_case_types)]
 #[sqlx(rename_all = "lowercase")]
 #[sqlx(type_name = "ttsmode")]
@@ -572,9 +557,9 @@ impl TTSMode {
     pub const fn speaking_rate_info(self) -> Option<SpeakingRateInfo> {
         match self {
             Self::gTTS => None,
-            Self::gCloud => SpeakingRateInfo::new(0.25, "1.0", 4.0, "x"),
-            Self::Polly => SpeakingRateInfo::new(10.0, "100.0", 500.0, "%"),
-            Self::eSpeak => SpeakingRateInfo::new(100.0, "175.0", 400.0, " words per minute"),
+            Self::gCloud => SpeakingRateInfo::new(0.25, 1.0, 4.0, "x"),
+            Self::Polly => SpeakingRateInfo::new(10.0, 100.0, 500.0, "%"),
+            Self::eSpeak => SpeakingRateInfo::new(100.0, 175.0, 400.0, " words per minute"),
         }
     }
 }
@@ -696,5 +681,4 @@ pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Data, CommandErr
 
 pub type CommandError = Error;
 pub type CommandResult<E = Error> = Result<(), E>;
-pub type LastToXsaidTracker = DashMap<GuildId, LastXsaidInfo>;
 pub type FrameworkContext<'a> = poise::FrameworkContext<'a, Data, CommandError>;

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, num::NonZeroU8};
 
-use crate::structs::{LastToXsaidTracker, LastXsaidInfo, RegexCache};
+use crate::structs::RegexCache;
 use itertools::Itertools as _;
 use poise::serenity_prelude as serenity;
 
@@ -241,8 +241,6 @@ pub fn clean(
     content: &mut MessageContent<'_>,
 
     user: &serenity::User,
-    cache: &serenity::Cache,
-    guild_id: serenity::GuildId,
     member_nick: Option<&str>,
 
     voice: &str,
@@ -252,7 +250,7 @@ pub fn clean(
     nickname: Option<&str>,
 
     regex_cache: &RegexCache,
-    last_to_xsaid_tracker: &LastToXsaidTracker,
+    mut get_should_announce: impl FnMut() -> bool,
 ) {
     let contained_url;
     if content.text == "?" {
@@ -281,14 +279,8 @@ pub fn clean(
         }
     }
 
-    let announce_name = xsaid
-        && last_to_xsaid_tracker.get(&guild_id).is_none_or(|state| {
-            let guild = cache.guild(guild_id).unwrap();
-            state.should_announce_name(&guild, user.id)
-        });
-
     let attached_file_format = attachments_to_format(content.attachments);
-    let said_name = announce_name.then(|| {
+    let said_name = (xsaid && get_should_announce()).then(|| {
         nickname
             .or(member_nick)
             .or(user.global_name.as_deref())
@@ -296,10 +288,6 @@ pub fn clean(
     });
 
     format_message(content, said_name, contained_url, attached_file_format);
-
-    if xsaid {
-        last_to_xsaid_tracker.insert(guild_id, LastXsaidInfo::new(user.id));
-    }
 
     if let Some(repeated_limit) = repeated_limit {
         remove_repeated_chars(&content.text, repeated_limit.get())

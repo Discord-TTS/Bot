@@ -1,8 +1,8 @@
 use std::{borrow::Cow, fmt::Write, hash::Hash, time::Duration};
 
 use aformat::{ToArrayString, aformat};
-use futures_channel::mpsc::UnboundedSender;
 use num_format::{Locale, ToFormattedString};
+use serenity::futures::channel::mpsc::UnboundedSender;
 use typesize::TypeSize;
 
 use crate::{REQUIRED_SETUP_PERMISSIONS, REQUIRED_VC_PERMISSIONS};
@@ -189,13 +189,18 @@ pub async fn info_(ctx: Context<'_>) -> CommandResult {
         .get((author_id, user_row.voice_mode.unwrap_or_default()))
         .await?;
 
-    let voice_client = data.songbird.get(guild_id);
+    let voice_channel = data
+        .voice_connections
+        .lock()
+        .get(&guild_id)
+        .map(|(_, channel, _)| channel.load(std::sync::atomic::Ordering::SeqCst));
+
     let embed = CreateEmbed::default()
         .title("TTS Bot Debug Info")
         .description(format!(
             "
 Shard ID: `{shard_id}`
-Voice Client: `{voice_client:?}`
+Voice Connection Channel: `{voice_channel:?}`
 
 Server Data: `{guild_row:?}`
 User Data: `{user_row:?}`
@@ -211,9 +216,11 @@ Guild Voice Data: `{guild_voice_row:?}`
 
 /// Force leaves the voice channel in the current server to bypass buggy states
 #[poise::command(prefix_command, guild_only, hide_in_help)]
+#[expect(clippy::unused_async)]
 pub async fn leave(ctx: Context<'_>) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
-    ctx.data().leave_vc(guild_id).await.map_err(Into::into)
+    ctx.data().voice_connections.lock().remove(&guild_id);
+    Ok(())
 }
 
 fn get_db_info<CacheKey, RowT>(

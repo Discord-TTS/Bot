@@ -13,6 +13,7 @@ bitflags = "2.11.0"
 strum_macros = "0.28"
 chrono = { version = "0.4.44", default-features = false }
 bool_to_bitflags = { version = "0.1.3", features = ["typesize"] }
+tokio-tungstenite = { version = "0.28.0", default-features = false }
 
 sqlx.workspace = true
 regex.workspace = true
@@ -27,11 +28,11 @@ dashmap.workspace = true
 reqwest.workspace = true
 arrayvec.workspace = true
 typesize.workspace = true
-songbird.workspace = true
 serenity.workspace = true
 mini-moka.workspace = true
 itertools.workspace = true
 parking_lot.workspace = true
+serde_json = { version = "1.0.149", default-features = false }
 
 [lints]
 workspace = true

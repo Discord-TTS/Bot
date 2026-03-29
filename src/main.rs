@@ -121,9 +121,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
 
         runners: OnceLock::new(), // Filled in later
         fully_started: AtomicBool::new(false),
-        join_vc_tokens: dashmap::DashMap::new(),
-        songbird: songbird::Songbird::serenity(),
-        last_to_xsaid_tracker: dashmap::DashMap::new(),
+        voice_connections: parking_lot::Mutex::default(),
         update_startup_lock: tokio::sync::Mutex::new(()),
         entitlement_cache: mini_moka::sync::Cache::builder()
             .time_to_live(Duration::from_secs(60 * 60))
@@ -184,7 +182,6 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         .framework(Box::new(poise::Framework::new(framework_options)))
         .compression(serenity::TransportCompression::Zstd)
         .event_handler(Arc::new(EventHandler))
-        .voice_manager(data.songbird.clone())
         .data(data as _)
         .await?;
 

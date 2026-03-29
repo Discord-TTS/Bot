@@ -1,4 +1,5 @@
 #![expect(async_fn_in_trait)]
+#![feature(if_let_guard, type_alias_impl_trait)]
 
 pub mod analytics;
 pub mod common;
@@ -11,3 +12,4 @@ pub mod opt_ext;
 pub mod process_msg;
 pub mod structs;
 pub mod traits;
+pub mod voice;

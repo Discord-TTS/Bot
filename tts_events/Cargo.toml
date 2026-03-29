@@ -17,7 +17,6 @@ tracing.workspace = true
 reqwest.workspace = true
 aformat.workspace = true
 serenity.workspace = true
-songbird.workspace = true
 
 tts_core = { path = "../tts_core" }
 tts_tasks = { path = "../tts_tasks" }
