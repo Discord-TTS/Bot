@@ -1,4 +1,4 @@
-use std::fmt::Write as _;
+use std::{borrow::Cow, fmt::Write as _};
 
 use aformat::{ArrayString, aformat, aformat_into};
 
@@ -33,9 +33,11 @@ fn get_premium_guilds<'a>(
 async fn get_premium_guild_count<'a>(
     conn: impl sqlx::PgExecutor<'a> + 'a,
     premium_user: serenity::UserId,
-) -> Result<i64> {
-    let guilds = get_premium_guilds(conn, premium_user);
-    Ok(guilds.count().await as i64)
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar("SELECT count(*) FROM guilds WHERE premium_user = $1")
+        .bind(premium_user.get() as i64)
+        .fetch_one(conn)
+        .await
 }
 
 /// Shows how you can help support TTS Bot's development and hosting!
@@ -210,32 +212,76 @@ pub async fn list(ctx: Context<'_>) -> CommandResult {
     category = "Premium",
     prefix_command,
     slash_command,
-    guild_only,
     required_bot_permissions = "SEND_MESSAGES | EMBED_LINKS"
 )]
-pub async fn deactivate(ctx: Context<'_>) -> CommandResult {
+pub async fn deactivate(
+    ctx: Context<'_>,
+    #[autocomplete = "premium_guild_autocomplete"] server: serenity::GuildId,
+) -> CommandResult {
+    let guild_id = server;
     let data = ctx.data();
+    let cache = ctx.cache();
     let author = ctx.author();
-    let guild_id = ctx.guild_id().unwrap();
-    let guild_row = data.guilds_db.get(guild_id.get() as i64).await?;
 
+    let guild_row = data.guilds_db.get(guild_id.get() as i64).await?;
     let Some(premium_user) = guild_row.premium_user else {
-        let msg = "This server isn't activated for premium, so I can't deactivate it!";
+        let msg = "The selected server isn't activated for premium, so I can't deactivate it!";
         ctx.send_ephemeral(msg).await?;
         return Ok(());
     };
 
     if premium_user != author.id {
-        let msg = "You are not setup as the premium user for this server, so cannot deactivate it!";
+        let msg = "You are not setup as the premium user for the selected server, so you cannot deactivate it!";
         ctx.send_ephemeral(msg).await?;
         return Ok(());
     }
 
     remove_premium(&data, guild_id).await?;
 
-    let msg = "Deactivated premium from this server.";
-    ctx.say(msg).await?;
+    if Some(guild_id) == ctx.guild_id() {
+        let msg = "Deactivated premium from this server.";
+        ctx.say(msg).await?;
+    } else {
+        let msg = if let Some(guild) = cache.guild(guild_id) {
+            &*format!("Deactivated premium from: {}", guild.name)
+        } else {
+            "Deactivated premium from: <unknown>"
+        };
+
+        ctx.send_ephemeral(msg).await?;
+    }
+
     Ok(())
+}
+
+async fn premium_guild_autocomplete<'a>(
+    ctx: Context<'a>,
+    name: &'a str,
+) -> serenity::CreateAutocompleteResponse<'a> {
+    let data = ctx.data();
+    let cache = ctx.cache();
+
+    let mut choices = Vec::new();
+    let mut guilds = get_premium_guilds(&data.pool, ctx.author().id);
+    while let Some(Ok(guild_row)) = guilds.next().await {
+        let guild_id = serenity::GuildId::new(guild_row.guild_id as u64);
+        let Some(guild_name) = cache.guild(guild_id).map(|g| g.name.to_string()) else {
+            continue;
+        };
+
+        let guild_name_lower = guild_name.to_lowercase();
+        let value = serenity::AutocompleteValue::String(Cow::Owned(guild_id.to_string()));
+        let choice = serenity::AutocompleteChoice::new(guild_name, value);
+        choices.push((guild_name_lower, choice));
+    }
+
+    let name_lower = name.to_lowercase();
+    choices.sort_by_cached_key(|(guild_name_lower, _)| {
+        strsim::levenshtein(guild_name_lower, &name_lower)
+    });
+
+    let choices: Vec<_> = choices.into_iter().map(|(_, choice)| choice).collect();
+    serenity::CreateAutocompleteResponse::new().set_choices(choices)
 }
 
 pub fn commands() -> [Command; 1] {
