@@ -27,26 +27,17 @@ pub async fn get_webhooks(
     Ok(WebhookConfig { logs, errors })
 }
 
-async fn fetch_json<T>(reqwest: &reqwest::Client, url: reqwest::Url, auth_header: &str) -> Result<T>
+async fn fetch_json<T>(reqwest: &reqwest::Client, url: reqwest::Url) -> Result<T>
 where
     T: serde::de::DeserializeOwned,
 {
-    let resp = reqwest
-        .get(url)
-        .header("Authorization", auth_header)
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
-
-    Ok(resp)
+    let resp = reqwest.get(url).send().await?;
+    Ok(resp.error_for_status()?.json().await?)
 }
 
 pub async fn fetch_voices<T: serde::de::DeserializeOwned>(
     reqwest: &reqwest::Client,
     mut tts_service: reqwest::Url,
-    auth_key: Option<&str>,
     mode: TTSMode,
 ) -> Result<T> {
     tts_service.set_path("voices");
@@ -56,7 +47,7 @@ pub async fn fetch_voices<T: serde::de::DeserializeOwned>(
         .append_pair("raw", "true")
         .finish();
 
-    let res = fetch_json(reqwest, tts_service, auth_key.unwrap_or("")).await?;
+    let res = fetch_json(reqwest, tts_service).await?;
 
     println!("Loaded voices for TTS Mode: {mode}");
     Ok(res)
@@ -65,13 +56,10 @@ pub async fn fetch_voices<T: serde::de::DeserializeOwned>(
 pub async fn fetch_translation_languages(
     reqwest: &reqwest::Client,
     mut tts_service: reqwest::Url,
-    auth_key: Option<&str>,
 ) -> Result<BTreeMap<FixedString<u8>, FixedString<u8>>> {
     tts_service.set_path("translation_languages");
 
-    let raw_langs: Vec<(String, FixedString<u8>)> =
-        fetch_json(reqwest, tts_service, auth_key.unwrap_or("")).await?;
-
+    let raw_langs: Vec<(String, FixedString<u8>)> = fetch_json(reqwest, tts_service).await?;
     let lang_map = raw_langs.into_iter().map(|(mut lang, name)| {
         lang.make_ascii_lowercase();
         (lang.trunc_into(), name)

@@ -48,7 +48,6 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
 
     println!("Initialising Http client");
     let reqwest = reqwest::Client::new();
-    let auth_key = config.main.tts_service_auth_key.as_deref();
 
     let token = config.main.token.clone();
     let mut http_builder = serenity::HttpBuilder::new(token.clone());
@@ -62,7 +61,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     let http = Arc::new(http_builder.build());
 
     println!("Performing big startup join");
-    let tts_service = || config.main.tts_service.clone();
+    let tts_service = || config.main.first_tts_service().clone();
     let (
         webhooks,
         guilds_db,
@@ -84,11 +83,11 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         create_db_handler!(pool.clone(), "user_voice", "user_id", "mode"),
         create_db_handler!(pool.clone(), "guild_voice", "guild_id", "mode"),
         create_db_handler!(pool.clone(), "nicknames", "guild_id", "user_id"),
-        fetch_voices(&reqwest, tts_service(), auth_key, TTSMode::gTTS),
-        fetch_voices(&reqwest, tts_service(), auth_key, TTSMode::eSpeak),
-        fetch_voices(&reqwest, tts_service(), auth_key, TTSMode::gCloud),
-        fetch_voices::<Vec<PollyVoice>>(&reqwest, tts_service(), auth_key, TTSMode::Polly),
-        fetch_translation_languages(&reqwest, tts_service(), auth_key),
+        fetch_voices(&reqwest, tts_service(), TTSMode::gTTS),
+        fetch_voices(&reqwest, tts_service(), TTSMode::eSpeak),
+        fetch_voices(&reqwest, tts_service(), TTSMode::gCloud),
+        fetch_voices::<Vec<PollyVoice>>(&reqwest, tts_service(), TTSMode::Polly),
+        fetch_translation_languages(&reqwest, tts_service()),
         async { Ok(http.get_bot_gateway().await?.shards) },
         async {
             let res = serenity::UserId::new(802632257658683442)

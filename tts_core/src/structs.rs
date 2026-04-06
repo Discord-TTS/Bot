@@ -60,12 +60,11 @@ pub struct Config {
 
 #[derive(serde::Deserialize)]
 pub struct MainConfig {
-    pub tts_service_auth_key: Option<Arc<str>>,
+    pub tts_services: FixedArray<reqwest::Url, u8>,
     pub website_url: Option<reqwest::Url>,
     pub announcements_channel: ChannelId,
     pub main_server_invite: FixedString,
     pub proxy_url: Option<FixedString>,
-    pub tts_service: reqwest::Url,
     pub token: serenity::Token,
     pub main_server: GuildId,
     pub ofs_role: RoleId,
@@ -73,6 +72,17 @@ pub struct MainConfig {
     // Only for situations where gTTS has broken
     #[serde(default)]
     pub gtts_disabled: AtomicBool,
+}
+
+impl MainConfig {
+    pub fn first_tts_service(&self) -> &reqwest::Url {
+        &self.tts_services[0]
+    }
+
+    pub fn pick_tts_service(&self, guild_id: serenity::GuildId) -> &reqwest::Url {
+        let service_index = guild_id.get() % u64::from(self.tts_services.len());
+        &self.tts_services[service_index.try_into().unwrap()]
+    }
 }
 
 #[derive(serde::Deserialize)]

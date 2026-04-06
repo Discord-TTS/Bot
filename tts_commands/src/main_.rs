@@ -203,7 +203,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let data = ctx.data();
     let display_name = {
         let voice_context = voice::VCContext {
-            tts_service: data.config.tts_service.clone(),
+            tts_service: data.config.pick_tts_service(guild_id).clone(),
             serenity: ctx.serenity_context().clone(),
             channel_id: Arc::new(AtomicU64::new(author_vc.get())),
             guild_id,

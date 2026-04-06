@@ -120,8 +120,13 @@ async fn tts_(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             .collect();
         let speaking_rate = data.speaking_rate(author.id, mode).await?;
 
+        let tts_service = match ctx.guild_id() {
+            Some(guild_id) => data.config.pick_tts_service(guild_id),
+            None => data.config.first_tts_service(),
+        };
+
         let url = prepare_url(
-            data.config.tts_service.clone(),
+            tts_service.clone(),
             message,
             &voice,
             mode,
@@ -130,10 +135,7 @@ async fn tts_(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
             translation_lang,
         );
 
-        let auth_key = data.config.tts_service_auth_key.as_deref();
-        let audio = fetch_audio(&data.reqwest, url, auth_key)
-            .await?
-            .try_unwrap()?;
+        let audio = fetch_audio(&data.reqwest, url).await?.try_unwrap()?;
 
         let mut file_name = author_name;
         file_name.push_str(&aformat!(
