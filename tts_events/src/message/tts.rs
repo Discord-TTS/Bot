@@ -266,15 +266,14 @@ fn run_checks<'c>(
             return Ok(None); // Bot not in vc and not auto joining
         }
 
-        if guild_row.require_voice() {
-            let voice_channel = voice_state.unwrap().channel_id.try_unwrap()?;
-            let channel = guild.channels.get(&voice_channel).try_unwrap()?;
-
-            if channel.base.kind == serenity::ChannelType::Stage
-                && voice_state.is_some_and(serenity::VoiceState::suppress)
-                && guild_row.audience_ignore()
-            {
-                return Ok(None); // Is audience
+        // If the user's voice channel is a stage, audience ignore is enabled, and the user is server muted: skip
+        if let Some(voice_state) = voice_state
+            && guild_row.audience_ignore()
+        {
+            let voice_channel_id = voice_state.channel_id.try_unwrap()?;
+            let voice_channel = guild.channels.get(&voice_channel_id).try_unwrap()?;
+            if voice_channel.base.kind == serenity::ChannelType::Stage && voice_state.suppress() {
+                return Ok(None);
             }
         }
     }
