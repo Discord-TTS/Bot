@@ -19,15 +19,33 @@ use serenity::{
     small_fixed_array::FixedString,
 };
 use tokio::net::TcpStream;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::Message as RawWSMessage};
-
-use crate::{
-    structs::{Data, LastXsaidInfo},
-    voice::models::WSConnectionInfo,
+use tokio_tungstenite::{
+    MaybeTlsStream, WebSocketStream,
+    tungstenite::{
+        Message as RawWSMessage, Utf8Bytes,
+        protocol::{CloseFrame, frame::coding::CloseCode},
+    },
 };
+
+use crate::{structs::Data, voice::models::WSConnectionInfo};
 pub use models::{GetTTS, WSMessage};
 
 mod models;
+
+#[derive(Clone, Copy)]
+pub struct LastXsaidInfo {
+    last_announced: Option<serenity::UserId>,
+    announce_time: std::time::Instant,
+}
+
+impl Default for LastXsaidInfo {
+    fn default() -> Self {
+        Self {
+            last_announced: None,
+            announce_time: std::time::Instant::now(),
+        }
+    }
+}
 
 // Do not write to AtomicU64 outside of voice task.
 pub type ConnectionEntry = (
@@ -52,7 +70,7 @@ pub struct VCContext {
 }
 
 pub async fn start_connection(data: &Data, ctx: VCContext) -> StartConnectionResult {
-    let (tx, rx) = match data.voice_connections.lock().entry(ctx.guild_id) {
+    let (tx, mut rx) = match data.voice_connections.lock().entry(ctx.guild_id) {
         std::collections::hash_map::Entry::Occupied(entry) => {
             return StartConnectionResult::AlreadyIn(entry.get().clone());
         }
@@ -72,9 +90,17 @@ pub async fn start_connection(data: &Data, ctx: VCContext) -> StartConnectionRes
     tokio::spawn(async move {
         let data = ctx.serenity.data::<Data>();
         let guild_id = ctx.guild_id;
-        ws_task(ctx, rx, connect_tx).await;
+
+        // If the leave is user-requested, a oneshot channel may be returned to notify calling code.
+        //
+        // It is important that `rx` is dropped AFTER the leave notifier is triggered, the `rx` drop
+        // will any pending leave notifiers and therefore trigger them.
+        let leave_notifier = ws_task(ctx, &mut rx, connect_tx).await;
 
         data.voice_connections.lock().remove(&guild_id);
+        if let Some(leave_notifier) = leave_notifier {
+            leave_notifier.send(()).ok();
+        }
     });
 
     match connect_rx.await {
@@ -83,22 +109,110 @@ pub async fn start_connection(data: &Data, ctx: VCContext) -> StartConnectionRes
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum LeaveVCResult {
+    Left,
+    Mismatch,
+    Missing,
+}
+
+pub async fn leave_vc(
+    data: &Data,
+    guild_id: serenity::GuildId,
+    requested_channel_id: Option<serenity::ChannelId>,
+) -> LeaveVCResult {
+    let interconnect = match data.voice_connections.lock().get(&guild_id) {
+        Some((tx, channel_id, _))
+            if requested_channel_id
+                .is_none_or(|requested| requested.get() == channel_id.load(SeqCst)) =>
+        {
+            tx.clone()
+        }
+        Some(_) => return LeaveVCResult::Mismatch,
+        None => return LeaveVCResult::Missing,
+    };
+
+    end_connection(interconnect).await;
+    LeaveVCResult::Left
+}
+
+pub async fn end_connection(interconnect: UnboundedSender<InterconnectMessage>) {
+    let (tx, rx) = oneshot::channel();
+    if interconnect
+        .unbounded_send(InterconnectMessage::Leave(tx))
+        .is_ok()
+    {
+        rx.await.ok();
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct MissingInterconnectError;
+
+pub fn clear_queue(
+    data: &Data,
+    guild_id: serenity::GuildId,
+) -> Result<(), MissingInterconnectError> {
+    if let Some((tx, _, _)) = data.voice_connections.lock().get(&guild_id)
+        && tx.unbounded_send(InterconnectMessage::ClearQueue).is_ok()
+    {
+        Ok(())
+    } else {
+        Err(MissingInterconnectError)
+    }
+}
+
+pub fn should_announce_name(
+    data: &Data,
+    guild_id: serenity::GuildId,
+    author_id: serenity::UserId,
+) -> bool {
+    let mut voice_connections = data.voice_connections.lock();
+    let Some((_, _, xsaid)) = voice_connections.get_mut(&guild_id) else {
+        return true;
+    };
+
+    if xsaid.last_announced == Some(author_id) && xsaid.announce_time.elapsed().as_secs() < 60 {
+        false
+    } else {
+        xsaid.announce_time = std::time::Instant::now();
+        xsaid.last_announced = Some(author_id);
+        true
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+#[expect(dead_code, reason = "Only used for debug printing")]
+pub struct VoiceDebug {
+    is_open: bool,
+    channel_id: serenity::ChannelId,
+}
+
+pub fn debug_info(data: &Data, guild_id: serenity::GuildId) -> Option<VoiceDebug> {
+    data.voice_connections
+        .lock()
+        .get(&guild_id)
+        .map(|(tx, id, _)| VoiceDebug {
+            is_open: !tx.is_closed(),
+            channel_id: serenity::ChannelId::new(id.load(SeqCst)),
+        })
+}
+
 #[derive(Debug)]
 pub enum InterconnectMessage {
     QueueTTS(models::GetTTS),
+    Leave(oneshot::Sender<()>),
     ClearQueue,
 }
 
 async fn ws_task(
     mut ctx: VCContext,
-    mut interconnect: UnboundedReceiver<InterconnectMessage>,
+    interconnect: &mut UnboundedReceiver<InterconnectMessage>,
     connect_tx: oneshot::Sender<()>,
-) {
+) -> Option<oneshot::Sender<()>> {
     let ctx_clone = ctx.clone();
     let mut collector = create_vc_collector(&ctx_clone);
-    let Some(mut connection_info) = join_voice_channel(&mut ctx, &mut collector).await else {
-        return;
-    };
+    let mut connection_info = join_voice_channel(&mut ctx, &mut collector).await?;
 
     let mut stream_url = ctx.tts_service.clone();
     stream_url.set_scheme("ws").unwrap();
@@ -108,18 +222,19 @@ async fn ws_task(
         Ok((stream, _)) => stream,
         Err(err) => {
             tracing::error!("Failed to connect to tts-service: {err}");
-            return;
+            return None;
         }
     };
 
     if send_ws_msg(&mut stream, &connection_info).await.is_err() {
         tracing::error!("Failed to send initial message to tts-service");
-        return;
+        return None;
     }
 
     // We don't care if the /join has hung up.
     _ = connect_tx.send(());
 
+    let mut leave_notifier = None::<oneshot::Sender<()>>;
     loop {
         tokio::select!(
             vc_event = collector.next() => {
@@ -154,7 +269,13 @@ async fn ws_task(
                             break;
                         }
                     },
-                    None => break,
+                    Some(InterconnectMessage::Leave(notifier)) => {
+                        leave_notifier = Some(notifier);
+                        break;
+                    },
+                    None => {
+                        break;
+                    },
                 }
             }
         );
@@ -163,6 +284,15 @@ async fn ws_task(
     // Leave VC
     ctx.serenity
         .update_voice_state(ctx.guild_id, None, false, false);
+
+    let close_frame = CloseFrame {
+        code: CloseCode::Normal,
+        reason: Utf8Bytes::default(),
+    };
+
+    stream.close(Some(close_frame)).await.ok();
+
+    leave_notifier
 }
 
 struct StateEvent {

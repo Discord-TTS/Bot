@@ -5,7 +5,9 @@ use std::sync::{
 
 use aformat::{ArrayString, aformat};
 
-use poise::serenity_prelude::{self as serenity, builder::*, colours::branding::YELLOW};
+use poise::serenity_prelude::{
+    self as serenity, builder::*, colours::branding::YELLOW, futures::channel::mpsc,
+};
 
 use tts_core::{
     common::{push_permission_names, random_footer},
@@ -50,13 +52,12 @@ async fn channel_check(
 
 async fn handle_vc_mismatch(
     ctx: Context<'_>,
-    guild_id: serenity::GuildId,
     author_vc: serenity::ChannelId,
+    interconnect: mpsc::UnboundedSender<voice::InterconnectMessage>,
     bot_id: serenity::UserId,
     bot_channel_id: serenity::ChannelId,
 ) -> Result<()> {
-    let data = ctx.data();
-    let (channel_exists, voice_state_matches) = {
+    let (guild_id, channel_exists, voice_state_matches) = {
         let Some(guild) = ctx.guild() else {
             return Ok(());
         };
@@ -64,6 +65,7 @@ async fn handle_vc_mismatch(
         let voice_state = guild.voice_states.get(&bot_id);
 
         (
+            guild.id,
             guild.channels.contains_key(&bot_channel_id),
             voice_state.is_some_and(|vs| vs.channel_id == Some(bot_channel_id)),
         )
@@ -79,12 +81,12 @@ async fn handle_vc_mismatch(
         }
         (false, _) => {
             tracing::warn!("Channel {bot_channel_id} didn't exist in {guild_id} in `/join`");
-            data.voice_connections.lock().remove(&guild_id);
+            voice::end_connection(interconnect).await;
             "I was in a deleted voice channel, but I have left now. Please try again."
         }
         (_, false) => {
             tracing::warn!("Voice task was in the wrong channel in {guild_id} in `/join`");
-            data.voice_connections.lock().remove(&guild_id);
+            voice::end_connection(interconnect).await;
             "I was confused about what voice channel I was in, but I have left now. Please try again."
         }
     };
@@ -212,10 +214,10 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
 
         match voice::start_connection(&data, voice_context).await {
             voice::StartConnectionResult::Started(_) => {}
-            voice::StartConnectionResult::AlreadyIn((_, bot_channel_id, _)) => {
+            voice::StartConnectionResult::AlreadyIn((interconnect, bot_channel_id, _)) => {
                 let bot_channel_id =
                     serenity::ChannelId::new(bot_channel_id.load(Ordering::SeqCst));
-                handle_vc_mismatch(ctx, guild_id, author_vc, bot_id, bot_channel_id).await?;
+                handle_vc_mismatch(ctx, author_vc, interconnect, bot_id, bot_channel_id).await?;
                 return Ok(());
             }
             voice::StartConnectionResult::TimedOut => {
@@ -286,22 +288,27 @@ pub async fn leave(ctx: Context<'_>) -> CommandResult {
         (guild.id, channel_id)
     };
 
-    let data = ctx.data();
-    let bot_vc = if let Some((_, channel_id, _)) = data.voice_connections.lock().get(&guild_id) {
-        Some(serenity::ChannelId::new(channel_id.load(Ordering::SeqCst)))
+    if channel_check(&ctx, author_vc).await?.is_none() {
+        return Ok(());
+    }
+
+    let result = if let Some(author_vc) = author_vc {
+        voice::leave_vc(&ctx.data(), guild_id, Some(author_vc)).await
     } else {
-        None
+        voice::LeaveVCResult::Mismatch
     };
 
-    if let Some(bot_vc) = bot_vc
-        && channel_check(&ctx, author_vc).await?.is_some()
-    {
-        if author_vc.is_none_or(|author_vc| bot_vc.get() != author_vc.get()) {
-            ctx.say("Error: You need to be in the same voice channel as me to make me leave!")
-                .await?;
-        } else {
-            data.voice_connections.lock().remove(&guild_id);
+    match result {
+        voice::LeaveVCResult::Left => {
             ctx.say("Left voice channel!").await?;
+        }
+        voice::LeaveVCResult::Mismatch => {
+            ctx.send_error("You need to be in the same voice channel as me to make me leave!")
+                .await?;
+        }
+        voice::LeaveVCResult::Missing => {
+            ctx.send_error("I'm not in a voice channel, so can't leave one!")
+                .await?;
         }
     }
 
@@ -323,14 +330,7 @@ pub async fn clear(ctx: Context<'_>) -> CommandResult {
     }
 
     let guild_id = ctx.guild_id().unwrap();
-    let success = if let Some((tx, _, _)) = ctx.data().voice_connections.lock().get(&guild_id) {
-        tx.unbounded_send(voice::InterconnectMessage::ClearQueue)
-            .is_ok()
-    } else {
-        false
-    };
-
-    if success {
+    if voice::clear_queue(&ctx.data(), guild_id).is_ok() {
         match ctx {
             poise::Context::Prefix(ctx) => {
                 // Prefixed command, just add a thumbsup reaction

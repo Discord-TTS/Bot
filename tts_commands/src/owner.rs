@@ -19,6 +19,7 @@ use tts_core::{
     database,
     database_models::Compact,
     structs::{Command, CommandResult, Context, Data, PrefixContext, TTSModeChoice},
+    voice,
 };
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
@@ -152,12 +153,7 @@ pub async fn refresh_ofs(ctx: Context<'_>) -> CommandResult {
 }
 
 /// Debug commands for the bot
-#[poise::command(
-    prefix_command,
-    slash_command,
-    guild_only,
-    subcommands("info", "leave")
-)]
+#[poise::command(prefix_command, slash_command, guild_only, subcommands("info"))]
 pub async fn debug(ctx: Context<'_>) -> CommandResult {
     info_(ctx).await
 }
@@ -189,18 +185,14 @@ pub async fn info_(ctx: Context<'_>) -> CommandResult {
         .get((author_id, user_row.voice_mode.unwrap_or_default()))
         .await?;
 
-    let voice_channel = data
-        .voice_connections
-        .lock()
-        .get(&guild_id)
-        .map(|(_, channel, _)| channel.load(std::sync::atomic::Ordering::SeqCst));
+    let voice_debug = voice::debug_info(&data, guild_id);
 
     let embed = CreateEmbed::default()
         .title("TTS Bot Debug Info")
         .description(format!(
             "
 Shard ID: `{shard_id}`
-Voice Connection Channel: `{voice_channel:?}`
+Voice Connection: `{voice_debug:?}`
 
 Server Data: `{guild_row:?}`
 User Data: `{user_row:?}`
@@ -211,15 +203,6 @@ Guild Voice Data: `{guild_voice_row:?}`
         ));
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
-    Ok(())
-}
-
-/// Force leaves the voice channel in the current server to bypass buggy states
-#[poise::command(prefix_command, guild_only, hide_in_help)]
-#[expect(clippy::unused_async)]
-pub async fn leave(ctx: Context<'_>) -> CommandResult {
-    let guild_id = ctx.guild_id().unwrap();
-    ctx.data().voice_connections.lock().remove(&guild_id);
     Ok(())
 }
 

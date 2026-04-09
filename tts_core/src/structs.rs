@@ -197,48 +197,6 @@ impl RegexCache {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct LastXsaidInfo(Option<UserId>, std::time::Instant);
-
-impl Default for LastXsaidInfo {
-    fn default() -> Self {
-        Self(None, std::time::Instant::now())
-    }
-}
-
-impl LastXsaidInfo {
-    fn get_vc_member_count(guild: &serenity::Guild, channel_id: ChannelId) -> usize {
-        guild
-            .voice_states
-            .iter()
-            .filter(|vs| vs.channel_id.is_some_and(|vc| vc == channel_id))
-            .filter_map(|vs| guild.members.get(&vs.user_id))
-            .filter(|member| !member.user.bot())
-            .count()
-    }
-
-    #[must_use]
-    pub fn should_announce_name(&self, guild: &serenity::Guild, user: UserId) -> bool {
-        let Some(voice_channel_id) = guild.voice_states.get(&user).and_then(|v| v.channel_id)
-        else {
-            return true;
-        };
-
-        let Some(last_user_id) = self.0 else {
-            return true;
-        };
-
-        if user != last_user_id {
-            return true;
-        }
-
-        let has_been_min = self.1.elapsed().as_secs() > 60;
-        let is_only_author = Self::get_vc_member_count(guild, voice_channel_id) <= 1;
-
-        has_been_min || is_only_author
-    }
-}
-
 pub struct Data {
     pub analytics: Arc<analytics::Handler>,
     pub guilds_db: database::Handler<i64, database::GuildRowRaw>,

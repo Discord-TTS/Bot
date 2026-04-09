@@ -3,9 +3,10 @@ use poise::serenity_prelude as serenity;
 use tts_core::{
     opt_ext::OptionTryUnwrap,
     structs::{Data, Result},
+    voice,
 };
 
-pub fn handle(
+pub async fn handle(
     ctx: &serenity::Context,
     old: Option<&serenity::VoiceState>,
     new: &serenity::VoiceState,
@@ -14,12 +15,7 @@ pub fn handle(
     let Some(old) = old else { return Ok(()) };
 
     let data = ctx.data_ref::<Data>();
-
-    // Bot is in vc on server
     let guild_id = new.guild_id.try_unwrap()?;
-    if !data.voice_connections.lock().contains_key(&guild_id) {
-        return Ok(());
-    }
 
     // Check if the bot is leaving
     let bot_id = ctx.cache.current_user().id;
@@ -31,7 +27,7 @@ pub fn handle(
     };
 
     if leave_vc {
-        data.voice_connections.lock().remove(&guild_id);
+        voice::leave_vc(data, guild_id, None).await;
     }
 
     Ok(())

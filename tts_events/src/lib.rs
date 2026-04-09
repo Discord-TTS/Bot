@@ -72,7 +72,7 @@ impl serenity::EventHandler for EventHandler {
                 }
             }
             serenity::FullEvent::VoiceStateUpdate { old, new, .. } => {
-                if let Err(err) = voice_state::handle(ctx, old.as_ref(), new)
+                if let Err(err) = voice_state::handle(ctx, old.as_ref(), new).await
                     && let Err(err) =
                         errors::handle_unexpected_default(ctx, "VoiceStateUpdate", err).await
                 {

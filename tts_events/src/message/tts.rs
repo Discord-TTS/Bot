@@ -57,16 +57,7 @@ pub(crate) async fn process_tts_msg(
             .get([guild_id.into(), message.author.id.into()])
             .await?;
 
-        let get_should_announce = || {
-            let Some(guild) = ctx.cache.guild(guild_id) else {
-                return true;
-            };
-
-            match data.voice_connections.lock().get(&guild_id) {
-                Some((_, _, xsaid)) => xsaid.should_announce_name(&guild, message.author.id),
-                None => true,
-            }
-        };
+        let get_should_announce = || voice::should_announce_name(data, guild_id, message.author.id);
 
         process_msg::clean(
             &mut content,
