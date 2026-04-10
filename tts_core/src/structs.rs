@@ -527,7 +527,7 @@ impl TTSMode {
             Self::gTTS => None,
             Self::gCloud => SpeakingRateInfo::new(0.25, 1.0, 4.0, "x"),
             Self::Polly => SpeakingRateInfo::new(10.0, 100.0, 500.0, "%"),
-            Self::eSpeak => SpeakingRateInfo::new(100.0, 175.0, 400.0, " words per minute"),
+            Self::eSpeak => SpeakingRateInfo::new(100.0, 130.0, 200.0, " words per minute"),
         }
     }
 }
