@@ -7,7 +7,6 @@ use std::{
 };
 
 use poise::serenity_prelude as serenity;
-use reqwest::Url;
 use serenity::{
     futures::{
         self, SinkExt, StreamExt,
@@ -18,16 +17,14 @@ use serenity::{
     },
     small_fixed_array::FixedString,
 };
-use tokio::net::TcpStream;
-use tokio_tungstenite::{
-    MaybeTlsStream, WebSocketStream,
-    tungstenite::{
-        Message as RawWSMessage, Utf8Bytes,
-        protocol::{CloseFrame, frame::coding::CloseCode},
-    },
-};
+use tokio::{net::TcpStream, sync::Mutex as TMutex};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::Message as RawWSMessage};
 
-use crate::{structs::Data, voice::models::WSConnectionInfo};
+use crate::{
+    common::select_tts_index,
+    structs::Data,
+    voice::models::{WSConnectionInfo, WSMessageFrame},
+};
 pub use models::{GetTTS, WSMessage};
 
 mod models;
@@ -47,6 +44,9 @@ impl Default for LastXsaidInfo {
     }
 }
 
+pub type RawWSStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
+pub type LockedWSStream = TMutex<RawWSStream>;
+
 // Do not write to AtomicU64 outside of voice task.
 pub type ConnectionEntry = (
     UnboundedSender<InterconnectMessage>,
@@ -62,7 +62,6 @@ pub enum StartConnectionResult {
 
 #[derive(Clone)]
 pub struct VCContext {
-    pub tts_service: Url,
     pub serenity: serenity::Context,
     pub bot_id: serenity::UserId,
     pub guild_id: serenity::GuildId,
@@ -95,7 +94,8 @@ pub async fn start_connection(data: &Data, ctx: VCContext) -> StartConnectionRes
         //
         // It is important that `rx` is dropped AFTER the leave notifier is triggered, the `rx` drop
         // will any pending leave notifiers and therefore trigger them.
-        let leave_notifier = ws_task(ctx, &mut rx, connect_tx).await;
+        let ws_tx = &data.ws_connections[select_tts_index(guild_id, data.ws_connections.len())];
+        let leave_notifier = ws_task(ctx, ws_tx, &mut rx, connect_tx).await;
 
         data.voice_connections.lock().remove(&guild_id);
         if let Some(leave_notifier) = leave_notifier {
@@ -206,28 +206,35 @@ pub enum InterconnectMessage {
 }
 
 async fn ws_task(
-    mut ctx: VCContext,
+    ctx: VCContext,
+    ws_tx: &LockedWSStream,
     interconnect: &mut UnboundedReceiver<InterconnectMessage>,
     connect_tx: oneshot::Sender<()>,
 ) -> Option<oneshot::Sender<()>> {
-    let ctx_clone = ctx.clone();
-    let mut collector = create_vc_collector(&ctx_clone);
-    let mut connection_info = join_voice_channel(&mut ctx, &mut collector).await?;
-
-    let mut stream_url = ctx.tts_service.clone();
-    stream_url.set_scheme("ws").unwrap();
-    stream_url.set_path("stream");
-
-    let mut stream = match tokio_tungstenite::connect_async(stream_url).await {
-        Ok((stream, _)) => stream,
-        Err(err) => {
-            tracing::error!("Failed to connect to tts-service: {err}");
-            return None;
-        }
+    let guild_id = ctx.guild_id;
+    let end_vc_connection = || {
+        ctx.serenity
+            .update_voice_state(guild_id, None, false, false);
     };
 
-    if send_ws_msg(&mut stream, &connection_info).await.is_err() {
-        tracing::error!("Failed to send initial message to tts-service");
+    let send_ws_msg = async |inner: WSMessage<'_>| {
+        let msg_framed = WSMessageFrame { guild_id, inner };
+        let serialized = serde_json::to_string(&msg_framed).unwrap();
+
+        let msg = RawWSMessage::Text(serialized.into());
+        ws_tx.lock().await.send(msg).await
+    };
+
+    let ctx_clone = ctx.clone();
+    let mut collector = create_vc_collector(&ctx_clone);
+    let mut connection_info = join_voice_channel(&ctx, &mut collector).await?;
+    if send_ws_msg(WSMessage::MoveVC(&connection_info))
+        .await
+        .is_err()
+    {
+        end_vc_connection();
+
+        tracing::error!("Failed to send initial MoveVC message to tts-service");
         return None;
     }
 
@@ -244,7 +251,7 @@ async fn ws_task(
                         ApplyEventResult::LeaveVC => break,
                         ApplyEventResult::Applied => {
                             ctx.channel_id.store(connection_info.channel_id.get(), SeqCst);
-                            if send_ws_msg(&mut stream, &WSMessage::MoveVC(&connection_info)).await.is_err() {
+                            if send_ws_msg(WSMessage::MoveVC(&connection_info)).await.is_err() {
                                 tracing::error!("Failed to send rejoin message to tts-service");
                                 break;
                             }
@@ -258,13 +265,13 @@ async fn ws_task(
             inter_msg = interconnect.next() => {
                 match inter_msg {
                     Some(InterconnectMessage::QueueTTS(request)) => {
-                        if send_ws_msg(&mut stream, &WSMessage::QueueTTS(request)).await.is_err() {
+                        if send_ws_msg(WSMessage::QueueTTS(request)).await.is_err() {
                             tracing::error!("Failed to send queue message to tts-service");
                             break;
                         }
                     },
                     Some(InterconnectMessage::ClearQueue) => {
-                        if send_ws_msg(&mut stream, &WSMessage::ClearQueue).await.is_err() {
+                        if send_ws_msg(WSMessage::ClearQueue).await.is_err() {
                             tracing::error!("Failed to send clear queue message to tts-service");
                             break;
                         }
@@ -281,17 +288,9 @@ async fn ws_task(
         );
     }
 
-    // Leave VC
-    ctx.serenity
-        .update_voice_state(ctx.guild_id, None, false, false);
+    end_vc_connection();
 
-    let close_frame = CloseFrame {
-        code: CloseCode::Normal,
-        reason: Utf8Bytes::default(),
-    };
-
-    stream.close(Some(close_frame)).await.ok();
-
+    send_ws_msg(WSMessage::Leave).await.ok();
     leave_notifier
 }
 
@@ -341,7 +340,7 @@ fn create_vc_collector(ctx: &VCContext) -> impl futures::Stream<Item = VCEvent> 
 }
 
 async fn join_voice_channel(
-    ctx: &mut VCContext,
+    ctx: &VCContext,
     collector: &mut (impl futures::Stream<Item = VCEvent> + Unpin),
 ) -> Option<WSConnectionInfo> {
     let mut target_channel = serenity::ChannelId::new(ctx.channel_id.load(SeqCst));
@@ -394,15 +393,6 @@ async fn join_voice_channel(
 
     tracing::warn!("Failed to recieve connection info for {}", ctx.guild_id);
     None
-}
-
-async fn send_ws_msg<T: serde::Serialize>(
-    ws: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
-    msg: &T,
-) -> Result<(), tokio_tungstenite::tungstenite::Error> {
-    let serialized = serde_json::to_string(msg).unwrap();
-    let msg = RawWSMessage::Text(serialized.into());
-    ws.send(msg).await
 }
 
 #[derive(Clone, Copy)]

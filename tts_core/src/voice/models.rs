@@ -20,10 +20,18 @@ make_serializers! {
 }
 
 #[derive(serde::Serialize)]
+pub struct WSMessageFrame<'a> {
+    #[serde(serialize_with = "serialize_guild_id")]
+    pub guild_id: serenity::GuildId,
+    pub inner: WSMessage<'a>,
+}
+
+#[derive(serde::Serialize)]
 pub enum WSMessage<'a> {
     QueueTTS(GetTTS),
     MoveVC(&'a WSConnectionInfo),
     ClearQueue,
+    Leave,
 }
 
 #[derive(Debug, serde::Serialize)]

@@ -94,7 +94,6 @@ pub(crate) async fn process_tts_msg(
         };
 
         let voice_context = voice::VCContext {
-            tts_service: data.config.pick_tts_service(guild_id).clone(),
             serenity: ctx.clone(),
             bot_id: ctx.cache.current_user().id,
             guild_id,

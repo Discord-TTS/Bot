@@ -74,17 +74,6 @@ pub struct MainConfig {
     pub gtts_disabled: AtomicBool,
 }
 
-impl MainConfig {
-    pub fn first_tts_service(&self) -> &reqwest::Url {
-        &self.tts_services[0]
-    }
-
-    pub fn pick_tts_service(&self, guild_id: serenity::GuildId) -> &reqwest::Url {
-        let service_index = guild_id.get() % u64::from(self.tts_services.len());
-        &self.tts_services[service_index.try_into().unwrap()]
-    }
-}
-
 #[derive(serde::Deserialize)]
 pub struct PostgresConfig {
     pub host: String,
@@ -215,6 +204,7 @@ pub struct Data {
     pub webhooks: WebhookConfig,
     pub pool: sqlx::PgPool,
 
+    pub ws_connections: FixedArray<voice::LockedWSStream, u8>,
     pub voice_connections: Mutex<HashMap<serenity::GuildId, voice::ConnectionEntry>>,
     pub runners: OnceLock<Arc<DashMap<serenity::ShardId, serenity::ShardRunnerMetadata>>>,
     pub config: MainConfig,

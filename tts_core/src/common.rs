@@ -11,6 +11,13 @@ pub(crate) fn timestamp_in_future(ts: serenity::Timestamp) -> bool {
     *ts > chrono::Utc::now()
 }
 
+#[must_use]
+pub fn select_tts_index(guild_id: serenity::GuildId, tts_services: u8) -> u8 {
+    (guild_id.get() % u64::from(tts_services))
+        .try_into()
+        .unwrap()
+}
+
 /// Builds components for invite command and invite link in DMs
 ///
 /// This has to allocate internally due to lifetime issues with trying CPS.

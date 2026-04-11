@@ -1,12 +1,21 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-use small_fixed_array::{FixedString, TruncatingInto as _};
+use rand::Rng;
+use small_fixed_array::{FixedArray, FixedString, TruncatingInto as _};
 
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{
+    self as serenity,
+    futures::{self, SinkExt, StreamExt, stream::FusedStream},
+};
 
+use tokio_tungstenite::tungstenite::Message;
 use tts_core::{
     opt_ext::OptionTryUnwrap as _,
-    structs::{GoogleGender, GoogleVoice, Result, TTSMode, WebhookConfig, WebhookConfigRaw},
+    structs::{
+        Data, GoogleGender, GoogleVoice, MainConfig, Result, TTSMode, WebhookConfig,
+        WebhookConfigRaw,
+    },
+    voice,
 };
 
 pub async fn get_webhooks(
@@ -103,4 +112,77 @@ pub async fn send_startup_message(
     let startup_message = log_webhook.execute(http, true, startup_builder).await?;
 
     Ok(startup_message.unwrap().id)
+}
+
+async fn connect_ws_stream(mut url: reqwest::Url) -> Result<voice::RawWSStream> {
+    url.set_path("stream");
+    url.set_scheme("ws").unwrap();
+
+    Ok(tokio_tungstenite::connect_async(url).await?.0)
+}
+
+pub async fn setup_ws_stream(config: &MainConfig) -> Result<FixedArray<voice::LockedWSStream, u8>> {
+    let tasks = config.tts_services.iter().map(async |url| {
+        let stream = connect_ws_stream(url.clone()).await?;
+        anyhow::Ok(voice::LockedWSStream::new(stream))
+    });
+
+    let streams = futures::future::try_join_all(tasks).await?;
+    println!("Connected to {} tts-services", config.tts_services.len());
+    Ok(streams.trunc_into())
+}
+
+async fn reconnect_ws_stream(url: &reqwest::Url, index: u8) -> voice::RawWSStream {
+    let mut interval = tokio::time::interval(Duration::from_millis(500));
+    loop {
+        if let Ok(stream) = connect_ws_stream(url.clone()).await {
+            tracing::warn!("Reconnected to tts-service-{index}");
+            break stream;
+        }
+
+        tracing::error!("Failed to reconnect tts-service-{index}");
+        interval.tick().await;
+    }
+}
+
+async fn check_ws_healthy(rng: &mut rand::rngs::SmallRng, ws_tx: &mut voice::RawWSStream) -> bool {
+    let mut expected_pong = [0_u8; 64];
+    rng.fill_bytes(&mut expected_pong);
+    let ping = bytes::Bytes::copy_from_slice(&expected_pong);
+
+    if ws_tx.is_terminated() {
+        return false;
+    }
+
+    if ws_tx.send(Message::Ping(ping.clone())).await.is_err() {
+        return false;
+    }
+
+    match tokio::time::timeout(Duration::from_secs(1), ws_tx.next()).await {
+        Ok(Some(Ok(Message::Pong(pong)))) => ping == pong,
+        _ => false,
+    }
+}
+
+pub fn start_ws_health_checks(data: &Arc<Data>) {
+    let health_check = async |data: Arc<Data>, index| {
+        let ws_tx_locked = &data.ws_connections[index];
+        let mut rng: rand::rngs::SmallRng = rand::make_rng();
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+
+            let mut ws_tx = ws_tx_locked.lock().await;
+            if check_ws_healthy(&mut rng, &mut ws_tx).await {
+                tracing::debug!("Health check passed for tts-service-{index}");
+            } else {
+                let url = data.config.tts_services[index].clone();
+                *ws_tx = reconnect_ws_stream(&url, index).await;
+            }
+        }
+    };
+
+    for index in 0..data.ws_connections.len() {
+        tokio::spawn(health_check(data.clone(), index));
+    }
 }

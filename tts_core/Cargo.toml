@@ -5,17 +5,16 @@ edition = "2024"
 rust-version = "1.94"
 
 [dependencies]
-rand = "0.10"
 sha2 = "0.10.9"
-bytes = "1.11.1"
 linkify = "0.10"
 bitflags = "2.11.0"
 strum_macros = "0.28"
 chrono = { version = "0.4.44", default-features = false }
 bool_to_bitflags = { version = "0.1.3", features = ["typesize"] }
-tokio-tungstenite = { version = "0.28.0", default-features = false }
 
+rand.workspace = true
 sqlx.workspace = true
+bytes.workspace = true
 regex.workspace = true
 poise.workspace = true
 serde.workspace = true
@@ -31,8 +30,9 @@ typesize.workspace = true
 serenity.workspace = true
 mini-moka.workspace = true
 itertools.workspace = true
+serde_json.workspace = true
 parking_lot.workspace = true
-serde_json = { version = "1.0.149", default-features = false }
+tokio-tungstenite.workspace = true
 
 [lints]
 workspace = true

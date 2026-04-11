@@ -61,8 +61,9 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     let http = Arc::new(http_builder.build());
 
     println!("Performing big startup join");
-    let tts_service = || config.main.first_tts_service().clone();
+    let tts_service = || config.main.tts_services[0].clone();
     let (
+        ws_connections,
         webhooks,
         guilds_db,
         userinfo_db,
@@ -77,6 +78,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         shard_count,
         premium_user,
     ) = tokio::try_join!(
+        setup_ws_stream(&config.main),
         get_webhooks(&http, config.webhooks),
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
         create_db_handler!(pool.clone(), "userinfo", "user_id"),
@@ -118,6 +120,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         system_info: Mutex::new(sysinfo::System::new()),
         bot_list_tokens: Mutex::new(config.bot_list_tokens),
 
+        ws_connections,
         runners: OnceLock::new(), // Filled in later
         fully_started: AtomicBool::new(false),
         voice_connections: parking_lot::Mutex::default(),
@@ -197,6 +200,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         shutdown_trigger();
     });
 
+    start_ws_health_checks(&data_clone);
     client
         .start_shards(shard_count.get())
         .await
