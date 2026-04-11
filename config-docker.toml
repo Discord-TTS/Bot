@@ -1,12 +1,12 @@
 [Main]
 log_level = 'info'
-tts_service = 'https://localhost:20310'
+tts_services = ['https://localhost:20310']
 #main_server_invite = 'https://discord.gg/example'
 #announcements_channel = id here
 #invite_channel = id here
-#main_server = id here 
+#main_server = id here
 #ofs_role = id here
-#token = 
+#token =
 
 [PostgreSQL-Info]
 database = 'tts'
@@ -16,8 +16,8 @@ user = 'tts'
 
 [Webhook-Info]
 # Each URL will look like 'https://discord.com/api/webhooks/830137192985788457/nCrFLCz-2tJRFUoBrFx1nN9cvUZdhdW0860ek0zNosf0DfCaMTbyM_oFdf9RidC_mcPp'
-#logs = 
-#errors = 
-#servers = 
-#analytics = 
+#logs =
+#errors =
+#servers =
+#analytics =
 #suggestions =
