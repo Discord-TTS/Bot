@@ -90,20 +90,22 @@ pub(crate) async fn process_tts_msg(
                 .voice_states
                 .get(&message.author.id)
                 .and_then(|vs| vs.channel_id)
-                .try_unwrap()?
         };
 
         let voice_context = voice::VCContext {
             serenity: ctx.clone(),
             bot_id: ctx.cache.current_user().id,
             guild_id,
-            channel_id: Arc::new(AtomicU64::new(author_voice_channel_id.get())),
+            channel_id: author_voice_channel_id
+                .map(serenity::ChannelId::get)
+                .map(AtomicU64::new)
+                .map(Arc::new),
         };
 
         match voice::start_connection(data, voice_context).await {
             voice::StartConnectionResult::Started(tx)
             | voice::StartConnectionResult::AlreadyIn((tx, _, _)) => tx,
-            voice::StartConnectionResult::TimedOut => {
+            voice::StartConnectionResult::CannotJoin | voice::StartConnectionResult::TimedOut => {
                 return Ok(());
             }
         }

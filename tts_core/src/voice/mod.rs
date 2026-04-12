@@ -58,6 +58,8 @@ pub enum StartConnectionResult {
     Started(UnboundedSender<InterconnectMessage>),
     TimedOut,
     AlreadyIn(ConnectionEntry),
+    /// Only occurs if channel id passed is None.
+    CannotJoin,
 }
 
 #[derive(Clone)]
@@ -65,7 +67,15 @@ pub struct VCContext {
     pub serenity: serenity::Context,
     pub bot_id: serenity::UserId,
     pub guild_id: serenity::GuildId,
-    pub channel_id: Arc<AtomicU64>,
+    pub channel_id: Option<Arc<AtomicU64>>,
+}
+
+impl VCContext {
+    fn channel_id(&self) -> &AtomicU64 {
+        self.channel_id.as_ref().expect(
+            "should be always set as StartConnectionResult::CannotJoin would be thrown otherwise",
+        )
+    }
 }
 
 pub async fn start_connection(data: &Data, ctx: VCContext) -> StartConnectionResult {
@@ -74,12 +84,12 @@ pub async fn start_connection(data: &Data, ctx: VCContext) -> StartConnectionRes
             return StartConnectionResult::AlreadyIn(entry.get().clone());
         }
         std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+            let Some(channel_id) = &ctx.channel_id else {
+                return StartConnectionResult::CannotJoin;
+            };
+
             let (tx, rx) = futures::channel::mpsc::unbounded();
-            vacant_entry.insert((
-                tx.clone(),
-                Arc::clone(&ctx.channel_id),
-                LastXsaidInfo::default(),
-            ));
+            vacant_entry.insert((tx.clone(), Arc::clone(channel_id), LastXsaidInfo::default()));
 
             (tx, rx)
         }
@@ -250,7 +260,7 @@ async fn ws_task(
                         ApplyEventResult::NoDifference => {},
                         ApplyEventResult::LeaveVC => break,
                         ApplyEventResult::Applied => {
-                            ctx.channel_id.store(connection_info.channel_id.get(), SeqCst);
+                            ctx.channel_id().store(connection_info.channel_id.get(), SeqCst);
                             if send_ws_msg(WSMessage::MoveVC(&connection_info)).await.is_err() {
                                 tracing::error!("Failed to send rejoin message to tts-service");
                                 break;
@@ -343,7 +353,7 @@ async fn join_voice_channel(
     ctx: &VCContext,
     collector: &mut (impl futures::Stream<Item = VCEvent> + Unpin),
 ) -> Option<WSConnectionInfo> {
-    let mut target_channel = serenity::ChannelId::new(ctx.channel_id.load(SeqCst));
+    let mut target_channel = serenity::ChannelId::new(ctx.channel_id().load(SeqCst));
 
     // Trigger the voice state update, which should trigger the events we are listening for
     ctx.serenity
@@ -379,7 +389,7 @@ async fn join_voice_channel(
         if let Some(state) = &mut state
             && let Some(server) = &mut server
         {
-            ctx.channel_id.store(target_channel.get(), SeqCst);
+            ctx.channel_id().store(target_channel.get(), SeqCst);
             return Some(WSConnectionInfo {
                 bot_id: ctx.bot_id,
                 guild_id: ctx.guild_id,

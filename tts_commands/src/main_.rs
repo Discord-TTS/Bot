@@ -206,7 +206,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let display_name = {
         let voice_context = voice::VCContext {
             serenity: ctx.serenity_context().clone(),
-            channel_id: Arc::new(AtomicU64::new(author_vc.get())),
+            channel_id: Some(Arc::new(AtomicU64::new(author_vc.get()))),
             guild_id,
             bot_id,
         };
@@ -223,6 +223,9 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
                 let msg = "I failed to join your voice channel, please check I have the right permissions and try again!";
                 ctx.send_error(msg).await?;
                 return Ok(());
+            }
+            voice::StartConnectionResult::CannotJoin => {
+                unreachable!()
             }
         }
 
