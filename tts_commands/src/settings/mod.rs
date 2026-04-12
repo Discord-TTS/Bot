@@ -965,7 +965,9 @@ pub async fn nick(
     let data = ctx.data();
 
     let to_send = if let Some(nick) = nickname {
-        if nick.contains('<') && nick.contains('>') {
+        if nick.len() > 100 {
+            "**Error**: You can't have more than 100 characters in your nickname!"
+        } else if nick.contains('<') && nick.contains('>') {
             "**Error**: You can't have mentions/emotes in your nickname!"
         } else {
             tokio::try_join!(
