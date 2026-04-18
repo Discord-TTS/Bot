@@ -108,7 +108,7 @@ async fn show_channel_select_menu(
     let interaction = reply_message
         .id
         .collect_component_interactions(ctx.serenity_context())
-        .timeout(std::time::Duration::from_secs(60 * 5))
+        .timeout(std::time::Duration::from_mins(5))
         .author_id(ctx.author().id)
         .await;
 

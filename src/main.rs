@@ -126,7 +126,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         voice_connections: parking_lot::Mutex::default(),
         update_startup_lock: tokio::sync::Mutex::new(()),
         entitlement_cache: mini_moka::sync::Cache::builder()
-            .time_to_live(Duration::from_secs(60 * 60))
+            .time_to_live(Duration::from_hours(1))
             .build(),
 
         gtts_voices,

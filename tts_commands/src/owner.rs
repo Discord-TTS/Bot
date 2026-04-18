@@ -481,7 +481,7 @@ pub async fn guild_info(ctx: Context<'_>, guild_id: Option<serenity::GuildId>) -
     let response = ctx
         .channel_id()
         .collect_component_interactions(ctx.serenity_context())
-        .timeout(Duration::from_secs(60 * 5))
+        .timeout(Duration::from_mins(5))
         .author_id(ctx.author().id)
         .custom_ids(custom_ids)
         .await;

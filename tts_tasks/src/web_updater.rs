@@ -20,7 +20,7 @@ fn remember_to_update_analytics_query() {
 }
 
 fn count_members<'a>(guilds: impl Iterator<Item = serenity::cache::GuildRef<'a>>) -> u64 {
-    guilds.map(|g| g.member_count).sum()
+    guilds.map(|g| u64::from(g.member_count.get())).sum()
 }
 
 #[derive(serde::Serialize)]

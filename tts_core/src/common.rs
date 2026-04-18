@@ -182,7 +182,7 @@ pub async fn confirm_dialog_wait(
 ) -> Result<Option<bool>> {
     let interaction = message_id
         .collect_component_interactions(ctx)
-        .timeout(std::time::Duration::from_secs(60 * 5))
+        .timeout(std::time::Duration::from_mins(5))
         .author_id(author_id)
         .await;
 

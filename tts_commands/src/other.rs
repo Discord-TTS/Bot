@@ -209,7 +209,7 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
                 .to_arraystring(),
             guilds
                 .into_iter()
-                .map(|g| g.member_count)
+                .map(|g| u64::from(g.member_count.get()))
                 .sum::<u64>()
                 .to_formatted_string(&Locale::en),
         )

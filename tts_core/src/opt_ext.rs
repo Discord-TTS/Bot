@@ -2,7 +2,7 @@ use anyhow::Result;
 
 #[cold]
 fn create_err(line: u32, file: &str) -> anyhow::Error {
-    anyhow::anyhow!("Unexpected None value on line {line} in {file}",)
+    anyhow::anyhow!("Unexpected None value on line {line} in {file}")
 }
 
 pub trait OptionTryUnwrap<T> {

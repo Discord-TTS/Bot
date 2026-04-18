@@ -101,16 +101,21 @@ impl serenity::EventHandler for EventHandler {
         mut event: Box<serenity::Event>,
     ) -> Option<Box<serenity::Event>> {
         use extract_map::ExtractMap;
+        use serenity::small_fixed_array::FixedArray;
 
         // Filter out Guild::emojis and Guild::stickers as we do not read them.
         match &mut *event {
             serenity::Event::GuildCreate(event) => {
                 event.guild.emojis = ExtractMap::new();
                 event.guild.stickers = ExtractMap::new();
+                event.guild.features = FixedArray::new();
+                event.guild.incidents_data = None;
             }
             serenity::Event::GuildUpdate(event) => {
                 event.guild.emojis = ExtractMap::new();
                 event.guild.stickers = ExtractMap::new();
+                event.guild.features = FixedArray::new();
+                event.guild.incidents_data = None;
             }
             serenity::Event::GuildEmojisUpdate(event) => event.emojis = ExtractMap::new(),
             serenity::Event::GuildStickersUpdate(event) => event.stickers = ExtractMap::new(),
