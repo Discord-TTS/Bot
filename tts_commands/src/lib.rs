@@ -179,14 +179,14 @@ pub async fn command_check(ctx: Context<'_>) -> Result<bool> {
 
     let member_roles = match ctx {
         Context::Application(poise::ApplicationContext { interaction, .. }) => {
-            &interaction.member.as_deref().try_unwrap()?.roles
+            &*interaction.member.as_deref().try_unwrap()?.roles
         }
         Context::Prefix(poise::PrefixContext { msg, .. }) => {
-            &msg.member.as_deref().try_unwrap()?.roles
+            &*msg.member.as_deref().try_unwrap()?.roles
         }
     };
 
-    if member_roles.contains(&required_role) || ctx.author_permissions()?.administrator() {
+    if member_roles.contains(&required_role) {
         return Ok(true);
     }
 

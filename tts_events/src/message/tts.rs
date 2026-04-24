@@ -175,16 +175,7 @@ fn run_checks<'c>(
         && let Some(message_member) = &message.member
         && !message_member.roles.contains(&required_role)
     {
-        let Some(channel) = guild.channels.get(&channel_id) else {
-            return Ok(None);
-        };
-
-        if !guild
-            .partial_member_permissions_in(channel, message.author.id, message_member)
-            .administrator()
-        {
-            return Ok(None);
-        }
+        return Ok(None);
     }
 
     // "A forwarded message can be identified by looking at its message_reference.type field"
