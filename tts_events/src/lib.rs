@@ -5,7 +5,6 @@ mod member;
 mod message;
 mod other;
 mod ready;
-mod voice_state;
 
 use poise::serenity_prelude as serenity;
 
@@ -69,14 +68,6 @@ impl serenity::EventHandler for EventHandler {
             serenity::FullEvent::GuildMemberRemoval { guild_id, user, .. } => {
                 if let Err(err) = member::handle_removal(ctx, *guild_id, user.id).await {
                     tracing::error!("Error in guild member removal handler: {err:?}");
-                }
-            }
-            serenity::FullEvent::VoiceStateUpdate { old, new, .. } => {
-                if let Err(err) = voice_state::handle(ctx, old.as_ref(), new).await
-                    && let Err(err) =
-                        errors::handle_unexpected_default(ctx, "VoiceStateUpdate", err).await
-                {
-                    tracing::error!("Error in voice state update handler: {err:?}");
                 }
             }
             serenity::FullEvent::InteractionCreate { interaction, .. } => {

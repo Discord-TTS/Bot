@@ -71,10 +71,18 @@ pub struct VCContext {
 }
 
 impl VCContext {
-    fn channel_id(&self) -> &AtomicU64 {
+    fn raw_channel_id(&self) -> &Arc<AtomicU64> {
         self.channel_id.as_ref().expect(
             "should be always set as StartConnectionResult::CannotJoin would be thrown otherwise",
         )
+    }
+
+    fn load_channel_id(&self) -> serenity::ChannelId {
+        serenity::ChannelId::new(self.raw_channel_id().load(SeqCst))
+    }
+
+    fn store_channel_id(&self, new_id: serenity::ChannelId) {
+        self.raw_channel_id().store(new_id.get(), SeqCst);
     }
 }
 
@@ -257,10 +265,9 @@ async fn ws_task(
             vc_event = collector.next() => {
                 if let Some(vc_event) = vc_event {
                     match apply_event_to_info(&mut connection_info, vc_event) {
-                        ApplyEventResult::NoDifference => {},
                         ApplyEventResult::LeaveVC => break,
                         ApplyEventResult::Applied => {
-                            ctx.channel_id().store(connection_info.channel_id.get(), SeqCst);
+                            ctx.store_channel_id(connection_info.channel_id);
                             if send_ws_msg(WSMessage::MoveVC(&connection_info)).await.is_err() {
                                 tracing::error!("Failed to send rejoin message to tts-service");
                                 break;
@@ -315,12 +322,15 @@ struct ServerEvent {
 }
 
 enum VCEvent {
+    Lonely,
+    ChannelDeleted,
     State(StateEvent),
     Server(ServerEvent),
-    ChannelDelete(serenity::ChannelId),
 }
 
 fn create_vc_collector(ctx: &VCContext) -> impl futures::Stream<Item = VCEvent> {
+    let target_channel = Arc::clone(ctx.raw_channel_id());
+    let cache = ctx.serenity.cache.clone();
     let guild_id = ctx.guild_id;
     let bot_id = ctx.bot_id;
     serenity::collector::collect(&ctx.serenity, move |event| match event {
@@ -336,14 +346,48 @@ fn create_vc_collector(ctx: &VCContext) -> impl futures::Stream<Item = VCEvent> 
         serenity::Event::VoiceStateUpdate(serenity::VoiceStateUpdateEvent {
             voice_state: event,
             ..
-        }) if event.guild_id == Some(guild_id) && event.user_id == bot_id => {
-            Some(VCEvent::State(StateEvent {
-                session_id: event.session_id.clone(),
-                channel_id: event.channel_id,
-            }))
+        }) if event.guild_id == Some(guild_id) => {
+            if event.user_id == bot_id {
+                Some(VCEvent::State(StateEvent {
+                    session_id: event.session_id.clone(),
+                    channel_id: event.channel_id,
+                }))
+            } else if let Some(guild) = cache.guild(guild_id)
+                && let Some(old_state) = guild.voice_states.get(&event.user_id)
+                && old_state.channel_id.is_some() & event.channel_id.is_none()
+            {
+                let target_channel = target_channel.load(SeqCst);
+                let mut channel_voice_states = guild.voice_states.iter().filter(|vs| {
+                    vs.channel_id
+                        .is_some_and(|vs_channel| vs_channel == target_channel)
+                });
+
+                let any_non_leaving_non_bot_member = channel_voice_states.any(|voice_state| {
+                    if voice_state.user_id == event.user_id {
+                        return false;
+                    }
+
+                    if let Some(member) = guild.members.get(&voice_state.user_id) {
+                        !member.user.bot()
+                    } else {
+                        false
+                    }
+                });
+
+                if any_non_leaving_non_bot_member {
+                    None
+                } else {
+                    Some(VCEvent::Lonely)
+                }
+            } else {
+                None
+            }
         }
-        serenity::Event::ChannelDelete(event) if event.channel.base.guild_id == guild_id => {
-            Some(VCEvent::ChannelDelete(event.channel.id))
+        serenity::Event::ChannelDelete(event)
+            if event.channel.base.guild_id == guild_id
+                && event.channel.id == target_channel.load(SeqCst) =>
+        {
+            Some(VCEvent::ChannelDeleted)
         }
         _ => None,
     })
@@ -353,11 +397,9 @@ async fn join_voice_channel(
     ctx: &VCContext,
     collector: &mut (impl futures::Stream<Item = VCEvent> + Unpin),
 ) -> Option<WSConnectionInfo> {
-    let mut target_channel = serenity::ChannelId::new(ctx.channel_id().load(SeqCst));
-
     // Trigger the voice state update, which should trigger the events we are listening for
     ctx.serenity
-        .update_voice_state(ctx.guild_id, Some(target_channel), false, false);
+        .update_voice_state(ctx.guild_id, Some(ctx.load_channel_id()), false, false);
 
     // Setup a timer that will Poll::ready in 30 seconds.
     let mut deadline = std::pin::pin!(tokio::time::sleep(Duration::from_secs(30)));
@@ -371,16 +413,17 @@ async fn join_voice_channel(
     ) {
         match event {
             VCEvent::Server(event) => server = Some(event),
-            VCEvent::ChannelDelete(channel_id) => {
-                if target_channel == channel_id {
-                    // Channel we are joining just got deleted, bail out as timeout will occur.
-                    tracing::warn!("Voice channel was deleted while joining");
-                    return None;
-                }
+            VCEvent::Lonely => {
+                tracing::warn!("Bot became lonely while joining vc");
+                return None;
+            }
+            VCEvent::ChannelDeleted => {
+                tracing::warn!("Voice channel was deleted while joining");
+                return None;
             }
             VCEvent::State(event) => {
                 if let Some(new_channel_id) = event.channel_id {
-                    target_channel = new_channel_id;
+                    ctx.store_channel_id(new_channel_id);
                     state = Some(event);
                 }
             }
@@ -389,11 +432,10 @@ async fn join_voice_channel(
         if let Some(state) = &mut state
             && let Some(server) = &mut server
         {
-            ctx.channel_id().store(target_channel.get(), SeqCst);
             return Some(WSConnectionInfo {
                 bot_id: ctx.bot_id,
                 guild_id: ctx.guild_id,
-                channel_id: target_channel,
+                channel_id: ctx.load_channel_id(),
                 session_id: std::mem::take(&mut state.session_id),
                 endpoint: std::mem::take(&mut server.endpoint),
                 token: std::mem::take(&mut server.token),
@@ -409,7 +451,6 @@ async fn join_voice_channel(
 enum ApplyEventResult {
     Applied,
     LeaveVC,
-    NoDifference,
 }
 
 fn apply_event_to_info(connection_info: &mut WSConnectionInfo, event: VCEvent) -> ApplyEventResult {
@@ -431,12 +472,6 @@ fn apply_event_to_info(connection_info: &mut WSConnectionInfo, event: VCEvent) -
             connection_info.endpoint = endpoint;
             ApplyEventResult::Applied
         }
-        VCEvent::ChannelDelete(channel_id) => {
-            if channel_id == connection_info.channel_id {
-                ApplyEventResult::LeaveVC
-            } else {
-                ApplyEventResult::NoDifference
-            }
-        }
+        VCEvent::Lonely | VCEvent::ChannelDeleted => ApplyEventResult::LeaveVC,
     }
 }
