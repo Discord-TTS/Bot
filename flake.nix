@@ -22,11 +22,6 @@
           name = "nixpkgs-patched";
           src = nixpkgs-unpatched;
           patches = [
-            # Bumps Rust to 1.94.1
-            (pkgsUnpatched.fetchpatch2 {
-              url = "https://github.com/NixOS/nixpkgs/pull/503830.patch";
-              hash = "sha256-wCC+IJqZJTxyteNV//+M/+31xh+Pns0tQ/qgDkSOQaQ=";
-            })
             # Bumps Rust to 1.95
             (pkgsUnpatched.fetchpatch2 {
               url = "https://github.com/NixOS/nixpkgs/pull/510674.patch";
@@ -47,7 +42,7 @@
             lockFile = ./Cargo.lock;
             outputHashes = {
               "poise-0.6.1" = "sha256-6NU1UOQUz8WO77Luv7VLp/RL1May65Y7JmMWxaPbgvo=";
-              "serenity-0.12.5" = "sha256-lyleiOtGDFH5zuHu3z4pUEE5lyyJZvZQkzH3pwu2XGA=";
+              "serenity-0.12.5" = "sha256-j3tQkPHR1+xe8hFM8ECP04AxNPrRQpbtyv+it/7XI74=";
             };
           };
 

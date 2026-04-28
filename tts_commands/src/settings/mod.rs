@@ -1269,6 +1269,66 @@ async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> 
     Ok((format!("{lang} {variant} ({gender})"), pages))
 }
 
+/// Changes the bot's avatar for this server
+#[poise::command(
+    category = "Extra Commands",
+    prefix_command,
+    slash_command,
+    guild_only,
+    check = "crate::premium_command_check",
+    required_permissions = "MANAGE_NICKNAMES",
+    required_bot_permissions = "SEND_MESSAGES"
+)]
+pub async fn avatar(ctx: Context<'_>, new_avatar: Option<serenity::Attachment>) -> CommandResult {
+    let http = ctx.http();
+    let guild_id = ctx.guild_id().unwrap();
+
+    let Some(new_avatar) = new_avatar else {
+        let builder = EditCurrentMember::new().avatar(None);
+        guild_id.edit_current_member(http, builder).await?;
+
+        ctx.say("Reset the bot's avatar to default!").await?;
+        return Ok(());
+    };
+
+    let content_type = match new_avatar.content_type {
+        Some(content_type) if ["image/png", "image/jpeg"].contains(&&*content_type) => content_type,
+        _ => {
+            let msg = "The bot's avatar can only be a PNG/JPEG file.";
+            ctx.send_error(msg).await?;
+            return Ok(());
+        }
+    };
+
+    let res = {
+        let _typing = ctx.defer_or_broadcast().await?;
+
+        let url = new_avatar.url.into_string();
+        let attachment = CreateAttachment::url(http, url, new_avatar.filename).await?;
+        let encoded_attachment = attachment.encode(&content_type).await?;
+
+        let builder = EditCurrentMember::new().avatar(Some(encoded_attachment));
+        guild_id.edit_current_member(http, builder).await
+    };
+
+    match res {
+        Ok(_) => {
+            ctx.say("Set the bot's avatar!").await?;
+            Ok(())
+        }
+        Err(serenity::Error::Http(serenity::HttpError::UnsuccessfulRequest(resp)))
+            if resp.error.code == serenity::JsonErrorCode::InvalidFormBody
+                && let [inner_err] = &*resp.error.errors
+                && inner_err.code == "AVATAR_RATE_LIMIT" =>
+        {
+            let msg = "You are changing the avatar too fast. Try again later.";
+            ctx.send_error(msg).await?;
+            Ok(())
+        }
+        Err(err) => Err(err.into()),
+    }
+}
+
 pub fn commands() -> [Command; 5] {
     [
         settings(),
@@ -1301,6 +1361,7 @@ pub fn commands() -> [Command; 5] {
                 command_prefix(),
                 text_in_voice(),
                 skip_emoji(),
+                avatar(),
                 owner::bot_ban(),
                 owner::gtts_disabled(),
             ],
