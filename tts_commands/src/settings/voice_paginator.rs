@@ -9,7 +9,7 @@ pub struct MenuPaginator<'a> {
     index: usize,
     mode: TTSMode,
     ctx: Context<'a>,
-    pages: Vec<String>,
+    pages: Box<[String]>,
     footer: Cow<'a, str>,
     current_voice: String,
 }
@@ -17,7 +17,7 @@ pub struct MenuPaginator<'a> {
 impl<'a> MenuPaginator<'a> {
     pub fn new(
         ctx: Context<'a>,
-        pages: Vec<String>,
+        pages: Box<[String]>,
         current_voice: String,
         mode: TTSMode,
         footer: Cow<'a, str>,
@@ -76,22 +76,20 @@ impl<'a> MenuPaginator<'a> {
 
     async fn edit_message(
         &self,
-        message: serenity::MessageId,
+        interaction: serenity::ComponentInteraction,
         disable: bool,
-    ) -> serenity::Result<serenity::MessageId> {
-        let http = self.ctx.http();
-        let channel_id = self.ctx.channel_id();
-
+    ) -> serenity::Result<()> {
         let components = [self.create_action_row(disable)];
-        let builder = EditMessage::default()
+        let builder = CreateInteractionResponseMessage::default()
             .embed(self.create_page(&self.pages[self.index]))
             .components(&components);
 
-        Ok(channel_id.edit_message(http, message, builder).await?.id)
+        let response = CreateInteractionResponse::UpdateMessage(builder);
+        interaction.create_response(self.ctx.http(), response).await
     }
 
     pub async fn start(mut self) -> serenity::Result<()> {
-        let mut message_id = self.create_message().await?;
+        let message_id = self.create_message().await?;
         let serenity_context = self.ctx.serenity_context();
 
         loop {
@@ -104,30 +102,28 @@ impl<'a> MenuPaginator<'a> {
                 break Ok(());
             };
 
-            message_id = match interaction.data.custom_id.as_str() {
+            match interaction.data.custom_id.as_str() {
                 "⏮️" => {
                     self.index = 0;
-                    self.edit_message(message_id, false).await?
+                    self.edit_message(interaction, false).await?;
                 }
                 "◀" => {
-                    self.index -= 1;
-                    self.edit_message(message_id, false).await?
+                    self.index = self.index.saturating_sub(1);
+                    self.edit_message(interaction, false).await?;
                 }
                 "⏹️" => {
-                    self.edit_message(message_id, true).await?;
-                    return interaction.defer(&serenity_context.http).await;
+                    return self.edit_message(interaction, true).await;
                 }
                 "▶️" => {
-                    self.index += 1;
-                    self.edit_message(message_id, false).await?
+                    self.index = self.index.saturating_add(1).max(self.pages.len() - 1);
+                    self.edit_message(interaction, false).await?;
                 }
                 "⏭️" => {
                     self.index = self.pages.len() - 1;
-                    self.edit_message(message_id, false).await?
+                    self.edit_message(interaction, false).await?;
                 }
                 _ => unreachable!(),
-            };
-            interaction.defer(&serenity_context.http).await?;
+            }
         }
     }
 }

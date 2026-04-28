@@ -1195,7 +1195,7 @@ pub async fn voices(
     Ok(())
 }
 
-async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
+async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Box<[String]>)> {
     let data = ctx.data();
 
     let (voice_id, mode) = data
@@ -1239,7 +1239,7 @@ async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
     ))
 }
 
-async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Vec<String>)> {
+async fn list_gcloud_voices(ctx: &Context<'_>) -> Result<(String, Box<[String]>)> {
     let data = ctx.data();
 
     let (lang_variant, mode) = data
