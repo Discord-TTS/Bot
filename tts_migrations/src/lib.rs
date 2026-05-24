@@ -20,15 +20,13 @@ async fn migrate_single_to_modes(
     let insert_query_mode =
         format!("INSERT INTO {new_table}({id_column}, mode, voice) VALUES ($1, $2, $3)");
     let insert_query_voice = format!(
-        "
-        INSERT INTO {table}({id_column}, voice_mode) VALUES ($1, $2)
-        ON CONFLICT ({id_column}) DO UPDATE SET voice_mode = EXCLUDED.voice_mode
-    "
+        "INSERT INTO {table}({id_column}, voice_mode) VALUES ($1, $2)
+        ON CONFLICT ({id_column}) DO UPDATE SET voice_mode = EXCLUDED.voice_mode"
     );
 
     let mut delete_voice = false;
     for row in transaction
-        .fetch_all(&*format!("SELECT * FROM {table}"))
+        .fetch_all(sqlx::AssertSqlSafe(&*format!("SELECT * FROM {table}")))
         .await?
     {
         if let Ok(voice) = row.try_get::<Option<String>, _>(old_column) {
@@ -38,14 +36,14 @@ async fn migrate_single_to_modes(
 
                 transaction
                     .execute(
-                        sqlx::query(&insert_query_voice)
+                        sqlx::query(sqlx::AssertSqlSafe(&*insert_query_voice))
                             .bind(column_id)
                             .bind(TTSMode::gTTS),
                     )
                     .await?;
                 transaction
                     .execute(
-                        sqlx::query(&insert_query_mode)
+                        sqlx::query(sqlx::AssertSqlSafe(&*insert_query_mode))
                             .bind(column_id)
                             .bind(TTSMode::gTTS)
                             .bind(voice),
@@ -58,9 +56,8 @@ async fn migrate_single_to_modes(
     }
 
     if delete_voice {
-        transaction
-            .execute(&*format!("ALTER TABLE {table} DROP COLUMN {old_column}"))
-            .await?;
+        let query = format!("ALTER TABLE {table} DROP COLUMN {old_column}");
+        transaction.execute(sqlx::AssertSqlSafe(&*query)).await?;
     }
 
     Ok(())

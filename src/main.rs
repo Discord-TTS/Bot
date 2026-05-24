@@ -38,11 +38,6 @@ fn main() -> Result<()> {
 }
 
 async fn main_(start_time: std::time::SystemTime) -> Result<()> {
-    println!("Initialising Rustls");
-    rustls::crypto::aws_lc_rs::default_provider()
-        .install_default()
-        .unwrap();
-
     println!("Loading and performing migrations");
     let (pool, config) = tts_migrations::load_db_and_conf().await?;
 

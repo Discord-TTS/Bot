@@ -1,14 +1,15 @@
 use std::{hash::Hash, sync::Arc};
 
 use dashmap::DashMap;
+use sqlx::AssertSqlSafe;
 use typesize::TypeSize;
 
 pub use crate::database_models::*;
 use crate::structs::{Result, TTSMode};
 
-type PgArguments<'a> = <sqlx::Postgres as sqlx::database::Database>::Arguments<'a>;
-type QueryAs<'a, R> = sqlx::query::QueryAs<'a, sqlx::Postgres, R, PgArguments<'a>>;
-type Query<'a> = sqlx::query::Query<'a, sqlx::Postgres, PgArguments<'a>>;
+type PgArguments = <sqlx::Postgres as sqlx::database::Database>::Arguments;
+type QueryAs<'a, R> = sqlx::query::QueryAs<'a, sqlx::Postgres, R, PgArguments>;
+type Query<'a> = sqlx::query::Query<'a, sqlx::Postgres, PgArguments>;
 
 pub trait CacheKeyTrait: std::cmp::Eq + Hash {
     fn bind_query(self, query: Query<'_>) -> Query<'_>;
@@ -129,7 +130,7 @@ where
         let query_raw = self.single_insert.replace("{key}", key);
 
         identifier
-            .bind_query(sqlx::query(&query_raw))
+            .bind_query(sqlx::query(AssertSqlSafe(&*query_raw)))
             .bind(value)
             .execute(&self.pool)
             .await?;
