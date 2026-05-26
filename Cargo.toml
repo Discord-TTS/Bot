@@ -28,11 +28,6 @@ workspace = true
 [dependencies]
 const_format = "0.2"
 jemallocator = "0.5.4"
-small-fixed-array = { version = "0.4.5", features = [
-    "nightly",
-    "to-arraystring",
-] }
-
 rand.workspace = true
 bytes.workspace = true
 serde.workspace = true
@@ -46,6 +41,7 @@ dashmap.workspace = true
 mini-moka.workspace = true
 parking_lot.workspace = true
 tokio-tungstenite.workspace = true
+small-fixed-array.workspace = true
 
 tts_core = { path = "tts_core" }
 tts_tasks = { path = "tts_tasks" }
@@ -68,6 +64,7 @@ parking_lot = "0.12"
 mini-moka = { version = "0.10.3", features = ["sync"] }
 serde_json = { version = "1.0.149", default-features = false }
 tokio-tungstenite = { version = "0.28.0", default-features = false }
+small-fixed-array = { version = "0.4.5", features = ["nightly", "to-arraystring"] }
 # TODO: Remove `dashmap` once mini_moka releases a breaking version with dashmap 6.
 typesize = { version = "0.1.9", features = ["arrayvec", "dashmap", "details"] }
 

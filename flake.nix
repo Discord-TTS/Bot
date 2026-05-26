@@ -29,7 +29,7 @@
             lockFile = ./Cargo.lock;
             outputHashes = {
               "poise-0.6.1" = "sha256-6NU1UOQUz8WO77Luv7VLp/RL1May65Y7JmMWxaPbgvo=";
-              "serenity-0.12.5" = "sha256-V5FxH5DlNqPE0Eb76y5zL6ZjzX4q52H2hspqaoOGeQA=";
+              "serenity-0.12.5" = "sha256-tonM8Ixc1dLRmNDjPX54gsyimMLWTiB0/LMHHfQtpNo=";
             };
           };
 
@@ -38,8 +38,10 @@
             mold
           ];
 
-          doCheck = false;
           hardeningDisable = [ "fortify" ];
+          checkPhase = ''
+            cargo test -p tts_commands
+          '';
         };
       in
       tts-utils.mkTTSModule {

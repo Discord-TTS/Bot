@@ -21,6 +21,7 @@ serenity.workspace = true
 typesize.workspace = true
 arrayvec.workspace = true
 parking_lot.workspace = true
+small-fixed-array.workspace = true
 
 tts_core = { path = "../tts_core" }
 

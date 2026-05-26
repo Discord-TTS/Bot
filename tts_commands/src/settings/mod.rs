@@ -2,7 +2,7 @@ mod owner;
 mod setup;
 mod voice_paginator;
 
-use std::{borrow::Cow, collections::HashMap, fmt::Write, sync::atomic::Ordering};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Write, sync::atomic::Ordering};
 
 use aformat::{ToArrayString, aformat};
 use arrayvec::ArrayString;
@@ -1209,7 +1209,7 @@ async fn list_polly_voices(ctx: &Context<'_>) -> Result<(String, Box<[String]>)>
         _ => &data.polly_voices[TTSMode::Polly.default_voice()],
     };
 
-    let mut lang_to_voices: HashMap<_, Vec<_>> = HashMap::new();
+    let mut lang_to_voices: BTreeMap<_, Vec<_>> = BTreeMap::new();
     for voice in data.polly_voices.values() {
         lang_to_voices
             .entry(&voice.language_name)

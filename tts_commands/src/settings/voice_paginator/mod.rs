@@ -5,11 +5,14 @@ use serenity::{CollectComponentInteractions, builder::*, small_fixed_array::Fixe
 
 use tts_core::structs::{Context, TTSMode};
 
+use cursor::PageCursor;
+
+mod cursor;
+
 pub struct MenuPaginator<'a> {
-    index: usize,
     mode: TTSMode,
     ctx: Context<'a>,
-    pages: Box<[String]>,
+    pages: PageCursor,
     footer: Cow<'a, str>,
     current_voice: String,
 }
@@ -24,11 +27,10 @@ impl<'a> MenuPaginator<'a> {
     ) -> Self {
         Self {
             ctx,
-            pages,
             current_voice,
             mode,
             footer,
-            index: 0,
+            pages: PageCursor::new(pages),
         }
     }
 
@@ -55,9 +57,8 @@ impl<'a> MenuPaginator<'a> {
                     ))
                     .disabled(
                         disabled
-                            || (["⏮️", "◀"].contains(&emoji) && self.index == 0)
-                            || (["▶️", "⏭️"].contains(&emoji)
-                                && self.index == (self.pages.len() - 1)),
+                            || (["⏮️", "◀"].contains(&emoji) && !self.pages.can_rewind())
+                            || (["▶️", "⏭️"].contains(&emoji) && !self.pages.can_advance()),
                     )
             })
             .collect();
@@ -68,7 +69,7 @@ impl<'a> MenuPaginator<'a> {
     async fn create_message(&self) -> serenity::Result<serenity::MessageId> {
         let components = [self.create_action_row(false)];
         let builder = poise::CreateReply::default()
-            .embed(self.create_page(&self.pages[self.index]))
+            .embed(self.create_page(self.pages.current()))
             .components(&components);
 
         self.ctx.send(builder).await?.message().await.map(|m| m.id)
@@ -81,7 +82,7 @@ impl<'a> MenuPaginator<'a> {
     ) -> serenity::Result<()> {
         let components = [self.create_action_row(disable)];
         let builder = CreateInteractionResponseMessage::default()
-            .embed(self.create_page(&self.pages[self.index]))
+            .embed(self.create_page(self.pages.current()))
             .components(&components);
 
         let response = CreateInteractionResponse::UpdateMessage(builder);
@@ -104,22 +105,22 @@ impl<'a> MenuPaginator<'a> {
 
             match interaction.data.custom_id.as_str() {
                 "⏮️" => {
-                    self.index = 0;
+                    self.pages.jump_start();
                     self.edit_message(interaction, false).await?;
                 }
                 "◀" => {
-                    self.index = self.index.saturating_sub(1);
+                    self.pages.rewind();
                     self.edit_message(interaction, false).await?;
                 }
                 "⏹️" => {
                     return self.edit_message(interaction, true).await;
                 }
                 "▶️" => {
-                    self.index = self.index.saturating_add(1).max(self.pages.len() - 1);
+                    self.pages.advance();
                     self.edit_message(interaction, false).await?;
                 }
                 "⏭️" => {
-                    self.index = self.pages.len() - 1;
+                    self.pages.jump_end();
                     self.edit_message(interaction, false).await?;
                 }
                 _ => unreachable!(),
