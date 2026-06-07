@@ -1,3 +1,5 @@
+/setvoice
+
 # TTS Bot - Rust Rewrite
 
 Text to speech Discord Bot using Serenity, Songbird, and Poise
