@@ -231,8 +231,12 @@ async fn ws_task(
 ) -> Option<oneshot::Sender<()>> {
     let guild_id = ctx.guild_id;
     let end_vc_connection = || {
-        ctx.serenity
-            .update_voice_state(guild_id, None, false, false);
+        send_gateway_message(&ctx, || serenity::ShardRunnerMessage::UpdateVoiceState {
+            guild_id,
+            channel_id: None,
+            self_mute: false,
+            self_deaf: false,
+        })
     };
 
     let send_ws_msg = async |inner: WSMessage<'_>| {
@@ -250,7 +254,7 @@ async fn ws_task(
         .await
         .is_err()
     {
-        end_vc_connection();
+        end_vc_connection().await;
 
         tracing::error!("Failed to send initial MoveVC message to tts-service");
         return None;
@@ -305,7 +309,7 @@ async fn ws_task(
         );
     }
 
-    end_vc_connection();
+    end_vc_connection().await;
 
     send_ws_msg(WSMessage::Leave).await.ok();
     leave_notifier
@@ -393,13 +397,36 @@ fn create_vc_collector(ctx: &VCContext) -> impl futures::Stream<Item = VCEvent> 
     })
 }
 
+async fn send_gateway_message(ctx: &VCContext, msg: impl Fn() -> serenity::ShardRunnerMessage) {
+    let shard_id = ctx.serenity.shard_id;
+    let runners = ctx.serenity.data_ref::<Data>().runners.get().unwrap();
+    let mut interval = tokio::time::interval(Duration::from_secs(1));
+    loop {
+        interval.tick().await;
+        if let Some(shard_runner) = runners.get_mut(&shard_id) {
+            if shard_runner.tx.unbounded_send(msg()).is_ok() {
+                break;
+            }
+
+            tracing::warn!("Failed to send message to shard ${shard_id}, retrying");
+        } else {
+            tracing::warn!("Failed to get shard tx for shard ${shard_id}, retrying");
+        }
+    }
+}
+
 async fn join_voice_channel(
     ctx: &VCContext,
     collector: &mut (impl futures::Stream<Item = VCEvent> + Unpin),
 ) -> Option<WSConnectionInfo> {
     // Trigger the voice state update, which should trigger the events we are listening for
-    ctx.serenity
-        .update_voice_state(ctx.guild_id, Some(ctx.load_channel_id()), false, false);
+    send_gateway_message(ctx, || serenity::ShardRunnerMessage::UpdateVoiceState {
+        guild_id: ctx.guild_id,
+        channel_id: Some(ctx.load_channel_id()),
+        self_mute: false,
+        self_deaf: false,
+    })
+    .await;
 
     // Setup a timer that will Poll::ready in 30 seconds.
     let mut deadline = std::pin::pin!(tokio::time::sleep(Duration::from_secs(30)));

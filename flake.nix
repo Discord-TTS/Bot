@@ -29,7 +29,7 @@
             lockFile = ./Cargo.lock;
             outputHashes = {
               "poise-0.6.1" = "sha256-6NU1UOQUz8WO77Luv7VLp/RL1May65Y7JmMWxaPbgvo=";
-              "serenity-0.12.5" = "sha256-tonM8Ixc1dLRmNDjPX54gsyimMLWTiB0/LMHHfQtpNo=";
+              "serenity-0.12.5" = "sha256-mTEtk2SL1l8V6WMWSxkVFW/fq0ttGg7f33W8ZH0Oq3M=";
             };
           };
 
