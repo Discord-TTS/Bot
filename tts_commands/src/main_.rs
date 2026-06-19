@@ -20,7 +20,7 @@ use tts_core::{
     voice,
 };
 
-use crate::REQUIRED_VC_PERMISSIONS;
+use crate::{REQUIRED_VC_PERMISSIONS, TTS_PFP_DESC};
 
 /// Returns Some(GuildRow) on correct channel, otherwise None.
 async fn channel_check(
@@ -243,7 +243,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let embed = serenity::CreateEmbed::default()
         .title("Joined your voice channel!")
         .description("Just type normally and TTS Bot will say your messages!")
-        .thumbnail(bot_face)
+        .thumbnail(bot_face, TTS_PFP_DESC)
         .author(CreateEmbedAuthor::new(display_name).icon_url(ctx.author().face()))
         .footer(CreateEmbedFooter::new(random_footer(
             &data.config.main_server_invite,

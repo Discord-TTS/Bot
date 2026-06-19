@@ -16,6 +16,8 @@ use tts_core::{
     traits::PoiseContextExt,
 };
 
+use crate::TTS_PREMIUM_ICON_DESC;
+
 #[derive(sqlx::FromRow)]
 struct GuildIdRow {
     guild_id: i64,
@@ -123,7 +125,7 @@ pub async fn activate(ctx: Context<'_>) -> CommandResult {
         let embed = CreateEmbed::default()
             .title("TTS Bot Premium")
             .description(error_msg)
-            .thumbnail(data.premium_avatar_url.as_str())
+            .thumbnail(data.premium_avatar_url.as_str(), TTS_PREMIUM_ICON_DESC)
             .colour(PREMIUM_NEUTRAL_COLOUR)
             .footer(CreateEmbedFooter::new(concat!(
                 "If you have just subscribed to TTS Bot Premium, please wait up to an hour and try again!\n",

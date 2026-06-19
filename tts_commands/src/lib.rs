@@ -25,6 +25,10 @@ const REQUIRED_VC_PERMISSIONS: serenity::Permissions = serenity::Permissions::VI
     .union(serenity::Permissions::CONNECT)
     .union(serenity::Permissions::SPEAK);
 
+const TTS_PFP_DESC: Option<Cow<'static, str>> = Some(Cow::Borrowed("TTS Bot Profile Picture"));
+const TTS_PREMIUM_ICON_DESC: Option<Cow<'static, str>> =
+    Some(Cow::Borrowed("TTS Bot Premium Icon"));
+
 #[must_use]
 pub fn commands() -> Vec<Command> {
     main_::commands()
@@ -92,7 +96,7 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
                     .title("TTS Bot Premium - Premium Only Command!")
                     .description(main_msg)
                     .colour(PREMIUM_NEUTRAL_COLOUR)
-                    .thumbnail(data.premium_avatar_url.as_str())
+                    .thumbnail(data.premium_avatar_url.as_str(), TTS_PREMIUM_ICON_DESC)
                     .footer(serenity::CreateEmbedFooter::new(FOOTER_MSG));
 
                 builder.embed(embed)
@@ -145,7 +149,7 @@ You may have:
 
     let embed = serenity::CreateEmbed::new()
         .author(serenity::CreateEmbedAuthor::new(author.name.as_str()).icon_url(author.face()))
-        .thumbnail(bot_face)
+        .thumbnail(bot_face, TTS_PFP_DESC)
         .colour(tts_core::constants::RED)
         .description(BAN_MESSAGE)
         .footer(serenity::CreateEmbedFooter::new(

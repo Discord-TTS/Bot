@@ -17,6 +17,8 @@ use tts_core::{
     traits::PoiseContextExt as _,
 };
 
+use crate::TTS_PFP_DESC;
+
 /// Shows how long TTS Bot has been online
 #[poise::command(
     category = "Extra Commands",
@@ -242,7 +244,7 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
     let embed = CreateEmbed::default()
         .title(embed_title)
-        .thumbnail(embed_thumbnail)
+        .thumbnail(embed_thumbnail, TTS_PFP_DESC)
         .url(data.config.main_server_invite.clone())
         .colour(neutral_colour)
         .footer(CreateEmbedFooter::new(format!(

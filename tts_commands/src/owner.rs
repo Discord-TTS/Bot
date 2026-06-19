@@ -15,46 +15,16 @@ use self::serenity::{
 use poise::{CreateReply, serenity_prelude as serenity};
 
 use tts_core::{
-    common::{dm_generic, safe_truncate},
+    common::safe_truncate,
     database,
     database_models::Compact,
-    structs::{Command, CommandResult, Context, Data, PrefixContext, TTSModeChoice},
+    structs::{Command, CommandResult, Context, Data, TTSModeChoice},
     voice,
 };
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>) -> CommandResult {
     poise::samples::register_application_commands(ctx, true).await?;
-    Ok(())
-}
-
-#[poise::command(prefix_command, hide_in_help, owners_only)]
-pub async fn dm(
-    ctx: PrefixContext<'_>,
-    todm: serenity::User,
-    #[rest] message: String,
-) -> CommandResult {
-    let attachment_url = ctx.msg.attachments.first().map(|a| a.url.as_str());
-    let (content, embed) = dm_generic(
-        ctx.serenity_context(),
-        &ctx.msg.author,
-        todm.id,
-        todm.tag().into_owned(),
-        attachment_url,
-        &message,
-    )
-    .await?;
-
-    ctx.msg
-        .channel_id
-        .send_message(
-            ctx.http(),
-            CreateMessage::default()
-                .content(content)
-                .add_embed(CreateEmbed::from(embed)),
-        )
-        .await?;
-
     Ok(())
 }
 
@@ -519,9 +489,8 @@ pub async fn guild_info(ctx: Context<'_>, guild_id: Option<serenity::GuildId>) -
     Ok(())
 }
 
-pub fn commands() -> [Command; 7] {
+pub fn commands() -> [Command; 6] {
     [
-        dm(),
         debug(),
         register(),
         remove_cache(),

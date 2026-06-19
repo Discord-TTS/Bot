@@ -67,36 +67,6 @@ pub async fn remove_premium(data: &Data, guild_id: serenity::GuildId) -> Result<
 
     Ok(())
 }
-
-pub async fn dm_generic(
-    ctx: &serenity::Context,
-    author: &serenity::User,
-    target: serenity::UserId,
-    mut target_tag: String,
-    attachment_url: Option<&str>,
-    message: &str,
-) -> Result<(String, serenity::Embed)> {
-    let mut embed = serenity::CreateEmbed::default();
-    if let Some(url) = attachment_url {
-        embed = embed.image(url);
-    }
-
-    let embeds = [embed
-        .title("Message from the developers:")
-        .description(message)
-        .author(serenity::CreateEmbedAuthor::new(author.tag()).icon_url(author.face()))];
-
-    let sent = target
-        .dm(
-            &ctx.http,
-            serenity::CreateMessage::default().embeds(&embeds),
-        )
-        .await?;
-
-    target_tag.insert_str(0, "Sent message to: ");
-    Ok((target_tag, sent.embeds.into_iter().next().unwrap()))
-}
-
 pub async fn fetch_audio(
     reqwest: &reqwest::Client,
     url: reqwest::Url,

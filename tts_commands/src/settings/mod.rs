@@ -22,6 +22,8 @@ use tts_core::{
     traits::PoiseContextExt,
 };
 
+use crate::TTS_PREMIUM_ICON_DESC;
+
 use self::voice_paginator::MenuPaginator;
 
 fn format_voice<'a>(data: &Data, voice: &'a str, mode: TTSMode) -> Cow<'a, str> {
@@ -298,7 +300,7 @@ async fn can_change_mode(
         ctx.send(poise::CreateReply::default().embed(CreateEmbed::default()
             .title("TTS Bot Premium")
             .colour(PREMIUM_NEUTRAL_COLOUR)
-            .thumbnail(data.premium_avatar_url.as_str())
+            .thumbnail(data.premium_avatar_url.as_str(), TTS_PREMIUM_ICON_DESC)
             .footer(CreateEmbedFooter::new(
                 "If this server has purchased premium, please run the `/premium activate` command to link yourself to this server!"
             ))

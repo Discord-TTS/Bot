@@ -14,7 +14,7 @@ use tts_core::{
     structs::{CommandResult, Context, Result},
 };
 
-use crate::REQUIRED_SETUP_PERMISSIONS;
+use crate::{REQUIRED_SETUP_PERMISSIONS, TTS_PFP_DESC};
 
 fn can_send_generic(permissions: Permissions) -> bool {
     (REQUIRED_SETUP_PERMISSIONS - permissions).is_empty()
@@ -198,7 +198,7 @@ pub async fn setup(
         poise::CreateReply::default().embed(
             serenity::CreateEmbed::default()
                 .title(aformat!("{bot_user_name} has been setup!").as_str())
-                .thumbnail(&bot_user_face)
+                .thumbnail(&bot_user_face, TTS_PFP_DESC)
                 .description(
                     aformat!(
                         "TTS Bot will now accept commands and read from <#{channel_id}>.\n{}"
