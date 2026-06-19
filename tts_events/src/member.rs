@@ -106,23 +106,34 @@ pub async fn handle_removal(
         None => "<Unknown>",
     };
 
-    let response = match confirm_dialog_wait(ctx, msg.id, premium_user).await? {
-        Some(true) => format!("Okay, kept your premium assigned to {guild_name} ({guild_id})."),
-        Some(false) => {
-            remove_premium(data, guild_id).await?;
-            format!("Okay, removed your premium assignment from {guild_name} ({guild_id}).")
-        }
-        None => {
-            remove_premium(data, guild_id).await?;
-            format!(
-                "You did not respond to whether or not to remove premium assignment from {guild_name} ({guild_id}), so it has been unassigned."
-            )
-        }
+    let Some((keep_assigned, interaction)) = confirm_dialog_wait(ctx, msg.id, premium_user).await?
+    else {
+        remove_premium(data, guild_id).await?;
+
+        let resp = format!(
+            "You did not respond to whether or not to remove premium assignment from {guild_name} ({guild_id}), so it has been unassigned."
+        );
+        user_id
+            .dm(&ctx.http, serenity::CreateMessage::new().content(resp))
+            .await?;
+
+        return Ok(());
     };
 
-    user_id
-        .dm(&ctx.http, serenity::CreateMessage::new().content(response))
-        .await?;
+    let response = if keep_assigned {
+        format!("Okay, kept your premium assigned to {guild_name} ({guild_id}).")
+    } else {
+        remove_premium(data, guild_id).await?;
+        format!("Okay, removed your premium assignment from {guild_name} ({guild_id}).")
+    };
 
+    interaction
+        .create_response(
+            &ctx.http,
+            serenity::CreateInteractionResponse::Message(
+                serenity::CreateInteractionResponseMessage::new().content(response),
+            ),
+        )
+        .await?;
     Ok(())
 }

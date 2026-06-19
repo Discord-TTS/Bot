@@ -179,7 +179,7 @@ pub async fn confirm_dialog_wait(
     ctx: &serenity::Context,
     message_id: serenity::MessageId,
     author_id: serenity::UserId,
-) -> Result<Option<bool>> {
+) -> Result<Option<(bool, serenity::ComponentInteraction)>> {
     let interaction = message_id
         .collect_component_interactions(ctx)
         .timeout(std::time::Duration::from_mins(5))
@@ -187,10 +187,9 @@ pub async fn confirm_dialog_wait(
         .await;
 
     if let Some(interaction) = interaction {
-        interaction.defer(&ctx.http).await?;
         match &*interaction.data.custom_id {
-            "True" => Ok(Some(true)),
-            "False" => Ok(Some(false)),
+            "True" => Ok(Some((true, interaction))),
+            "False" => Ok(Some((false, interaction))),
             _ => unreachable!(),
         }
     } else {
@@ -203,7 +202,7 @@ pub async fn confirm_dialog(
     prompt: &str,
     positive: &str,
     negative: &str,
-) -> Result<Option<bool>> {
+) -> Result<Option<(bool, serenity::ComponentInteraction)>> {
     let buttons = confirm_dialog_buttons(positive, negative);
     let components = CreateComponent::ActionRow(CreateActionRow::buttons(&buttons));
     let builder = poise::CreateReply::default()

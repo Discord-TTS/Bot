@@ -271,8 +271,13 @@ async fn translation_languages_autocomplete<'a>(
 async fn bool_button(ctx: Context<'_>, value: Option<bool>) -> Result<Option<bool>, Error> {
     if let Some(value) = value {
         Ok(Some(value))
+    } else if let Some((value, interaction)) =
+        confirm_dialog(ctx, "What would you like to set this to?", "True", "False").await?
+    {
+        interaction.defer(ctx.http()).await?;
+        Ok(Some(value))
     } else {
-        confirm_dialog(ctx, "What would you like to set this to?", "True", "False").await
+        Ok(None)
     }
 }
 
@@ -585,13 +590,14 @@ pub async fn required_role(
         return Ok(());
     };
 
-    let Some(response) = confirm_dialog(ctx, question, "Yes, I'm sure.", &negative).await? else {
+    let Some((value, interaction)) =
+        confirm_dialog(ctx, question, "Yes, I'm sure.", &negative).await?
+    else {
         return Ok(());
     };
 
-    if response {
-        ctx.data()
-            .guilds_db
+    let resp = if value {
+        data.guilds_db
             .set_one(
                 guild_id.into(),
                 "required_role",
@@ -599,22 +605,26 @@ pub async fn required_role(
             )
             .await?;
 
-        let msg: &str = {
-            let bot_name = &cache.current_user().name;
-            if let Some(required_role) = required_role {
-                &aformat!(
-                    "{bot_name} now requires {} to use.",
-                    required_role.mention()
-                )
-            } else {
-                &aformat!("{bot_name} is now usable by everyone!")
-            }
-        };
-
-        ctx.say(msg).await
+        let bot_name = &cache.current_user().name;
+        if let Some(required_role) = required_role {
+            &*aformat!(
+                "{bot_name} now requires {} to use.",
+                required_role.mention()
+            )
+        } else {
+            &*aformat!("{bot_name} is now usable by everyone!")
+        }
     } else {
-        ctx.say("Cancelled!").await
-    }?;
+        "Cancelled!"
+    };
+
+    let inter_resp = serenity::CreateInteractionResponseMessage::new().content(resp);
+    interaction
+        .create_response(
+            ctx.http(),
+            serenity::CreateInteractionResponse::Message(inter_resp),
+        )
+        .await?;
 
     Ok(())
 }

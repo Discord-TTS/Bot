@@ -223,7 +223,7 @@ pub async fn setup(
         return Ok(());
     }
 
-    let Some(confirmed) = confirm_dialog(
+    let Some((confirmed, confirm_interaction)) = confirm_dialog(
         ctx,
         "Would you like to set up TTS Bot update announcements for the setup channel?",
         "Yes",
@@ -243,7 +243,15 @@ pub async fn setup(
         "Okay, didn't set up update announcements."
     };
 
-    ctx.send(poise::CreateReply::default().content(reply).ephemeral(true))
+    confirm_interaction
+        .create_response(
+            ctx.http(),
+            serenity::CreateInteractionResponse::Message(
+                serenity::CreateInteractionResponseMessage::new()
+                    .content(reply)
+                    .ephemeral(true),
+            ),
+        )
         .await?;
 
     Ok(())
