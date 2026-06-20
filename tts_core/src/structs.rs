@@ -48,6 +48,8 @@ macro_rules! into_static_display {
 pub struct Config {
     #[serde(rename = "Main")]
     pub main: MainConfig,
+    #[serde(rename = "TTS-Services")]
+    pub tts_services: FixedArray<TTSServiceConfig, u8>,
     #[serde(rename = "Webhook-Info")]
     pub webhooks: WebhookConfigRaw,
     #[serde(rename = "Website-Info")]
@@ -60,7 +62,6 @@ pub struct Config {
 
 #[derive(serde::Deserialize)]
 pub struct MainConfig {
-    pub tts_services: FixedArray<reqwest::Url, u8>,
     pub website_url: Option<reqwest::Url>,
     pub announcements_channel: ChannelId,
     pub main_server_invite: FixedString,
@@ -72,6 +73,12 @@ pub struct MainConfig {
     // Only for situations where gTTS has broken
     #[serde(default)]
     pub gtts_disabled: AtomicBool,
+}
+
+#[derive(serde::Deserialize)]
+pub struct TTSServiceConfig {
+    pub url: reqwest::Url,
+    pub weight: NonZeroU8,
 }
 
 #[derive(serde::Deserialize)]
@@ -204,11 +211,14 @@ pub struct Data {
     pub webhooks: WebhookConfig,
     pub pool: sqlx::PgPool,
 
+    pub service_weight_lookups: FixedArray<u8, u8>, // Maps weighted index to non-weighted.
+    pub tts_services: FixedArray<reqwest::Url, u8>,
     pub ws_connections: FixedArray<voice::LockedWSStream, u8>,
     pub voice_connections: Mutex<HashMap<serenity::GuildId, voice::ConnectionEntry>>,
-    pub runners: OnceLock<Arc<DashMap<serenity::ShardId, serenity::ShardRunnerMetadata>>>,
+
     pub config: MainConfig,
     pub premium_config: Option<PremiumConfig>,
+    pub runners: OnceLock<Arc<DashMap<serenity::ShardId, serenity::ShardRunnerMetadata>>>,
 
     // Startup information
     pub website_info: Mutex<Option<WebsiteInfo>>,
@@ -231,6 +241,13 @@ impl std::fmt::Debug for Data {
 }
 
 impl Data {
+    #[must_use]
+    pub fn select_tts_index(&self, guild_id: serenity::GuildId) -> u8 {
+        self.service_weight_lookups[(guild_id.get() % u64::from(self.service_weight_lookups.len()))
+            .try_into()
+            .unwrap()]
+    }
+
     pub async fn speaking_rate(&self, user_id: UserId, mode: TTSMode) -> Result<f32> {
         let row = self.user_voice_db.get((user_id.into(), mode)).await?;
 

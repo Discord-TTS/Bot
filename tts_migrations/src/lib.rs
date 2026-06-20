@@ -240,7 +240,7 @@ pub async fn load_db_and_conf() -> Result<(sqlx::PgPool, Config)> {
     run(&mut config_toml, &pool).await?;
 
     let config: Config = config_toml.try_into()?;
-    if config.main.tts_services.is_empty() {
+    if config.tts_services.is_empty() {
         return Err(anyhow::anyhow!("No TTS services are configured"));
     }
 

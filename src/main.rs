@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::Ok;
 use parking_lot::Mutex;
+use small_fixed_array::FixedArray;
 
 use poise::serenity_prelude as serenity;
 use serenity::small_fixed_array::FixedString;
@@ -56,7 +57,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     let http = Arc::new(http_builder.build());
 
     println!("Performing big startup join");
-    let tts_service = || config.main.tts_services[0].clone();
+    let tts_service = || config.tts_services[0].url.clone();
     let (
         ws_connections,
         webhooks,
@@ -73,7 +74,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         shard_count,
         premium_user,
     ) = tokio::try_join!(
-        setup_ws_stream(&config.main),
+        setup_ws_stream(&config.tts_services),
         get_webhooks(&http, config.webhooks),
         create_db_handler!(pool.clone(), "guilds", "guild_id"),
         create_db_handler!(pool.clone(), "userinfo", "user_id"),
@@ -111,43 +112,65 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
     tokio::spawn(analytics.clone().start());
 
     let data = Arc::new(Data {
-        pool,
-        system_info: Mutex::new(sysinfo::System::new()),
-        bot_list_tokens: Mutex::new(config.bot_list_tokens),
-
-        ws_connections,
-        runners: OnceLock::new(), // Filled in later
-        fully_started: AtomicBool::new(false),
-        voice_connections: parking_lot::Mutex::default(),
-        update_startup_lock: tokio::sync::Mutex::new(()),
-        entitlement_cache: mini_moka::sync::Cache::builder()
-            .time_to_live(Duration::from_hours(1))
-            .build(),
-
-        gtts_voices,
-        espeak_voices,
-        translation_languages,
-        gcloud_voices: prepare_gcloud_voices(gcloud_voices),
-        polly_voices: polly_voices
-            .into_iter()
-            .map(|v| (v.id.clone(), v))
-            .collect::<BTreeMap<_, _>>(),
-
-        config: config.main,
-        premium_config: config.premium,
-        website_info: Mutex::new(config.website_info),
-        reqwest,
-        premium_avatar_url: FixedString::from_string_trunc(premium_user.face()),
         analytics,
-        webhooks,
-        start_time,
-        startup_message,
-        regex_cache: RegexCache::new()?,
         guilds_db,
         userinfo_db,
         nickname_db,
         user_voice_db,
         guild_voice_db,
+
+        entitlement_cache: mini_moka::sync::Cache::builder()
+            .time_to_live(Duration::from_hours(1))
+            .build(),
+        startup_message,
+        premium_avatar_url: FixedString::from_string_trunc(premium_user.face()),
+        system_info: Mutex::new(sysinfo::System::new()),
+        start_time,
+        reqwest,
+        regex_cache: RegexCache::new()?,
+        webhooks,
+        pool,
+
+        service_weight_lookups: FixedArray::try_from(
+            config
+                .tts_services
+                .iter()
+                .enumerate()
+                .flat_map(|(index, service)| {
+                    (1..=service.weight.get()).map(move |_| index.try_into().unwrap())
+                })
+                .collect::<Box<[_]>>(),
+        )
+        .unwrap(),
+        tts_services: FixedArray::try_from(
+            config
+                .tts_services
+                .into_iter()
+                .map(|service| service.url)
+                .collect::<Box<[_]>>(),
+        )
+        .unwrap(),
+        ws_connections,
+        voice_connections: Mutex::default(),
+
+        config: config.main,
+        premium_config: config.premium,
+        runners: OnceLock::new(), // Filled in later
+
+        website_info: Mutex::new(config.website_info),
+        bot_list_tokens: Mutex::new(config.bot_list_tokens),
+        fully_started: AtomicBool::new(false),
+        update_startup_lock: tokio::sync::Mutex::new(()),
+
+        espeak_voices,
+        gtts_voices,
+        polly_voices: polly_voices
+            .into_iter()
+            .map(|v| (v.id.clone(), v))
+            .collect::<BTreeMap<_, _>>(),
+        gcloud_voices: prepare_gcloud_voices(gcloud_voices),
+
+        translation_languages,
     });
 
     let framework_options = poise::FrameworkOptions {

@@ -9,7 +9,7 @@ use poise::{
 
 use aformat::ToArrayString;
 use tts_core::{
-    common::{build_invite_components, fetch_audio, prepare_url, select_tts_index},
+    common::{build_invite_components, fetch_audio, prepare_url},
     constants::OPTION_SEPERATORS,
     opt_ext::OptionTryUnwrap,
     require_guild,
@@ -123,12 +123,12 @@ async fn tts_(ctx: Context<'_>, author: &serenity::User, message: &str) -> Comma
         let speaking_rate = data.speaking_rate(author.id, mode).await?;
 
         let tts_service_index = match ctx.guild_id() {
-            Some(guild_id) => select_tts_index(guild_id, data.config.tts_services.len()),
+            Some(guild_id) => data.select_tts_index(guild_id),
             None => 0,
         };
 
         let url = prepare_url(
-            data.config.tts_services[tts_service_index].clone(),
+            data.tts_services[tts_service_index].clone(),
             message,
             &voice,
             mode,

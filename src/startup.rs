@@ -12,7 +12,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tts_core::{
     opt_ext::OptionTryUnwrap as _,
     structs::{
-        Data, GoogleGender, GoogleVoice, MainConfig, Result, TTSMode, WebhookConfig,
+        Data, GoogleGender, GoogleVoice, Result, TTSMode, TTSServiceConfig, WebhookConfig,
         WebhookConfigRaw,
     },
     voice,
@@ -121,14 +121,18 @@ async fn connect_ws_stream(mut url: reqwest::Url) -> Result<voice::RawWSStream> 
     Ok(tokio_tungstenite::connect_async(url).await?.0)
 }
 
-pub async fn setup_ws_stream(config: &MainConfig) -> Result<FixedArray<voice::LockedWSStream, u8>> {
-    let tasks = config.tts_services.iter().map(async |url| {
-        let stream = connect_ws_stream(url.clone()).await?;
-        anyhow::Ok(voice::LockedWSStream::new(stream))
-    });
+pub async fn setup_ws_stream(
+    tts_services: &[TTSServiceConfig],
+) -> Result<FixedArray<voice::LockedWSStream, u8>> {
+    let tasks = tts_services
+        .iter()
+        .map(async |TTSServiceConfig { url, .. }| {
+            let stream = connect_ws_stream(url.clone()).await?;
+            anyhow::Ok(voice::LockedWSStream::new(stream))
+        });
 
     let streams = futures::future::try_join_all(tasks).await?;
-    println!("Connected to {} tts-services", config.tts_services.len());
+    println!("Connected to {} tts-services", tts_services.len());
     Ok(streams.trunc_into())
 }
 
@@ -176,13 +180,13 @@ pub fn start_ws_health_checks(data: &Arc<Data>) {
             if check_ws_healthy(&mut rng, &mut ws_tx).await {
                 tracing::debug!("Health check passed for tts-service-{index}");
             } else {
-                let url = data.config.tts_services[index].clone();
+                let url = data.tts_services[index].clone();
                 *ws_tx = reconnect_ws_stream(&url, index).await;
             }
         }
     };
 
-    for index in 0..data.ws_connections.len() {
+    for index in 0..data.tts_services.len() {
         tokio::spawn(health_check(data.clone(), index));
     }
 }

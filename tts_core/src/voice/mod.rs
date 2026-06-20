@@ -21,7 +21,6 @@ use tokio::{net::TcpStream, sync::Mutex as TMutex};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::Message as RawWSMessage};
 
 use crate::{
-    common::select_tts_index,
     structs::Data,
     voice::models::{WSConnectionInfo, WSMessageFrame},
 };
@@ -112,7 +111,7 @@ pub async fn start_connection(data: &Data, ctx: VCContext) -> StartConnectionRes
         //
         // It is important that `rx` is dropped AFTER the leave notifier is triggered, the `rx` drop
         // will any pending leave notifiers and therefore trigger them.
-        let ws_tx = &data.ws_connections[select_tts_index(guild_id, data.ws_connections.len())];
+        let ws_tx = &data.ws_connections[data.select_tts_index(guild_id)];
         let leave_notifier = ws_task(ctx, ws_tx, &mut rx, connect_tx).await;
 
         data.voice_connections.lock().remove(&guild_id);

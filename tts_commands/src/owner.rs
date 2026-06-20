@@ -156,6 +156,7 @@ pub async fn info_(ctx: Context<'_>) -> CommandResult {
         .await?;
 
     let voice_debug = voice::debug_info(&data, guild_id);
+    let tts_service_url = &data.tts_services[data.select_tts_index(guild_id)];
 
     let embed = CreateEmbed::default()
         .title("TTS Bot Debug Info")
@@ -163,6 +164,7 @@ pub async fn info_(ctx: Context<'_>) -> CommandResult {
             "
 Shard ID: `{shard_id}`
 Voice Connection: `{voice_debug:?}`
+TTS Service URL: `{tts_service_url}`
 
 Server Data: `{guild_row:?}`
 User Data: `{user_row:?}`
