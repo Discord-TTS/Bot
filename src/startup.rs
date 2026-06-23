@@ -149,22 +149,34 @@ async fn reconnect_ws_stream(url: &reqwest::Url, index: u8) -> voice::RawWSStrea
     }
 }
 
-async fn check_ws_healthy(rng: &mut rand::rngs::SmallRng, ws_tx: &mut voice::RawWSStream) -> bool {
+async fn check_ws_healthy(
+    rng: &mut rand::rngs::SmallRng,
+    ws_tx: &mut voice::RawWSStream,
+    index: u8,
+) -> bool {
     let mut expected_pong = [0_u8; 64];
     rng.fill_bytes(&mut expected_pong);
     let ping = bytes::Bytes::copy_from_slice(&expected_pong);
 
     if ws_tx.is_terminated() {
+        tracing::warn!("WS connection has been terminated for tts-service-{index}");
         return false;
     }
 
     if ws_tx.send(Message::Ping(ping.clone())).await.is_err() {
+        tracing::warn!("Failed to send ping to tts-service-{index}");
         return false;
     }
 
     match tokio::time::timeout(Duration::from_secs(1), ws_tx.next()).await {
-        Ok(Some(Ok(Message::Pong(pong)))) => ping == pong,
-        _ => false,
+        Ok(Some(Ok(Message::Pong(pong)))) if ping == pong => {
+            tracing::debug!("Health check passed for tts-service-{index}");
+            true
+        }
+        _ => {
+            tracing::warn!("Recieved something other than pong from tts-service-{index}");
+            false
+        }
     }
 }
 
@@ -177,9 +189,7 @@ pub fn start_ws_health_checks(data: &Arc<Data>) {
             interval.tick().await;
 
             let mut ws_tx = ws_tx_locked.lock().await;
-            if check_ws_healthy(&mut rng, &mut ws_tx).await {
-                tracing::debug!("Health check passed for tts-service-{index}");
-            } else {
+            if !check_ws_healthy(&mut rng, &mut ws_tx, index).await {
                 let url = data.tts_services[index].clone();
                 *ws_tx = reconnect_ws_stream(&url, index).await;
             }
