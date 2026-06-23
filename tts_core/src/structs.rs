@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap},
+    hash::Hasher as _,
     num::NonZeroU8,
     sync::{
         Arc, OnceLock,
@@ -243,7 +244,12 @@ impl std::fmt::Debug for Data {
 impl Data {
     #[must_use]
     pub fn select_tts_index(&self, guild_id: serenity::GuildId) -> u8 {
-        self.service_weight_lookups[(guild_id.get() % u64::from(self.service_weight_lookups.len()))
+        let shared_seed = foldhash::SharedSeed::global_random();
+        let mut hasher = foldhash::quality::FoldHasher::with_seed(0, shared_seed);
+        hasher.write_u64(guild_id.get());
+        let bucket_id = hasher.finish();
+
+        self.service_weight_lookups[(bucket_id % u64::from(self.service_weight_lookups.len()))
             .try_into()
             .unwrap()]
     }

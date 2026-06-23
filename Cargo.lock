@@ -3134,6 +3134,7 @@ dependencies = [
  "bytes",
  "chrono",
  "dashmap 6.2.1",
+ "foldhash",
  "itertools",
  "linkify",
  "mini-moka",

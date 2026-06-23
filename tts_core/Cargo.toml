@@ -7,6 +7,7 @@ rust-version = "1.94"
 [dependencies]
 sha2 = "0.10.9"
 linkify = "0.10"
+foldhash = "0.2.0"
 bitflags = "2.11.0"
 strum_macros = "0.28"
 chrono = { version = "0.4.44", default-features = false }
