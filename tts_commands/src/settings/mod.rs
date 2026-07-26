@@ -1306,7 +1306,7 @@ pub async fn avatar(ctx: Context<'_>, new_avatar: Option<serenity::Attachment>) 
         let _typing = ctx.defer_or_broadcast().await?;
 
         let url = new_avatar.url.into_string();
-        let attachment = CreateAttachment::url(http, url, new_avatar.filename).await?;
+        let attachment = CreateAttachment::url(url, new_avatar.filename).await?;
         let encoded_attachment = attachment.encode(&content_type).await?;
 
         let builder = EditCurrentMember::new().avatar(Some(encoded_attachment));

@@ -1,5 +1,4 @@
 #![expect(async_fn_in_trait)]
-#![feature(type_alias_impl_trait)]
 
 pub mod analytics;
 pub mod common;
