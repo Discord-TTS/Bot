@@ -3,3 +3,4 @@
 docker-compose.yml
 /config.toml
 /target
+.env

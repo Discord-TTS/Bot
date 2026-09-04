@@ -1,29 +1,47 @@
 services:
     bot:
-        image: Discord-TTS/Bot
+        image: gnomeddev/discord-tts-bot
         volumes:
           - type: bind
             source: ./config.toml
             target: /config.toml
-
-        depends_on: [database, tts-service]
-        network_mode: "host"
+        depends_on:
+          database:
+            condition: service_healthy
+          tts-service: 
+            condition: service_started
+        restart: unless-stopped
+    
     database:
         image: postgres:13
         ports: [5432:5432]
-        environment: 
+        environment:
             POSTGRES_USER: tts
             POSTGRES_PASSWORD: tts_password
+        volumes:
+          - db-data:/var/lib/postgresql/data
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U tts"]
+          interval: 5s
+          timeout: 5s
+          retries: 5
+        restart: unless-stopped
+    
     tts-service:
         image: gnomeddev/tts-service
         volumes:
           - type: bind
-            source: ${GOOGLE_APPLICATION_CREDENTIALS}
+            source: ./gcp.json
             target: /gcp.json
         environment:
-          -  IPV6_BLOCK
-          -  LOG_LEVEL=INFO
-          -  BIND_ADDR=0.0.0.0:20310
-          -  GOOGLE_APPLICATION_CREDENTIALS=/gcp.json
-        network_mode: "host"
+          - IPV6_BLOCK=DISABLE
+          - LOG_LEVEL=INFO
+          - BIND_ADDR=0.0.0.0:20310
+          - GOOGLE_APPLICATION_CREDENTIALS=/gcp.json
+          - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          - AWS_REGION=${AWS_REGION}
         expose: [20310]
+        restart: unless-stopped
+volumes:
+    db-data:

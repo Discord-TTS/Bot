@@ -1,23 +1,25 @@
 [Main]
-log_level = 'info'
-#tts_services = array of instances of https://github.com/GnomedDev/tts-service
-#main_server_invite = 'https://discord.gg/example'
-#announcements_channel = id here
-#invite_channel = id here
-#main_server = id here
-#ofs_role = = id here
-#token =
+#token =                                   # REQUIRED (Should be surrounded by "")
+#main_server = id here                     # REQUIRED
+#main_server_invite = 'https://discord.gg/example'   # REQUIRED
+#announcements_channel = id here           # REQUIRED
+#ofs_role = id here                        # REQUIRED
+
+[[TTS-Services]]
+# One [[TTS-Services]] block per running instance of https://github.com/GnomedDev/tts-service
+#url = 'http://localhost:20310'            # REQUIRED 
+#weight = 1                                # REQUIRED
 
 [PostgreSQL-Info]
-#database =
-#password =
-#host =
-#user =
+#database =    # REQUIRED
+#password =    # REQUIRED
+#host =        # REQUIRED
+#user =        # REQUIRED
 
 [Webhook-Info]
 # Each URL will look like 'https://discord.com/api/webhooks/830137192985788457/nCrFLCz-2tJRFUoBrFx1nN9cvUZdhdW0860ek0zNosf0DfCaMTbyM_oFdf9RidC_mcPp'
-#logs =
-#errors =
+#logs =      # REQUIRED
+#errors =    # REQUIRED
 #servers =
 #analytics =
 #suggestions =
