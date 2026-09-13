@@ -65,7 +65,7 @@ pub struct GuildRow {
     pub msg_length: u16,
     pub repeated_chars: Option<NonZeroU8>,
     pub prefix: ArrayString<8>,
-    pub target_lang: Option<ArrayString<8>>,
+    pub target_lang: Option<ArrayString<16>>,
     pub required_prefix: Option<ArrayString<8>>,
     pub voice_mode: TTSMode,
 }

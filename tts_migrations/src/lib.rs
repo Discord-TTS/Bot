@@ -183,13 +183,14 @@ async fn run_(config: &mut toml::Table, transaction: &mut Transaction<'_>) -> Re
             ADD COLUMN IF NOT EXISTS audience_ignore  bool       DEFAULT True,
             ADD COLUMN IF NOT EXISTS voice_mode       TTSMode    DEFAULT 'gtts',
             ADD COLUMN IF NOT EXISTS to_translate     bool       DEFAULT False,
-            ADD COLUMN IF NOT EXISTS target_lang      varchar(5),
+            ADD COLUMN IF NOT EXISTS target_lang      varchar(16),
             ADD COLUMN IF NOT EXISTS premium_user     bigint,
             ADD COLUMN IF NOT EXISTS require_voice    bool       DEFAULT True,
             ADD COLUMN IF NOT EXISTS required_role    bigint,
             ADD COLUMN IF NOT EXISTS required_prefix  varchar(6),
             ADD COLUMN IF NOT EXISTS text_in_voice    bool       DEFAULT True,
-            ADD COLUMN IF NOT EXISTS skip_emoji       bool       DEFAULT False;
+            ADD COLUMN IF NOT EXISTS skip_emoji       bool       DEFAULT False,
+            ALTER COLUMN target_lang TYPE varchar(16);
         ALTER TABLE user_voice
             ADD COLUMN IF NOT EXISTS speaking_rate real;
 
