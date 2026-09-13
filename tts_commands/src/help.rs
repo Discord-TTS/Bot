@@ -120,6 +120,16 @@ async fn help(
     command_func(ctx, command.as_deref()).await
 }
 
+fn find_command<'a>(commands: &'a [Command], top_level_command: &'a str) -> Option<&'a Command> {
+    let mut command_tree = Vec::<&Command>::with_capacity(1);
+    poise::find_command(commands, top_level_command, true, &mut command_tree);
+    if let [command] = &*command_tree {
+        Some(command)
+    } else {
+        None
+    }
+}
+
 pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandResult {
     let framework_options = ctx.framework().options();
     let commands = &framework_options.commands;
@@ -131,9 +141,7 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
             let mut subcommand_iterator = command.split(' ');
 
             let top_level_command = subcommand_iterator.next().unwrap();
-            let Some((mut command_obj, _, _)) =
-                poise::find_command(commands, top_level_command, true, &mut Vec::new())
-            else {
+            let Some(mut command_obj) = find_command(commands, top_level_command) else {
                 let msg = format!("No command called {top_level_command} found!");
                 ctx.say(msg).await?;
                 return Ok(());
@@ -141,23 +149,15 @@ pub async fn command_func(ctx: Context<'_>, command: Option<&str>) -> CommandRes
 
             remaining_args = subcommand_iterator.collect();
             if !remaining_args.is_empty() {
-                (command_obj, _, _) = require!(
-                    poise::find_command(
-                        &command_obj.subcommands,
-                        &remaining_args,
-                        true,
-                        &mut Vec::new()
-                    ),
-                    {
-                        let group_name = &command_obj.name;
-                        let msg = format!(
-                            "The group {group_name} does not have a subcommand called {remaining_args}!"
-                        );
+                command_obj = require!(find_command(&command_obj.subcommands, &remaining_args), {
+                    let group_name = &command_obj.name;
+                    let msg = format!(
+                        "The group {group_name} does not have a subcommand called {remaining_args}!"
+                    );
 
-                        ctx.say(msg).await?;
-                        Ok(())
-                    }
-                );
+                    ctx.say(msg).await?;
+                    Ok(())
+                });
             }
 
             if command_obj.owners_only && !framework_options.owners.contains(&ctx.author().id) {

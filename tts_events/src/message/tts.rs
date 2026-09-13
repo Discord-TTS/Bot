@@ -186,20 +186,17 @@ fn run_checks<'c>(
         _ => TTSMessageKind::Default,
     };
 
-    let content;
-    let mentions;
-    let attachments;
-    if kind == TTSMessageKind::Forward {
+    let (content, mentions, attachments) = if kind == TTSMessageKind::Forward {
         // "message_snapshots will be the message data associated with the forward. Currently we support only 1 snapshot."
         let snapshot = message.message_snapshots.first().try_unwrap()?;
-        content = &*snapshot.content;
-        mentions = &*snapshot.mentions;
-        attachments = &*snapshot.attachments;
+        (
+            &*snapshot.content,
+            &*snapshot.mentions,
+            &*snapshot.attachments,
+        )
     } else {
-        content = &*message.content;
-        mentions = &*message.mentions;
-        attachments = &*message.attachments;
-    }
+        (&*message.content, &*message.mentions, &*message.attachments)
+    };
 
     let mut content = {
         let options = serenity::ContentSafeOptions::default()

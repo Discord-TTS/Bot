@@ -47,13 +47,15 @@ impl<'ctx> PoiseContextExt<'ctx> for Context<'ctx> {
     fn author_permissions(&self) -> Result<serenity::Permissions> {
         match self {
             poise::Context::Application(poise::ApplicationContext { interaction, .. }) => {
-                let channel = interaction.channel.as_ref().try_unwrap()?;
                 let Some(author_member) = interaction.member.as_deref() else {
                     return Ok(serenity::Permissions::dm_permissions());
                 };
 
                 let mut permissions = author_member.permissions.try_unwrap()?;
-                if matches!(channel, serenity::GenericInteractionChannel::Thread(_)) {
+                if matches!(
+                    interaction.channel,
+                    serenity::GenericInteractionChannel::Thread(_)
+                ) {
                     permissions.set(
                         serenity::Permissions::SEND_MESSAGES,
                         permissions.send_messages_in_threads(),

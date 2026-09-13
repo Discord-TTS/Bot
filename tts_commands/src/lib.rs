@@ -116,10 +116,10 @@ pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
 pub async fn try_strip_prefix<'a>(
     ctx: &serenity::Context,
     message: &'a serenity::Message,
-) -> Result<Option<(&'a str, &'a str)>> {
+) -> Result<Option<&'a str>> {
     let Some(guild_id) = message.guild_id else {
         if message.content.starts_with('-') {
-            return Ok(Some(message.content.split_at("-".len())));
+            return Ok(Some(message.content.split_at("-".len()).0));
         }
         return Ok(None);
     };
@@ -129,7 +129,7 @@ pub async fn try_strip_prefix<'a>(
 
     let prefix = row.prefix.as_str();
     if message.content.starts_with(prefix) {
-        return Ok(Some(message.content.split_at(prefix.len())));
+        return Ok(Some(message.content.split_at(prefix.len()).0));
     }
 
     Ok(None)

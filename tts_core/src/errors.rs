@@ -424,7 +424,7 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
         }
         poise::FrameworkError::ArgumentParse {
             error, ctx, input, ..
-        } => handle_argparse(ctx, error, input).await?,
+        } => handle_argparse(ctx, error, input.map(|input| *input)).await?,
         poise::FrameworkError::CooldownHit {
             remaining_cooldown,
             ctx,
