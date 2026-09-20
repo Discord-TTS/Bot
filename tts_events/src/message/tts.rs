@@ -111,7 +111,7 @@ pub(crate) async fn process_tts_msg(
         }
     };
 
-    let tx_res = voice_tx.unbounded_send(voice::InterconnectMessage::QueueTTS(voice::GetTTS {
+    let request = voice::GetTTS {
         text: content.text,
         mode,
         voice,
@@ -121,9 +121,12 @@ pub(crate) async fn process_tts_msg(
         translation_lang: guild_row
             .target_lang(IsPremium::from(is_premium))
             .map(FixedString::from_str_trunc),
-    }));
+    };
 
-    if tx_res.is_ok() {
+    if voice_tx
+        .unbounded_send(voice::InterconnectMessage::QueueTTS(message.id, request))
+        .is_ok()
+    {
         data.analytics.log(
             Cow::Borrowed(match mode {
                 TTSMode::gTTS => "gTTS_tts",

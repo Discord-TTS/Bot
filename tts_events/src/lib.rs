@@ -33,6 +33,35 @@ impl serenity::EventHandler for EventHandler {
                     tracing::error!("Error in message event handler: {err:?}");
                 }
             }
+            serenity::FullEvent::MessageDelete {
+                guild_id: Some(guild_id),
+                channel_id,
+                deleted_message_id: message_id,
+                ..
+            } => {
+                if let Err(err) =
+                    message::delete::handle(ctx, *guild_id, *channel_id, *message_id).await
+                    && let Err(err) =
+                        errors::handle_unexpected_default(ctx, "MessageDelete", err).await
+                {
+                    tracing::error!("Error in message deletion event handler: {err:?}");
+                }
+            }
+            serenity::FullEvent::MessageDeleteBulk {
+                guild_id: Some(guild_id),
+                channel_id,
+                multiple_deleted_messages_ids: message_ids,
+                ..
+            } => {
+                let message_ids = Box::from(message_ids.as_ref());
+                if let Err(err) =
+                    message::delete::handle_bulk(ctx, *guild_id, *channel_id, message_ids).await
+                    && let Err(err) =
+                        errors::handle_unexpected_default(ctx, "MessageDeleteBulk", err).await
+                {
+                    tracing::error!("Error in message deletion event handler: {err:?}");
+                }
+            }
             serenity::FullEvent::Ready { data_about_bot, .. } => {
                 if let Err(err) = ready::handle(ctx, data_about_bot).await
                     && let Err(err) = errors::handle_unexpected_default(ctx, "Ready", err).await

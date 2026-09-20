@@ -8,6 +8,7 @@ use tts_core::{
 
 use tts::process_tts_msg;
 
+pub(crate) mod delete;
 mod tts;
 
 pub async fn handle(ctx: &serenity::Context, new_message: &serenity::Message) -> Result<()> {

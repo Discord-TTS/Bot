@@ -163,20 +163,44 @@ pub async fn end_connection(interconnect: UnboundedSender<InterconnectMessage>) 
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct MissingInterconnectError;
 
-pub fn clear_queue(
+impl std::error::Error for MissingInterconnectError {}
+impl std::fmt::Display for MissingInterconnectError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Failed to send message as interconnect is not alive for guild")
+    }
+}
+
+fn send_interconnect_message(
     data: &Data,
     guild_id: serenity::GuildId,
+    msg: InterconnectMessage,
 ) -> Result<(), MissingInterconnectError> {
     if let Some((tx, _, _)) = data.voice_connections.lock().get(&guild_id)
-        && tx.unbounded_send(InterconnectMessage::ClearQueue).is_ok()
+        && tx.unbounded_send(msg).is_ok()
     {
         Ok(())
     } else {
         Err(MissingInterconnectError)
     }
+}
+
+pub fn clear_queue(
+    data: &Data,
+    guild_id: serenity::GuildId,
+) -> Result<(), MissingInterconnectError> {
+    send_interconnect_message(data, guild_id, InterconnectMessage::ClearQueue)
+}
+
+pub fn delete_messages(
+    data: &Data,
+    guild_id: serenity::GuildId,
+    message_ids: Box<[serenity::MessageId]>,
+) -> Result<(), MissingInterconnectError> {
+    let msg = InterconnectMessage::DeleteFromQueue(message_ids);
+    send_interconnect_message(data, guild_id, msg)
 }
 
 pub fn should_announce_name(
@@ -217,7 +241,8 @@ pub fn debug_info(data: &Data, guild_id: serenity::GuildId) -> Option<VoiceDebug
 
 #[derive(Debug)]
 pub enum InterconnectMessage {
-    QueueTTS(models::GetTTS),
+    QueueTTS(serenity::MessageId, models::GetTTS),
+    DeleteFromQueue(Box<[serenity::MessageId]>),
     Leave(oneshot::Sender<()>),
     ClearQueue,
 }
@@ -284,9 +309,15 @@ async fn ws_task(
             },
             inter_msg = interconnect.next() => {
                 match inter_msg {
-                    Some(InterconnectMessage::QueueTTS(request)) => {
-                        if send_ws_msg(WSMessage::QueueTTS(request)).await.is_err() {
+                    Some(InterconnectMessage::QueueTTS(message_id, request)) => {
+                        if send_ws_msg(WSMessage::QueueTTS(message_id, request)).await.is_err() {
                             tracing::error!("Failed to send queue message to tts-service");
+                            break;
+                        }
+                    },
+                    Some(InterconnectMessage::DeleteFromQueue(message_ids)) => {
+                        if send_ws_msg(WSMessage::DeleteFromQueue(message_ids)).await.is_err() {
+                            tracing::error!("Failed to send delete message to tts-service");
                             break;
                         }
                     },

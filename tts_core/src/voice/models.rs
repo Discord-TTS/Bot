@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Serialize, ser::SerializeSeq as _};
 use small_fixed_array::FixedString;
 
 use serenity::{all as serenity, small_fixed_array};
@@ -15,8 +15,21 @@ macro_rules! make_serializers {
 
 make_serializers! {
     fn serialize_channel_id(serenity::ChannelId);
+    fn serialize_message_id(serenity::MessageId);
     fn serialize_guild_id(serenity::GuildId);
     fn serialize_user_id(serenity::UserId);
+}
+
+fn serialize_message_ids<S: serde::Serializer>(
+    val: &[serenity::MessageId],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let mut serializer = serializer.serialize_seq(Some(val.len()))?;
+    for message_id in val {
+        serializer.serialize_element(&message_id.get())?;
+    }
+
+    serializer.end()
 }
 
 #[derive(serde::Serialize)]
@@ -28,8 +41,13 @@ pub struct WSMessageFrame<'a> {
 
 #[derive(serde::Serialize)]
 pub enum WSMessage<'a> {
-    QueueTTS(GetTTS),
+    QueueTTS(
+        #[serde(serialize_with = "serialize_message_id")] serenity::MessageId,
+        GetTTS,
+    ),
     MoveVC(&'a WSConnectionInfo),
+    #[serde(serialize_with = "serialize_message_ids")]
+    DeleteFromQueue(Box<[serenity::MessageId]>),
     ClearQueue,
     Leave,
 }
