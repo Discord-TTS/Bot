@@ -28,8 +28,8 @@
           cargoLock = {
             lockFile = ./Cargo.lock;
             outputHashes = {
-              "poise-0.7.0" = "sha256-WPBuxFtTkEqBfMGJWCJS8fb+R8O2xOofpHLMhJ7WFoE=";
-              "serenity-0.12.5" = "sha256-OS5ZM4kgLqJ9TrJHoGlxuhwbvzygqKm4kTLg+FMUBfg=";
+              "poise-0.7.0" = "sha256-hX4Vxu0EPw2UQKCPeg12UHcmYwdPNZ4Knst66y7QmYM=";
+              "serenity-0.12.5" = "sha256-UUwskuVe8CY5iWtjHekJY++se9GwCnHg5JfRZExkqLk=";
             };
           };
 

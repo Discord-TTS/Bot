@@ -71,7 +71,7 @@ typesize = { version = "0.1.9", features = ["arrayvec", "dashmap", "details"] }
 [workspace.dependencies.sqlx]
 version = "0.9.0"
 default-features = false
-features = ["macros", "postgres", "runtime-tokio", "tls-rustls-aws-lc-rs"]
+features = ["macros", "postgres", "runtime-tokio", "tls-none"]
 
 [workspace.dependencies.reqwest]
 version = "0.13"
