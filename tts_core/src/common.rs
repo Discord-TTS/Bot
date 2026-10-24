@@ -8,7 +8,7 @@ use serenity::{CollectComponentInteractions, CreateActionRow, CreateButton, Crea
 use crate::structs::{Context, Data, Result, TTSMode, TTSServiceError};
 
 pub(crate) fn timestamp_in_future(ts: serenity::Timestamp) -> bool {
-    *ts > chrono::Utc::now()
+    ts > serenity::Timestamp::now()
 }
 
 /// Builds components for invite command and invite link in DMs
