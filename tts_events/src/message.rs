@@ -12,16 +12,31 @@ pub(crate) mod delete;
 mod tts;
 
 pub async fn handle(ctx: &serenity::Context, new_message: &serenity::Message) -> Result<()> {
+    let data = ctx.data_ref::<Data>();
+
+    check_pluralkit_message(data, new_message);
     tokio::try_join!(
-        process_tts_msg(ctx, new_message),
-        process_mention_msg(ctx, new_message)
+        process_tts_msg(ctx, data, new_message),
+        process_mention_msg(ctx, data, new_message)
     )?;
 
     Ok(())
 }
 
-async fn process_mention_msg(ctx: &serenity::Context, message: &serenity::Message) -> Result<()> {
-    let data = ctx.data_ref::<Data>();
+fn check_pluralkit_message(data: &Data, new_message: &serenity::Message) {
+    if let Some(guild_id) = new_message.guild_id
+        && (new_message.author.id == crate::message::delete::PK_USER_ID
+            || new_message.application_id == Some(crate::message::delete::PK_USER_ID.get().into()))
+    {
+        data.pluralkit_guild_status.insert(guild_id, true);
+    }
+}
+
+async fn process_mention_msg(
+    ctx: &serenity::Context,
+    data: &Data,
+    message: &serenity::Message,
+) -> Result<()> {
     let Some(bot_mention_regex) = data.regex_cache.bot_mention.get() else {
         return Ok(());
     };

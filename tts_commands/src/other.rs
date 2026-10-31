@@ -15,6 +15,7 @@ use tts_core::{
     require_guild,
     structs::{ApplicationContext, Command, CommandResult, Context, IsPremium, TTSMode},
     traits::PoiseContextExt as _,
+    version,
 };
 
 use crate::TTS_PFP_DESC;
@@ -234,18 +235,21 @@ pub async fn botstats(ctx: Context<'_>) -> CommandResult {
     let neutral_colour = ctx.neutral_colour().await;
     let (embed_title, embed_thumbnail) = {
         let current_user = cache.current_user();
-
-        let title = format!("{}: Freshly rewritten in Rust!", current_user.name);
         let thumbnail = current_user.face();
 
-        (title, thumbnail)
+        (&current_user.name.clone(), thumbnail)
     };
+
+    let url = aformat!(
+        "https://github.com/Discord-TTS/Bot/commit/{}",
+        version::full()
+    );
 
     let time_to_fetch = start_time.elapsed()?.as_secs_f64() * 1000.0;
     let embed = CreateEmbed::default()
         .title(embed_title)
         .thumbnail(embed_thumbnail, TTS_PFP_DESC)
-        .url(data.config.main_server_invite.clone())
+        .url(&*url)
         .colour(neutral_colour)
         .footer(CreateEmbedFooter::new(format!(
             "Time to fetch: {time_to_fetch:.2}ms

@@ -14,6 +14,7 @@ use serenity::small_fixed_array::FixedString;
 use tts_core::{
     analytics, create_db_handler, database,
     structs::{Data, PollyVoice, RegexCache, Result, TTSMode},
+    version,
 };
 use tts_events::EventHandler;
 use tts_tasks::Looper as _;
@@ -31,7 +32,7 @@ fn main() -> Result<()> {
 
     let start_time = std::time::SystemTime::now();
 
-    println!("Starting tokio runtime");
+    println!("TTS Bot: Version {}", version::readable());
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
@@ -119,12 +120,13 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
         user_voice_db,
         guild_voice_db,
 
+        pluralkit_guild_status: dashmap::DashMap::new(),
         entitlement_cache: mini_moka::sync::Cache::builder()
             .time_to_live(Duration::from_hours(1))
             .build(),
         startup_message,
         premium_avatar_url: FixedString::from_string_trunc(premium_user.face()),
-        system_info: Mutex::new(sysinfo::System::new()),
+        system_info: Mutex::new(sysinfo::System::new().unwrap()),
         start_time,
         reqwest,
         regex_cache: RegexCache::new()?,

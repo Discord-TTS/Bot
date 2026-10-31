@@ -88,6 +88,7 @@ pub async fn handle_delete(
     }
 
     let data = ctx.data_ref::<Data>();
+    data.pluralkit_guild_status.remove(&incomplete.id);
     data.guilds_db.delete(incomplete.id.into()).await?;
 
     let Some(guild) = full else { return Ok(()) };

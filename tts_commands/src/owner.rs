@@ -24,7 +24,7 @@ use tts_core::{
 
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register(ctx: Context<'_>) -> CommandResult {
-    poise::samples::register_application_commands(ctx, true).await?;
+    poise::builtins::register_application_commands(ctx, true).await?;
     Ok(())
 }
 
@@ -157,6 +157,11 @@ pub async fn info_(ctx: Context<'_>) -> CommandResult {
 
     let voice_debug = voice::debug_info(&data, guild_id);
     let tts_service_url = &data.tts_services[data.select_tts_index(guild_id)];
+    let pluralkit_in_guild = data
+        .pluralkit_guild_status
+        .get(&guild_id)
+        .as_deref()
+        .copied();
 
     let embed = CreateEmbed::default()
         .title("TTS Bot Debug Info")
@@ -171,6 +176,8 @@ User Data: `{user_row:?}`
 Nickname Data: `{nick_row:?}`
 User Voice Data: `{user_voice_row:?}`
 Guild Voice Data: `{guild_voice_row:?}`
+
+PluralKit Status: `{pluralkit_in_guild:?}`
 "
         ));
 

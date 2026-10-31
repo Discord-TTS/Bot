@@ -33,6 +33,10 @@ async fn add_ofs_role(data: &Data, http: &serenity::Http, user_id: serenity::Use
 
 pub async fn handle_addition(ctx: &serenity::Context, member: &serenity::Member) -> Result<()> {
     let data = ctx.data_ref::<Data>();
+    if member.user.id == crate::message::delete::PK_USER_ID {
+        data.pluralkit_guild_status.insert(member.guild_id, true);
+    }
+
     if member.guild_id == data.config.main_server && is_guild_owner(&ctx.cache, member.user.id) {
         add_ofs_role(data, &ctx.http, member.user.id).await?;
     }
@@ -72,6 +76,9 @@ pub async fn handle_removal(
     user_id: serenity::UserId,
 ) -> Result<()> {
     let data = ctx.data_ref::<Data>();
+    if user_id == crate::message::delete::PK_USER_ID {
+        data.pluralkit_guild_status.insert(guild_id, false);
+    }
 
     let guild_row = data.guilds_db.get(guild_id.into()).await?;
     let Some(premium_user) = guild_row.premium_user else {

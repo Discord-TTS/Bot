@@ -2,7 +2,6 @@
 name = "tts_core"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.94"
 
 [dependencies]
 sha2 = "0.11.0"
@@ -33,6 +32,9 @@ itertools.workspace = true
 serde_json.workspace = true
 parking_lot.workspace = true
 tokio-tungstenite.workspace = true
+
+[build-dependencies]
+vergen-gix = "10.0.3"
 
 [lints]
 workspace = true

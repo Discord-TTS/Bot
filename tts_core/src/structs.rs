@@ -70,6 +70,7 @@ pub struct MainConfig {
     pub token: serenity::Token,
     pub main_server: GuildId,
     pub ofs_role: RoleId,
+    pub pluralkit_token: Option<FixedString<u8>>,
 
     // Only for situations where gTTS has broken
     #[serde(default)]
@@ -202,6 +203,7 @@ pub struct Data {
     pub user_voice_db: database::Handler<(i64, TTSMode), database::UserVoiceRowRaw>,
     pub guild_voice_db: database::Handler<(i64, TTSMode), database::GuildVoiceRowRaw>,
 
+    pub pluralkit_guild_status: dashmap::DashMap<serenity::GuildId, bool>,
     pub entitlement_cache: mini_moka::sync::Cache<UserId, CachedEntitlement>,
     pub startup_message: serenity::MessageId,
     pub premium_avatar_url: FixedString<u16>,

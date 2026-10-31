@@ -11,4 +11,5 @@ pub mod opt_ext;
 pub mod process_msg;
 pub mod structs;
 pub mod traits;
+pub mod version;
 pub mod voice;

@@ -16,9 +16,9 @@ use tts_core::{
 
 pub(crate) async fn process_tts_msg(
     ctx: &serenity::Context,
+    data: &Data,
     message: &serenity::Message,
 ) -> Result<()> {
-    let data = ctx.data_ref::<Data>();
     let Some(guild_id) = message.guild_id else {
         return Ok(());
     };

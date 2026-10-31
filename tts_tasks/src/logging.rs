@@ -91,7 +91,7 @@ impl Looper for Arc<WebhookLogger> {
                 &self.normal_logs
             };
 
-            let webhook_name = aformat!("TTS-Webhook [{}]", CapStr::<5>(severity.as_str()));
+            let webhook_name = aformat!("TTS-Webhook [{}]", CapStr::<6>(severity.as_str()));
 
             for chunk in chunks {
                 let builder = ExecuteWebhook::default()
@@ -127,7 +127,7 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for ArcWrapper<Webhook
     fn on_event(&self, event: &tracing::Event<'_>, _: tracing_subscriber::layer::Context<'_, S>) {
         let metadata = event.metadata();
         let enabled = if metadata.target().starts_with("tts_") {
-            tracing::Level::INFO >= *metadata.level()
+            tracing::Level::DEBUG >= *metadata.level()
         } else {
             tracing::Level::WARN >= *metadata.level()
         };

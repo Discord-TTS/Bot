@@ -72,10 +72,12 @@ pub async fn handle_unexpected<'a>(
                 .with_memory(sysinfo::MemoryRefreshKind::nothing().with_ram()),
         );
 
-        (
-            sysinfo::System::load_average().five.to_string(),
-            (system.used_memory() / 1024).to_string(),
-        )
+        let load_avg = match sysinfo::System::load_average() {
+            Ok(load_avg) => Cow::Owned(load_avg.five.to_string()),
+            Err(_) => Cow::Borrowed("Unknown"),
+        };
+
+        (load_avg, (system.used_memory() / 1024).to_string())
     };
 
     let before_fields = [
@@ -89,7 +91,7 @@ pub async fn handle_unexpected<'a>(
     ];
 
     let after_fields = [
-        ("CPU Usage (5 minutes)", Cow::Owned(cpu_usage), true),
+        ("CPU Usage (5 minutes)", cpu_usage, true),
         ("System Memory Usage", Cow::Owned(mem_usage), true),
         ("Shard Count", Cow::Borrowed("0"), true),
     ];
