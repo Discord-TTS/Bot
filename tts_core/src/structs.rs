@@ -57,6 +57,8 @@ pub struct Config {
     pub website_info: Option<WebsiteInfo>,
     #[serde(rename = "Premium-Info")]
     pub premium: Option<PremiumConfig>,
+    #[serde(rename = "Pluralkit-Info")]
+    pub pluralkit: Option<PluralkitConfig>,
     #[serde(rename = "Bot-List-Tokens")]
     pub bot_list_tokens: Option<BotListTokens>,
 }
@@ -70,7 +72,6 @@ pub struct MainConfig {
     pub token: serenity::Token,
     pub main_server: GuildId,
     pub ofs_role: RoleId,
-    pub pluralkit_token: Option<FixedString<u8>>,
 
     // Only for situations where gTTS has broken
     #[serde(default)]
@@ -118,6 +119,12 @@ pub struct PremiumConfig {
     pub patreon_service: reqwest::Url,
     pub basic_sku: SkuId,
     pub extra_sku: SkuId,
+}
+
+#[derive(serde::Deserialize)]
+pub struct PluralkitConfig {
+    pub token: FixedString<u8>,
+    pub app_token: FixedString<u8>,
 }
 
 pub struct WebhookConfig {
@@ -221,6 +228,7 @@ pub struct Data {
 
     pub config: MainConfig,
     pub premium_config: Option<PremiumConfig>,
+    pub pluralkit_config: Option<PluralkitConfig>,
     pub runners: OnceLock<Arc<DashMap<serenity::ShardId, serenity::ShardRunnerMetadata>>>,
 
     // Startup information

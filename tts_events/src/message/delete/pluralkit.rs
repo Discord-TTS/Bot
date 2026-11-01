@@ -7,7 +7,7 @@ use serenity::all as serenity;
 
 use tts_core::{
     opt_ext::OptionTryUnwrap as _,
-    structs::{Data, Result},
+    structs::{Data, PluralkitConfig, Result},
     version,
 };
 
@@ -18,14 +18,14 @@ pub(super) async fn is_proxy_delete(
     guild_id: serenity::GuildId,
     message_id: serenity::MessageId,
 ) -> Result<bool> {
-    let Some(pluralkit_token) = data.config.pluralkit_token.as_deref() else {
+    let Some(config) = &data.pluralkit_config else {
         return Ok(false);
     };
 
     if is_pluralkit_in_guild(ctx, data, guild_id).await? {
         let bot_id = ctx.cache.current_user().id;
 
-        let is_proxy = check_proxy_delete(&data.reqwest, pluralkit_token, bot_id, message_id).await;
+        let is_proxy = check_proxy_delete(&data.reqwest, config, bot_id, message_id).await;
         data.analytics.log(pk_event_from_result(&is_proxy), false);
         is_proxy
     } else {
@@ -77,7 +77,7 @@ async fn check_pluralkit_in_guild(
 
 async fn check_proxy_delete(
     reqwest: &reqwest::Client,
-    pluralkit_token: &str,
+    config: &PluralkitConfig,
     bot_id: serenity::UserId,
     message_id: serenity::MessageId,
 ) -> Result<bool> {
@@ -86,8 +86,9 @@ async fn check_proxy_delete(
 
     let response = reqwest
         .get(&*url)
-        .header(AUTHORIZATION, pluralkit_token)
         .header(USER_AGENT, &*aformat!("TTS Bot/{version_hash} ({bot_id})"))
+        .header(AUTHORIZATION, &*config.token)
+        .header("x-pluralkit-app", &*config.app_token)
         .timeout(std::time::Duration::from_millis(500))
         .send()
         .await?;

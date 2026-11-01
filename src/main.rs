@@ -157,6 +157,7 @@ async fn main_(start_time: std::time::SystemTime) -> Result<()> {
 
         config: config.main,
         premium_config: config.premium,
+        pluralkit_config: config.pluralkit,
         runners: OnceLock::new(), // Filled in later
 
         website_info: Mutex::new(config.website_info),

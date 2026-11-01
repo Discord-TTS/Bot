@@ -127,7 +127,7 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for ArcWrapper<Webhook
     fn on_event(&self, event: &tracing::Event<'_>, _: tracing_subscriber::layer::Context<'_, S>) {
         let metadata = event.metadata();
         let enabled = if metadata.target().starts_with("tts_") {
-            tracing::Level::DEBUG >= *metadata.level()
+            tracing::Level::INFO >= *metadata.level()
         } else {
             tracing::Level::WARN >= *metadata.level()
         };
