@@ -1,0 +1,219 @@
+//! Holds application command definition structs.
+
+use std::borrow::Cow;
+use std::collections::HashMap;
+
+use super::{CowStr, CowVec};
+use crate::{BoxFuture, serenity_prelude as serenity};
+
+/// Specifies if the current invokation is from a Command or Autocomplete.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum CommandInteractionType {
+    /// Invoked from an application command
+    Command,
+    /// Invoked from an autocomplete interaction
+    Autocomplete,
+}
+
+/// Application command specific context passed to command invocations.
+#[derive_where::derive_where(Debug)]
+pub struct ApplicationContext<'a, U, E> {
+    /// The interaction which triggered this command execution.
+    pub interaction: &'a serenity::CommandInteraction,
+    /// The type of the interaction which triggered this command execution.
+    pub interaction_type: CommandInteractionType,
+    /// Slash command arguments
+    ///
+    /// **Not** equivalent to `self.interaction.data().options`. That one refers to just the
+    /// top-level command arguments, whereas [`Self::args`] is the options of the actual
+    /// subcommand, if any.
+    pub args: &'a [serenity::ResolvedOption<'a>],
+    /// Keeps track of whether an initial response has been sent.
+    ///
+    /// Discord requires different HTTP endpoints for initial and additional responses.
+    pub has_sent_initial_response: &'a std::sync::atomic::AtomicBool,
+    /// Read-only reference to the framework
+    ///
+    /// Useful if you need the list of commands, for example for a custom help command
+    #[derive_where(skip)]
+    pub framework: crate::FrameworkContext<'a, U, E>,
+    /// The command invoked by this interaction.
+    ///
+    /// This includes the full command tree, ordered top-down from parent commands to invoked
+    /// command. For example, if `/x y z` is invoked, this contains `&[&x, &y, &z]`.
+    pub command_tree: &'a [&'a crate::Command<U, E>],
+    /// Custom user data carried across a single command invocation
+    pub invocation_data: &'a tokio::sync::Mutex<Box<dyn std::any::Any + Send + Sync>>,
+    // #[non_exhaustive] forbids struct update syntax for ?? reason
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+impl<U, E> Clone for ApplicationContext<'_, U, E> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<U, E> Copy for ApplicationContext<'_, U, E> {}
+impl<U, E> crate::_GetGenerics for ApplicationContext<'_, U, E> {
+    type U = U;
+    type E = E;
+}
+
+impl<U, E> ApplicationContext<'_, U, E> {
+    /// See [`crate::Context::defer()`]
+    pub async fn defer_response(&self, ephemeral: bool) -> Result<(), serenity::Error> {
+        if !self.has_sent_initial_response.load(std::sync::atomic::Ordering::SeqCst) {
+            let response = serenity::CreateInteractionResponse::Defer(
+                serenity::CreateInteractionResponseMessage::new().ephemeral(ephemeral),
+            );
+
+            let http = &self.framework.serenity_context.http;
+            self.interaction.create_response(http, response).await?;
+
+            self.has_sent_initial_response.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+        Ok(())
+    }
+}
+
+/// Possible actions that a context menu entry can have
+#[derive_where::derive_where(Debug)]
+pub enum ContextMenuCommandAction<U, E> {
+    /// Context menu entry on a user
+    User(
+        #[derive_where(skip)]
+        fn(
+            ApplicationContext<'_, U, E>,
+            serenity::User,
+        ) -> BoxFuture<'_, Result<(), crate::FrameworkError<'_, U, E>>>,
+    ),
+    /// Context menu entry on a message
+    Message(
+        #[derive_where(skip)]
+        fn(
+            ApplicationContext<'_, U, E>,
+            serenity::Message,
+        ) -> BoxFuture<'_, Result<(), crate::FrameworkError<'_, U, E>>>,
+    ),
+    #[doc(hidden)]
+    __NonExhaustive,
+}
+impl<U, E> Copy for ContextMenuCommandAction<U, E> {}
+impl<U, E> Clone for ContextMenuCommandAction<U, E> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<U, E> From<ContextMenuCommandAction<U, E>> for serenity::CommandType {
+    fn from(value: ContextMenuCommandAction<U, E>) -> Self {
+        match value {
+            ContextMenuCommandAction::User(_) => serenity::CommandType::User,
+            ContextMenuCommandAction::Message(_) => serenity::CommandType::Message,
+            ContextMenuCommandAction::__NonExhaustive => unreachable!(),
+        }
+    }
+}
+
+/// A single drop-down choice in a slash command choice parameter
+#[derive(Debug, Clone)]
+pub struct CommandParameterChoice {
+    /// Label of this choice
+    pub name: CowStr,
+    /// Localized labels with locale string as the key (slash-only)
+    pub localizations: CowVec<(CowStr, CowStr)>,
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+/// A single parameter of a [`crate::Command`]
+#[derive_where::derive_where(Debug)]
+pub struct CommandParameter<U, E> {
+    /// Name of this command parameter
+    pub name: CowStr,
+    /// Localized names with locale string as the key (slash-only)
+    pub name_localizations: CowVec<(CowStr, CowStr)>,
+    /// Description of the command. Required for slash commands
+    pub description: Option<CowStr>,
+    /// Localized descriptions with locale string as the key (slash-only)
+    pub description_localizations: CowVec<(CowStr, CowStr)>,
+    /// `true` if this parameter is required, `false` if it's optional or variadic
+    pub required: bool,
+    /// If this parameter is a channel, users can only enter these channel types in a slash command
+    ///
+    /// Prefix commands are currently unaffected by this
+    pub channel_types: Option<CowVec<serenity::ChannelType>>,
+    /// If this parameter is an attachment, users can only upload these file types (slash-only)
+    pub file_types: Option<CowVec<CowStr>>,
+    /// If this parameter is a choice parameter, this is the fixed list of options
+    pub choices: CowVec<CommandParameterChoice>,
+    /// Closure that sets this parameter's type and min/max value in the given builder
+    ///
+    /// For example a u32 [`CommandParameter`] would store this as the [`Self::type_setter`]:
+    /// ```rust
+    /// # use poise::serenity_prelude as serenity;
+    /// # let _: fn(serenity::CreateCommandOption) -> serenity::CreateCommandOption =
+    /// |b| b.kind(serenity::CommandOptionType::Integer).min_int_value(0).max_int_value(i64::MAX)
+    /// # ;
+    /// ```
+    #[derive_where(skip)]
+    pub type_setter:
+        Option<fn(serenity::CreateCommandOption<'_>) -> serenity::CreateCommandOption<'_>>,
+    /// Optionally, a callback that is invoked on autocomplete interactions. This closure should
+    /// extract the partial argument from the given JSON value and generate the autocomplete
+    /// response which contains the list of autocomplete suggestions.
+    #[derive_where(skip)]
+    pub autocomplete_callback: Option<
+        for<'a> fn(
+            crate::ApplicationContext<'a, U, E>,
+            &'a str,
+        ) -> BoxFuture<'a, serenity::CreateAutocompleteResponse<'a>>,
+    >,
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl<U, E> CommandParameter<U, E> {
+    /// Generates a slash command parameter builder from this [`CommandParameter`] instance. This
+    /// can be used to register the command on Discord's servers
+    #[must_use]
+    pub fn create_as_slash_command_option(&self) -> Option<serenity::CreateCommandOption<'static>> {
+        let description =
+            self.description.clone().unwrap_or(Cow::Borrowed("A slash command parameter"));
+
+        let mut builder = serenity::CreateCommandOption::<'static>::new(
+            serenity::CommandOptionType::String,
+            self.name.clone(),
+            description,
+        );
+
+        builder =
+            builder.required(self.required).set_autocomplete(self.autocomplete_callback.is_some());
+
+        for (locale, name) in self.name_localizations.iter() {
+            builder = builder.name_localized(locale.clone(), name.clone());
+        }
+        for (locale, description) in self.description_localizations.iter() {
+            builder = builder.description_localized(locale.clone(), description.clone());
+        }
+        if let Some(channel_types) = self.channel_types.as_deref() {
+            builder = builder.channel_types(channel_types.to_owned());
+        }
+        if let Some(file_types) = self.file_types.as_deref() {
+            builder = builder.file_types(file_types.to_owned());
+        }
+        for (i, choice) in self.choices.iter().enumerate() {
+            builder = builder.add_int_choice_localized(
+                choice.name.clone(),
+                i as _,
+                choice
+                    .localizations
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<HashMap<_, _>>(),
+            );
+        }
+
+        Some((self.type_setter?)(builder))
+    }
+}
