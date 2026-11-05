@@ -3,7 +3,6 @@
     not(any(
         feature = "rustls_backend",
         feature = "rustls_backend_no_provider",
-        feature = "native_tls_backend"
     ))
 ))]
 compile_error!(

@@ -27,13 +27,7 @@
           meta.mainProgram = pkgDesc.name;
 
           src = lib.sources.cleanSource ./.;
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-            outputHashes = {
-              "poise-0.7.0" = "sha256-D9pdVL4qZGJHUmUR/SQHyiimAEHT2NVuHfiNL7j9qHI=";
-              "serenity-0.12.5" = "sha256-c7kQ1EAJee7DjeWMp4yRlMmYt23Jxm1Op0qY2S4buNs=";
-            };
-          };
+          cargoLock.lockFile = ./Cargo.lock;
 
           env = {
             RUSTC_BOOTSTRAP = "1";
@@ -58,9 +52,9 @@
         extraDockerContents = with pkgs; [ dockerTools.caCertificates ];
         extraDevTools = with pkgs; [
           clippy
-          rustfmt
           cargo-edit
           rust-analyzer
+          (rustfmt.override { asNightly = true; })
         ];
       }
     );

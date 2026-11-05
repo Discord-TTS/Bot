@@ -3,11 +3,6 @@
 //! - slash commands: completely define both normal and slash commands with a single function
 //! - flexible argument parsing: command parameters are defined with normal Rust types and parsed
 //!   automatically
-//!
-//! # Quickstart
-//! ```rust,no_run
-#![doc = include_str!("../examples/quickstart/main.rs")]
-//! ```
 //! 
 //! To run commands, ping your bot and write the command name and arguments after. Run the register
 //! command to register slash commands, after which you can use those, too.

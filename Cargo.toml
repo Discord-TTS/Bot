@@ -10,6 +10,9 @@ members = [
     "tts_events",
     "tts_tasks",
     "tts_migrations",
+
+    "externals/poise",
+    "externals/serenity"
 ]
 
 [profile.release]
@@ -86,9 +89,8 @@ version = "6.1.0"
 default-features = false
 
 [workspace.dependencies.serenity]
-git = "https://github.com/serenity-rs/serenity"
+path = "externals/serenity"
 default-features = false
-branch = "next"
 features = [
     "voice",
     "typesize",
@@ -99,10 +101,9 @@ features = [
 ]
 
 [workspace.dependencies.poise]
-git = "https://github.com/serenity-rs/poise"
+path = "externals/poise"
 features = ["cache"]
 default-features = false
-branch = "serenity-next"
 
 [workspace.lints.rust]
 rust_2018_idioms = "warn"
@@ -122,10 +123,6 @@ similar_names = "allow"
 missing_panics_doc = "allow"
 missing_errors_doc = "allow"
 map_unwrap_or = "allow"
-
-[patch."https://github.com/serenity-rs/serenity".serenity]
-git = "https://github.com/GnomedDev/serenity"
-branch = "bump-deps"
 
 [package.metadata.cargo-machete]
 ignored = [

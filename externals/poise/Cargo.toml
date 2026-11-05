@@ -3,7 +3,6 @@ authors = ["kangalio <jannik.a.schaper@web.de>"]
 edition = "2024"
 name = "poise"
 version = "0.7.0"
-rust-version = "1.95.0"
 description = "A Discord bot framework for serenity"
 license = "MIT"
 repository = "https://github.com/serenity-rs/poise/"
@@ -22,25 +21,10 @@ trim-in-place = "0.2.0"
 [dependencies.serenity]
 default-features = false
 features = ["builder", "gateway", "model", "utils", "collector", "framework"]
-git = "https://github.com/serenity-rs/serenity"
-branch = "next"
-
-# Example target required to enable example scraping
-[[example]]
-name = "quickstart"
-doc-scrape-examples = true
-
-[dev-dependencies]
-# For the examples
-tokio = { version = "1.25.1", features = ["rt-multi-thread"] }
-futures = { version = "0.3.13", default-features = false }
-tracing-subscriber = "0.3.18"
-fluent = "0.17.0"
-intl-memoizer = "0.5.1"
-fluent-syntax = "0.12"
+workspace = true
 
 [features]
-default = ["serenity/rustls_backend", "cache", "handle_panics"]
+default = ["serenity/rustls_backend_no_provider", "cache", "handle_panics"]
 cache = ["serenity/cache"]
 # No-op feature because serenity/collector is now enabled by default
 collector = []

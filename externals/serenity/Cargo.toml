@@ -5,26 +5,12 @@ authors = ["Alex M. M. <acdenissk69@gmail.com>"]
 description = "A Rust library for the Discord API."
 readme = "README.md"
 include = ["src/**/*", "LICENSE.md", "README.md", "CHANGELOG.md", "build.rs"]
-
-documentation.workspace = true
-homepage.workspace = true
-repository.workspace = true
-keywords.workspace = true
-license.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-
-[workspace]
-members = ["examples/*"]
-
-[workspace.package]
 documentation = "https://docs.rs/serenity"
 homepage = "https://github.com/serenity-rs/serenity"
 repository = "https://github.com/serenity-rs/serenity.git"
 keywords = ["discord", "api"]
 license = "ISC"
 edition = "2024"
-rust-version = "1.95"
 
 [dependencies]
 # Required dependencies
@@ -62,7 +48,6 @@ mime_guess = { version = "2.0.5", optional = true }
 mime ={ version = "0.3.16", optional = true }
 dashmap = { version = "6.1.0", features = ["serde"], optional = true }
 parking_lot = { version = "0.13.0" }
-ed25519-dalek = { version = "3.0.0", optional = true }
 typesize = { version = "0.1.16", optional = true, features = ["url", "serde_json", "secrecy", "parking_lot_13", "nonmax", "jiff"] }
 # serde feature only allows for serialisation,
 
@@ -72,9 +57,7 @@ package = "http"
 
 [features]
 # Defaults with different backends
-default = ["default_no_backend", "rustls_backend"]
 default_rustls_no_provider = ["default_no_backend", "rustls_backend_no_provider"]
-default_native_tls = ["default_no_backend", "native_tls_backend"]
 
 # Serenity requires a backend, this picks all default features without a backend.
 default_no_backend = [
@@ -116,13 +99,6 @@ utils = []
 voice = ["gateway"]
 # Enables unstable tokio features to give explicit names to internally spawned tokio tasks
 tokio_task_builder = ["tokio/tracing"]
-interactions_endpoint = ["ed25519-dalek"]
-
-# This enables all parts of the serenity codebase
-# (Note: all feature-gated APIs to be documented should have their features listed here!)
-#
-# Unstable functionality should be gated under the `unstable` feature.
-full = ["default", "collector", "voice", "interactions_endpoint"]
 
 # Enables temporary caching in functions that retrieve data via the HTTP API.
 temp_cache = ["cache", "mini-moka", "typesize?/mini_moka", "typesize?/dashmap"]
@@ -141,12 +117,6 @@ rustls_backend = [
 rustls_backend_no_provider = [
     "reqwest/rustls-no-provider",
     "tokio-tungstenite?/rustls-tls-native-roots",
-]
-
-# - Native TLS Backends
-native_tls_backend = [
-    "reqwest/native-tls",
-    "tokio-tungstenite?/native-tls",
 ]
 
 

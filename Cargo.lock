@@ -2892,7 +2892,6 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 [[package]]
 name = "poise"
 version = "0.7.0"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#52963f766fb8f7271fbafdcf595691d0037ad212"
 dependencies = [
  "async-trait",
  "derive-where",
@@ -2909,7 +2908,6 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.7.0"
-source = "git+https://github.com/serenity-rs/poise?branch=serenity-next#52963f766fb8f7271fbafdcf595691d0037ad212"
 dependencies = [
  "darling 0.24.1",
  "proc-macro2",
@@ -3452,7 +3450,6 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.5"
-source = "git+https://github.com/GnomedDev/serenity?branch=bump-deps#3a20daa08a4b1fcf36b94805fdd034d2b8d73bcf"
 dependencies = [
  "aformat",
  "arrayvec",
@@ -3466,6 +3463,7 @@ dependencies = [
  "flate2",
  "foldhash",
  "futures",
+ "http",
  "jiff",
  "mime",
  "mime_guess",
@@ -3486,7 +3484,6 @@ dependencies = [
  "tracing",
  "typesize",
  "url",
- "zeroize",
  "zstd",
 ]
 
@@ -4475,7 +4472,6 @@ dependencies = [
  "parking_lot 0.13.0",
  "secrecy",
  "serde_json",
- "time",
  "typesize-derive",
  "url",
 ]
