@@ -1,0 +1,205 @@
+use reqwest::header::{
+    AUTHORIZATION,
+    CONTENT_LENGTH,
+    CONTENT_TYPE,
+    HeaderMap as Headers,
+    HeaderValue,
+    USER_AGENT,
+};
+use reqwest::{Client, RequestBuilder as ReqwestRequestBuilder, Url};
+#[cfg(feature = "tracing_instrument")]
+use tracing::instrument;
+
+use super::multipart::Multipart;
+use super::routing::Route;
+use super::{HttpError, LightMethod};
+use crate::internal::prelude::*;
+
+/// The [UserAgent] sent along with every request.
+///
+/// [UserAgent]: reqwest::header::USER_AGENT
+pub const SERENITY_USER_AGENT: &str = concat!(
+    "DiscordBot (https://github.com/serenity-rs/serenity, ",
+    env!("CARGO_PKG_VERSION"),
+    ")"
+);
+
+#[derive(Clone, Debug)]
+#[must_use]
+pub struct Request<'a> {
+    pub(super) body: Option<Vec<u8>>,
+    pub(super) multipart: Option<Multipart<'a>>,
+    pub(super) headers: Option<Headers>,
+    pub(super) method: LightMethod,
+    pub(super) route: Route<'a>,
+    pub(super) params: Option<&'a [(&'a str, &'a str)]>,
+}
+
+impl<'a> Request<'a> {
+    pub fn new(route: Route<'a>, method: LightMethod) -> Self {
+        Self {
+            body: None,
+            multipart: None,
+            headers: None,
+            method,
+            route,
+            params: None,
+        }
+    }
+
+    pub fn body(mut self, body: Option<Vec<u8>>) -> Self {
+        self.body = body;
+        self
+    }
+
+    pub fn multipart(mut self, multipart: Option<Multipart<'a>>) -> Self {
+        self.multipart = multipart;
+        self
+    }
+
+    pub fn headers(mut self, headers: Option<Headers>) -> Self {
+        self.headers = headers;
+        self
+    }
+
+    pub fn params(mut self, params: &'a [(&'a str, &'a str)]) -> Self {
+        if params.is_empty() {
+            self.params = None;
+        } else {
+            self.params = Some(params);
+        }
+        self
+    }
+
+    /// # Errors
+    ///
+    /// Errors if the given proxy URL is invalid, or the token cannot be parsed into a HTTP header.
+    #[cfg_attr(feature = "tracing_instrument", instrument(skip(token)))]
+    pub async fn build(
+        self,
+        client: &Client,
+        token: Option<&str>,
+        proxy: Option<&str>,
+    ) -> Result<ReqwestRequestBuilder> {
+        // Build the multipart first, as to keep future size small.
+        let multipart = if let Some(multipart) = self.multipart {
+            Some(multipart.build_form().await?)
+        } else {
+            None
+        };
+
+        let mut path = self.route.path().into_owned();
+
+        if let Some(proxy) = proxy {
+            // trim_end_matches to prevent double slashes after the domain
+            path = path.replace("https://discord.com", proxy.trim_end_matches('/'));
+        }
+
+        let mut url = Url::parse(&path)?;
+
+        if let Some(params) = self.params {
+            url.query_pairs_mut().extend_pairs(params);
+        }
+
+        let mut builder = client.request(self.method.reqwest_method(), url);
+
+        let mut headers = self.headers.unwrap_or_default();
+        headers.insert(USER_AGENT, HeaderValue::from_static(SERENITY_USER_AGENT));
+        if let Some(token) = token {
+            headers.insert(
+                AUTHORIZATION,
+                HeaderValue::from_str(token).map_err(HttpError::InvalidHeader)?,
+            );
+        }
+
+        if let Some(multipart) = multipart {
+            // Setting multipart adds the content-length header.
+            builder = builder.multipart(multipart);
+        } else if let Some(bytes) = self.body {
+            headers.insert(CONTENT_LENGTH, bytes.len().into());
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            builder = builder.body(bytes);
+        } else {
+            headers.insert(CONTENT_LENGTH, 0.into()); // Can we skip this?
+        }
+
+        Ok(builder.headers(headers))
+    }
+
+    #[must_use]
+    pub fn body_ref(&self) -> Option<&[u8]> {
+        self.body.as_deref()
+    }
+
+    #[must_use]
+    pub fn body_mut(&mut self) -> Option<&mut [u8]> {
+        self.body.as_deref_mut()
+    }
+
+    #[must_use]
+    pub fn headers_ref(&self) -> Option<&Headers> {
+        self.headers.as_ref()
+    }
+
+    #[must_use]
+    pub fn headers_mut(&mut self) -> &mut Option<Headers> {
+        &mut self.headers
+    }
+
+    #[must_use]
+    pub fn method_ref(&self) -> &LightMethod {
+        &self.method
+    }
+
+    #[must_use]
+    pub fn route_ref(&self) -> &Route<'_> {
+        &self.route
+    }
+
+    #[must_use]
+    pub fn params_ref(&self) -> Option<&'a [(&'a str, &'a str)]> {
+        self.params
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+    use std::vec::Vec;
+
+    use super::*;
+    use crate::http::client::HttpBuilder;
+    use crate::model::id::GuildId;
+
+    // This test has to be async because Request::build is async, even though we don't use its async
+    // functionality here.
+    #[tokio::test]
+    async fn test_query_params_are_correctly_encoded() {
+        // Http::search_guild_members passes the query string unmodified into the Request struct
+        // expression. Let's see if it's handled correctly.
+        let guild_id = GuildId::default();
+        // This is actually a valid nickname on Discord. But since the & is also used to separate
+        // query arguments, it must be urlencoded before it can be sent.
+        let query = "foo&bar";
+        let limit = "50";
+
+        let sample_request = Request {
+            body: None,
+            multipart: None,
+            headers: None,
+            method: LightMethod::Get,
+            route: Route::GuildMembersSearch {
+                guild_id,
+            },
+            params: Some(&[("query", query), ("limit", limit)]),
+        };
+
+        let client = HttpBuilder::without_token().build();
+        let request_builder = sample_request.build(&client.client, None, None).await.unwrap();
+        let built = request_builder.build().unwrap();
+        let expected =
+            vec![(Cow::from("query"), Cow::from(query)), (Cow::from("limit"), Cow::from(limit))];
+        let actual = Vec::from_iter(built.url().query_pairs());
+        assert_eq!(actual, expected);
+    }
+}

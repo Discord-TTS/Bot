@@ -1,0 +1,119 @@
+use std::borrow::Cow;
+
+use super::DataUri;
+use crate::model::prelude::*;
+
+/// A builder to create a soundboard sound.
+///
+/// [Discord docs](https://docs.discord.com/developers/resources/soundboard#create-guild-soundboard-sound)
+#[derive(Clone, Debug, Serialize)]
+#[must_use]
+pub struct CreateSoundboard<'a> {
+    name: Cow<'a, str>,
+    sound: DataUri<'a>,
+    volume: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    emoji_id: Option<EmojiId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    emoji_name: Option<Cow<'a, str>>,
+
+    #[serde(skip)]
+    audit_log_reason: Option<Cow<'a, str>>,
+}
+
+impl<'a> CreateSoundboard<'a> {
+    /// Creates a new builder with the given data.
+    pub fn new(name: impl Into<Cow<'a, str>>, sound: DataUri<'a>) -> Self {
+        Self {
+            name: name.into(),
+            sound,
+            volume: 1.0,
+            emoji_id: None,
+            emoji_name: None,
+            audit_log_reason: None,
+        }
+    }
+
+    /// Set the name of the soundboard sound, replacing the current value as set in [`Self::new`].
+    ///
+    /// **Note**: Must be between 2 and 32 characters long.
+    pub fn name(mut self, name: impl Into<Cow<'a, str>>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    /// Set the sound file. Replaces the current value as set in [`Self::new`].
+    ///
+    /// **Note**: Must be audio that is encoded in MP3 or OGG, max 512 KB, max
+    /// duration 5.2 seconds.
+    pub fn sound(mut self, sound: DataUri<'a>) -> Self {
+        self.sound = sound;
+        self
+    }
+
+    /// Set the volume of the soundboard sound.
+    ///
+    /// **Note**: Must be between 0 to 1.
+    pub fn volume(mut self, volume: f64) -> Self {
+        self.volume = volume;
+        self
+    }
+
+    /// Set the ID of the custom emoji.
+    pub fn emoji_id(mut self, id: EmojiId) -> Self {
+        self.emoji_id = Some(id);
+        self
+    }
+
+    /// Set the Unicode character of the custom emoji.
+    pub fn emoji_name(mut self, name: impl Into<Cow<'a, str>>) -> Self {
+        self.emoji_name = Some(name.into());
+        self
+    }
+
+    /// Sets the request's audit log reason.
+    pub fn audit_log_reason(mut self, reason: impl Into<Cow<'a, str>>) -> Self {
+        self.audit_log_reason = Some(reason.into());
+        self
+    }
+
+    pub fn into_owned(self) -> CreateSoundboard<'static> {
+        let Self {
+            name,
+            sound,
+            volume,
+            emoji_id,
+            emoji_name,
+            audit_log_reason,
+        } = self;
+        CreateSoundboard {
+            name: name.into_owned().into(),
+            sound: sound.into_owned(),
+            volume,
+            emoji_id,
+            emoji_name: emoji_name.map(|e| e.into_owned().into()),
+            audit_log_reason: audit_log_reason.map(|r| r.into_owned().into()),
+        }
+    }
+
+    /// Creates a new soundboard in the guild with the data set.
+    ///
+    /// **Note**: Requires the [Create Guild Expressions] permission.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Http`] if the current user lacks permission or if invalid data is given.
+    ///
+    /// [Create Guild Expressions]: Permissions::CREATE_GUILD_EXPRESSIONS
+    #[cfg(feature = "http")]
+    pub async fn execute(
+        self,
+        cache_http: impl CacheHttp,
+        guild_id: GuildId,
+    ) -> Result<Soundboard> {
+        cache_http
+            .http()
+            .create_guild_soundboard(guild_id, &self, self.audit_log_reason.as_deref())
+            .await
+    }
+}

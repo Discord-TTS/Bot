@@ -1,0 +1,179 @@
+//! Mappings of objects received from the API, with optional helper methods for ease of use.
+//!
+//! Models can optionally have additional helper methods compiled, by enabling the `model` feature.
+//!
+//! Normally you can import models through the sub-modules:
+//!
+//! ```rust,no_run
+//! use serenity::model::channel::{ChannelType, GuildChannel, Message};
+//! use serenity::model::id::{ChannelId, GuildId};
+//! use serenity::model::user::User;
+//! ```
+//!
+//! This can get a bit tedious - especially with a large number of imports - so this can be
+//! simplified by simply glob importing everything from the prelude:
+//!
+//! ```rust,no_run
+//! use serenity::model::prelude::*;
+//! ```
+
+#[macro_use]
+mod utils;
+#[cfg(test)]
+pub(crate) use utils::assert_json;
+
+pub mod application;
+pub mod channel;
+pub mod colour;
+pub mod connection;
+pub mod error;
+pub mod event;
+pub mod gateway;
+pub mod guild;
+pub mod id;
+pub mod invite;
+pub mod mention;
+pub mod misc;
+pub mod monetization;
+pub mod permissions;
+pub mod soundboard;
+pub mod sticker;
+pub mod timestamp;
+#[cfg(feature = "model")]
+pub mod typing;
+pub mod user;
+pub mod voice;
+pub mod webhook;
+
+#[cfg(feature = "http")]
+use std::sync::Arc;
+
+pub use self::colour::{Color, Colour};
+pub use self::error::Error as ModelError;
+pub use self::permissions::Permissions;
+pub use self::timestamp::Timestamp;
+#[cfg(all(feature = "http", feature = "cache"))]
+use crate::cache::Cache;
+#[cfg(feature = "http")]
+use crate::http::Http;
+
+/// This trait will be required by functions that need [`Http`] and can optionally use a [`Cache`]
+/// to potentially avoid REST-requests.
+///
+/// If the `cache` feature is enabled, but an implementing type does not have access to a cache,
+/// the [`CacheHttp::cache`] method will simply return `None`.
+#[cfg(feature = "http")]
+pub trait CacheHttp: Send + Sync {
+    fn http(&self) -> &Http;
+
+    #[cfg(feature = "cache")]
+    #[must_use]
+    fn cache(&self) -> Option<&Arc<Cache>> {
+        None
+    }
+}
+
+#[cfg(feature = "http")]
+impl<T> CacheHttp for &T
+where
+    T: CacheHttp,
+{
+    fn http(&self) -> &Http {
+        (*self).http()
+    }
+    #[cfg(feature = "cache")]
+    fn cache(&self) -> Option<&Arc<Cache>> {
+        (*self).cache()
+    }
+}
+
+#[cfg(feature = "http")]
+impl<T> CacheHttp for Arc<T>
+where
+    T: CacheHttp,
+{
+    fn http(&self) -> &Http {
+        (**self).http()
+    }
+    #[cfg(feature = "cache")]
+    fn cache(&self) -> Option<&Arc<Cache>> {
+        (**self).cache()
+    }
+}
+
+#[cfg(all(feature = "http", feature = "cache"))]
+impl CacheHttp for (Option<&Arc<Cache>>, &Http) {
+    fn cache(&self) -> Option<&Arc<Cache>> {
+        self.0
+    }
+
+    fn http(&self) -> &Http {
+        self.1
+    }
+}
+
+#[cfg(feature = "http")]
+impl CacheHttp for Http {
+    fn http(&self) -> &Http {
+        self
+    }
+}
+
+/// The model prelude re-exports all types in the model sub-modules.
+///
+/// This allows for quick and easy access to all of the model types.
+///
+/// # Examples
+///
+/// Import all model types into scope:
+///
+/// ```rust,no_run
+/// use serenity::model::prelude::*;
+/// ```
+pub mod prelude {
+    pub(crate) use serde::{Deserialize, Deserializer};
+
+    #[cfg(feature = "http")]
+    #[doc(hidden)]
+    pub use super::CacheHttp;
+    pub use super::guild::automod::EventType as AutomodEventType;
+    #[doc(hidden)]
+    pub use super::guild::automod::{
+        Action,
+        ActionExecution,
+        ActionType,
+        AutoModRule,
+        KeywordPresetType,
+        Trigger,
+        TriggerMetadata,
+        TriggerType,
+    };
+    #[cfg(feature = "model")]
+    #[doc(hidden)]
+    pub use super::typing::*;
+    #[doc(hidden)]
+    pub use super::{
+        ModelError,
+        Timestamp,
+        application::*,
+        channel::*,
+        colour::*,
+        connection::*,
+        event::*,
+        gateway::*,
+        guild::audit_log::*,
+        guild::*,
+        id::*,
+        invite::*,
+        mention::*,
+        misc::*,
+        monetization::*,
+        permissions::*,
+        soundboard::*,
+        sticker::*,
+        user::*,
+        voice::*,
+        webhook::*,
+    };
+    pub(crate) use crate::internal::prelude::*;
+}

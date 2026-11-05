@@ -1,0 +1,796 @@
+//! A cache containing data received from [`Shard`]s.
+//!
+//! Using the cache allows to avoid REST API requests via the [`http`] module where possible.
+//! Issuing too many requests will lead to ratelimits.
+//!
+//! # Use by Models
+//!
+//! Most models of Discord objects, such as the [`Message`], [`GuildChannel`], or [`Emoji`], have
+//! methods for interacting with that single instance. This feature is only compiled if the `model`
+//! feature is enabled. An example of this is [`Guild::edit`], which performs a check to ensure that
+//! the current user has the [Manage Guild] permission prior to actually performing the HTTP
+//! request. The cache is involved due to the function's use of unlocking the cache and retrieving
+//! the permissions of the current user. This is an inexpensive method of being able to access data
+//! required by these sugary methods.
+//!
+//! # Do I need the Cache?
+//!
+//! If you're asking this, the answer is likely "definitely yes" or "definitely no"; any in-between
+//! tends to be "yes". If you are low on RAM, and need to run on only a couple MB, then the answer
+//! is "definitely no". If you do not care about RAM and want your bot to be able to access data
+//! while needing to hit the REST API as little as possible, then the answer is "yes".
+//!
+//! [`Shard`]: crate::gateway::Shard
+//! [`http`]: crate::http
+//! [Manage Guild]: Permissions::MANAGE_GUILD
+
+use std::collections::{HashSet, VecDeque};
+use std::hash::Hash;
+use std::num::NonZeroU16;
+#[cfg(feature = "temp_cache")]
+use std::sync::Arc;
+#[cfg(feature = "temp_cache")]
+use std::time::Duration;
+
+use dashmap::DashMap;
+use dashmap::mapref::one::{MappedRef, Ref};
+#[cfg(feature = "temp_cache")]
+use mini_moka::sync::Cache as MokaCache;
+use parking_lot::RwLock;
+#[cfg(feature = "tracing_instrument")]
+use tracing::instrument;
+
+pub use self::cache_update::CacheUpdate;
+pub use self::settings::Settings;
+use crate::model::prelude::*;
+
+mod cache_update;
+mod event;
+mod settings;
+pub(crate) mod wrappers;
+
+#[cfg(feature = "temp_cache")]
+pub(crate) use wrappers::MaybeOwnedArc;
+use wrappers::{BuildHasher, MaybeMap, ReadOnlyMapRef};
+
+struct NotSend;
+
+enum CacheRefInner<'a, K, V, T> {
+    #[cfg(feature = "temp_cache")]
+    Arc(Arc<V>),
+    DashRef(Ref<'a, K, V>),
+    DashMappedRef(MappedRef<'a, K, T, V>),
+    ReadGuard(parking_lot::RwLockReadGuard<'a, V>),
+}
+
+pub struct CacheRef<'a, K, V, T = ()> {
+    inner: CacheRefInner<'a, K, V, T>,
+    phantom: std::marker::PhantomData<*const NotSend>,
+}
+
+impl<'a, K, V, T> CacheRef<'a, K, V, T> {
+    fn new(inner: CacheRefInner<'a, K, V, T>) -> Self {
+        Self {
+            inner,
+            phantom: std::marker::PhantomData,
+        }
+    }
+
+    #[cfg(feature = "temp_cache")]
+    fn from_arc(inner: MaybeOwnedArc<V>) -> Self {
+        Self::new(CacheRefInner::Arc(inner.get_inner()))
+    }
+
+    fn from_ref(inner: Ref<'a, K, V>) -> Self {
+        Self::new(CacheRefInner::DashRef(inner))
+    }
+
+    fn from_mapped_ref(inner: MappedRef<'a, K, T, V>) -> Self {
+        Self::new(CacheRefInner::DashMappedRef(inner))
+    }
+
+    fn from_guard(inner: parking_lot::RwLockReadGuard<'a, V>) -> Self {
+        Self::new(CacheRefInner::ReadGuard(inner))
+    }
+}
+
+impl<K: Eq + Hash, V, T> std::ops::Deref for CacheRef<'_, K, V, T> {
+    type Target = V;
+
+    fn deref(&self) -> &Self::Target {
+        match &self.inner {
+            #[cfg(feature = "temp_cache")]
+            CacheRefInner::Arc(inner) => inner,
+            CacheRefInner::DashRef(inner) => inner.value(),
+            CacheRefInner::DashMappedRef(inner) => inner.value(),
+            CacheRefInner::ReadGuard(inner) => inner,
+        }
+    }
+}
+
+type Never = std::convert::Infallible;
+
+pub type UserRef<'a> = CacheRef<'a, UserId, User, Never>;
+pub type GuildRef<'a> = CacheRef<'a, GuildId, Guild, Never>;
+pub type SettingsRef<'a> = CacheRef<'a, Never, Settings, Never>;
+pub type CurrentUserRef<'a> = CacheRef<'a, Never, CurrentUser, Never>;
+pub type MessageRef<'a> = CacheRef<'a, GenericChannelId, Message, VecDeque<Message>>;
+pub type ChannelMessagesRef<'a> = CacheRef<'a, GenericChannelId, VecDeque<Message>, Never>;
+
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
+#[derive(Debug)]
+struct CachedShardData {
+    total: NonZeroU16,
+    connected: HashSet<ShardId>,
+    has_sent_shards_ready: bool,
+}
+
+/// A cache containing data received from [`Shard`]s.
+///
+/// Using the cache allows to avoid REST API requests via the [`http`] module where possible.
+/// Issuing too many requests will lead to ratelimits.
+///
+/// This is the list of cached resources and the events that populate them:
+/// - channels: [`ChannelCreateEvent`], [`ChannelUpdateEvent`], [`GuildCreateEvent`]
+/// - guilds: [`GuildCreateEvent`]
+/// - unavailable_guilds: [`ReadyEvent`], [`GuildDeleteEvent`]
+/// - users: [`GuildMemberAddEvent`], [`GuildMemberRemoveEvent`], [`GuildMembersChunkEvent`],
+///   [`PresenceUpdateEvent`], [`ReadyEvent`]
+/// - presences: [`PresenceUpdateEvent`], [`ReadyEvent`]
+/// - messages: [`MessageCreateEvent`]
+///
+/// The documentation of each event contains the required gateway intents.
+///
+/// [`Shard`]: crate::gateway::Shard
+/// [`http`]: crate::http
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct Cache {
+    // Temp cache:
+    // ---
+    /// Cache of channels that have been fetched via to_channel.
+    ///
+    /// The TTL for each value is configured in CacheSettings.
+    #[cfg(feature = "temp_cache")]
+    pub(crate) temp_channels: MokaCache<ChannelId, MaybeOwnedArc<GuildChannel>, BuildHasher>,
+    /// Cache of threads that have been fetched via to_channel.
+    ///
+    /// The TTL for each value is configured in CacheSettings.
+    #[cfg(feature = "temp_cache")]
+    pub(crate) temp_threads: MokaCache<ThreadId, MaybeOwnedArc<GuildThread>, BuildHasher>,
+    /// Cache of private channels created via create_dm_channel.
+    ///
+    /// The TTL for each value is configured in CacheSettings.
+    #[cfg(feature = "temp_cache")]
+    pub(crate) temp_private_channels: MokaCache<UserId, MaybeOwnedArc<PrivateChannel>, BuildHasher>,
+    /// Cache of messages that have been fetched via message.
+    ///
+    /// The TTL for each value is configured in CacheSettings.
+    #[cfg(feature = "temp_cache")]
+    pub(crate) temp_messages: MokaCache<MessageId, MaybeOwnedArc<Message>, BuildHasher>,
+    /// Cache of users who have been fetched from `to_user`.
+    ///
+    /// The TTL for each value is configured in CacheSettings.
+    #[cfg(feature = "temp_cache")]
+    pub(crate) temp_users: MokaCache<UserId, MaybeOwnedArc<User>, BuildHasher>,
+
+    // Guilds cache:
+    // ---
+    /// A map of guilds with full data available. This includes data like [`Role`]s and [`Emoji`]s
+    /// that are not available through the REST API.
+    guilds: MaybeMap<GuildId, Guild>,
+    /// A list of guilds which are "unavailable".
+    ///
+    /// Additionally, guilds are always unavailable for bot users when a Ready is received. Guilds
+    /// are "sent in" over time through the receiving of [`Event::GuildCreate`]s.
+    unavailable_guilds: MaybeMap<GuildId, ()>,
+
+    // Messages cache:
+    // ---
+    messages: DashMap<GenericChannelId, VecDeque<Message>, BuildHasher>,
+
+    // Miscellanous fixed-size data
+    // ---
+    /// Information about running shards
+    shard_data: RwLock<CachedShardData>,
+    /// The current user "logged in" and for which events are being received for.
+    ///
+    /// The current user contains information that a regular [`User`] does not, such as whether it
+    /// is a bot, whether the user is verified, etc.
+    ///
+    /// Refer to the documentation for [`CurrentUser`] for more information.
+    user: RwLock<CurrentUser>,
+    /// The settings for the cache.
+    settings: RwLock<Settings>,
+}
+
+impl Cache {
+    /// Creates a new cache.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a new cache instance with settings applied.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use serenity::cache::{Cache, Settings};
+    ///
+    /// let mut settings = Settings::default();
+    /// settings.max_messages = 10;
+    ///
+    /// let cache = Cache::new_with_settings(settings);
+    /// ```
+    #[cfg_attr(feature = "tracing_instrument", instrument)]
+    pub fn new_with_settings(settings: Settings) -> Self {
+        #[cfg(feature = "temp_cache")]
+        fn temp_cache<K, V>(ttl: Duration) -> MokaCache<K, V, BuildHasher>
+        where
+            K: Hash + Eq + Send + Sync + 'static,
+            V: Clone + Send + Sync + 'static,
+        {
+            MokaCache::builder().time_to_live(ttl).build_with_hasher(BuildHasher::default())
+        }
+
+        Self {
+            #[cfg(feature = "temp_cache")]
+            temp_private_channels: temp_cache(settings.time_to_live),
+            #[cfg(feature = "temp_cache")]
+            temp_channels: temp_cache(settings.time_to_live),
+            #[cfg(feature = "temp_cache")]
+            temp_threads: temp_cache(settings.time_to_live),
+            #[cfg(feature = "temp_cache")]
+            temp_messages: temp_cache(settings.time_to_live),
+            #[cfg(feature = "temp_cache")]
+            temp_users: temp_cache(settings.time_to_live),
+
+            guilds: MaybeMap(settings.cache_guilds.then(DashMap::default)),
+            unavailable_guilds: MaybeMap(settings.cache_guilds.then(DashMap::default)),
+
+            messages: DashMap::default(),
+
+            shard_data: RwLock::new(CachedShardData {
+                total: NonZeroU16::MIN,
+                connected: HashSet::new(),
+                has_sent_shards_ready: false,
+            }),
+            user: RwLock::new(CurrentUser::default()),
+            settings: RwLock::new(settings),
+        }
+    }
+
+    /// Fetches the number of [`Member`]s that have not had data received.
+    ///
+    /// The important detail to note here is that this is the number of _member_s that have not had
+    /// data received. A single [`User`] may have multiple associated member objects that have not
+    /// been received.
+    ///
+    /// This can be used in combination with [`Shard::chunk_guild`], and can be used to determine
+    /// how many members have not yet been received.
+    ///
+    /// [`Shard::chunk_guild`]: crate::gateway::Shard::chunk_guild
+    pub fn unknown_members(&self) -> u32 {
+        let mut total = 0;
+
+        for guild_entry in self.guilds.iter() {
+            let guild = guild_entry.value();
+
+            let known_member_count = guild.members.len() as u32;
+            let member_count_estimate = guild.member_count.get();
+            if member_count_estimate > known_member_count {
+                total += member_count_estimate - known_member_count;
+            }
+        }
+
+        total
+    }
+
+    /// Fetches a vector of all [`Guild`]s' Ids that are stored in the cache.
+    ///
+    /// Note that if you are utilizing multiple [`Shard`]s, then the guilds retrieved over all
+    /// shards are included in this count -- not just the current [`Context`]'s shard, if accessing
+    /// from one.
+    ///
+    /// # Examples
+    ///
+    /// Print all of the Ids of guilds in the Cache:
+    ///
+    /// ```rust,no_run
+    /// # use serenity::model::event::FullEvent;
+    /// # use serenity::prelude::*;
+    ///
+    /// struct Handler;
+    ///
+    /// #[serenity::async_trait]
+    /// impl EventHandler for Handler {
+    ///     async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
+    ///         match event {
+    ///             FullEvent::Ready {
+    ///                 data_about_bot, ..
+    ///             } => {
+    ///                 let guilds = ctx.cache.guilds().len();
+    ///                 println!("Guilds in the Cache: {guilds}");
+    ///             },
+    ///             _ => {},
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// [`Context`]: crate::gateway::client::Context
+    /// [`Shard`]: crate::gateway::Shard
+    pub fn guilds(&self) -> Vec<GuildId> {
+        let unavailable_guilds = self.unavailable_guilds();
+
+        let unavailable_guild_ids = unavailable_guilds.iter().map(|i| *i.key());
+
+        self.guilds.iter().map(|i| *i.key()).chain(unavailable_guild_ids).collect()
+    }
+
+    /// Get a reference to the cached messages for a channel based on the given `Id`.
+    ///
+    /// # Examples
+    ///
+    /// Find all messages by user ID 8 in channel ID 7:
+    ///
+    /// ```rust,no_run
+    /// # use serenity::model::id::GenericChannelId;
+    /// #
+    /// # let cache: serenity::cache::Cache = todo!();
+    /// if let Some(messages_in_channel) = cache.channel_messages(GenericChannelId::new(7)) {
+    ///     let messages_by_user: Vec<_> =
+    ///         messages_in_channel.iter().filter(|m| m.author.id == 8).collect();
+    /// }
+    /// ```
+    pub fn channel_messages(&self, channel_id: GenericChannelId) -> Option<ChannelMessagesRef<'_>> {
+        self.messages.get(&channel_id).map(CacheRef::from_ref)
+    }
+
+    /// Gets a reference to a guild from the cache based on the given `id`.
+    ///
+    /// # Examples
+    ///
+    /// Retrieve a guild from the cache and print its name:
+    ///
+    /// ```rust,no_run
+    /// # use serenity::cache::Cache;
+    /// # use serenity::model::id::GuildId;
+    /// #
+    /// # let cache = Cache::default();
+    /// // assuming the cache is in scope, e.g. via `Context`
+    /// if let Some(guild) = cache.guild(GuildId::new(7)) {
+    ///     println!("Guild name: {}", guild.name);
+    /// };
+    /// ```
+    pub fn guild(&self, id: GuildId) -> Option<GuildRef<'_>> {
+        self.guilds.get(&id).map(CacheRef::from_ref)
+    }
+
+    /// Returns the number of cached guilds.
+    pub fn guild_count(&self) -> usize {
+        self.guilds.len()
+    }
+
+    /// This method clones and returns all unavailable guilds.
+    pub fn unavailable_guilds(&self) -> ReadOnlyMapRef<'_, GuildId, ()> {
+        self.unavailable_guilds.as_read_only()
+    }
+
+    /// Returns the number of shards.
+    pub fn shard_count(&self) -> NonZeroU16 {
+        self.shard_data.read().total
+    }
+
+    /// Retrieves a [`Channel`]'s message from the cache based on the channel's and message's given
+    /// Ids.
+    ///
+    /// **Note**: This will clone the entire message.
+    ///
+    /// # Examples
+    ///
+    /// Retrieving the message object from a channel.
+    ///
+    /// ```rust,no_run
+    /// # use serenity::cache::Cache;
+    /// # use serenity::model::channel::Message;
+    /// #
+    /// # fn run(cache: Cache, message: Message) {
+    /// #
+    /// match cache.message(message.channel_id, message.id) {
+    ///     Some(m) => assert_eq!(message.content, m.content),
+    ///     None => println!("No message found in cache."),
+    /// };
+    /// # }
+    /// ```
+    pub fn message(
+        &self,
+        channel_id: GenericChannelId,
+        message_id: MessageId,
+    ) -> Option<MessageRef<'_>> {
+        #[cfg(feature = "temp_cache")]
+        if let Some(message) = self.temp_messages.get(&message_id) {
+            return Some(CacheRef::from_arc(message));
+        }
+
+        let messages = self.messages.get(&channel_id)?;
+        let message =
+            messages.try_map(|messages| messages.iter().find(|m| m.id == message_id)).ok()?;
+        Some(CacheRef::from_mapped_ref(message))
+    }
+
+    /// Returns the settings.
+    ///
+    /// # Examples
+    ///
+    /// Printing the maximum number of messages in a channel to be cached:
+    ///
+    /// ```rust
+    /// use serenity::cache::Cache;
+    ///
+    /// # fn test() {
+    /// let mut cache = Cache::new();
+    /// println!("Max settings: {}", cache.settings().max_messages);
+    /// # }
+    /// ```
+    pub fn settings(&self) -> SettingsRef<'_> {
+        CacheRef::from_guard(self.settings.read())
+    }
+
+    /// Sets the maximum amount of messages per channel to cache.
+    ///
+    /// By default, no messages will be cached.
+    pub fn set_max_messages(&self, max: usize) {
+        // Check to see if cache has to be truncated
+        if max < self.settings.read().max_messages {
+            for mut entry in self.messages.iter_mut() {
+                let message_queue = entry.value_mut();
+                let queue_len = message_queue.len();
+
+                if queue_len > max {
+                    message_queue.drain(..queue_len - max);
+                }
+            }
+        }
+
+        self.settings.write().max_messages = max;
+    }
+
+    /// This method provides a reference to the user used by the bot.
+    pub fn current_user(&self) -> CurrentUserRef<'_> {
+        CacheRef::from_guard(self.user.read())
+    }
+
+    /// Clones all channel categories in the given guild and returns them.
+    pub fn guild_categories(
+        &self,
+        guild_id: GuildId,
+    ) -> Option<ExtractMap<ChannelId, GuildChannel>> {
+        let guild = self.guilds.get(&guild_id)?;
+
+        let filter = |channel: &&GuildChannel| channel.base.kind == ChannelType::Category;
+        Some(guild.channels.iter().filter(filter).cloned().collect())
+    }
+
+    /// Inserts new messages into the message cache for a channel manually.
+    ///
+    /// This will keep the ordering of the message cache consistent, even if the message iterator
+    /// contains randomly ordered messages, and respects the [`Settings::max_messages`] setting.
+    pub(crate) fn fill_message_cache(
+        &self,
+        channel_id: GenericChannelId,
+        new_messages: impl Iterator<Item = Message>,
+    ) {
+        let max_messages = self.settings().max_messages;
+        if max_messages == 0 {
+            // Early exit for common case of message cache being disabled.
+            return;
+        }
+
+        let mut channel_messages = self.messages.entry(channel_id).or_default();
+
+        // Fill up the existing cache
+        channel_messages.extend(new_messages.take(max_messages));
+        // Make sure the cache stays sorted to messages
+        channel_messages.make_contiguous().sort_unstable_by_key(|m| m.id);
+        // Get rid of the overflow at the front of the queue.
+        let truncate_end_index = channel_messages.len().saturating_sub(max_messages);
+        channel_messages.drain(..truncate_end_index);
+    }
+
+    /// Updates the cache with the update implementation for an event or other custom update
+    /// implementation.
+    ///
+    /// Refer to the documentation for [`CacheUpdate`] for more information.
+    ///
+    /// # Examples
+    ///
+    /// Refer to the [`CacheUpdate` examples].
+    ///
+    /// [`CacheUpdate` examples]: CacheUpdate#examples
+    #[cfg_attr(feature = "tracing_instrument", instrument(skip(self, e)))]
+    pub fn update<E: CacheUpdate>(&self, e: &mut E) -> Option<E::Output> {
+        e.update(self)
+    }
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Self::new_with_settings(Settings::default())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use crate::cache::{Cache, CacheUpdate, Settings};
+    use crate::model::prelude::*;
+
+    #[test]
+    fn test_cache_messages() {
+        let settings = Settings {
+            max_messages: 2,
+            ..Default::default()
+        };
+        let cache = Cache::new_with_settings(settings);
+
+        // Test inserting one message into a channel's message cache.
+        let mut event = MessageCreateEvent {
+            message: Message {
+                id: MessageId::new(3),
+                guild_id: Some(GuildId::new(1)),
+                ..Default::default()
+            },
+        };
+
+        // Check that the channel cache doesn't exist.
+        assert!(!cache.messages.contains_key(&event.message.channel_id));
+        // Add first message, none because message ID 2 doesn't already exist.
+        assert!(event.update(&cache).is_none());
+        // None, it only returns the oldest message if the cache was already full.
+        assert!(event.update(&cache).is_none());
+        // Assert there's only 1 message in the channel's message cache.
+        assert_eq!(cache.messages.get(&event.message.channel_id).unwrap().len(), 1);
+
+        // Add a second message, assert that channel message cache length is 2.
+        event.message.id = MessageId::new(4);
+        assert!(event.update(&cache).is_none());
+        assert_eq!(cache.messages.get(&event.message.channel_id).unwrap().len(), 2);
+
+        // Add a third message, the first should now be removed.
+        event.message.id = MessageId::new(5);
+        assert!(event.update(&cache).is_some());
+
+        // Add a reaction for a channel
+        let message = &event.message;
+        let reaction_type = ReactionType::Unicode(FixedString::from_str("\u{2753}").unwrap());
+        let second_reaction_type =
+            ReactionType::Unicode(FixedString::from_str("\u{2757}").unwrap());
+
+        let mut reaction_event = ReactionAddEvent {
+            reaction: Reaction {
+                user_id: Some(UserId::new(1)),
+                channel_id: message.channel_id,
+                message_id: message.id,
+                guild_id: message.guild_id,
+                member: None,
+                emoji: reaction_type.clone(),
+                message_author_id: Some(message.author.id),
+                burst: false,
+                burst_colours: None,
+                reaction_type: ReactionTypes::Normal,
+            },
+        };
+
+        assert!(cache.update(&mut reaction_event).is_some());
+
+        {
+            let channel = cache.messages.get(&reaction_event.reaction.channel_id).unwrap();
+            let message =
+                channel.iter().find(|m| m.id == reaction_event.reaction.message_id).unwrap();
+
+            assert_eq!(message.reactions.len(), 1);
+        }
+
+        // Add second reaction
+        reaction_event.reaction.emoji = second_reaction_type;
+
+        assert!(cache.update(&mut reaction_event).is_some());
+
+        {
+            let channel = cache.messages.get(&reaction_event.reaction.channel_id).unwrap();
+            let message =
+                channel.iter().find(|m| m.id == reaction_event.reaction.message_id).unwrap();
+
+            assert_eq!(message.reactions.len(), 2);
+        }
+
+        // Add a burst reaction
+        reaction_event.reaction.emoji = reaction_type.clone();
+        reaction_event.reaction.burst = true;
+        reaction_event.reaction.reaction_type = ReactionTypes::Burst;
+
+        assert!(cache.update(&mut reaction_event).is_some());
+
+        {
+            let channel = cache.messages.get(&reaction_event.reaction.channel_id).unwrap();
+            let message =
+                channel.iter().find(|m| m.id == reaction_event.reaction.message_id).unwrap();
+
+            assert_eq!(message.reactions.len(), 2);
+            assert!(
+                message
+                    .reactions
+                    .iter()
+                    .find(|r| r.reaction_type == reaction_type
+                        && r.count == 2
+                        && r.count_details.burst == 1)
+                    .is_some()
+            );
+        }
+
+        // Remove a reaction
+        let mut reaction_remove_event = ReactionRemoveEvent {
+            reaction: reaction_event.reaction.clone(),
+        };
+
+        reaction_remove_event.reaction.emoji = reaction_type.clone();
+
+        assert!(cache.update(&mut reaction_remove_event).is_some());
+
+        {
+            let channel = cache.messages.get(&reaction_event.reaction.channel_id).unwrap();
+            let message =
+                channel.iter().find(|m| m.id == reaction_event.reaction.message_id).unwrap();
+
+            assert_eq!(message.reactions.len(), 2);
+            assert!(
+                message
+                    .reactions
+                    .iter()
+                    .find(|r| r.reaction_type == reaction_type
+                        && r.count == 1
+                        && r.count_details.burst == 0)
+                    .is_some()
+            );
+        }
+
+        // Remove normal reaction, so the entire reaction should be removed
+        reaction_remove_event.reaction.burst = false;
+        reaction_remove_event.reaction.reaction_type = ReactionTypes::Normal;
+
+        assert!(cache.update(&mut reaction_remove_event).is_some());
+
+        {
+            let channel = cache.messages.get(&reaction_event.reaction.channel_id).unwrap();
+            let message =
+                channel.iter().find(|m| m.id == reaction_event.reaction.message_id).unwrap();
+
+            assert_eq!(message.reactions.len(), 1);
+        }
+
+        // The instance should be removed when ReactionRemoveEmojiEvent is fired
+        let mut reaction_remove_event = ReactionRemoveEmojiEvent {
+            reaction: reaction_event.reaction.clone(),
+        };
+
+        // First prepare test data
+        reaction_event.reaction.emoji = reaction_type.clone();
+        assert!(cache.update(&mut reaction_event).is_some());
+
+        reaction_event.reaction.burst = false;
+        reaction_event.reaction.reaction_type = ReactionTypes::Normal;
+
+        assert!(cache.update(&mut reaction_event).is_some());
+
+        reaction_event.reaction.user_id = Some(UserId::new(2));
+        assert!(cache.update(&mut reaction_event).is_some());
+
+        {
+            let channel = cache.messages.get(&reaction_event.reaction.channel_id).unwrap();
+            let message =
+                channel.iter().find(|m| m.id == reaction_event.reaction.message_id).unwrap();
+
+            assert_eq!(message.reactions.len(), 2);
+            assert!(
+                message
+                    .reactions
+                    .iter()
+                    .find(|r| r.reaction_type == reaction_type
+                        && r.count == 3
+                        && r.count_details.burst == 1
+                        && r.count_details.normal == 2)
+                    .is_some()
+            );
+        }
+
+        assert!(cache.update(&mut reaction_remove_event).is_some());
+
+        {
+            let channel = cache.messages.get(&reaction_event.reaction.channel_id).unwrap();
+            let message =
+                channel.iter().find(|m| m.id == reaction_event.reaction.message_id).unwrap();
+            assert_eq!(message.reactions.len(), 1);
+        }
+
+        // All reactions should be removed when ReactionRemoveAllEvent is fired
+        let mut reaction_remove_event = ReactionRemoveAllEvent {
+            message_id: reaction_event.reaction.message_id,
+            channel_id: reaction_event.reaction.channel_id,
+            guild_id: reaction_event.reaction.guild_id,
+        };
+
+        // First add second reaction
+        assert!(cache.update(&mut reaction_event).is_some());
+
+        {
+            let channel = cache.messages.get(&reaction_event.reaction.channel_id).unwrap();
+            let message =
+                channel.iter().find(|m| m.id == reaction_event.reaction.message_id).unwrap();
+            assert_eq!(message.reactions.len(), 2);
+        }
+
+        // Remove all reactions
+        assert!(cache.update(&mut reaction_remove_event).is_some());
+
+        {
+            let channel = cache.messages.get(&reaction_event.reaction.channel_id).unwrap();
+            let message =
+                channel.iter().find(|m| m.id == reaction_event.reaction.message_id).unwrap();
+
+            assert_eq!(message.reactions.len(), 0);
+        }
+
+        {
+            let channel = cache.messages.get(&event.message.channel_id).unwrap();
+
+            assert_eq!(channel.len(), 2);
+            // Check that the first message is now removed.
+            assert!(!channel.iter().any(|m| m.id == MessageId::new(3)));
+        }
+
+        let channel = GuildChannel {
+            id: event.message.channel_id.expect_channel(),
+            base: BaseGuildChannel {
+                guild_id: event.message.guild_id.unwrap(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Add a channel delete event to the cache, the cached messages for that channel should now
+        // be gone.
+        let mut delete = ChannelDeleteEvent {
+            channel: channel.clone(),
+        };
+        assert!(cache.update(&mut delete).is_some());
+        assert!(!cache.messages.contains_key(&delete.channel.id.into()));
+
+        // Test deletion of a guild channel's message cache when a GuildDeleteEvent is received.
+        let mut guild_create = GuildCreateEvent {
+            guild: Guild {
+                id: GuildId::new(1),
+                channels: ExtractMap::from_iter([channel]),
+                ..Default::default()
+            },
+        };
+        assert!(cache.update(&mut guild_create).is_some());
+        assert!(cache.update(&mut event).is_none());
+
+        let mut guild_delete = GuildDeleteEvent {
+            guild: UnavailableGuild {
+                id: GuildId::new(1),
+                unavailable: false,
+            },
+        };
+
+        // The guild existed in the cache, so the cache's guild is returned by the update.
+        assert!(cache.update(&mut guild_delete).is_some());
+
+        // Assert that the channel's message cache no longer exists.
+        assert!(!cache.messages.contains_key(&GenericChannelId::new(2)));
+    }
+}

@@ -1,0 +1,262 @@
+use std::borrow::Cow;
+
+use super::DataUri;
+#[cfg(feature = "http")]
+use crate::http::Http;
+use crate::model::prelude::*;
+
+/// A builder to create or edit a [`Role`] for use via a number of model methods.
+///
+/// These are:
+///
+/// - [`GuildId::create_role`]
+/// - [`GuildId::edit_role`]
+/// - [`Role::edit`]
+///
+/// Defaults are provided for each parameter on role creation.
+///
+/// # Examples
+///
+/// Create a hoisted, mentionable role named `"a test role"`:
+///
+/// ```rust,no_run
+/// # use serenity::builder::EditRole;
+/// # use serenity::http::Http;
+/// # use serenity::model::id::GuildId;
+/// # use std::sync::Arc;
+/// #
+/// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+/// # let http: Arc<Http> = unimplemented!();
+/// # let guild_id: GuildId = unimplemented!();
+/// #
+/// // assuming a `guild_id` has been bound
+/// let builder = EditRole::new().name("a test role").hoist(true).mentionable(true);
+/// let role = guild_id.create_role(&http, builder).await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [Discord docs](https://docs.discord.com/developers/resources/guild#modify-guild-role)
+#[derive(Clone, Debug, Default, Serialize)]
+#[must_use]
+pub struct EditRole<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<Cow<'a, str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    permissions: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "color")]
+    colour: Option<Colour>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "colors")]
+    colours: Option<CreateRoleColours>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hoist: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    icon: Option<Option<DataUri<'a>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unicode_emoji: Option<Option<Cow<'a, str>>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mentionable: Option<bool>,
+
+    #[serde(skip)]
+    position: Option<i16>,
+    #[serde(skip)]
+    audit_log_reason: Option<Cow<'a, str>>,
+}
+
+impl<'a> EditRole<'a> {
+    /// Equivalent to [`Self::default`].
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a new builder with the values of the given [`Role`].
+    pub fn from_role(role: &'a Role) -> Self {
+        EditRole {
+            hoist: Some(role.hoist()),
+            mentionable: Some(role.mentionable()),
+            name: Some(Cow::Borrowed(&role.name)),
+            permissions: Some(role.permissions.bits()),
+            position: Some(role.position),
+            colour: Some(role.colour),
+            unicode_emoji: role.unicode_emoji.as_ref().map(|v| Some(Cow::Borrowed(v.as_str()))),
+            audit_log_reason: None,
+            colours: Some(role.colours.into()),
+            // TODO: Do we want to download role.icon?
+            icon: None,
+        }
+    }
+
+    /// Set the colour of the role.
+    pub fn colour(mut self, colour: impl Into<Colour>) -> Self {
+        self.colour = Some(colour.into());
+        self
+    }
+
+    /// Sets the colours of the role. Supports gradient and holographic role colours.
+    pub fn colours(mut self, colours: impl Into<CreateRoleColours>) -> Self {
+        self.colours = Some(colours.into());
+        self
+    }
+
+    /// Whether or not to hoist the role above lower-positioned roles in the user list.
+    pub fn hoist(mut self, hoist: bool) -> Self {
+        self.hoist = Some(hoist);
+        self
+    }
+
+    /// Whether or not to make the role mentionable, upon which users with that role will be
+    /// notified.
+    pub fn mentionable(mut self, mentionable: bool) -> Self {
+        self.mentionable = Some(mentionable);
+        self
+    }
+
+    /// Set the role's name.
+    pub fn name(mut self, name: impl Into<Cow<'a, str>>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Set the role's permissions.
+    pub fn permissions(mut self, permissions: Permissions) -> Self {
+        self.permissions = Some(permissions.bits());
+        self
+    }
+
+    /// Set the role's position in the role list. This correlates to the role's position in the
+    /// user list.
+    pub fn position(mut self, position: i16) -> Self {
+        self.position = Some(position);
+        self
+    }
+
+    /// Set the role icon to a unicode emoji.
+    pub fn unicode_emoji(mut self, unicode_emoji: Option<Cow<'a, str>>) -> Self {
+        self.unicode_emoji = Some(unicode_emoji);
+        self.icon = Some(None);
+        self
+    }
+
+    /// Set the role icon to a custom image.
+    pub fn icon(mut self, icon: Option<DataUri<'a>>) -> Self {
+        self.icon = Some(icon);
+        self.unicode_emoji = Some(None);
+        self
+    }
+
+    /// Sets the request's audit log reason.
+    pub fn audit_log_reason(mut self, reason: impl Into<Cow<'a, str>>) -> Self {
+        self.audit_log_reason = Some(reason.into());
+        self
+    }
+
+    pub fn into_owned(self) -> EditRole<'static> {
+        let Self {
+            name,
+            permissions,
+            colour,
+            colours,
+            hoist,
+            icon,
+            unicode_emoji,
+            mentionable,
+            position,
+            audit_log_reason,
+        } = self;
+        EditRole {
+            name: name.map(|n| n.into_owned().into()),
+            permissions,
+            colour,
+            colours,
+            hoist,
+            icon: icon.map(|i| i.map(DataUri::into_owned)),
+            unicode_emoji: unicode_emoji.map(|e| e.map(|e| e.into_owned().into())),
+            mentionable,
+            position,
+            audit_log_reason: audit_log_reason.map(|r| r.into_owned().into()),
+        }
+    }
+
+    /// Edits the role.
+    ///
+    /// **Note**: Requires the [Manage Roles] permission.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Http`] if the current user lacks permission or if invalid data is given.
+    ///
+    /// [Manage Roles]: Permissions::MANAGE_ROLES
+    #[cfg(feature = "http")]
+    pub async fn execute(
+        self,
+        http: &Http,
+        guild_id: GuildId,
+        role_id: Option<RoleId>,
+    ) -> Result<Role> {
+        let role = match role_id {
+            Some(role_id) => {
+                http.edit_role(guild_id, role_id, &self, self.audit_log_reason.as_deref()).await?
+            },
+            None => http.create_role(guild_id, &self, self.audit_log_reason.as_deref()).await?,
+        };
+
+        if let Some(position) = self.position {
+            guild_id
+                .edit_role_positions(http, [(role.id, position)], self.audit_log_reason.as_deref())
+                .await?;
+        }
+        Ok(role)
+    }
+}
+
+/// The colours of a Discord role, secondary_colour and tertiary_colour may only be set if
+/// the [Guild] has the `ENHANCED_ROLE_COLORS` feature.
+///
+/// Note: 2024-07-05 - tertiary_colour is currently enforced to be set with a specific pair of
+/// primary and secondary colours, for current validation see
+/// [Discord docs](https://docs.discord.com/developers/topics/permissions#role-object-role-colors-object).
+#[derive(Clone, Debug, Default, Serialize)]
+#[must_use]
+#[expect(clippy::struct_field_names)]
+pub struct CreateRoleColours {
+    primary_color: Colour,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    secondary_color: Option<Colour>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tertiary_color: Option<Colour>,
+}
+
+impl CreateRoleColours {
+    pub fn new(primary_colour: Colour) -> Self {
+        Self {
+            primary_color: primary_colour,
+            secondary_color: None,
+            tertiary_color: None,
+        }
+    }
+
+    /// Sets the secondary colour for this role.
+    pub fn secondary_colour(mut self, secondary_colour: Colour) -> Self {
+        self.secondary_color = Some(secondary_colour);
+        self
+    }
+
+    /// Sets the tertiary colour for this role, see struct documentation for limitations.
+    pub fn tertiary_colour(mut self, tertiary_colour: Colour) -> Self {
+        self.tertiary_color = Some(tertiary_colour);
+        self
+    }
+}
+
+impl From<RoleColours> for CreateRoleColours {
+    fn from(c: RoleColours) -> CreateRoleColours {
+        CreateRoleColours {
+            primary_color: c.primary_colour,
+            secondary_color: c.secondary_colour,
+            tertiary_color: c.tertiary_colour,
+        }
+    }
+}
