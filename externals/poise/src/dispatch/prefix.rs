@@ -1,0 +1,333 @@
+//! Dispatches incoming messages and message edits onto framework commands
+
+use std::convert::TryInto as _;
+use std::sync::Arc;
+
+use crate::serenity_prelude as serenity;
+
+/// Converts a prefix string's length into u16, panicking if it doesn't fit.
+fn prefix_len_to_u16(prefix: &str) -> u16 {
+    prefix.len().try_into().expect("messages should not be more than 64k bytes, let alone a prefix")
+}
+
+/// Checks if this message is a bot invocation by attempting to strip the prefix
+///
+/// Returns tuple of stripped prefix and rest of the message, if any prefix matches
+async fn strip_prefix<'a, U: Send + Sync + 'static, E>(
+    framework: crate::FrameworkContext<'a, U, E>,
+    msg: &'a serenity::Message,
+) -> Option<u16> {
+    let partial_ctx = crate::PartialContext {
+        guild_id: msg.guild_id,
+        channel_id: msg.channel_id,
+        author: &msg.author,
+        framework,
+        __non_exhaustive: (),
+    };
+
+    if let Some(dynamic_prefix) = framework.options.prefix_options.dynamic_prefix {
+        match dynamic_prefix(partial_ctx).await {
+            Ok(prefix) => {
+                if let Some(prefix) = prefix
+                    && msg.content.starts_with(prefix.as_ref())
+                {
+                    return Some(prefix_len_to_u16(&prefix));
+                }
+            },
+            Err(error) => {
+                (framework.options.on_error)(crate::FrameworkError::DynamicPrefix {
+                    error,
+                    ctx: partial_ctx,
+                    msg,
+                })
+                .await;
+            },
+        }
+    }
+
+    if let Some(prefix) = framework.options.prefix_options.prefix.as_deref()
+        && msg.content.starts_with(prefix)
+    {
+        return Some(prefix_len_to_u16(prefix));
+    }
+
+    if let Some(prefix) = framework.options.prefix_options.additional_prefixes.iter().find_map(
+        |prefix| match prefix {
+            &crate::Prefix::Literal(prefix) => Some(prefix),
+            crate::Prefix::Regex(prefix) => {
+                let regex_match = prefix.find(&msg.content)?;
+                if regex_match.start() == 0 {
+                    Some(&msg.content[..regex_match.end()])
+                } else {
+                    None
+                }
+            },
+            crate::Prefix::__NonExhaustive => unreachable!(),
+        },
+    ) {
+        return Some(prefix_len_to_u16(prefix));
+    }
+
+    if let Some(dynamic_prefix) = framework.options.prefix_options.stripped_dynamic_prefix {
+        match dynamic_prefix(framework.serenity_context, msg, framework.user_data()).await {
+            Ok(Some(prefix)) => return Some(prefix_len_to_u16(prefix)),
+            Ok(None) => {},
+            Err(error) => {
+                (framework.options.on_error)(crate::FrameworkError::DynamicPrefix {
+                    error,
+                    ctx: partial_ctx,
+                    msg,
+                })
+                .await;
+            },
+        }
+    }
+
+    if framework.options.prefix_options.mention_as_prefix {
+        // Mentions are either <@USER_ID> or <@!USER_ID>
+        if let Some(stripped_content) = (|| {
+            msg.content
+                .strip_prefix("<@")?
+                .trim_start_matches('!')
+                .strip_prefix(&framework.bot_id().to_string())?
+                .strip_prefix('>')
+        })() {
+            let mention_prefix =
+                &msg.content[..(msg.content.len() as usize - stripped_content.len())];
+            return Some(prefix_len_to_u16(mention_prefix));
+        }
+    }
+
+    None
+}
+
+/// Find a command or subcommand within `&[Command]`, given a command invocation without a prefix.
+/// Returns the verbatim command name string as well as the command arguments (i.e. the remaining
+/// string).
+///
+/// The API must be like this (as opposed to just taking the command name upfront) because of
+/// subcommands.
+///
+/// ```rust
+/// # #[allow(unused_variables)]
+/// #[poise::command(prefix_command)]
+/// async fn command1(ctx: poise::Context<'_, (), ()>) -> Result<(), ()> { Ok(()) }
+/// # #[allow(unused_variables)]
+/// #[poise::command(prefix_command, subcommands("command3"))]
+/// async fn command2(ctx: poise::Context<'_, (), ()>) -> Result<(), ()> { Ok(()) }
+/// # #[allow(unused_variables)]
+/// #[poise::command(prefix_command)]
+/// async fn command3(ctx: poise::Context<'_, (), ()>) -> Result<(), ()> { Ok(()) }
+/// let commands = vec![command1(), command2()];
+///
+/// let mut command_tree = Vec::new();
+/// assert_eq!(
+///     poise::find_command(&commands, "command1 my arguments", false, &mut command_tree),
+///     Some(("command1", "my arguments")),
+/// );
+/// assert_eq!(&command_tree, &[&commands[0]]);
+///
+/// command_tree.clear();
+/// assert_eq!(
+///     poise::find_command(&commands, "command2 command3 my arguments", false, &mut command_tree),
+///     Some(("command3", "my arguments")),
+/// );
+/// assert_eq!(&command_tree, &[&commands[1], &commands[1].subcommands[0]]);
+///
+/// command_tree.clear();
+/// assert_eq!(
+///     poise::find_command(&commands, "CoMmAnD2 cOmMaNd99 my arguments", true, &mut command_tree),
+///     Some(("CoMmAnD2", "cOmMaNd99 my arguments")),
+/// );
+/// assert_eq!(&command_tree, &[&commands[1]]);
+pub fn find_command<'a, U, E>(
+    commands: &'a [crate::Command<U, E>],
+    remaining_message: &'a str,
+    case_insensitive: bool,
+    command_tree: &mut Vec<&'a crate::Command<U, E>>,
+) -> Option<(&'a str, &'a str)> {
+    let string_equal = if case_insensitive {
+        |a: &str, b: &str| a.eq_ignore_ascii_case(b)
+    } else {
+        |a: &str, b: &str| a == b
+    };
+
+    let (command_name, remaining_message) = {
+        let mut iter = remaining_message.splitn(2, char::is_whitespace);
+        (iter.next().unwrap(), iter.next().unwrap_or("").trim_start())
+    };
+
+    for command in commands {
+        let primary_name_matches = string_equal(&command.name, command_name);
+        let alias_matches = command.aliases.iter().any(|alias| string_equal(alias, command_name));
+        if !primary_name_matches && !alias_matches {
+            continue;
+        }
+
+        command_tree.push(command);
+        return Some(
+            find_command(&command.subcommands, remaining_message, case_insensitive, command_tree)
+                .unwrap_or((command_name, remaining_message)),
+        );
+    }
+
+    None
+}
+
+/// Manually dispatches a message with the prefix framework
+pub async fn dispatch_message<'a, U: Send + Sync + 'static, E>(
+    framework: crate::FrameworkContext<'a, U, E>,
+    msg: &'a serenity::Message,
+    trigger: crate::MessageDispatchTrigger,
+    invocation_data: &'a tokio::sync::Mutex<Box<dyn std::any::Any + Send + Sync>>,
+    command_tree: &'a mut Vec<&'a crate::Command<U, E>>,
+) -> Result<(), crate::FrameworkError<'a, U, E>> {
+    if let Some(ctx) =
+        parse_invocation(framework, msg, trigger, invocation_data, command_tree).await?
+    {
+        crate::catch_unwind_maybe(run_invocation(ctx)).await.map_err(|payload| {
+            crate::FrameworkError::CommandPanic {
+                payload: payload.map(Box::new),
+                ctx: ctx.into(),
+            }
+        })??;
+    } else if let Some(non_command_message) = framework.options.prefix_options.non_command_message {
+        non_command_message(&framework, msg).await.map_err(|e| {
+            crate::FrameworkError::NonCommandMessage {
+                error: e,
+                framework,
+                msg,
+            }
+        })?;
+    }
+    Ok(())
+}
+
+/// Given a [`Message`] and some context data, parses command, etc. out of the message and
+/// returns the resulting [`crate::PrefixContext`]. To run the command, see [`run_invocation`].
+///
+/// Returns `Ok(None)` if the message does not look like a command invocation.
+/// Returns `Err(...)` if the message _does_ look like a command invocation, but cannot be
+/// fully parsed.
+///
+/// [`Message`]: serenity::Message
+pub async fn parse_invocation<'a, U: Send + Sync + 'static, E>(
+    framework: crate::FrameworkContext<'a, U, E>,
+    msg: &'a serenity::Message,
+    trigger: crate::MessageDispatchTrigger,
+    invocation_data: &'a tokio::sync::Mutex<Box<dyn std::any::Any + Send + Sync>>,
+    command_tree: &'a mut Vec<&'a crate::Command<U, E>>,
+) -> Result<Option<crate::PrefixContext<'a, U, E>>, crate::FrameworkError<'a, U, E>> {
+    // Check if we're allowed to invoke from bot messages
+    if msg.author.bot() && framework.options.prefix_options.ignore_bots {
+        return Ok(None);
+    }
+
+    // Check if we're allowed to execute our own messages
+    if framework.bot_id() == msg.author.id
+        && !framework.options.prefix_options.execute_self_messages
+    {
+        return Ok(None);
+    }
+
+    // Check if we can execute commands contained in thread creation messages
+    if msg.kind == serenity::MessageType::ThreadCreated
+        && framework.options.prefix_options.ignore_thread_creation
+    {
+        return Ok(None);
+    }
+
+    // Strip prefix, trim whitespace between prefix and rest, split rest into command name and args
+    let Some(content_start) = strip_prefix(framework, msg).await else {
+        return Ok(None);
+    };
+    let msg_content = msg.content[content_start.into()..].trim_start();
+
+    let (invoked_command_name, args) = find_command(
+        &framework.options.commands,
+        msg_content,
+        framework.options.prefix_options.case_insensitive_commands,
+        command_tree,
+    )
+    .ok_or(crate::FrameworkError::UnknownCommand {
+        msg,
+        content_start,
+        framework,
+        invocation_data,
+        trigger,
+    })?;
+
+    if command_tree.last().is_none_or(|c| c.prefix_action.is_none()) {
+        return Ok(None);
+    }
+
+    Ok(Some(crate::PrefixContext {
+        msg,
+        content_start,
+        invoked_command_name,
+        args,
+        framework,
+        command_tree,
+        invocation_data,
+        trigger,
+        __non_exhaustive: (),
+    }))
+}
+
+/// Given an existing parsed command invocation from [`parse_invocation`], run it, including all the
+/// before and after code like checks and built in filters from edit tracking
+pub async fn run_invocation<U: Send + Sync + 'static, E>(
+    ctx: crate::PrefixContext<'_, U, E>,
+) -> Result<(), crate::FrameworkError<'_, U, E>> {
+    let command = ctx.command();
+
+    // This was already checked in parse_invocation, so this could be an unwrap,
+    // but this is public so we simply early return if there is no prefix action.
+    let Some(prefix_action) = command.prefix_action else {
+        return Ok(());
+    };
+
+    // Check if we should disregard this invocation if it was triggered by an edit
+    if ctx.trigger == crate::MessageDispatchTrigger::MessageEdit && !command.invoke_on_edit {
+        return Ok(());
+    }
+    if ctx.trigger == crate::MessageDispatchTrigger::MessageEditFromInvalid
+        && !ctx.framework.options.prefix_options.execute_untracked_edits
+    {
+        return Ok(());
+    }
+
+    if command.subcommand_required {
+        // None of this command's subcommands were invoked, or else we'd have the subcommand in
+        // ctx.command and not the parent command
+        return Err(crate::FrameworkError::SubcommandRequired {
+            ctx: crate::Context::Prefix(ctx),
+        });
+    }
+
+    super::common::check_permissions_and_cooldown(ctx.into()).await?;
+
+    // Typing is broadcasted as long as this object is alive
+    let _typing_broadcaster = if command.broadcast_typing {
+        Some(ctx.msg.channel_id.start_typing(Arc::clone(&ctx.framework.serenity_context.http)))
+    } else {
+        None
+    };
+
+    (ctx.framework.options.pre_command)(crate::Context::Prefix(ctx)).await;
+
+    // Store that this command is currently running; so that if the invocation message is being
+    // edited before a response message is registered, we don't accidentally treat it as an
+    // execute_untracked_edits situation and start an infinite loop
+    // Reported by vicky5124 https://discord.com/channels/381880193251409931/381912587505500160/897981367604903966
+    if let Some(edit_tracker) = &ctx.framework.options.prefix_options.edit_tracker {
+        edit_tracker.write().unwrap().track_command(ctx.msg, command.track_deletion);
+    }
+
+    // Execute command
+    (prefix_action)(ctx).await?;
+
+    (ctx.framework.options.post_command)(crate::Context::Prefix(ctx)).await;
+
+    Ok(())
+}
