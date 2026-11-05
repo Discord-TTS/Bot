@@ -1,0 +1,264 @@
+//! A set of macros for easily working with internals.
+
+#[cfg(any(feature = "model", feature = "utils"))]
+macro_rules! cdn {
+    ($e:expr) => {
+        concat!("https://cdn.discordapp.com", $e)
+    };
+    ($e:expr, $($rest:tt)*) => {
+        format!(cdn!($e), $($rest)*)
+    };
+}
+
+#[cfg(feature = "http")]
+macro_rules! api {
+    ($e:expr) => {
+        concat!("https://discord.com/api/v10", $e)
+    };
+    ($e:expr, $($rest:tt)*) => {
+        format!(api!($e), $($rest)*)
+    };
+}
+
+#[cfg(feature = "http")]
+macro_rules! status {
+    ($e:expr) => {
+        concat!("https://status.discord.com/api/v2", $e)
+    };
+}
+
+/// The `enum_number!` macro generates a newtype wrapper struct with associated constants.
+///
+/// When defining the enum like this:
+/// ```ignore
+/// enum_number! {
+///     /// The `Foo` enum
+///     #[derive(Clone, Copy, Deserialize, Serialize)]
+///     #[<default> = 1]
+///     pub enum Foo {
+///         /// First
+///         Aah = 1,
+///         /// Second
+///         #[cfg(feature = "unstable")]
+///         Bar = 2,
+///         _ => Unknown(u8),
+///     }
+/// }
+/// ```
+///
+/// Code like this will be generated:
+///
+/// ```
+/// # use serde::{Deserialize, Serialize};
+/// #
+/// #[derive(Clone, Copy, Deserialize, Serialize)]
+/// pub struct Foo(pub u8);
+///
+/// impl Default for Foo {
+///     fn default() -> Self {
+///         Self(1)
+///     }
+/// }
+///
+/// impl Foo {
+///     /// First
+///     pub const Aah: Self = Self(1);
+///     /// Second
+///     #[cfg(feature = "unstable")]
+///     pub const Bar: Self = Self(2);
+///
+///     /// Variant value is unknown.
+///     #[must_use]
+///     pub const fn Unknown(val: u8) -> Self {
+///         Self(val)
+///     }
+///
+///     /// Get a string representation.
+///     #[must_use]
+///     pub const fn as_str(&self) -> &'static str {
+///         match &self.0 {
+///             1 => "Aah",
+///             2 => "Bar",
+///             _ => "Unknown",
+///         }
+///     }
+/// }
+/// ```
+macro_rules! enum_number {
+    (
+        $(#[$outer:meta])*
+        $(#[<default> = $default:literal])?
+        $vis:vis enum $Enum:ident {
+            $(
+                $(#[doc = $doc:literal])*
+                $(#[cfg $($cfg:tt)*])?
+                $Variant:ident = $value:literal,
+            )*
+            _ => Unknown($T:ty),
+        }
+    ) => {
+        $(#[$outer])*
+        $vis struct $Enum (pub $T);
+
+        $(
+            impl Default for $Enum {
+                fn default() -> Self {
+                    Self($default)
+                }
+            }
+        )?
+
+        #[allow(non_snake_case, non_upper_case_globals)]
+        #[allow(clippy::allow_attributes, reason = "Does not always trigger due to macro")]
+        impl $Enum {
+            $(
+                $(#[doc = $doc])*
+                $(#[cfg $($cfg)*])?
+                $vis const $Variant: Self = Self($value);
+            )*
+
+            /// Variant value is unknown.
+            #[must_use]
+            $vis const fn Unknown(val: $T) -> Self {
+                Self(val)
+            }
+
+            /// Get a string representation.
+            #[must_use]
+            $vis const fn as_str(&self) -> &'static str {
+                match &self.0 {
+                    $(
+                        $value => stringify!($Variant),
+                    )*
+                    _ => "Unknown",
+                }
+            }
+        }
+    };
+}
+
+/// The macro forwards the generation to the `bitflags::bitflags!` macro and implements the default
+/// (de)serialization for Discord's bitmask values.
+///
+/// The flags are created with `T::from_bits_truncate` for the deserialized integer value.
+///
+/// Use the `bitflags::bitflags! macro directly if a different serde implementation is required.
+macro_rules! bitflags {
+    (
+        $(#[$outer:meta])*
+        $vis:vis struct $BitFlags:ident: $T:ty {
+            $(
+                $(#[$inner:ident $($args:tt)*])*
+                const $Flag:ident = $value:expr;
+            )*
+        }
+    ) => {
+        $(#[$outer])*
+        #[repr(Rust, packed)]
+        $vis struct $BitFlags($T);
+
+        bitflags::bitflags! {
+            impl $BitFlags: $T {
+                $(
+                    $(#[$inner $($args)*])*
+                    const $Flag = $value;
+                )*
+            }
+        }
+
+        bitflags!(__impl_serde $BitFlags: $T);
+    };
+    (__impl_serde $BitFlags:ident: $T:tt) => {
+        impl<'de> serde::de::Deserialize<'de> for $BitFlags {
+            fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+                Ok(Self::from_bits_truncate(u64::deserialize(deserializer)? as $T))
+            }
+        }
+
+        impl serde::ser::Serialize for $BitFlags {
+            fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+                self.bits().serialize(serializer)
+            }
+        }
+    };
+}
+
+/// The `http_response_codes!` macro generates `const` definitions and methods for incorporating
+/// Discord-defined [`HttpResponseCode`]s and meanings into error messages.
+///
+/// [`HttpResponseCode`]: crate::http::HttpResponseCode
+#[cfg(feature = "http")]
+macro_rules! http_response_codes {
+    (
+        $(
+            $(#[$docs:meta])*
+            ($code:expr, $konst:ident, $message:expr);
+        )+
+    ) => {
+        impl HttpResponseCode {
+        $(
+            $(#[$docs])*
+            pub const $konst: Self = Self($code);
+        )+
+
+        /// Returns the Discord-defined meaning of this HTTP response code, if available.
+        #[must_use]
+        pub const fn to_meaning(&self) -> Option<&'static str> {
+            Self::meaning_of(self.0)
+        }
+
+        /// Returns an HTTP response code returned by the API with its Discord-defined meaning,
+        /// if available.
+        #[must_use]
+        pub const fn meaning_of(code: u16) -> Option<&'static str> {
+            match code {
+                $(
+                $code => Some($message),
+                )+
+                503 | 504 => HttpResponseCode::meaning_of(500),
+                _ => None
+            }
+        }
+
+        }
+
+        impl From<StatusCode> for HttpResponseCode {
+            fn from(status_code: StatusCode) -> Self {
+                Self(status_code.as_u16())
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use crate::model::assert_json;
+
+    #[test]
+    fn enum_number() {
+        enum_number! {
+            #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+            pub enum T {
+                /// AAA
+                A = 1,
+                /// BBB
+                B = 2,
+                /// CCC
+                C = 3,
+                _ => Unknown(u8),
+            }
+        }
+
+        assert_json(&T::A, json!(1));
+        assert_json(&T::B, json!(2));
+        assert_json(&T::C, json!(3));
+        assert_json(&T::Unknown(123), json!(123));
+
+        assert_eq!(T::A.as_str(), "A");
+        assert_eq!(T::B.as_str(), "B");
+        assert_eq!(T::C.as_str(), "C");
+        assert_eq!(T::Unknown(123).as_str(), "Unknown");
+    }
+}
