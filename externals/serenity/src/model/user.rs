@@ -15,9 +15,8 @@ use crate::builder::{CreateMessage, EditProfile};
 use crate::http::Http;
 #[cfg(feature = "model")]
 use crate::model::CacheHttp;
-use crate::model::utils::deserialize_null_as_default;
 #[cfg(feature = "model")]
-use crate::model::utils::{avatar_url, user_banner_url};
+use crate::model::utils::avatar_url;
 
 /// Used with `#[serde(with|deserialize_with|serialize_with)]`
 ///
@@ -246,61 +245,11 @@ pub struct User {
     /// Indicator of whether the user is a bot.
     #[serde(default)]
     pub bot: bool,
-    /// Whether the user is an Official Discord System user (part of the urgent message system).
-    #[serde(default)]
-    pub system: bool,
-    /// Whether the user has two factor enabled on their account
-    #[serde(default)]
-    pub mfa_enabled: bool,
-    /// Optional banner hash.
-    ///
-    /// **Note**: This will only be present if the user is fetched via Rest API, e.g. with
-    /// [`crate::http::Http::get_user`].
-    pub banner: Option<ImageHash>,
-    /// The user's banner colour encoded as an integer representation of hexadecimal colour code
-    ///
-    /// **Note**: This will only be present if the user is fetched via Rest API, e.g. with
-    /// [`crate::http::Http::get_user`].
-    #[serde(rename = "accent_color")]
-    pub accent_colour: Option<Colour>,
-    /// The user's chosen language option
-    pub locale: Option<FixedString<u8>>,
-    /// Whether the email on this account has been verified
-    ///
-    /// Requires [`Scope::Email`]
-    pub verified: Option<bool>,
-    /// The user's email
-    ///
-    /// Requires [`Scope::Email`]
-    pub email: Option<FixedString<u8>>,
-    /// The flags on a user's account
-    #[serde(default)]
-    pub flags: UserPublicFlags,
-    /// The type of Nitro subscription on a user's account
-    ///
-    /// Requires [`Scope::IdentifyPremium`]
-    /// **Note**: This will return `0` for applications that have not been approved for the
-    /// [`Scope::IdentifyPremium`] scope.
-    #[serde(default)]
-    pub premium_type: PremiumType,
-    /// The public flags on a user's account
-    pub public_flags: Option<UserPublicFlags>,
     /// Only included in [`Message::mentions`] for messages from the gateway.
     ///
     /// [Discord docs](https://docs.discord.com/developers/events/gateway-events#message-create-message-create-extra-fields).
     // Box required to avoid infinitely recursive types
     pub member: Option<Box<PartialMember>>,
-    /// The primary guild and tag the user has active.
-    ///
-    /// Note: just because this guild is populated does not mean the tag is visible.
-    pub primary_guild: Option<PrimaryGuild>,
-    /// Information about this user's avatar decoration.
-    pub avatar_decoration_data: Option<AvatarDecorationData>,
-    /// The collectibles the user currently has active, excluding avatar decorations and profile
-    /// effects.
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_null_as_default")]
-    pub collectibles: Collectibles,
 }
 
 impl ExtractKey<UserId> for User {
@@ -470,18 +419,6 @@ impl User {
     #[must_use]
     pub fn avatar_url(&self) -> Option<String> {
         avatar_url(None, self.id, self.avatar.as_ref())
-    }
-
-    /// Returns the formatted URL of the user's banner, if one exists.
-    ///
-    /// This will produce a WEBP image URL, or GIF if the user has a GIF banner.
-    ///
-    /// **Note**: This will only be present if the user is fetched via Rest API, e.g. with
-    /// [`crate::http::Http::get_user`].
-    #[inline]
-    #[must_use]
-    pub fn banner_url(&self) -> Option<String> {
-        user_banner_url(None, self.id, self.banner.as_ref())
     }
 
     /// Creates a direct message channel between the [current user] and the user. This can also

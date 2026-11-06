@@ -1,5 +1,3 @@
-#[cfg(feature = "cache")]
-use std::cmp::Reverse;
 use std::fmt;
 
 #[cfg(feature = "model")]
@@ -9,9 +7,8 @@ use crate::cache::Cache;
 #[cfg(feature = "model")]
 use crate::http::Http;
 use crate::model::prelude::*;
-use crate::model::utils::deserialize_null_as_default;
 #[cfg(feature = "model")]
-use crate::model::utils::{avatar_url, user_banner_url};
+use crate::model::utils::avatar_url;
 
 /// Information about a member of a guild.
 ///
@@ -30,23 +27,12 @@ pub struct Member {
     pub nick: Option<FixedString<u8>>,
     /// The member's guild avatar hash
     pub avatar: Option<ImageHash>,
-    /// The member's guild banner hash
-    pub banner: Option<ImageHash>,
     /// Vector of Ids of [`Role`]s given to the member.
     pub roles: FixedArray<RoleId>,
-    /// Timestamp representing the date when the member joined.
-    pub joined_at: Option<Timestamp>,
-    /// Timestamp representing the date since the member is boosting the guild.
-    pub premium_since: Option<Timestamp>,
     /// Indicator of whether the member can hear in voice channels.
     pub deaf: bool,
     /// Indicator of whether the member can speak in voice channels.
     pub mute: bool,
-    /// Guild member flags.
-    pub flags: GuildMemberFlags,
-    /// Indicator that the member hasn't accepted the rules of the guild yet.
-    #[serde(default)]
-    pub pending: bool,
     /// The total permissions of the member in a channel, including overrides.
     ///
     /// This is only [`Some`] when returned in an [`Interaction`] object.
@@ -61,18 +47,6 @@ pub struct Member {
     /// The unique Id of the guild that the member is a part of.
     #[serde(default)]
     pub guild_id: GuildId,
-    /// If the member is currently flagged for sending excessive DMs to non-friend server members
-    /// in the last 24 hours.
-    ///
-    /// Will be None or a time in the past if the user is not flagged.
-    pub unusual_dm_activity_until: Option<Timestamp>,
-    /// Information about this member's guild specific avatar decoration.
-    pub avatar_decoration_data: Option<AvatarDecorationData>,
-    /// The collectibles the member currently has active, excluding avatar decorations and profile
-    /// effects.
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_null_as_default")]
-    pub collectibles: Collectibles,
 }
 
 bitflags! {
@@ -157,24 +131,6 @@ impl Member {
     /// [Ban Members]: Permissions::BAN_MEMBERS
     pub async fn ban(&self, http: &Http, dms: u32, audit_log_reason: Option<&str>) -> Result<()> {
         self.guild_id.ban(http, self.user.id, dms, audit_log_reason).await
-    }
-
-    /// Determines the member's colour.
-    #[cfg(feature = "cache")]
-    pub fn colour(&self, cache: &Cache) -> Option<Colour> {
-        let guild = cache.guild(self.guild_id)?;
-
-        let mut roles = self
-            .roles
-            .iter()
-            .filter_map(|role_id| guild.roles.get(role_id))
-            .collect::<Vec<&Role>>();
-
-        roles.sort_by_key(|&b| Reverse(b));
-
-        let default = Colour::default();
-
-        roles.iter().find(|r| r.colour.0 != default.0).map(|r| r.colour)
     }
 
     /// Returns the "default channel" of the guild for the member. (This returns the first channel
@@ -406,14 +362,6 @@ impl Member {
         avatar_url(Some(self.guild_id), self.user.id, self.avatar.as_ref())
     }
 
-    /// Returns the formatted URL of the member's per guild banner, if one exists.
-    ///
-    /// This will produce a WEBP image URL, or GIF if the member has a GIF avatar.
-    #[must_use]
-    pub fn banner_url(&self) -> Option<String> {
-        user_banner_url(Some(self.guild_id), self.user.id, self.banner.as_ref())
-    }
-
     /// Retrieves the URL to the current member's avatar, falling back to the user's avatar, then
     /// default avatar if needed.
     ///
@@ -458,8 +406,6 @@ pub struct PartialMember {
     /// Indicator of whether the member can hear in voice channels.
     #[serde(default)]
     pub deaf: bool,
-    /// Timestamp representing the date when the member joined.
-    pub joined_at: Option<Timestamp>,
     /// Indicator of whether the member can speak in voice channels
     #[serde(default)]
     pub mute: bool,
@@ -469,11 +415,6 @@ pub struct PartialMember {
     pub nick: Option<FixedString<u8>>,
     /// Vector of Ids of [`Role`]s given to the member.
     pub roles: FixedArray<RoleId>,
-    /// Indicator that the member hasn't accepted the rules of the guild yet.
-    #[serde(default)]
-    pub pending: bool,
-    /// Timestamp representing the date since the member is boosting the guild.
-    pub premium_since: Option<Timestamp>,
     /// The unique Id of the guild that the member is a part of.
     ///
     /// Manually inserted in [`Reaction::deserialize`].
@@ -486,46 +427,24 @@ pub struct PartialMember {
     ///
     /// [`Interaction`]: crate::model::application::Interaction
     pub permissions: Option<Permissions>,
-    /// If the member is currently flagged for sending excessive DMs to non-friend server members
-    /// in the last 24 hours.
-    ///
-    /// Will be None or a time in the past if the user is not flagged.
-    pub unusual_dm_activity_until: Option<Timestamp>,
     /// The member's guild avatar hash
     pub avatar: Option<ImageHash>,
-    /// The member's guild banner hash
-    pub banner: Option<ImageHash>,
-    /// Information about this member's avatar decoration.
-    pub avatar_decoration_data: Option<AvatarDecorationData>,
-    /// The collectibles the member currently has active, excluding avatar decorations and profile
-    /// effects.
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_null_as_default")]
-    pub collectibles: Collectibles,
 }
 
 impl From<PartialMember> for Member {
     fn from(partial: PartialMember) -> Self {
-        let (pending, deaf, mute) = (partial.pending(), partial.deaf(), partial.mute());
+        let (deaf, mute) = (partial.deaf(), partial.mute());
         let mut member = Member {
             __generated_flags: MemberGeneratedFlags::empty(),
             user: partial.user.unwrap_or_default(),
             nick: partial.nick,
             avatar: partial.avatar,
-            banner: partial.banner,
             roles: partial.roles,
-            joined_at: partial.joined_at,
-            premium_since: partial.premium_since,
-            flags: GuildMemberFlags::default(),
             permissions: partial.permissions,
             communication_disabled_until: None,
             guild_id: partial.guild_id.unwrap_or_default(),
-            unusual_dm_activity_until: partial.unusual_dm_activity_until,
-            avatar_decoration_data: partial.avatar_decoration_data,
-            collectibles: partial.collectibles,
         };
 
-        member.set_pending(pending);
         member.set_deaf(deaf);
         member.set_mute(mute);
         member
@@ -534,26 +453,19 @@ impl From<PartialMember> for Member {
 
 impl From<Member> for PartialMember {
     fn from(member: Member) -> Self {
-        let (pending, deaf, mute) = (member.pending(), member.deaf(), member.mute());
+        let (deaf, mute) = (member.deaf(), member.mute());
         let mut partial = PartialMember {
             __generated_flags: PartialMemberGeneratedFlags::empty(),
-            joined_at: member.joined_at,
             nick: member.nick,
             roles: member.roles,
-            premium_since: member.premium_since,
             guild_id: Some(member.guild_id),
             user: Some(member.user),
             permissions: member.permissions,
-            unusual_dm_activity_until: member.unusual_dm_activity_until,
             avatar: member.avatar,
-            banner: member.banner,
-            avatar_decoration_data: member.avatar_decoration_data,
-            collectibles: member.collectibles,
         };
 
         partial.set_deaf(deaf);
         partial.set_mute(mute);
-        partial.set_pending(pending);
         partial
     }
 }

@@ -151,26 +151,6 @@ pub struct GuildThread {
     pub id: ThreadId,
     /// The Id of the parent text channel.
     pub parent_id: ChannelId,
-    /// The Id of the user who created this thread
-    pub owner_id: UserId,
-    /// An approximate count of users in a thread, stops counting at 50.
-    pub member_count: u8,
-    /// An approximate count of messages in the thread.
-    pub message_count: u32,
-    /// The thread metadata.
-    pub thread_metadata: ThreadMetadata,
-    /// Thread member object for the current user, if they have joined the thread.
-    ///
-    /// This is only included on certain API endpoints.
-    pub member: Option<PartialThreadMember>,
-    /// The number of messages ever sent in a thread, it's similar to `message_count` on message
-    /// creation, but will not decrement the number when a message is deleted.
-    pub total_message_sent: u32,
-    /// The set of applied tags.
-    ///
-    /// **Note**: This is only available in a thread in a forum.
-    #[serde(default)]
-    pub applied_tags: FixedArray<ForumTagId>,
 }
 
 #[cfg(feature = "model")]

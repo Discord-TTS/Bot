@@ -35,23 +35,6 @@ pub(super) fn avatar_url(
 }
 
 #[cfg(feature = "model")]
-pub(super) fn user_banner_url(
-    guild_id: Option<GuildId>,
-    user_id: UserId,
-    hash: Option<&ImageHash>,
-) -> Option<String> {
-    hash.map(|hash| {
-        let ext = if hash.is_animated() { "gif" } else { "webp" };
-
-        if let Some(guild_id) = guild_id {
-            cdn!("/guilds/{}/users/{}/banners/{}.{}?size=1024", guild_id, user_id, hash, ext)
-        } else {
-            cdn!("/banners/{}/{}.{}?size=1024", user_id, hash, ext)
-        }
-    })
-}
-
-#[cfg(feature = "model")]
 pub(super) fn icon_url(id: GuildId, icon: Option<&ImageHash>) -> Option<String> {
     icon.map(|icon| {
         let ext = if icon.is_animated() { "gif" } else { "webp" };
@@ -256,12 +239,4 @@ where
         .collect::<Result<Vec<_>, _>>()?
         .try_into()
         .map_err(D::Error::custom)
-}
-
-pub(crate) fn deserialize_null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Default + serde::Deserialize<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Option::unwrap_or_default)
 }

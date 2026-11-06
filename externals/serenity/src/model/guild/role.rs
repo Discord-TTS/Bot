@@ -26,24 +26,6 @@ pub struct Role {
     /// The Id of the Guild the Role is in.
     #[serde(default)]
     pub guild_id: GuildId,
-    /// The colour of the role.
-    #[serde(rename = "color")]
-    pub colour: Colour,
-    #[serde(rename = "colors")]
-    pub colours: RoleColours,
-    /// Indicator of whether the role is pinned above lesser roles.
-    ///
-    /// In the client, this causes [`Member`]s in the role to be seen above those in roles with a
-    /// lower [`Self::position`].
-    pub hoist: bool,
-    /// Indicator of whether the role is managed by an integration service.
-    pub managed: bool,
-    /// Indicator of whether the role can be mentioned, similar to mentioning a specific member or
-    /// `@everyone`.
-    ///
-    /// Only members of the role will be notified if a role is mentioned with this set to `true`.
-    #[serde(default)]
-    pub mentionable: bool,
     /// The name of the role.
     pub name: FixedString,
     /// A set of permissions that the role has been assigned.
@@ -57,17 +39,6 @@ pub struct Role {
     ///
     /// The `@everyone` role is usually either `-1` or `0`.
     pub position: i16,
-    /// The tags this role has. It can be used to determine if this role is a special role in this
-    /// guild such as guild subscriber role, or if the role is linked to an [`Integration`] or a
-    /// bot.
-    ///
-    /// [`Integration`]: super::Integration
-    #[serde(default)]
-    pub tags: RoleTags,
-    /// Role icon image hash.
-    pub icon: Option<ImageHash>,
-    /// Role unicoded image.
-    pub unicode_emoji: Option<FixedString>,
 }
 
 /// The colours of a Discord role, secondary_colour and tertiary_colour may only be set if
@@ -139,16 +110,6 @@ impl Role {
         } else {
             self.permissions.contains(permissions)
         }
-    }
-
-    #[must_use]
-    /// Generates a URL to the Role icon's image.
-    pub fn icon_url(&self) -> Option<String> {
-        self.icon.map(|icon| {
-            let ext = if icon.is_animated() { "gif" } else { "webp" };
-
-            cdn!("/role-icons/{}/{}.{}", self.id, icon, ext)
-        })
     }
 }
 

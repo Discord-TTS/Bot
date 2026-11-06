@@ -475,9 +475,6 @@ impl FullEvent {
                 }
             },
             Event::ChannelInfo(event) => {
-                #[cfg(feature = "cache")]
-                let old = event.update(cache);
-                #[cfg(not(feature = "cache"))]
                 let old = None;
 
                 Self::ChannelInfo {
@@ -541,14 +538,9 @@ impl FullEvent {
                     full,
                 }
             },
-            Event::GuildEmojisUpdate(event) => {
-                #[cfg(feature = "cache")]
-                event.update(cache);
-
-                Self::GuildEmojisUpdate {
-                    guild_id: event.guild_id,
-                    current_state: event.emojis,
-                }
+            Event::GuildEmojisUpdate(event) => Self::GuildEmojisUpdate {
+                guild_id: event.guild_id,
+                current_state: event.emojis,
             },
             Event::GuildIntegrationsUpdate(event) => Self::GuildIntegrationsUpdate {
                 guild_id: event.guild_id,
@@ -629,14 +621,9 @@ impl FullEvent {
                     new: event.role,
                 }
             },
-            Event::GuildStickersUpdate(event) => {
-                #[cfg(feature = "cache")]
-                event.update(cache);
-
-                Self::GuildStickersUpdate {
-                    guild_id: event.guild_id,
-                    current_state: event.stickers,
-                }
+            Event::GuildStickersUpdate(event) => Self::GuildStickersUpdate {
+                guild_id: event.guild_id,
+                current_state: event.stickers,
             },
             Event::GuildUpdate(event) => {
                 #[cfg(feature = "cache")]
@@ -685,9 +672,6 @@ impl FullEvent {
                 }
             },
             Event::PresenceUpdate(event) => {
-                #[cfg(feature = "cache")]
-                let old_data = event.update(cache);
-                #[cfg(not(feature = "cache"))]
                 let old_data = None;
 
                 Self::PresenceUpdate {
@@ -803,9 +787,6 @@ impl FullEvent {
                 effect: event.effect,
             },
             Event::VoiceChannelStartTimeUpdate(event) => {
-                #[cfg(feature = "cache")]
-                let old = event.update(cache);
-                #[cfg(not(feature = "cache"))]
                 let old = None;
 
                 Self::VoiceChannelStartTimeUpdate {
@@ -816,9 +797,6 @@ impl FullEvent {
                 }
             },
             Event::VoiceChannelStatusUpdate(event) => {
-                #[cfg(feature = "cache")]
-                let old = event.update(cache).map(Into::into);
-                #[cfg(not(feature = "cache"))]
                 let old = None;
 
                 let status: Option<String> = event.status.map(Into::into);
@@ -905,29 +883,14 @@ impl FullEvent {
             Event::ThreadMembersUpdate(event) => Self::ThreadMembersUpdate {
                 thread_members_update: event,
             },
-            Event::GuildScheduledEventCreate(event) => {
-                #[cfg(feature = "cache")]
-                event.update(cache);
-
-                Self::GuildScheduledEventCreate {
-                    event: event.event,
-                }
+            Event::GuildScheduledEventCreate(event) => Self::GuildScheduledEventCreate {
+                event: event.event,
             },
-            Event::GuildScheduledEventUpdate(event) => {
-                #[cfg(feature = "cache")]
-                event.update(cache);
-
-                Self::GuildScheduledEventUpdate {
-                    event: event.event,
-                }
+            Event::GuildScheduledEventUpdate(event) => Self::GuildScheduledEventUpdate {
+                event: event.event,
             },
-            Event::GuildScheduledEventDelete(event) => {
-                #[cfg(feature = "cache")]
-                event.update(cache);
-
-                Self::GuildScheduledEventDelete {
-                    event: event.event,
-                }
+            Event::GuildScheduledEventDelete(event) => Self::GuildScheduledEventDelete {
+                event: event.event,
             },
             Event::GuildScheduledEventUserAdd(event) => Self::GuildScheduledEventUserAdd {
                 subscribed: event,
@@ -969,23 +932,10 @@ mod tests {
 
     use super::is_guild_new;
     use crate::cache::Cache;
-    use crate::model::Timestamp;
     use crate::model::application::{ApplicationFlags, PartialCurrentApplicationInfo};
     use crate::model::event::{Event, FullEvent, GuildCreateEvent, ReadyEvent};
     use crate::model::gateway::Ready;
-    use crate::model::guild::{
-        DefaultMessageNotificationLevel,
-        ExplicitContentFilter,
-        Guild,
-        GuildGeneratedFlags,
-        MemberCount,
-        MfaLevel,
-        NsfwLevel,
-        PremiumTier,
-        SystemChannelFlags,
-        UnavailableGuild,
-        VerificationLevel,
-    };
+    use crate::model::guild::{Guild, GuildGeneratedFlags, MemberCount, UnavailableGuild};
     use crate::model::id::{ApplicationId, GuildId, UserId};
     use crate::model::user::CurrentUser;
 
@@ -1028,48 +978,11 @@ mod tests {
                 id: guild_id,
                 name: FixedString::new(),
                 icon: None,
-                icon_hash: None,
-                splash: None,
-                discovery_splash: None,
                 owner_id: UserId::new(1),
-                afk_metadata: None,
-                widget_channel_id: None,
-                verification_level: VerificationLevel::None,
-                default_message_notifications: DefaultMessageNotificationLevel::Mentions,
-                explicit_content_filter: ExplicitContentFilter::None,
                 roles: ExtractMap::new(),
-                emojis: ExtractMap::new(),
-                features: FixedArray::new(),
-                mfa_level: MfaLevel::None,
-                application_id: None,
-                system_channel_id: None,
-                system_channel_flags: SystemChannelFlags::default(),
-                rules_channel_id: None,
-                max_presences: None,
-                max_members: None,
-                vanity_url_code: None,
-                description: None,
-                banner: None,
-                premium_tier: PremiumTier::Tier0,
-                premium_subscription_count: None,
-                preferred_locale: FixedString::new(),
-                public_updates_channel_id: None,
-                max_video_channel_users: None,
-                max_stage_video_channel_users: None,
-                approximate_member_count: None,
-                approximate_presence_count: None,
-                welcome_screen: None,
-                nsfw_level: NsfwLevel::Default,
-                stickers: ExtractMap::new(),
-                joined_at: Timestamp::now(),
                 channels: ExtractMap::new(),
                 member_count: MemberCount::ZERO,
                 members: ExtractMap::new(),
-                incidents_data: None,
-                presences: ExtractMap::new(),
-                safety_alerts_channel_id: None,
-                scheduled_events: ExtractMap::new(),
-                stage_instances: FixedArray::new(),
                 threads: ExtractMap::new(),
                 voice_states: ExtractMap::new(),
             },
@@ -1098,48 +1011,11 @@ mod tests {
                 id: guild_id2,
                 name: FixedString::new(),
                 icon: None,
-                icon_hash: None,
-                splash: None,
-                discovery_splash: None,
                 owner_id: UserId::new(1),
-                afk_metadata: None,
-                widget_channel_id: None,
-                verification_level: VerificationLevel::None,
-                default_message_notifications: DefaultMessageNotificationLevel::Mentions,
-                explicit_content_filter: ExplicitContentFilter::None,
                 roles: ExtractMap::new(),
-                emojis: ExtractMap::new(),
-                features: FixedArray::new(),
-                mfa_level: MfaLevel::None,
-                application_id: None,
-                system_channel_id: None,
-                system_channel_flags: SystemChannelFlags::default(),
-                rules_channel_id: None,
-                max_presences: None,
-                max_members: None,
-                vanity_url_code: None,
-                description: None,
-                banner: None,
-                premium_tier: PremiumTier::Tier0,
-                premium_subscription_count: None,
-                preferred_locale: FixedString::new(),
-                public_updates_channel_id: None,
-                max_video_channel_users: None,
-                max_stage_video_channel_users: None,
-                approximate_member_count: None,
-                approximate_presence_count: None,
-                welcome_screen: None,
-                nsfw_level: NsfwLevel::Default,
-                stickers: ExtractMap::new(),
-                joined_at: Timestamp::now(),
                 channels: ExtractMap::new(),
                 member_count: MemberCount::ZERO,
                 members: ExtractMap::new(),
-                incidents_data: None,
-                presences: ExtractMap::new(),
-                safety_alerts_channel_id: None,
-                scheduled_events: ExtractMap::new(),
-                stage_instances: FixedArray::new(),
                 threads: ExtractMap::new(),
                 voice_states: ExtractMap::new(),
             },

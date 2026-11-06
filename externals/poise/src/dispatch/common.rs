@@ -1,31 +1,5 @@
 //! Prefix and slash agnostic utilities for dispatching incoming events onto framework commands
 
-#[cfg(feature = "cache")]
-use crate::serenity_prelude as serenity;
-
-/// Fetches the NSFW status of the channel (or thread) the command was executed in.
-#[cfg(feature = "cache")]
-async fn check_nsfw_channel<U: Send + Sync + 'static, E>(ctx: crate::Context<'_, U, E>) -> bool {
-    match ctx.channel().await {
-        Some(serenity::Channel::Private(_)) => true,
-        Some(serenity::Channel::Guild(ch)) => ch.nsfw,
-        Some(serenity::Channel::GuildThread(th)) => {
-            let guild_id = th.base.guild_id;
-            match th.parent_id.to_guild_channel(ctx, Some(guild_id)).await {
-                Ok(ch) => ch.nsfw,
-                Err(e) => {
-                    tracing::warn!("Error when getting thread parent for NSFW check: {e}");
-                    false
-                },
-            }
-        },
-        None | Some(_) => {
-            tracing::warn!("Error when getting channel for NSFW check");
-            false
-        },
-    }
-}
-
 /// See [`check_permissions_and_cooldown`]. Runs the check only for a single command. The caller
 /// should call this multiple time for each parent command to achieve the check inheritance logic.
 async fn check_permissions_and_cooldown_single<'a, U: Send + Sync + 'static, E>(
@@ -63,13 +37,6 @@ async fn check_permissions_and_cooldown_single<'a, U: Send + Sync + 'static, E>(
 
     if cmd.dm_only && ctx.guild_id().is_some() {
         return Err(crate::FrameworkError::DmOnly { ctx });
-    }
-
-    #[cfg(feature = "cache")]
-    {
-        if cmd.nsfw_only && !check_nsfw_channel(ctx).await {
-            return Err(crate::FrameworkError::NsfwOnly { ctx });
-        }
     }
 
     // Make sure that user has required permissions

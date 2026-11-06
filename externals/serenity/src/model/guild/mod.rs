@@ -32,8 +32,6 @@ pub use self::role::*;
 pub use self::scheduled_event::*;
 pub use self::system_channel::*;
 pub use self::welcome_screen::*;
-#[cfg(feature = "model")]
-use crate::builder::EditGuild;
 #[cfg(doc)]
 use crate::constants::LARGE_THRESHOLD;
 #[cfg(feature = "model")]
@@ -101,110 +99,14 @@ pub struct Guild {
     ///
     /// In the client, this appears on the guild list on the left-hand side.
     pub icon: Option<ImageHash>,
-    /// Icon hash, returned when in the template object
-    pub icon_hash: Option<ImageHash>,
-    /// An identifying hash of the guild's splash icon.
-    ///
-    /// If the `InviteSplash` feature is enabled, this can be used to generate a URL to a splash
-    /// image.
-    pub splash: Option<ImageHash>,
-    /// An identifying hash of the guild discovery's splash icon.
-    ///
-    /// **Note**: Only present for guilds with the `DISCOVERABLE` feature.
-    pub discovery_splash: Option<ImageHash>,
     // Omitted `owner` field because only Http::get_guilds uses it, which returns GuildInfo
     /// The Id of the [`User`] who owns the guild.
     pub owner_id: UserId,
     // Omitted `permissions` field because only Http::get_guilds uses it, which returns GuildInfo
     // Omitted `region` field because it is deprecated (see Discord docs)
     /// Information about the voice afk channel.
-    #[serde(flatten)]
-    pub afk_metadata: Option<AfkMetadata>,
-    /// Whether or not the guild widget is enabled.
-    pub widget_enabled: Option<bool>,
-    /// The channel id that the widget will generate an invite to, or null if set to no invite
-    pub widget_channel_id: Option<ChannelId>,
-    /// Indicator of the current verification level of the guild.
-    pub verification_level: VerificationLevel,
-    /// Indicator of whether notifications for all messages are enabled by
-    /// default in the guild.
-    pub default_message_notifications: DefaultMessageNotificationLevel,
-    /// Default explicit content filter level.
-    pub explicit_content_filter: ExplicitContentFilter,
     /// A mapping of the guild's roles.
     pub roles: ExtractMap<RoleId, Role>,
-    /// All of the guild's custom emojis.
-    pub emojis: ExtractMap<EmojiId, Emoji>,
-    /// The guild features. These are user-invisible options which are used for Discord rollouts
-    /// and/or paid benefits. More information is available at [`discord's documentation`].
-    ///
-    /// [`discord's documentation`]: https://docs.discord.com/developers/resources/guild#guild-object-guild-features
-    pub features: FixedArray<FixedString>,
-    /// Indicator of whether the guild requires multi-factor authentication for [`Role`]s or
-    /// [`User`]s with moderation permissions.
-    pub mfa_level: MfaLevel,
-    /// Application ID of the guild creator if it is bot-created.
-    pub application_id: Option<ApplicationId>,
-    /// The ID of the channel to which system messages are sent.
-    pub system_channel_id: Option<ChannelId>,
-    /// System channel flags.
-    pub system_channel_flags: SystemChannelFlags,
-    /// The id of the channel where rules and/or guidelines are displayed.
-    ///
-    /// **Note**: Only available on `COMMUNITY` guild, see [`Self::features`].
-    pub rules_channel_id: Option<ChannelId>,
-    /// The maximum number of presences for the guild. The default value is currently 25000.
-    ///
-    /// **Note**: It is in effect when it is `None`.
-    pub max_presences: Option<MemberCount>,
-    /// The maximum number of members for the guild.
-    pub max_members: Option<MemberCount>,
-    /// The vanity url code for the guild, if it has one.
-    pub vanity_url_code: Option<FixedString<u8>>,
-    /// The server's description, if it has one.
-    pub description: Option<FixedString>,
-    /// The guild's banner, if it has one.
-    pub banner: Option<ImageHash>,
-    /// The server's premium boosting level.
-    pub premium_tier: PremiumTier,
-    /// The total number of users currently boosting this server.
-    pub premium_subscription_count: Option<MemberCount>,
-    /// The preferred locale of this guild only set if guild has the "COMMUNITY" feature,
-    /// defaults to en-US.
-    pub preferred_locale: FixedString<u8>,
-    /// The id of the channel where admins and moderators of Community guilds receive notices from
-    /// Discord.
-    ///
-    /// **Note**: Only available on `COMMUNITY` guild, see [`Self::features`].
-    pub public_updates_channel_id: Option<ChannelId>,
-    /// The maximum amount of users in a video channel.
-    pub max_video_channel_users: Option<MemberCount>,
-    /// The maximum amount of users in a stage video channel
-    pub max_stage_video_channel_users: Option<MemberCount>,
-    /// Approximate number of members in this guild.
-    pub approximate_member_count: Option<MemberCount>,
-    /// Approximate number of non-offline members in this guild.
-    pub approximate_presence_count: Option<MemberCount>,
-    /// The welcome screen of the guild.
-    ///
-    /// **Note**: Only available on `COMMUNITY` guild, see [`Self::features`].
-    pub welcome_screen: Option<GuildWelcomeScreen>,
-    /// The guild NSFW state. See [`discord support article`].
-    ///
-    /// [`discord support article`]: https://support.discord.com/hc/en-us/articles/1500005389362-NSFW-Server-Designation
-    pub nsfw_level: NsfwLevel,
-    /// All of the guild's custom stickers.
-    pub stickers: ExtractMap<StickerId, Sticker>,
-    /// Whether the guild has the boost progress bar enabled
-    pub premium_progress_bar_enabled: bool,
-
-    // =======
-    // From here on, all fields are from Guild Create Event's extra fields (see Discord docs)
-    // =======
-    /// The date that the current user joined the guild.
-    pub joined_at: Timestamp,
-    /// Indicator of whether the guild is considered "large" by Discord.
-    pub large: bool,
     /// Whether this guild is unavailable due to an outage.
     #[serde(default)]
     pub unavailable: bool,
@@ -228,19 +130,6 @@ pub struct Guild {
     /// event is fired in said thread, however an `INTERACTION_CREATE` may not have a private
     /// thread in cache.
     pub threads: ExtractMap<ThreadId, GuildThread>,
-    /// A mapping of [`User`]s' Ids to their current presences.
-    ///
-    /// **Note**: This will be empty unless the "guild presences" privileged intent is enabled.
-    pub presences: ExtractMap<UserId, Presence>,
-    /// The stage instances in this guild.
-    pub stage_instances: FixedArray<StageInstance>,
-    /// The scheduled events in this guild.
-    #[serde(rename = "guild_scheduled_events")]
-    pub scheduled_events: ExtractMap<ScheduledEventId, ScheduledEvent>,
-    /// The id of the channel where this guild will recieve safety alerts.
-    pub safety_alerts_channel_id: Option<ChannelId>,
-    /// The incidents data for this guild, if any.
-    pub incidents_data: Option<Box<IncidentsData>>,
 }
 
 #[cfg(feature = "model")]
@@ -282,12 +171,6 @@ impl Guild {
         })
     }
 
-    /// Returns the formatted URL of the guild's banner image, if one exists.
-    #[must_use]
-    pub fn banner_url(&self) -> Option<String> {
-        self.banner.as_ref().map(|banner| cdn!("/banners/{}/{}.webp?size=1024", self.id, banner))
-    }
-
     /// Deletes the current guild if the current user is the owner of the
     /// guild.
     ///
@@ -310,65 +193,6 @@ impl Guild {
         }
 
         self.id.delete(cache_http.http()).await
-    }
-
-    /// Edits the current guild with new data where specified.
-    ///
-    /// **Note**: Requires the [Manage Guild] permission.
-    ///
-    /// # Examples
-    ///
-    /// Change a guild's icon using a file named "icon.png":
-    ///
-    /// ```rust,no_run
-    /// # use serenity::builder::{EditGuild, CreateAttachment};
-    /// # use serenity::{http::Http, model::guild::Guild};
-    /// #
-    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let http: Http = unimplemented!();
-    /// # let mut guild: Guild = unimplemented!();
-    /// let icon = CreateAttachment::path("./icon.png".as_ref())?.encode("image/png").await?;
-    ///
-    /// // assuming a `guild` has already been bound
-    /// let builder = EditGuild::new().icon(Some(icon));
-    /// guild.edit(&http, builder).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Http`] if the current user lacks permission or if invalid data is given.
-    ///
-    /// [Manage Guild]: Permissions::MANAGE_GUILD
-    pub async fn edit(&mut self, http: &Http, builder: EditGuild<'_>) -> Result<()> {
-        let guild = self.id.edit(http, builder).await?;
-
-        self.afk_metadata = guild.afk_metadata;
-        self.default_message_notifications = guild.default_message_notifications;
-        self.emojis = guild.emojis;
-        self.features = guild.features;
-        self.icon = guild.icon;
-        self.mfa_level = guild.mfa_level;
-        self.name = guild.name;
-        self.owner_id = guild.owner_id;
-        self.roles = guild.roles;
-        self.splash = guild.splash;
-        self.verification_level = guild.verification_level;
-
-        Ok(())
-    }
-
-    /// Gets a partial amount of guild data by its Id.
-    ///
-    /// **Note**: This will not be a [`Guild`], as the REST API does not send all data with a guild
-    /// retrieval.
-    ///
-    /// # Errors
-    ///
-    /// Returns an [`Error::Http`] if the current user is not in the guild.
-    pub async fn get(cache_http: impl CacheHttp, guild_id: GuildId) -> Result<PartialGuild> {
-        guild_id.to_partial_guild(cache_http).await
     }
 
     /// Gets the highest role a [`Member`] of this Guild has.
@@ -507,14 +331,6 @@ impl Guild {
         } else {
             http.get_member(self.id, user_id).await.map(Cow::Owned)
         }
-    }
-
-    /// Gets a list of all the members (satisfying the status provided to the function) in this
-    /// guild.
-    pub fn members_with_status(&self, status: OnlineStatus) -> impl Iterator<Item = &Member> {
-        self.members.iter().filter(move |member| {
-            self.presences.get(&member.user.id).is_some_and(|p| p.status == status)
-        })
     }
 
     /// Retrieves the first [`Member`] found that matches the name - with an optional discriminator
@@ -900,12 +716,6 @@ impl Guild {
             member_allow_overwrites,
             member_deny_overwrites,
         })
-    }
-
-    /// Returns the formatted URL of the guild's splash image, if one exists.
-    #[must_use]
-    pub fn splash_url(&self) -> Option<String> {
-        self.splash.as_ref().map(|splash| cdn!("/splashes/{}/{}.webp?size=4096", self.id, splash))
     }
 
     /// Obtain a reference to a role by its name.

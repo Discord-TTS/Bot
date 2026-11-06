@@ -72,23 +72,6 @@ impl<'a> EditRole<'a> {
         Self::default()
     }
 
-    /// Creates a new builder with the values of the given [`Role`].
-    pub fn from_role(role: &'a Role) -> Self {
-        EditRole {
-            hoist: Some(role.hoist()),
-            mentionable: Some(role.mentionable()),
-            name: Some(Cow::Borrowed(&role.name)),
-            permissions: Some(role.permissions.bits()),
-            position: Some(role.position),
-            colour: Some(role.colour),
-            unicode_emoji: role.unicode_emoji.as_ref().map(|v| Some(Cow::Borrowed(v.as_str()))),
-            audit_log_reason: None,
-            colours: Some(role.colours.into()),
-            // TODO: Do we want to download role.icon?
-            icon: None,
-        }
-    }
-
     /// Set the colour of the role.
     pub fn colour(mut self, colour: impl Into<Colour>) -> Self {
         self.colour = Some(colour.into());

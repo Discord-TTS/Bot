@@ -1,7 +1,5 @@
 use std::fmt;
 
-use nonmax::{NonMaxU16, NonMaxU32};
-
 #[cfg(feature = "model")]
 use crate::builder::{
     CreateMessage,
@@ -32,16 +30,6 @@ pub struct BaseGuildChannel {
     pub kind: ChannelType,
     /// The name of the channel. (1-100 characters)
     pub name: FixedString<u16>,
-    /// The Id of the last message sent in the channel.
-    pub last_message_id: Option<MessageId>,
-    /// The timestamp of the time a pin was most recently made.
-    pub last_pin_timestamp: Option<Timestamp>,
-    /// A rate limit that applies per user and excludes bots.
-    ///
-    /// **Note**: This is only available for text channels excluding news channels.
-    #[doc(alias = "slowmode")]
-    #[serde(default)]
-    pub rate_limit_per_user: Option<NonMaxU16>,
 }
 
 #[cfg(feature = "model")]
@@ -65,15 +53,6 @@ pub struct GuildChannel {
     pub base: BaseGuildChannel,
     /// The unique ID of the channel.
     pub id: ChannelId,
-    /// The Id of the parent category for a channel.
-    ///
-    /// **Note**: This is only available for channels in a category.
-    // Technically shared, but for different purposes.
-    pub parent_id: Option<ChannelId>,
-    /// The bitrate of the channel.
-    ///
-    /// **Note**: This is only available for voice and stage channels.
-    pub bitrate: Option<NonMaxU32>,
     /// Permission overwrites for [`Member`]s and for [`Role`]s.
     #[serde(default)]
     pub permission_overwrites: FixedArray<PermissionOverwrite>,
@@ -82,70 +61,6 @@ pub struct GuildChannel {
     /// The default text channel will _almost always_ have a position of `0`.
     #[serde(default)]
     pub position: u16,
-    /// The topic of the channel.
-    ///
-    /// **Note**: This is only available for text, forum and stage channels.
-    pub topic: Option<FixedString<u16>>,
-    /// The maximum number of members allowed in the channel.
-    ///
-    /// This is max 99 for voice channels and 10,000 for stage channels (0 refers to no limit).
-    pub user_limit: Option<NonMaxU16>,
-    /// Used to tell if the channel is not safe for work.
-    // This field can or can not be present sometimes, but if it isn't default to `false`.
-    #[serde(default)]
-    pub nsfw: bool,
-    /// The region override.
-    ///
-    /// **Note**: This is only available for voice and stage channels. [`None`] for voice and stage
-    /// channels means automatic region selection.
-    pub rtc_region: Option<FixedString<u8>>,
-    /// The video quality mode for a voice channel.
-    pub video_quality_mode: Option<VideoQualityMode>,
-    /// Default duration for newly created threads, in minutes, to automatically archive the thread
-    /// after recent activity.
-    pub default_auto_archive_duration: Option<AutoArchiveDuration>,
-    /// Extra information about the channel.
-    #[serde(default)]
-    pub flags: ChannelFlags,
-    /// The set of available tags.
-    ///
-    /// **Note**: This is only available in forum channels.
-    #[serde(default)]
-    pub available_tags: FixedArray<ForumTag>,
-    /// The emoji to show in the add reaction button
-    ///
-    /// **Note**: This is only available in a forum.
-    pub default_reaction_emoji: Option<ForumEmoji>,
-    /// The initial `rate_limit_per_user` to set on newly created threads in a channel. This field
-    /// is copied to the thread at creation time and does not live update.
-    ///
-    /// **Note**: This is only available in a forum or text channel.
-    pub default_thread_rate_limit_per_user: Option<NonMaxU16>,
-    /// The status of a voice channel.
-    ///
-    /// **Note**: This is only available in voice channels and will only be [`Some`] when the cache
-    /// is enabled. To manually retrieve the value and trigger population in the cache, see
-    /// [`Context::channel_info`].
-    ///
-    /// [`Context::channel_info`]: crate::gateway::client::Context::channel_info
-    pub status: Option<FixedString<u16>>,
-    /// Unix timestamp (in seconds) of when a voice session started.
-    ///
-    /// **Note**: This is only available in voice channels and will only be [`Some`] when the cache
-    /// is enabled. To manually retrieve the value and trigger population in the cache, see
-    /// [`Context::channel_info`].
-    ///
-    /// [`Context::channel_info`]: crate::gateway::client::Context::channel_info
-    pub voice_start_time: Option<i64>,
-    /// The default sort order type used to order posts
-    ///
-    /// **Note**: This is only available in a forum.
-    pub default_sort_order: Option<SortOrder>,
-    /// The default forum layout view used to display posts in a forum. Defaults to 0, which
-    /// indicates a layout view has not been set by a channel admin.
-    ///
-    /// **Note**: This is only available in a forum.
-    pub default_forum_layout: Option<ForumLayoutType>,
 }
 
 enum_number! {

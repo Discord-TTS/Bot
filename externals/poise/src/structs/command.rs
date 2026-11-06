@@ -109,8 +109,6 @@ pub struct Command<U, E> {
     pub guild_only: bool,
     /// If true, the command may only run in DMs
     pub dm_only: bool,
-    /// If true, the command may only run in NSFW channels
-    pub nsfw_only: bool,
     /// Command-specific override for [`crate::FrameworkOptions::on_error`]
     #[derive_where(skip)]
     pub on_error: Option<fn(crate::FrameworkError<'_, U, E>) -> BoxFuture<'_, ()>>,
@@ -313,7 +311,6 @@ impl<U, E> Default for Command<U, E> {
             owners_only: false,
             guild_only: false,
             dm_only: false,
-            nsfw_only: false,
             on_error: None,
             checks: Vec::new(),
             parameters: Vec::new(),

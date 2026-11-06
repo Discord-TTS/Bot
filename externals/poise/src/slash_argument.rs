@@ -82,7 +82,7 @@ macro_rules! argumentconvert_slash_argument {
 
 argumentconvert_slash_argument! {
     serenity::Message,
-    serenity::EmojiId, serenity::Emoji,
+    serenity::EmojiId,
     #[cfg(feature = "cache")]
     serenity::GuildId,
     #[cfg(feature = "cache")]

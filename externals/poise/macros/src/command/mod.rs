@@ -48,7 +48,6 @@ pub struct CommandArgs {
     owners_only: bool,
     guild_only: bool,
     dm_only: bool,
-    nsfw_only: bool,
     identifying_name: Option<String>,
     category: Option<String>,
     custom_data: Option<syn::Expr>,
@@ -306,7 +305,6 @@ fn generate_command(mut inv: Invocation) -> Result<proc_macro2::TokenStream, dar
     let owners_only = inv.args.owners_only;
     let guild_only = inv.args.guild_only;
     let dm_only = inv.args.dm_only;
-    let nsfw_only = inv.args.nsfw_only;
 
     let install_context = &inv.install_context;
     let interaction_context = &inv.interaction_context;
@@ -387,7 +385,6 @@ fn generate_command(mut inv: Invocation) -> Result<proc_macro2::TokenStream, dar
                 owners_only: #owners_only,
                 guild_only: #guild_only,
                 dm_only: #dm_only,
-                nsfw_only: #nsfw_only,
                 install_context: #install_context,
                 interaction_context: #interaction_context,
                 checks: vec![ #( |ctx| Box::pin(#checks(ctx)) ),* ],

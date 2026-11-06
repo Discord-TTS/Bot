@@ -252,27 +252,7 @@ pub struct PresenceUser {
     pub avatar: Option<ImageHash>,
     #[serde(default)]
     pub bot: Option<bool>,
-    #[serde(default)]
-    pub system: Option<bool>,
-    #[serde(default)]
-    pub mfa_enabled: Option<bool>,
-    pub banner: Option<ImageHash>,
-    #[serde(rename = "accent_color")]
-    pub accent_colour: Option<Colour>,
-    pub locale: Option<FixedString<u8>>,
-    pub verified: Option<bool>,
-    pub email: Option<FixedString<u8>>,
-    #[serde(default)]
-    pub flags: Option<UserPublicFlags>,
-    #[serde(default)]
-    pub premium_type: Option<PremiumType>,
-    pub public_flags: Option<UserPublicFlags>,
     pub member: Option<Box<PartialMember>>,
-    pub primary_guild: Option<PrimaryGuild>,
-    pub avatar_decoration_data: Option<AvatarDecorationData>,
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_null_as_default")]
-    pub collectibles: Collectibles,
     // TODO: should really go over these fields at some point and check them.
 }
 
@@ -282,32 +262,18 @@ impl PresenceUser {
     /// If one of [`User`]'s required fields is None in `self`, None is returned.
     #[must_use]
     pub fn into_user(self) -> Option<User> {
-        let (bot, verified, system, mfa_enabled) =
-            (self.bot()?, self.verified(), self.system(), self.mfa_enabled());
+        let bot = self.bot()?;
         let mut user = User {
             avatar: self.avatar,
             discriminator: self.discriminator,
             global_name: self.global_name,
             id: self.id,
             name: self.name?,
-            public_flags: self.public_flags,
-            banner: self.banner,
-            accent_colour: self.accent_colour,
             member: self.member,
-            locale: self.locale,
-            email: self.email,
-            flags: self.public_flags.unwrap_or_default(),
-            premium_type: self.premium_type.unwrap_or_default(),
-            primary_guild: self.primary_guild,
-            avatar_decoration_data: self.avatar_decoration_data,
-            collectibles: self.collectibles,
             __generated_flags: UserGeneratedFlags::empty(),
         };
 
         user.set_bot(bot);
-        user.set_verified(verified);
-        user.set_system(system.unwrap_or_default());
-        user.set_mfa_enabled(mfa_enabled.unwrap_or_default());
 
         Some(user)
     }

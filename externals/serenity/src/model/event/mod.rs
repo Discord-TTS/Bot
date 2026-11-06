@@ -13,7 +13,6 @@ use strum::{EnumCount, IntoStaticStr, VariantNames};
 pub use self::full_event::*;
 use crate::constants::Opcode;
 use crate::model::prelude::*;
-use crate::model::utils::deserialize_null_as_default;
 
 /// Requires no gateway intents.
 ///
@@ -253,26 +252,15 @@ pub struct GuildMemberRemoveEvent {
 pub struct GuildMemberUpdateEvent {
     pub guild_id: GuildId,
     pub nick: Option<FixedString<u8>>,
-    pub joined_at: Option<Timestamp>,
     pub roles: FixedArray<RoleId>,
     pub user: User,
-    pub premium_since: Option<Timestamp>,
-    #[serde(default)]
-    pub pending: bool,
     #[serde(default)]
     pub deaf: bool,
     #[serde(default)]
     pub mute: bool,
     pub avatar: Option<ImageHash>,
-    pub banner: Option<ImageHash>,
     pub communication_disabled_until: Option<Timestamp>,
-    // This is not documented but present on the event?
-    pub unusual_dm_activity_until: Option<Timestamp>,
     pub flags: Option<GuildMemberFlags>,
-    pub avatar_decoration_data: Option<AvatarDecorationData>,
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_null_as_default")]
-    pub collectibles: Collectibles,
 }
 
 /// Requires no gateway intents.

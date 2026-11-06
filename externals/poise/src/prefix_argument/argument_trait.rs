@@ -152,7 +152,7 @@ argumentconvert_pop_argument! {
     serenity::User, serenity::Member,
     serenity::Message,
     serenity::Channel, serenity::GuildChannel,
-    serenity::EmojiId, serenity::Emoji,
+    serenity::EmojiId,
     serenity::Role,
 
     serenity::GuildId,

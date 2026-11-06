@@ -631,19 +631,6 @@ impl Message {
     pub fn link(&self) -> MessageLink {
         self.id.link(self.channel_id, self.guild_id)
     }
-
-    /// Retrieves the message channel's category ID if the channel has one.
-    pub async fn category_id(&self, cache_http: impl CacheHttp) -> Option<ChannelId> {
-        #[cfg(feature = "cache")]
-        if let Some(cache) = cache_http.cache()
-            && let Some(guild) = cache.guild(self.guild_id?)
-        {
-            let channel = guild.channels.get(&self.channel_id.expect_channel())?;
-            return channel.parent_id;
-        }
-
-        cache_http.http().get_channel(self.channel_id).await.ok()?.guild()?.parent_id
-    }
 }
 
 impl ExtractKey<MessageId> for Message {
