@@ -35,8 +35,14 @@
             VERGEN_GIT_DIRTY = if builtins.hasAttr "dirtyRev" self then "true" else "false";
           };
 
+          buildInputs = with pkgs; [
+            aws-lc
+            zstd
+            rust-jemalloc-sys
+          ];
           nativeBuildInputs = with pkgs; [
             mold
+            pkg-config
           ];
 
           hardeningDisable = [ "fortify" ];
