@@ -1,7 +1,7 @@
 {
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
+    nixpkgs.url = "https://channels.nixos.org/nixos-unstable-small/nixexprs.tar.zst";
     flake-utils.url = "github:numtide/flake-utils";
 
     tts-utils.url = "github:Discord-TTS/shared-workflows";
