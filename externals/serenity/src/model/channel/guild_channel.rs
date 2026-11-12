@@ -41,6 +41,16 @@ impl BaseGuildChannel {
     }
 }
 
+impl From<&ObfuscatedChannel> for BaseGuildChannel {
+    fn from(obfuscated_channel: &ObfuscatedChannel) -> Self {
+        Self {
+            guild_id: obfuscated_channel.guild_id,
+            kind: obfuscated_channel.kind,
+            name: FixedString::from_static_trunc("___hidden___"),
+        }
+    }
+}
+
 /// Represents a channel in a [`Guild`], excluding thread information.
 ///
 /// [Discord docs](https://docs.discord.com/developers/resources/channel#channel-object).
@@ -61,6 +71,9 @@ pub struct GuildChannel {
     /// The default text channel will _almost always_ have a position of `0`.
     #[serde(default)]
     pub position: u16,
+    /// Extra information about the channel.
+    #[serde(default)]
+    pub flags: ChannelFlags,
 }
 
 enum_number! {
@@ -171,7 +184,7 @@ impl GuildChannel {
     ///
     /// let channel = {
     ///     let guild = cache.guild(guild_id).ok_or(ModelError::ItemMissing)?;
-    ///     guild.channels.get(&channel_id).ok_or(ModelError::ItemMissing)?.clone()
+    ///     guild.viewable_channels.get(&channel_id).ok_or(ModelError::ItemMissing)?.clone()
     /// };
     ///
     /// let builder = EditVoiceState::new().suppress(false);
@@ -224,7 +237,7 @@ impl GuildChannel {
     ///
     /// let channel = {
     ///     let guild = cache.guild(guild_id).ok_or(ModelError::ItemMissing)?;
-    ///     guild.channels.get(&channel_id).ok_or(ModelError::ItemMissing)?.clone()
+    ///     guild.viewable_channels.get(&channel_id).ok_or(ModelError::ItemMissing)?.clone()
     /// };
     ///
     /// // Send a request to speak
@@ -402,5 +415,195 @@ impl fmt::Display for GuildChannel {
 impl ExtractKey<ChannelId> for GuildChannel {
     fn extract_key(&self) -> &ChannelId {
         &self.id
+    }
+}
+
+impl From<ObfuscatedChannel> for GuildChannel {
+    fn from(obfuscated_channel: ObfuscatedChannel) -> Self {
+        Self {
+            base: BaseGuildChannel {
+                guild_id: obfuscated_channel.guild_id,
+                kind: obfuscated_channel.kind,
+                name: FixedString::from_static_trunc("___hidden___"),
+                ..Default::default()
+            },
+            id: obfuscated_channel.id,
+            permission_overwrites: FixedArray::from_vec_trunc(vec![PermissionOverwrite {
+                allow: Permissions::empty(),
+                deny: Permissions::VIEW_CHANNEL,
+                kind: PermissionOverwriteType::Role(RoleId::new(obfuscated_channel.guild_id.get())),
+            }]),
+            position: obfuscated_channel.position,
+            flags: ChannelFlags::CHANNEL_OBFUSCATED,
+            ..Default::default()
+        }
+    }
+}
+
+/// Represents an obfuscated channel in a [`Guild`].
+///
+/// Only includes data guaranteed to be available; obfuscated metadata is omitted.
+///
+/// [Discord docs](https://docs.discord.com/developers/resources/channel#channel-object-obfuscated-channels).
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
+#[non_exhaustive]
+pub struct ObfuscatedChannel {
+    /// The Id of the guild the channel is located in.
+    #[serde(default)]
+    pub guild_id: GuildId,
+    /// The type of the channel.
+    #[serde(rename = "type")]
+    pub kind: ChannelType,
+    /// The unique Id of the channel.
+    pub id: ChannelId,
+    /// The position of the channel.
+    #[serde(default)]
+    pub position: u16,
+}
+
+impl fmt::Display for ObfuscatedChannel {
+    /// Formats the channel, creating a mention of it.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.mention(), f)
+    }
+}
+
+impl ExtractKey<ChannelId> for ObfuscatedChannel {
+    fn extract_key(&self) -> &ChannelId {
+        &self.id
+    }
+}
+
+impl From<GuildChannel> for ObfuscatedChannel {
+    fn from(guild_channel: GuildChannel) -> Self {
+        Self {
+            guild_id: guild_channel.base.guild_id,
+            kind: guild_channel.base.kind,
+            id: guild_channel.id,
+            position: guild_channel.position,
+        }
+    }
+}
+
+impl From<&GuildChannel> for ObfuscatedChannel {
+    fn from(guild_channel: &GuildChannel) -> Self {
+        Self {
+            guild_id: guild_channel.base.guild_id,
+            kind: guild_channel.base.kind,
+            id: guild_channel.id,
+            position: guild_channel.position,
+        }
+    }
+}
+
+/// A container for a guild channel that might be obfuscated.
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
+#[derive(Clone, Debug, Serialize)]
+pub enum MaybeObfuscated {
+    Viewable(GuildChannel),
+    Obfuscated(ObfuscatedChannel),
+}
+
+impl MaybeObfuscated {
+    /// Returns the [`ChannelId`] of [`MaybeObfuscated`].
+    #[must_use]
+    pub fn id(&self) -> ChannelId {
+        match self {
+            MaybeObfuscated::Viewable(gc) => gc.id,
+            MaybeObfuscated::Obfuscated(oc) => oc.id,
+        }
+    }
+
+    /// Returns the [`ChannelType`] of [`MaybeObfuscated`].
+    #[must_use]
+    pub fn kind(&self) -> ChannelType {
+        match self {
+            MaybeObfuscated::Viewable(gc) => gc.base.kind,
+            MaybeObfuscated::Obfuscated(oc) => oc.kind,
+        }
+    }
+
+    /// Returns the name of [`MaybeObfuscated`], if viewable.
+    ///
+    /// **Note**: If the channel is obfuscated, this will return `None`.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            MaybeObfuscated::Viewable(gc) => Some(gc.base.name.as_str()),
+            MaybeObfuscated::Obfuscated(_) => None,
+        }
+    }
+
+    /// Returns the position of [`MaybeObfuscated`].
+    #[must_use]
+    pub fn position(&self) -> u16 {
+        match self {
+            MaybeObfuscated::Viewable(gc) => gc.position,
+            MaybeObfuscated::Obfuscated(oc) => oc.position,
+        }
+    }
+
+    /// Returns the [`GuildId`] of [`MaybeObfuscated`].
+    #[must_use]
+    pub fn guild_id(&self) -> GuildId {
+        match self {
+            MaybeObfuscated::Viewable(gc) => gc.base.guild_id,
+            MaybeObfuscated::Obfuscated(oc) => oc.guild_id,
+        }
+    }
+}
+
+impl fmt::Display for MaybeObfuscated {
+    /// Formats the channel, creating a mention of it.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.mention(), f)
+    }
+}
+
+impl ExtractKey<ChannelId> for MaybeObfuscated {
+    fn extract_key(&self) -> &ChannelId {
+        match self {
+            MaybeObfuscated::Viewable(gc) => &gc.id,
+            MaybeObfuscated::Obfuscated(oc) => &oc.id,
+        }
+    }
+}
+
+impl From<GuildChannel> for MaybeObfuscated {
+    fn from(guild_channel: GuildChannel) -> Self {
+        if guild_channel.flags.contains(ChannelFlags::CHANNEL_OBFUSCATED) {
+            Self::Obfuscated(guild_channel.into())
+        } else {
+            Self::Viewable(guild_channel)
+        }
+    }
+}
+
+impl From<ObfuscatedChannel> for MaybeObfuscated {
+    fn from(obfuscated_channel: ObfuscatedChannel) -> Self {
+        Self::Obfuscated(obfuscated_channel)
+    }
+}
+
+impl<'de> Deserialize<'de> for MaybeObfuscated {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as DeError;
+        use serde_json::value::RawValue;
+
+        #[derive(Deserialize)]
+        struct MaybeObfuscatedRaw {
+            flags: ChannelFlags,
+        }
+
+        let raw_data = <&RawValue>::deserialize(deserializer)?;
+        let raw = MaybeObfuscatedRaw::deserialize(raw_data).map_err(DeError::custom)?;
+
+        if raw.flags.contains(ChannelFlags::CHANNEL_OBFUSCATED) {
+            Deserialize::deserialize(raw_data).map(MaybeObfuscated::Obfuscated)
+        } else {
+            Deserialize::deserialize(raw_data).map(MaybeObfuscated::Viewable)
+        }
+        .map_err(DeError::custom)
     }
 }

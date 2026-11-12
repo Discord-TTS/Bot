@@ -39,7 +39,6 @@ use std::time::{Duration, Instant};
 use aformat::aformat_into;
 use aformat::{ArrayString, CapStr, aformat};
 use tokio_tungstenite::tungstenite::error::Error as TungsteniteError;
-use tokio_tungstenite::tungstenite::protocol::frame::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode as TungsteniteCloseCode;
 #[cfg(feature = "tracing_instrument")]
 use tracing::instrument;
@@ -55,11 +54,11 @@ pub use self::shard_manager::{
 };
 pub use self::shard_queue::ShardQueue;
 pub use self::shard_runner::{ShardRunner, ShardRunnerMessage};
-use super::{ActivityData, ChunkGuildFilter, GatewayError, PresenceData, WsClient};
+use super::{ActivityData, ChunkGuildFilter, CloseFrame, GatewayError, PresenceData, WsClient};
 use crate::constants::{self, CloseCode};
 use crate::internal::prelude::*;
 use crate::model::event::{DeserializedEvent, Event, GatewayEvent};
-use crate::model::gateway::{ConnectionStage, GatewayIntents, ShardInfo};
+use crate::model::gateway::{ConnectionStage, GatewayCapabilities, GatewayIntents, ShardInfo};
 #[cfg(feature = "voice")]
 use crate::model::id::ChannelId;
 use crate::model::id::{ApplicationId, GuildId, ShardId};
@@ -103,6 +102,7 @@ pub struct Shard {
     resume_metadata: Option<ResumeMetadata>,
     compression: TransportCompression,
     pub intents: GatewayIntents,
+    pub capabilities: Option<GatewayCapabilities>,
 }
 
 impl Shard {
@@ -142,6 +142,7 @@ impl Shard {
     ///     shard_info,
     ///     GatewayIntents::all(),
     ///     None,
+    ///     None,
     ///     TransportCompression::None,
     /// )
     /// .await?;
@@ -154,13 +155,13 @@ impl Shard {
     ///
     /// # Errors
     ///
-    /// On Error, will return either [`Error::Gateway`], [`Error::Tungstenite`] or a Rustls/native
-    /// TLS error.
+    /// On Error, will return either [`Error::Gateway`] or a Rustls/native TLS error.
     pub async fn new(
         ws_url: Arc<str>,
         token: Token,
         info: ShardInfo,
         intents: GatewayIntents,
+        capabilities: Option<GatewayCapabilities>,
         presence: Option<PresenceData>,
         compression: TransportCompression,
     ) -> Result<Shard> {
@@ -183,6 +184,7 @@ impl Shard {
             resume_metadata: None,
             compression,
             intents,
+            capabilities,
         })
     }
 
@@ -213,8 +215,8 @@ impl Shard {
         match self.client.send_heartbeat(&self.info, Some(self.seq)).await {
             Ok(()) => self.heartbeater.send(),
             Err(why) => {
-                if let Error::Tungstenite(err) = &why
-                    && let TungsteniteError::Io(err) = &**err
+                if let Error::Gateway(GatewayError::Transport(err)) = &why
+                    && let TungsteniteError::Io(err) = &*err.0
                     && err.raw_os_error() != Some(32)
                 {
                     debug!("[{:?}] Err heartbeating: {:?}", self.info, err);
@@ -311,9 +313,9 @@ impl Shard {
     }
 
     #[cfg_attr(feature = "tracing_instrument", instrument(skip(self)))]
-    fn handle_gateway_closed(&mut self, data: Option<&CloseFrame>) -> Result<()> {
-        if let Some(code) = data.map(|d| d.code) {
-            match CloseCode(code.into()) {
+    fn handle_gateway_closed(&mut self, data: Option<CloseFrame>) -> Result<()> {
+        if let Some(data) = data {
+            match data.code() {
                 CloseCode::UnknownError => warn!("[{:?}] Unknown gateway error.", self.info),
                 CloseCode::UnknownOpcode => warn!("[{:?}] Sent invalid opcode.", self.info),
                 CloseCode::DecodeError => warn!("[{:?}] Sent invalid message.", self.info),
@@ -361,15 +363,15 @@ impl Shard {
                     error!("[{:?}] Disallowed gateway intents have been provided.", self.info);
                     return Err(Error::Gateway(GatewayError::DisallowedGatewayIntents));
                 },
-                _ => match code {
+                _ => match data.0.code {
                     TungsteniteCloseCode::Normal => info!("[{:?}] Normal closure.", self.info),
                     TungsteniteCloseCode::Away => info!("[{:?}] Going away.", self.info),
                     TungsteniteCloseCode::Restart => info!("[{:?}] Server restarting.", self.info),
                     _ => warn!(
                         "[{0:?}] Other close code {1} ({1:?}): {2:?}",
                         self.info,
-                        code,
-                        data.map(|d| &d.reason)
+                        data.0.code,
+                        data.reason()
                     ),
                 },
             }
@@ -440,10 +442,10 @@ impl Shard {
             },
             Ok(GatewayEvent::Reconnect) => Ok(Some(ShardAction::Reconnect)),
             Err(Error::Gateway(GatewayError::Closed(data))) => {
-                self.handle_gateway_closed(data.as_deref())?;
+                self.handle_gateway_closed(data)?;
                 Ok(Some(ShardAction::Reconnect))
             },
-            Err(Error::Tungstenite(why)) => {
+            Err(Error::Gateway(GatewayError::Transport(why))) => {
                 info!("[{:?}] Websocket error: {:?}", self.info, why);
                 info!("[{:?}] Will attempt to auto-reconnect", self.info);
 
@@ -578,7 +580,13 @@ impl Shard {
     #[cfg_attr(feature = "tracing_instrument", instrument(skip(self)))]
     pub async fn identify(&mut self) -> Result<()> {
         self.client
-            .send_identify(&self.info, self.token.expose_secret(), self.intents, &self.presence)
+            .send_identify(
+                &self.info,
+                self.token.expose_secret(),
+                self.intents,
+                self.capabilities,
+                &self.presence,
+            )
             .await?;
 
         self.heartbeater.send();

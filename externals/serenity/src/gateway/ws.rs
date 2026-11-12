@@ -9,7 +9,11 @@ use futures::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::tungstenite::protocol::{CloseFrame, WebSocketConfig};
+use tokio_tungstenite::tungstenite::error::Error as TungsteniteError;
+use tokio_tungstenite::tungstenite::protocol::{
+    CloseFrame as TungsteniteCloseFrame,
+    WebSocketConfig,
+};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_with_config};
 #[cfg(feature = "tracing_instrument")]
 use tracing::instrument;
@@ -18,10 +22,18 @@ use url::Url;
 #[cfg(feature = "transport_compression_zstd")]
 use zstd::stream::write::Decoder as ZstdWriter;
 
-use super::{ActivityData, ChunkGuildFilter, GatewayError, PresenceData, TransportCompression};
+use super::{
+    ActivityData,
+    ChunkGuildFilter,
+    CloseFrame,
+    GatewayError,
+    GatewayTransportError,
+    PresenceData,
+    TransportCompression,
+};
 use crate::constants::{self, Opcode};
 use crate::model::event::GatewayEvent;
-use crate::model::gateway::{GatewayIntents, ShardInfo};
+use crate::model::gateway::{GatewayCapabilities, GatewayIntents, ShardInfo};
 #[cfg(feature = "voice")]
 use crate::model::id::ChannelId;
 use crate::model::id::{GuildId, UserId};
@@ -68,6 +80,7 @@ enum WebSocketMessageData<'a> {
         large_threshold: u8,
         shard: &'a ShardInfo,
         intents: GatewayIntents,
+        capabilities: Option<GatewayCapabilities>,
         properties: IdentifyProperties,
         presence: PresenceUpdateMessage<'a>,
     },
@@ -208,6 +221,10 @@ pub struct WsClient {
 
 const TIMEOUT: Duration = Duration::from_millis(500);
 
+fn transport_err_to_lib(err: TungsteniteError) -> Error {
+    Error::Gateway(GatewayError::Transport(GatewayTransportError::new(err)))
+}
+
 impl WsClient {
     pub(crate) async fn connect(url: Url, compression: TransportCompression) -> Result<Self> {
         let config = {
@@ -218,7 +235,9 @@ impl WsClient {
             config
         };
 
-        let (stream, _) = connect_async_with_config(url, Some(config), false).await?;
+        let (stream, _) = connect_async_with_config(url, Some(config), false)
+            .await
+            .map_err(transport_err_to_lib)?;
 
         Ok(Self {
             stream,
@@ -229,7 +248,7 @@ impl WsClient {
     pub(crate) async fn recv_json(&mut self) -> Result<Option<GatewayEvent>> {
         let message = match timeout(TIMEOUT, self.stream.next()).await {
             Ok(Some(Ok(msg))) => msg,
-            Ok(Some(Err(e))) => return Err(e.into()),
+            Ok(Some(Err(e))) => return Err(transport_err_to_lib(e)),
             Ok(None) | Err(_) => return Ok(None),
         };
 
@@ -240,7 +259,7 @@ impl WsClient {
                 None => return Ok(None),
             },
             Message::Close(Some(frame)) => {
-                return Err(Error::Gateway(GatewayError::Closed(Some(Box::new(frame)))));
+                return Err(Error::Gateway(GatewayError::Closed(Some(CloseFrame::new(frame)))));
             },
             _ => return Ok(None),
         };
@@ -257,13 +276,13 @@ impl WsClient {
     pub(crate) async fn send_json(&mut self, value: &impl serde::Serialize) -> Result<()> {
         let message = Message::Text(serde_json::to_string(value)?.into());
 
-        self.stream.send(message).await?;
+        self.stream.send(message).await.map_err(transport_err_to_lib)?;
         Ok(())
     }
 
     /// Delegate to `WebSocketStream::close`
-    pub(crate) async fn close(&mut self, msg: Option<CloseFrame>) -> Result<()> {
-        self.stream.close(msg).await?;
+    pub(crate) async fn close(&mut self, msg: Option<TungsteniteCloseFrame>) -> Result<()> {
+        self.stream.close(msg).await.map_err(transport_err_to_lib)?;
         Ok(())
     }
 
@@ -364,6 +383,7 @@ impl WsClient {
         shard: &ShardInfo,
         token: &str,
         intents: GatewayIntents,
+        capabilities: Option<GatewayCapabilities>,
         presence: &PresenceData,
     ) -> Result<()> {
         let now = SystemTime::now();
@@ -377,6 +397,7 @@ impl WsClient {
                 token,
                 shard,
                 intents,
+                capabilities,
                 compress: matches!(self.compression, Compression::Payload { .. }),
                 large_threshold: constants::LARGE_THRESHOLD,
                 properties: IdentifyProperties {
