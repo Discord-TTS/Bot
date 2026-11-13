@@ -125,13 +125,6 @@ pub struct Guild {
     ///
     /// [obfuscated metadata]: https://docs.discord.com/developers/resources/channel#channel-object-obfuscated-channels
     pub viewable_channels: ExtractMap<ChannelId, GuildChannel>,
-    /// All channels with [obfuscated metadata] contained within a guild.
-    ///
-    /// Channel metadata is obfuscated when the bot does not have permission to view that channel.
-    /// For channels with full metadata, see the `viewable_channels` field.
-    ///
-    /// [obfuscated metadata]: https://docs.discord.com/developers/resources/channel#channel-object-obfuscated-channels
-    pub obfuscated_channels: ExtractMap<ChannelId, ObfuscatedChannel>,
     /// All active threads in this guild that current user has permission to view.
     ///
     /// A thread is guaranteed (for errors, not for panics) to be cached if a `MESSAGE_CREATE`
@@ -142,57 +135,17 @@ pub struct Guild {
 
 #[cfg(feature = "model")]
 impl Guild {
-    /// Returns the "default" channel of the guild for the passed user Id.
-    ///
-    /// This returns the first text-only channel that the user can view, or [`None`] if there
-    /// isn't one or if the user's member object is not in the cache.
-    ///
-    /// **Note**: Bots cannot view permission overwrites on obfuscated channels. Results will be
-    /// inaccurate if the member's default channel is an obfuscated channel with access granted
-    /// via permission overwrites on that channel.
+    /// Returns the [`GuildChannel`] or [`GuildThread`] that this Id corresponds to.
     #[must_use]
-    pub fn default_channel(&self, uid: UserId) -> Option<GuildChannelRef<'_>> {
-        let member = self.members.get(&uid)?;
-        let mut sorted = self
-            .channels()
-            .filter(|&channel| {
-                channel.kind() != ChannelType::Category
-                    && channel.kind() != ChannelType::Voice
-                    && channel.kind() != ChannelType::Stage
-                    && self.user_permissions_in(channel, member).view_channel()
-            })
-            .collect::<Vec<_>>();
-        sorted.sort_by_key(|channel| channel.position());
-        sorted.first().copied()
-    }
-
-    /// Returns the [`GuildChannel`], [`ObfuscatedChannel`], or [`GuildThread`] that this Id
-    /// corresponds to.
-    #[must_use]
-    pub fn channel(&self, channel_id: GenericChannelId) -> Option<GenericGuildChannelRef<'_>> {
+    pub fn viewable_channel(
+        &self,
+        channel_id: GenericChannelId,
+    ) -> Option<GenericGuildChannelRef<'_>> {
         let (channel_id, thread_id) = channel_id.split();
-        let viewable = self
-            .viewable_channels
-            .get(&channel_id)
-            .map(|gc| GenericGuildChannelRef::Channel(GuildChannelRef::Viewable(gc)));
-        let obfuscated = || {
-            self.obfuscated_channels
-                .get(&channel_id)
-                .map(|oc| GenericGuildChannelRef::Channel(GuildChannelRef::Obfuscated(oc)))
-        };
+        let viewable = self.viewable_channels.get(&channel_id).map(GenericGuildChannelRef::Channel);
         let thread = || self.threads.get(&thread_id).map(GenericGuildChannelRef::Thread);
 
-        viewable.or_else(obfuscated).or_else(thread)
-    }
-
-    /// Returns an `impl Iterator` over all non-thread channels within the guild.
-    ///
-    /// This includes both [`GuildChannel`]s and [`ObfuscatedChannel`]s.
-    pub fn channels(&self) -> impl Iterator<Item = GuildChannelRef<'_>> {
-        self.viewable_channels
-            .iter()
-            .map(GuildChannelRef::Viewable)
-            .chain(self.obfuscated_channels.iter().map(GuildChannelRef::Obfuscated))
+        viewable.or_else(thread)
     }
 
     /// Returns the guaranteed "default" channel of the guild.
@@ -848,7 +801,6 @@ impl<'de> Deserialize<'de> for Guild {
             voice_states: ExtractMap<UserId, VoiceState>,
             members: ExtractMap<UserId, Member>,
             viewable_channels: ExtractMap<ChannelId, GuildChannel>,
-            obfuscated_channels: ExtractMap<ChannelId, ObfuscatedChannel>,
             channels: Vec<GuildChannel>,
             threads: ExtractMap<ThreadId, GuildThread>,
         }
@@ -866,7 +818,6 @@ impl<'de> Deserialize<'de> for Guild {
             voice_states: raw.voice_states,
             members: raw.members,
             viewable_channels: ExtractMap::new(),
-            obfuscated_channels: ExtractMap::new(),
             threads: raw.threads,
             __generated_flags: GuildGeneratedFlags::empty(),
         };
@@ -874,9 +825,7 @@ impl<'de> Deserialize<'de> for Guild {
         guild.set_unavailable(unavailable);
 
         for channel in raw.channels {
-            if channel.flags.contains(ChannelFlags::CHANNEL_OBFUSCATED) {
-                guild.obfuscated_channels.insert(channel.into());
-            } else {
+            if !channel.flags.contains(ChannelFlags::CHANNEL_OBFUSCATED) {
                 guild.viewable_channels.insert(channel);
             }
         }

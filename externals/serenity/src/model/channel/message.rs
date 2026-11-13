@@ -224,7 +224,7 @@ impl Message {
     ///
     /// Can return an error if the HTTP request fails.
     pub async fn channel(&self, cache_http: impl CacheHttp) -> Result<Channel> {
-        self.channel_id.to_channel(cache_http, self.guild_id).await
+        self.channel_id.to_viewable_channel(cache_http, self.guild_id).await
     }
 
     /// Retrieves the [`GuildChannel`] the message was sent in.

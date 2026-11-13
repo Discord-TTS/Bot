@@ -15,9 +15,7 @@ impl CacheUpdate for ChannelCreateEvent {
             MaybeObfuscated::Viewable(guild_channel) => {
                 guild.viewable_channels.insert(guild_channel.clone()).map(Into::into)
             },
-            MaybeObfuscated::Obfuscated(obfuscated_channel) => {
-                guild.obfuscated_channels.insert(*obfuscated_channel).map(Into::into)
-            },
+            MaybeObfuscated::Obfuscated(_) => None,
         }
     }
 }
@@ -28,10 +26,8 @@ impl CacheUpdate for ChannelDeleteEvent {
     fn update(&self, cache: &Cache) -> Option<VecDeque<Message>> {
         let (channel_id, guild_id) = (self.channel.id(), self.channel.guild_id());
 
-        if let Some(mut guild) = cache.guilds.get_mut(&guild_id)
-            && guild.viewable_channels.remove(&channel_id).is_none()
-        {
-            guild.obfuscated_channels.remove(&channel_id);
+        if let Some(mut guild) = cache.guilds.get_mut(&guild_id) {
+            guild.viewable_channels.remove(&channel_id);
         }
 
         // Remove the cached messages for the channel.
@@ -48,16 +44,10 @@ impl CacheUpdate for ChannelUpdateEvent {
 
         match updated_channel {
             MaybeObfuscated::Viewable(guild_channel) => {
-                match guild.viewable_channels.insert(guild_channel.clone()) {
-                    Some(viewable_channel) => Some(viewable_channel.into()),
-                    None => guild.obfuscated_channels.remove(&updated_channel.id()).map(Into::into),
-                }
+                guild.viewable_channels.insert(guild_channel.clone()).map(Into::into)
             },
-            MaybeObfuscated::Obfuscated(obfuscated_channel) => {
-                match guild.obfuscated_channels.insert(*obfuscated_channel) {
-                    Some(obfuscated_channel) => Some(obfuscated_channel.into()),
-                    None => guild.viewable_channels.remove(&updated_channel.id()).map(Into::into),
-                }
+            MaybeObfuscated::Obfuscated(_) => {
+                guild.viewable_channels.remove(&updated_channel.id()).map(Into::into)
             },
         }
     }
@@ -183,9 +173,7 @@ fn obfuscate_no_longer_viewable_channels(
     channels: Vec<ChannelId>,
 ) {
     for id in channels {
-        if let Some(channel) = guild.viewable_channels.remove(&id) {
-            guild.obfuscated_channels.insert(channel.into());
-        }
+        guild.viewable_channels.remove(&id);
     }
 }
 
@@ -440,9 +428,8 @@ impl CacheUpdate for VoiceStateUpdateEvent {
             && let Some(channel) = guild.viewable_channels.get(channel_id)
             && let Some(member) = guild.members.get(&self.voice_state.user_id)
             && !guild.user_permissions_in(channel, member).view_channel()
-            && let Some(removed_channel) = guild.viewable_channels.remove(channel_id)
         {
-            guild.obfuscated_channels.insert(removed_channel.into());
+            guild.viewable_channels.remove(channel_id);
         }
 
         old_state

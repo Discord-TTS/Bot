@@ -471,34 +471,6 @@ impl Cache {
         CacheRef::from_guard(self.user.read())
     }
 
-    /// Returns all channel categories in the given guild as [`MaybeObfuscated`].
-    ///
-    /// This will clone viewable categories and copy obfuscated categories.
-    pub fn guild_categories(
-        &self,
-        guild_id: GuildId,
-    ) -> Option<ExtractMap<ChannelId, MaybeObfuscated>> {
-        let guild = self.guilds.get(&guild_id)?;
-
-        let categories = guild
-            .viewable_channels
-            .iter()
-            .filter(|channel| channel.base.kind == ChannelType::Category)
-            .cloned()
-            .map(MaybeObfuscated::Viewable)
-            .chain(
-                guild
-                    .obfuscated_channels
-                    .iter()
-                    .filter(|channel| channel.kind == ChannelType::Category)
-                    .copied()
-                    .map(MaybeObfuscated::Obfuscated),
-            )
-            .collect();
-
-        Some(categories)
-    }
-
     /// Inserts new messages into the message cache for a channel manually.
     ///
     /// This will keep the ordering of the message cache consistent, even if the message iterator

@@ -254,8 +254,10 @@ fn run_checks<'c>(
             && guild_row.audience_ignore()
         {
             let voice_channel_id = voice_state.channel_id.try_unwrap()?;
-            let voice_channel = guild.channels.get(&voice_channel_id).try_unwrap()?;
-            if voice_channel.base.kind == serenity::ChannelType::Stage && voice_state.suppress() {
+            let voice_channel = guild
+                .viewable_channel(voice_channel_id.widen())
+                .try_unwrap()?;
+            if voice_channel.base().kind == serenity::ChannelType::Stage && voice_state.suppress() {
                 return Ok(None);
             }
         }

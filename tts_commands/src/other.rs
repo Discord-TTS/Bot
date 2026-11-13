@@ -284,7 +284,7 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
     let guild_row = ctx.data().guilds_db.get(guild_id.into()).await?;
 
     let msg = if let Some(channel) = guild_row.channel
-        && require_guild!(ctx).channels.contains_key(&channel)
+        && require_guild!(ctx).viewable_channels.contains_key(&channel)
     {
         if channel.widen() == ctx.channel_id() {
             "You are in the setup channel already!"
@@ -292,7 +292,7 @@ pub async fn channel(ctx: Context<'_>) -> CommandResult {
             &aformat!("The current setup channel is: <#{channel}>")
         }
     } else {
-        "The channel hasn't been setup, do `/setup #textchannel`"
+        "The channel hasn't been setup or is inaccessible, do `/setup #textchannel`"
     };
 
     ctx.say(msg).await?;

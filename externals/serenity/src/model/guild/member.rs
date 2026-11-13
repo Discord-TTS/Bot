@@ -133,36 +133,6 @@ impl Member {
         self.guild_id.ban(http, self.user.id, dms, audit_log_reason).await
     }
 
-    /// Returns the "default channel" of the guild for the member.
-    ///
-    /// This returns the first text-only channel that the member can view, or [`None`] if there
-    /// isn't one.
-    ///
-    /// This will clone the channel out of the cache. If you only need a reference, use
-    /// [`Guild::default_channel`].
-    ///
-    /// **Note**: Bots cannot view permission overwrites on obfuscated channels. Results will be
-    /// inaccurate if the member's default channel is an obfuscated channel with access granted
-    /// via permission overwrites on that channel.
-    #[cfg(feature = "cache")]
-    pub fn default_channel(&self, cache: &Cache) -> Option<MaybeObfuscated> {
-        let guild = self.guild_id.to_guild_cached(cache)?;
-        let mut sorted = guild
-            .channels()
-            .filter(|&channel| {
-                channel.kind() != ChannelType::Category
-                    && channel.kind() != ChannelType::Voice
-                    && channel.kind() != ChannelType::Stage
-                    && guild.user_permissions_in(channel, self).view_channel()
-            })
-            .collect::<Vec<_>>();
-        sorted.sort_unstable_by_key(|channel| channel.position());
-        sorted.first().map(|&gc_ref| match gc_ref {
-            GuildChannelRef::Viewable(gc) => MaybeObfuscated::Viewable(gc.clone()),
-            GuildChannelRef::Obfuscated(oc) => MaybeObfuscated::Obfuscated(*oc),
-        })
-    }
-
     /// Times the user out until `time`.
     ///
     /// Requires the [Moderate Members] permission.

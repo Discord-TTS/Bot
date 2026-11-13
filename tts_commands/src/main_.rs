@@ -37,10 +37,10 @@ async fn channel_check(
 
     let msg = if let Some(setup_id) = guild_row.channel {
         let guild = require_guild!(ctx, Ok(None));
-        if guild.channels.contains_key(&setup_id) {
+        if guild.viewable_channels.contains_key(&setup_id) {
             &aformat!("You ran this command in the wrong channel, please move to <#{setup_id}>.")
         } else {
-            "Your setup channel has been deleted, please run /setup!"
+            "Your setup channel is inaccessible/deleted, please run /setup!"
         }
     } else {
         "You haven't setup the bot, please run /setup!"
@@ -66,7 +66,7 @@ async fn handle_vc_mismatch(
 
         (
             guild.id,
-            guild.channels.contains_key(&bot_channel_id),
+            guild.viewable_channels.contains_key(&bot_channel_id),
             voice_state.is_some_and(|vs| vs.channel_id == Some(bot_channel_id)),
         )
     };
@@ -82,7 +82,7 @@ async fn handle_vc_mismatch(
         (false, _) => {
             tracing::warn!("Channel {bot_channel_id} didn't exist in {guild_id} in `/join`");
             voice::end_connection(interconnect).await;
-            "I was in a deleted voice channel, but I have left now. Please try again."
+            "I was in a deleted/inaccessible voice channel, but I have left now. Please try again."
         }
         (_, false) => {
             tracing::warn!("Voice task was in the wrong channel in {guild_id} in `/join`");
@@ -177,7 +177,7 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let (author_vc_bot_perms, communication_disabled_until) = {
         let guild = require_guild!(ctx);
         let bot_member = guild.members.get(&bot_id).try_unwrap()?;
-        let author_vc = guild.channels.get(&author_vc).try_unwrap()?;
+        let author_vc = guild.viewable_channels.get(&author_vc).try_unwrap()?;
 
         let bot_vc_perms = guild.user_permissions_in(author_vc, bot_member);
         (bot_vc_perms, bot_member.communication_disabled_until)

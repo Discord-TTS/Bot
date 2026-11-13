@@ -62,13 +62,9 @@ fn get_eligible_channels(
     };
 
     let channels = guild
-        .channels
+        .viewable_channels
         .iter()
-        .filter(|c| {
-            c.base.kind == serenity::ChannelType::Text
-                && can_send(&guild, c, bot_member)
-                && author_can_send(c)
-        })
+        .filter(|c| c.base.kind == serenity::ChannelType::Text && author_can_send(c))
         .map(|c| ChannelMenuEntry {
             id: c.id,
             id_str: c.id.to_arraystring(),

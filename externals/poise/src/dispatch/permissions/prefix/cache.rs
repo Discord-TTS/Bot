@@ -42,7 +42,7 @@ fn get_bot_permissions(
     // Should never fail, as the bot member is always cached
     let bot_member = guild.members.get(&bot_id)?;
 
-    let Some(channel) = guild.channel(channel_id) else {
+    let Some(channel) = guild.viewable_channel(channel_id) else {
         // The message was either:
         // - Sent in a guild with broken caching
         // - Not set in a channel or thread?

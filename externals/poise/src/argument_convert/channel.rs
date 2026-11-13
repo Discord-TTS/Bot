@@ -46,7 +46,8 @@ async fn lookup_channel_global(
         .or_else(|| serenity::utils::parse_channel_mention(s))
         .or_else(|| serenity::utils::parse_channel_url(s).map(|(_, channel_id)| channel_id))
     {
-        return channel_id.to_channel(ctx, guild_id).await.map_err(ChannelParseError::Http);
+        let res = channel_id.to_viewable_channel(ctx, guild_id).await;
+        return res.map_err(ChannelParseError::Http);
     }
 
     let guild_id = guild_id.ok_or(ChannelParseError::NotFoundOrMalformed)?;

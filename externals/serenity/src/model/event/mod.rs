@@ -180,7 +180,6 @@ impl<'de> Deserialize<'de> for GuildCreateEvent {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> StdResult<Self, D::Error> {
         let mut guild: Guild = Guild::deserialize(deserializer)?;
         guild.viewable_channels.iter_mut().for_each(|x| x.base.guild_id = guild.id);
-        guild.obfuscated_channels.iter_mut().for_each(|x| x.guild_id = guild.id);
         guild.threads.iter_mut().for_each(|x| x.base.guild_id = guild.id);
         guild.members.iter_mut().for_each(|x| x.guild_id = guild.id);
         guild.roles.iter_mut().for_each(|x| x.guild_id = guild.id);

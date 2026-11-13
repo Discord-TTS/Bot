@@ -65,7 +65,7 @@ pub async fn settings(ctx: Context<'_>) -> CommandResult {
         .await?;
 
     let channel_mention = if let Some(channel) = guild_row.channel
-        && require_guild!(ctx).channels.contains_key(&channel)
+        && require_guild!(ctx).viewable_channels.contains_key(&channel)
     {
         &*channel.mention().to_arraystring()
     } else {

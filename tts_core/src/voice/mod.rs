@@ -418,8 +418,8 @@ fn create_vc_collector(ctx: &VCContext) -> impl futures::Stream<Item = VCEvent> 
             }
         }
         serenity::Event::ChannelDelete(event)
-            if event.channel.base.guild_id == guild_id
-                && event.channel.id == target_channel.load(SeqCst) =>
+            if event.channel.guild_id() == guild_id
+                && event.channel.id() == target_channel.load(SeqCst) =>
         {
             Some(VCEvent::ChannelDeleted)
         }

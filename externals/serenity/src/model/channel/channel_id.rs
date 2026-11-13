@@ -645,7 +645,7 @@ impl GenericChannelId {
     ///
     /// Returns [`Error::Http`] if the channel retrieval request failed.
     #[cfg_attr(not(feature = "cache"), expect(unused_variables))]
-    pub async fn to_channel(
+    pub async fn to_viewable_channel(
         self,
         cache_http: impl CacheHttp,
         guild_id: Option<GuildId>,
@@ -655,12 +655,13 @@ impl GenericChannelId {
 
         #[cfg(feature = "cache")]
         if let Some(cache) = cache_http.cache() {
-            match guild_id.and_then(|id| cache.guild(id)).as_ref().and_then(|g| g.channel(self)) {
-                Some(GenericGuildChannelRef::Channel(chan)) => match chan {
-                    GuildChannelRef::Viewable(gc) => return Ok(Channel::GuildViewable(gc.clone())),
-                    GuildChannelRef::Obfuscated(oc) => {
-                        return Ok(Channel::GuildObfuscated(*oc));
-                    },
+            match guild_id
+                .and_then(|id| cache.guild(id))
+                .as_ref()
+                .and_then(|g| g.viewable_channel(self))
+            {
+                Some(GenericGuildChannelRef::Channel(chan)) => {
+                    return Ok(Channel::GuildViewable(chan.clone()));
                 },
                 Some(GenericGuildChannelRef::Thread(th)) => {
                     return Ok(Channel::GuildThread(th.clone()));

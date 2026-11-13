@@ -261,7 +261,7 @@ fn process_cache_info(
             guild_iter(serenity_cache).map(|g| g.get_size_details()),
         )),
         Some("channel") => Some(average_details(
-            guild_iter(serenity_cache).flat_map(|g| details_iter(g.channels.iter())),
+            guild_iter(serenity_cache).flat_map(|g| details_iter(g.viewable_channels.iter())),
         )),
         Some("role") => Some(average_details(
             guild_iter(serenity_cache).flat_map(|g| details_iter(g.roles.iter())),
@@ -346,11 +346,11 @@ fn filter_channels_by<'a>(
     required_permissions: serenity::Permissions,
 ) -> impl Iterator<Item = &'a serenity::GuildChannel> + use<'a> {
     guild
-        .channels
+        .viewable_channels
         .iter()
         .filter(move |c| c.base.kind == kind)
         .filter(move |c| {
-            let channel_permissions = guild.user_permissions_in(c, bot_member);
+            let channel_permissions = guild.user_permissions_in(*c, bot_member);
             (required_permissions - channel_permissions).is_empty()
         })
 }

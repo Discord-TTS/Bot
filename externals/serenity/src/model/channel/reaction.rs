@@ -88,23 +88,6 @@ impl Serialize for Reaction {
 
 #[cfg(feature = "model")]
 impl Reaction {
-    /// Retrieves the [`Channel`] the reaction was made in.
-    ///
-    /// If the cache is enabled, this will search for the already-cached channel. If not - or the
-    /// channel was not found - this will perform a request over the REST API for the channel.
-    ///
-    /// Requires the [Read Message History] permission.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Http`] if the current user lacks permission, or if the channel no longer
-    /// exists.
-    ///
-    /// [Read Message History]: Permissions::READ_MESSAGE_HISTORY
-    pub async fn channel(&self, cache_http: impl CacheHttp) -> Result<Channel> {
-        self.channel_id.to_channel(cache_http, self.guild_id).await
-    }
-
     /// Deletes the reaction, but only if the current user is the user who made the reaction or has
     /// permission to.
     ///

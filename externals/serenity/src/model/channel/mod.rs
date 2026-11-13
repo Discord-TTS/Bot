@@ -11,7 +11,6 @@ mod private_channel;
 mod reaction;
 mod thread;
 
-use std::borrow::Cow;
 use std::fmt;
 
 use serde::de::Error as DeError;
@@ -83,7 +82,7 @@ impl GenericChannelId {
 // purposefully missing non-exhaustive, as discord considers new channel types like threads to be
 // breaking (see the difference between API v8/v9).
 pub enum GenericGuildChannelRef<'a> {
-    Channel(GuildChannelRef<'a>),
+    Channel(&'a GuildChannel),
     Thread(&'a GuildThread),
 }
 
@@ -92,10 +91,7 @@ impl<'a> GenericGuildChannelRef<'a> {
     #[must_use]
     pub fn id(self) -> GenericChannelId {
         match self {
-            Self::Channel(ch) => match ch {
-                GuildChannelRef::Viewable(gc) => gc.id.widen(),
-                GuildChannelRef::Obfuscated(oc) => oc.id.widen(),
-            },
+            Self::Channel(ch) => ch.id.widen(),
             Self::Thread(th) => th.id.widen(),
         }
     }
@@ -103,13 +99,10 @@ impl<'a> GenericGuildChannelRef<'a> {
     /// Returns the shared fields between a [`GuildChannel`] and a [`GuildThread`],
     /// or an obfuscated version if [`GenericGuildChannelRef`] is an [`ObfuscatedChannel`].
     #[must_use]
-    pub fn base(self) -> Cow<'a, BaseGuildChannel> {
+    pub fn base(self) -> &'a BaseGuildChannel {
         match self {
-            Self::Channel(ch) => match ch {
-                GuildChannelRef::Viewable(gc) => Cow::Borrowed(&gc.base),
-                GuildChannelRef::Obfuscated(oc) => Cow::Owned(oc.into()),
-            },
-            Self::Thread(th) => Cow::Borrowed(&th.base),
+            Self::Channel(ch) => &ch.base,
+            Self::Thread(th) => &th.base,
         }
     }
 }

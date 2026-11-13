@@ -56,12 +56,12 @@ async fn process_mention_msg(
         };
 
         let bot_member = guild.members.get(&bot_user).try_unwrap()?;
-        match guild.channel(message.channel_id) {
+        match guild.viewable_channel(message.channel_id) {
             Some(GenericGuildChannelRef::Channel(ch)) => {
                 guild.user_permissions_in(ch, bot_member).send_messages()
             }
             Some(GenericGuildChannelRef::Thread(th)) => {
-                let parent_channel = guild.channels.get(&th.parent_id).try_unwrap()?;
+                let parent_channel = guild.viewable_channels.get(&th.parent_id).try_unwrap()?;
                 guild
                     .user_permissions_in(parent_channel, bot_member)
                     .send_messages_in_threads()

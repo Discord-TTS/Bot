@@ -195,12 +195,6 @@ pub async fn handle_message(
         extra_fields.push(("Guild ID", Cow::Owned(guild_id.to_string()), true));
     }
 
-    extra_fields.push((
-        "Channel Type",
-        Cow::Borrowed(channel_type(&message.channel(ctx).await?)),
-        true,
-    ));
-
     handle_unexpected(
         ctx,
         "MessageCreate",
@@ -278,12 +272,12 @@ async fn handle_cooldown(ctx: Context<'_>, remaining_cooldown: std::time::Durati
             };
 
             let bot_member = guild.members.get(&bot_user_id).try_unwrap()?;
-            let permissions = match guild.channel(error_message.channel_id) {
+            let permissions = match guild.viewable_channel(error_message.channel_id) {
                 Some(GenericGuildChannelRef::Channel(ch)) => {
                     guild.user_permissions_in(ch, bot_member)
                 }
                 Some(GenericGuildChannelRef::Thread(th)) => {
-                    let parent = guild.channels.get(&th.parent_id).try_unwrap()?;
+                    let parent = guild.viewable_channels.get(&th.parent_id).try_unwrap()?;
                     guild.user_permissions_in(parent, bot_member)
                 }
 
@@ -330,26 +324,6 @@ async fn handle_argparse(
     Ok(())
 }
 
-const fn channel_type(channel: &serenity::Channel) -> &'static str {
-    use self::serenity::{Channel, ChannelType};
-
-    match channel {
-        Channel::Guild(channel) => match channel.base.kind {
-            ChannelType::Text | ChannelType::News => "Text Channel",
-            ChannelType::Voice => "Voice Channel",
-            _ => "Unknown Channel Type",
-        },
-        Channel::GuildThread(thread) => match thread.base.kind {
-            ChannelType::PublicThread => "Public Thread Channel",
-            ChannelType::PrivateThread => "Private Thread Channel",
-            ChannelType::NewsThread => "News Thread Channel",
-            _ => "Unknown Channel Type",
-        },
-        Channel::Private(_) => "Private Channel",
-        _ => "Unknown Channel Type",
-    }
-}
-
 fn handle_bot_permissions(missing_permissions: serenity::Permissions) -> String {
     let mut msg = String::from(
         "I am missing permissions, please ask an owner/administrator of the server to give me: ",
@@ -391,15 +365,12 @@ pub async fn handle(error: poise::FrameworkError<'_, Data, Error>) -> Result<()>
                 ("Command", command.name.clone(), true),
                 (
                     "Slash Command",
-                    Cow::Owned(matches!(ctx, poise::Context::Application(..)).to_string()),
-                    true,
-                ),
-                (
-                    "Channel Type",
-                    Cow::Borrowed(channel_type(
-                        &ctx.channel_id().to_channel(&ctx, ctx.guild_id()).await?,
-                    )),
-                    true,
+                    Cow::Borrowed(if matches!(ctx, poise::Context::Application(..)) {
+                        "true"
+                    } else {
+                        "false"
+                    }),
+                    false,
                 ),
             ];
 
