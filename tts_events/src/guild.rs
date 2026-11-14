@@ -9,9 +9,13 @@ use tts_core::structs::{Data, Result};
 #[expect(unreachable_code, unused_variables)]
 pub async fn handle_create(
     ctx: &serenity::Context,
-    guild: &serenity::Guild,
+    guild: &serenity::GuildCreateGuild,
     is_new: Option<bool>,
 ) -> Result<()> {
+    let serenity::GuildCreateGuild::Available(guild) = guild else {
+        return Ok(());
+    };
+
     return Ok(()); // Seems like is_new is buggy again?
     if !is_new.unwrap() {
         return Ok(());

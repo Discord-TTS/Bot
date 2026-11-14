@@ -70,11 +70,16 @@ impl serenity::EventHandler for EventHandler {
                 }
             }
             serenity::FullEvent::GuildCreate { guild, is_new, .. } => {
-                if let Err(err) = guild::handle_create(ctx, guild, *is_new).await
-                    && let Err(err) =
-                        errors::handle_guild("GuildCreate", ctx, Some(guild), err).await
-                {
-                    tracing::error!("Error in guild create handler: {err:?}");
+                if let Err(err) = guild::handle_create(ctx, guild, *is_new).await {
+                    let guild = if let serenity::GuildCreateGuild::Available(guild) = guild {
+                        Some(guild)
+                    } else {
+                        None
+                    };
+
+                    if let Err(err) = errors::handle_guild("GuildCreate", ctx, guild, err).await {
+                        tracing::error!("Error in guild create handler: {err:?}");
+                    }
                 }
             }
             serenity::FullEvent::GuildDelete {

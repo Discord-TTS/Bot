@@ -1301,12 +1301,12 @@ pub struct MessageCall {
 // all tests here require cache, move if non-cache test is added
 #[cfg(all(test, feature = "cache"))]
 mod tests {
-    use extract_map::ExtractMap;
     use small_fixed_array::FixedArray;
 
     use super::{
         Guild,
         GuildChannel,
+        GuildCreateGuild,
         Member,
         Message,
         PermissionOverwrite,
@@ -1315,7 +1315,7 @@ mod tests {
         User,
         UserId,
     };
-    use crate::cache::Cache;
+    use crate::cache::{Cache, ExtractMap};
     use crate::model::event::GuildCreateEvent;
 
     fn new_extract_map<K, T>(val: T) -> ExtractMap<K, T>
@@ -1323,7 +1323,7 @@ mod tests {
         K: std::hash::Hash + Eq,
         T: extract_map::ExtractKey<K>,
     {
-        let mut map = ExtractMap::new();
+        let mut map = ExtractMap::default();
         map.insert(val);
         map
     }
@@ -1369,7 +1369,7 @@ mod tests {
         // Cache, with the guild setup.
         let cache = Cache::new();
         cache.update(&mut GuildCreateEvent {
-            guild,
+            guild: GuildCreateGuild::Available(guild),
         });
 
         // The author should only have the one permission, SEND_MESSAGES.

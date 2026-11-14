@@ -240,3 +240,17 @@ where
         .try_into()
         .map_err(D::Error::custom)
 }
+
+// Needed to insert guild_id fields in GuildChannel/ObfuscatedChannel, GuildThread, Member, and
+// Role when deserializing a [`GuildCreateGuild::Available`] guild.
+pub(crate) fn deserialize_available_guild<'de, D>(deserializer: D) -> Result<Guild, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut guild: Guild = Guild::deserialize(deserializer)?;
+    guild.viewable_channels.iter_mut().for_each(|x| x.base.guild_id = guild.id);
+    guild.threads.iter_mut().for_each(|x| x.base.guild_id = guild.id);
+    guild.members.iter_mut().for_each(|x| x.guild_id = guild.id);
+    guild.roles.iter_mut().for_each(|x| x.guild_id = guild.id);
+    Ok(guild)
+}

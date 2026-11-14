@@ -37,6 +37,7 @@ use crate::constants::LARGE_THRESHOLD;
 #[cfg(feature = "model")]
 use crate::http::Http;
 use crate::model::prelude::*;
+use crate::model::utils::deserialize_available_guild;
 #[cfg(feature = "model")]
 use crate::model::utils::*;
 
@@ -582,8 +583,8 @@ impl Guild {
 
     /// Calculate a [`Member`]'s permissions in the guild.
     ///
-    /// You likely want to use Guild::user_permissions_in instead as this function does not consider
-    /// permission overwrites.
+    /// You likely want to use [`Guild::user_permissions_in`] instead, as this function does not
+    /// consider permission overwrites.
     #[must_use]
     pub fn member_permissions(&self, member: &Member) -> Permissions {
         Self::user_permissions_in_(
@@ -598,8 +599,8 @@ impl Guild {
 
     /// Calculate a [`PartialMember`]'s permissions in the guild.
     ///
-    /// You likely want to use Guild::partial_member_permissions_in instead as this function does
-    /// not consider permission overwrites.
+    /// You likely want to use [`Guild::partial_member_permissions_in`] instead, as this function
+    /// does not consider permission overwrites.
     ///
     /// # Panics
     ///
@@ -629,6 +630,12 @@ impl Guild {
     /// **Note**: Bots cannot view permission overwrites on obfuscated channels. Results may be
     /// inaccurate if the channel is an obfuscated channel with permission overwrites relevant to
     /// the member.
+    ///
+    /// To circumvent this limitation, apply [implicit permission masking], or calculate
+    /// permissions with a [`GenericChannelId`] and [`UserId`] only, at the expense of an HTTP
+    /// call, use [`GenericChannelId::member_permissions`].
+    ///
+    /// [implicit permission masking]: https://docs.discord.com/developers/topics/permissions#implicit-permissions
     #[must_use]
     pub fn user_permissions_in<'a>(
         &self,
@@ -651,9 +658,15 @@ impl Guild {
     /// inaccurate if the channel is an obfuscated channel with permission overwrites relevant to
     /// the member.
     ///
+    /// To circumvent this limitation, apply [implicit permission masking], or calculate
+    /// permissions with a [`GenericChannelId`] and [`UserId`] only, at the expense of an HTTP
+    /// call, use [`GenericChannelId::member_permissions`].
+    ///
     /// # Panics
     ///
     /// Panics if the passed [`UserId`] does not match the [`PartialMember`] id, if user is Some.
+    ///
+    /// [implicit permission masking]: https://docs.discord.com/developers/topics/permissions#implicit-permissions
     #[must_use]
     pub fn partial_member_permissions_in<'a>(
         &self,
@@ -817,7 +830,7 @@ impl<'de> Deserialize<'de> for Guild {
             member_count: raw.member_count,
             voice_states: raw.voice_states,
             members: raw.members,
-            viewable_channels: ExtractMap::new(),
+            viewable_channels: ExtractMap::default(),
             threads: raw.threads,
             __generated_flags: GuildGeneratedFlags::empty(),
         };
@@ -1034,6 +1047,47 @@ pub struct UnavailableGuild {
     /// Indicator of whether the guild is unavailable.
     #[serde(default)]
     pub unavailable: bool,
+}
+
+/// Representation of the inner payload of a [`GuildCreateEvent`], which can include either a
+/// [`Guild`] or an [`UnavailableGuild`].
+///
+/// [Discord docs](https://docs.discord.com/developers/events/gateway-events#guild-create).
+#[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Almost always Present so boxing would be counter-productive"
+)]
+pub enum GuildCreateGuild {
+    #[serde(deserialize_with = "deserialize_available_guild")]
+    Available(Guild),
+    Unavailable(UnavailableGuild),
+}
+
+impl GuildCreateGuild {
+    /// Returns the [`GuildId`] of the [`GuildCreateGuild`].
+    #[must_use]
+    pub fn id(&self) -> GuildId {
+        match self {
+            GuildCreateGuild::Available(guild) => guild.id,
+            GuildCreateGuild::Unavailable(unavailable_guild) => unavailable_guild.id,
+        }
+    }
+
+    /// Whether this [`GuildCreateGuild`] is unavailable due to an outage.
+    ///
+    /// **Note:** Both [`Guild`] and [`UnavailableGuild`] will be marked as unavailable when
+    /// offline due to an outage. When an [`UnavailableGuild`] is ___not___ marked as unavailable,
+    /// this indicates that the current user has been removed from that guild.
+    #[must_use]
+    pub fn unavailable(&self) -> bool {
+        match self {
+            GuildCreateGuild::Available(guild) => guild.unavailable(),
+            GuildCreateGuild::Unavailable(unavailable_guild) => unavailable_guild.unavailable,
+        }
+    }
 }
 
 enum_number! {
