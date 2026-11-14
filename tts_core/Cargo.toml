@@ -9,7 +9,7 @@ linkify = "0.11"
 foldhash = "0.2.0"
 bitflags = "2.11.0"
 strum_macros = "0.28"
-bool_to_bitflags = { version = "0.1.3", features = ["typesize"] }
+bool_to_bitflags = { version = "0.2.0", features = ["typesize"] }
 
 rand.workspace = true
 sqlx.workspace = true
