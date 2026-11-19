@@ -151,6 +151,12 @@ fn run_checks<'c>(
         return Ok(None);
     }
 
+    // Ignore messages marked with @silent.
+    let flags = message.flags;
+    if flags.is_some_and(|f| f.contains(serenity::MessageFlags::SUPPRESS_NOTIFICATIONS)) {
+        return Ok(None);
+    }
+
     let Some(guild) = message.guild(&ctx.cache) else {
         return Ok(None);
     };
