@@ -167,7 +167,7 @@ fn run_checks<'c>(
     let channel_id = message.channel_id.expect_channel();
     if guild_row.channel != Some(channel_id) {
         // "Text in Voice" works by just sending messages in voice channels, so checking for it just takes
-        // checking if the message's channel_id is the author's voice channel_id
+        // checking if the message's channel_id is the author's voice channel_id.
         if !guild_row.text_in_voice() {
             return Ok(None);
         }
@@ -175,9 +175,19 @@ fn run_checks<'c>(
         let author_vc = guild
             .voice_states
             .get(&message.author.id)
-            .and_then(|c| c.channel_id);
+            .and_then(|vs| vs.channel_id);
 
-        if author_vc.is_none_or(|author_vc| author_vc != channel_id) {
+        let bot_vc = || {
+            guild
+                .voice_states
+                .get(&ctx.cache.current_user().id)
+                .and_then(|vs| vs.channel_id)
+        };
+
+        if author_vc != Some(channel_id)
+            // If require_voice isn't set, check if the message is in the text-in-voice channel of the bot.
+            && (guild_row.require_voice() || bot_vc() != Some(channel_id))
+        {
             return Ok(None);
         }
     }
