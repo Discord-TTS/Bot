@@ -187,7 +187,7 @@ impl CurrentUser {
 #[derive(
     Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize,
 )]
-#[non_exhaustive]
+#[cfg_attr(not(feature = "unstable_exhaustive_types"), non_exhaustive)]
 pub enum OnlineStatus {
     #[serde(rename = "dnd")]
     DoNotDisturb,
@@ -222,7 +222,7 @@ impl OnlineStatus {
 #[bool_to_bitflags::bool_to_bitflags]
 #[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
-#[non_exhaustive]
+#[cfg_attr(not(feature = "unstable_exhaustive_types"), non_exhaustive)]
 pub struct User {
     /// The unique Id of the user. Can be used to calculate the account's creation date.
     pub id: UserId,
@@ -265,7 +265,7 @@ enum_number! {
     /// [Discord docs](https://docs.discord.com/developers/resources/user#user-object-premium-types).
     #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
     #[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
-    #[non_exhaustive]
+    #[cfg_attr(not(feature = "unstable_exhaustive_types"), non_exhaustive)]
     pub enum PremiumType {
         None = 0,
         NitroClassic = 1,
@@ -323,7 +323,7 @@ bitflags! {
 /// [Discord docs](https://docs.discord.com/developers/resources/user#user-object-user-primary-guild)
 #[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-#[non_exhaustive]
+#[cfg_attr(not(feature = "unstable_exhaustive_types"), non_exhaustive)]
 pub struct PrimaryGuild {
     /// The id of the user's primary guild.
     pub identity_guild_id: Option<GuildId>,
@@ -347,7 +347,7 @@ impl PrimaryGuild {
 
 #[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
-#[non_exhaustive]
+#[cfg_attr(not(feature = "unstable_exhaustive_types"), non_exhaustive)]
 /// The data for a [`User`]'s avatar decoration.
 ///
 /// [Discord docs](https://docs.discord.com/developers/resources/user#avatar-decoration-data-object).
@@ -372,7 +372,7 @@ impl AvatarDecorationData {
 /// [Discord docs](https://docs.discord.com/developers/resources/user#collectibles).
 #[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-#[non_exhaustive]
+#[cfg_attr(not(feature = "unstable_exhaustive_types"), non_exhaustive)]
 pub struct Collectibles {
     /// The [`User`]'s nameplate, if they have one.
     pub nameplate: Option<Box<Nameplate>>,
@@ -383,7 +383,7 @@ pub struct Collectibles {
 /// [Discord docs](https://docs.discord.com/developers/resources/user#nameplate-nameplate-structure).
 #[cfg_attr(feature = "typesize", derive(typesize::derive::TypeSize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
-#[non_exhaustive]
+#[cfg_attr(not(feature = "unstable_exhaustive_types"), non_exhaustive)]
 pub struct Nameplate {
     /// Id of the nameplate SKU
     pub sku_id: SkuId,
