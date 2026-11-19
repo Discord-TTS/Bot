@@ -813,7 +813,6 @@ impl<'de> Deserialize<'de> for Guild {
             member_count: MemberCount,
             voice_states: ExtractMap<UserId, VoiceState>,
             members: ExtractMap<UserId, Member>,
-            viewable_channels: ExtractMap<ChannelId, GuildChannel>,
             channels: Vec<GuildChannel>,
             threads: ExtractMap<ThreadId, GuildThread>,
         }
