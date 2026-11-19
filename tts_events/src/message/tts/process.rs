@@ -1,8 +1,8 @@
 use std::{borrow::Cow, num::NonZeroU8};
 
-use crate::structs::RegexCache;
 use itertools::Itertools as _;
 use poise::serenity_prelude as serenity;
+use tts_core::structs::RegexCache;
 
 fn strip_emoji<'c>(regex_cache: &RegexCache, content: &'c str) -> Cow<'c, str> {
     regex_cache.emoji_filter.replace_all(content, "")

@@ -3,16 +3,18 @@ use std::{
     sync::{Arc, atomic::AtomicU64},
 };
 
+use ::serenity::small_fixed_array::FixedString;
 use poise::serenity_prelude as serenity;
 
-use ::serenity::small_fixed_array::FixedString;
+use process::{MessageContent, TTSMessageKind};
 use tts_core::{
     database::{GuildRow, UserRow},
     opt_ext::OptionTryUnwrap as _,
-    process_msg::{self, MessageContent, TTSMessageKind},
     structs::{Data, IsPremium, Result, TTSMode},
     voice,
 };
+
+mod process;
 
 pub(crate) async fn process_tts_msg(
     ctx: &serenity::Context,
@@ -59,7 +61,7 @@ pub(crate) async fn process_tts_msg(
 
         let get_should_announce = || voice::should_announce_name(data, guild_id, message.author.id);
 
-        process_msg::clean(
+        process::clean(
             &mut content,
             &message.author,
             member_nick,
