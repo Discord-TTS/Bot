@@ -536,11 +536,20 @@ create_bool_command!(
 )]
 pub async fn required_role(
     ctx: Context<'_>,
-    #[description = "The required role for all bot usage"] required_role: Option<serenity::Role>,
+    #[description = "The required role for all bot usage"] mut required_role: Option<
+        serenity::RoleId,
+    >,
 ) -> CommandResult {
     let guild_id = ctx.guild_id().unwrap();
     let cache = ctx.cache();
     let data = ctx.data();
+
+    // If a user inputs the @everyone role, interpret as wanting to clear the required role.
+    if let Some(id) = &required_role
+        && id.get() == guild_id.get()
+    {
+        required_role = None;
+    }
 
     let currently_required_role = data
         .guilds_db
@@ -597,7 +606,7 @@ pub async fn required_role(
             .set_one(
                 guild_id.into(),
                 "required_role",
-                &required_role.as_ref().map(|r| r.id.get() as i64),
+                &required_role.as_ref().map(|r| r.get() as i64),
             )
             .await?;
 
