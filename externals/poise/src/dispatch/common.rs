@@ -46,7 +46,6 @@ async fn check_permissions_and_cooldown_single<'a, U: Send + Sync + 'static, E>(
             cmd.required_permissions,
             cmd.required_bot_permissions,
         )
-        .await
     {
         if !user_missing_permissions.is_empty() {
             return Err(crate::FrameworkError::MissingUserPermissions {

@@ -24,7 +24,7 @@ impl PermissionsInfo {
 }
 
 /// Retrieves the permissions for the context author and the bot.
-async fn get_author_and_bot_permissions<U, E>(
+fn get_author_and_bot_permissions<U, E>(
     ctx: crate::Context<'_, U, E>,
     skip_author: bool,
     skip_bot: bool,
@@ -42,7 +42,7 @@ where
             Some(application::get_author_and_bot_permissions(ctx.interaction))
         },
         crate::Context::Prefix(ctx) => {
-            prefix::get_author_and_bot_permissions(ctx, guild_id, skip_author, skip_bot).await
+            prefix::get_author_and_bot_permissions(ctx, guild_id, skip_author, skip_bot)
         },
     }
 }
@@ -50,7 +50,7 @@ where
 /// Retrieves the set of permissions that are lacking, relative to the given required permission set
 ///
 /// Returns None if permissions couldn't be retrieved.
-pub(super) async fn calculate_missing<U, E>(
+pub(super) fn calculate_missing<U, E>(
     ctx: crate::Context<'_, U, E>,
     author_required_permissions: serenity::Permissions,
     bot_required_permissions: serenity::Permissions,
@@ -68,8 +68,7 @@ where
         ctx,
         author_required_permissions.is_empty(),
         bot_required_permissions.is_empty(),
-    )
-    .await?;
+    )?;
 
     let author_missing_perms = permissions
         .author_permissions

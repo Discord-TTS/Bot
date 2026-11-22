@@ -61,10 +61,13 @@ async fn process_mention_msg(
                 guild.user_permissions_in(ch, bot_member).send_messages()
             }
             Some(GenericGuildChannelRef::Thread(th)) => {
-                let parent_channel = guild.viewable_channels.get(&th.parent_id).try_unwrap()?;
-                guild
-                    .user_permissions_in(parent_channel, bot_member)
-                    .send_messages_in_threads()
+                if let Some(parent_channel) = guild.viewable_channels.get(&th.parent_id) {
+                    guild
+                        .user_permissions_in(parent_channel, bot_member)
+                        .send_messages_in_threads()
+                } else {
+                    false
+                }
             }
             None => return Ok(()),
         }

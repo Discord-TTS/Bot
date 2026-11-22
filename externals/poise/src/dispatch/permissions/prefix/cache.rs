@@ -4,7 +4,7 @@ use crate::dispatch::permissions::PermissionsInfo;
 use crate::{PrefixContext, serenity_prelude as serenity};
 
 /// Gets the permissions of the ctx author and the bot.
-pub(in crate::dispatch::permissions) async fn get_author_and_bot_permissions<U, E>(
+pub(in crate::dispatch::permissions) fn get_author_and_bot_permissions<U, E>(
     ctx: PrefixContext<'_, U, E>,
     guild_id: serenity::GuildId,
     skip_author: bool,

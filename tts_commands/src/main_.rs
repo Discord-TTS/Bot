@@ -177,10 +177,12 @@ pub async fn join(ctx: Context<'_>) -> CommandResult {
     let (author_vc_bot_perms, communication_disabled_until) = {
         let guild = require_guild!(ctx);
         let bot_member = guild.members.get(&bot_id).try_unwrap()?;
-        let author_vc = guild.viewable_channels.get(&author_vc).try_unwrap()?;
-
-        let bot_vc_perms = guild.user_permissions_in(author_vc, bot_member);
-        (bot_vc_perms, bot_member.communication_disabled_until)
+        if let Some(author_vc) = guild.viewable_channels.get(&author_vc) {
+            let bot_vc_perms = guild.user_permissions_in(author_vc, bot_member);
+            (bot_vc_perms, bot_member.communication_disabled_until)
+        } else {
+            (serenity::Permissions::empty(), None)
+        }
     };
 
     if let Some(communication_disabled_until) = communication_disabled_until
