@@ -41,7 +41,7 @@ pub fn commands() -> Vec<Command> {
         .collect()
 }
 
-pub async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
+async fn premium_command_check(ctx: Context<'_>) -> Result<bool> {
     if let Context::Application(ctx) = ctx
         && ctx.interaction_type == poise::CommandInteractionType::Autocomplete
     {
@@ -160,6 +160,35 @@ You may have:
     Ok(())
 }
 
+async fn is_missing_required_role(
+    ctx: &Context<'_>,
+    data: &Data,
+) -> Result<Option<serenity::RoleId>> {
+    let Some(guild_id) = ctx.guild_id() else {
+        return Ok(None);
+    };
+
+    let guild_row = data.guilds_db.get(guild_id.into()).await?;
+    let Some(required_role) = guild_row.required_role else {
+        return Ok(None);
+    };
+
+    let member_roles = match ctx {
+        Context::Application(poise::ApplicationContext { interaction, .. }) => {
+            &*interaction.member.as_deref().try_unwrap()?.roles
+        }
+        Context::Prefix(poise::PrefixContext { msg, .. }) => {
+            &*msg.member.as_deref().try_unwrap()?.roles
+        }
+    };
+
+    Ok(if member_roles.contains(&required_role) {
+        None
+    } else {
+        Some(required_role)
+    })
+}
+
 pub async fn command_check(ctx: Context<'_>) -> Result<bool> {
     if ctx.author().bot() {
         return Ok(false);
@@ -172,33 +201,17 @@ pub async fn command_check(ctx: Context<'_>) -> Result<bool> {
         return Ok(false);
     }
 
-    let Some(guild_id) = ctx.guild_id() else {
-        return Ok(true);
-    };
+    if ctx.command().source_code_name != "required_role"
+        && let Some(required_role) = is_missing_required_role(&ctx, &data).await?
+    {
+        let msg = aformat!(
+            "You do not have the required role to use this bot, ask a server administrator for {}.",
+            required_role.mention()
+        );
 
-    let guild_row = data.guilds_db.get(guild_id.into()).await?;
-    let Some(required_role) = guild_row.required_role else {
-        return Ok(true);
-    };
-
-    let member_roles = match ctx {
-        Context::Application(poise::ApplicationContext { interaction, .. }) => {
-            &*interaction.member.as_deref().try_unwrap()?.roles
-        }
-        Context::Prefix(poise::PrefixContext { msg, .. }) => {
-            &*msg.member.as_deref().try_unwrap()?.roles
-        }
-    };
-
-    if member_roles.contains(&required_role) {
-        return Ok(true);
+        ctx.send_error(msg.as_str()).await?;
+        return Ok(false);
     }
 
-    let msg = aformat!(
-        "You do not have the required role to use this bot, ask a server administrator for {}.",
-        required_role.mention()
-    );
-
-    ctx.send_error(msg.as_str()).await?;
-    Ok(false)
+    Ok(true)
 }
