@@ -809,6 +809,7 @@ impl<'de> Deserialize<'de> for Guild {
             icon: Option<ImageHash>,
             owner_id: UserId,
             roles: ExtractMap<RoleId, Role>,
+            #[serde(default)]
             unavailable: bool,
             member_count: MemberCount,
             voice_states: ExtractMap<UserId, VoiceState>,
